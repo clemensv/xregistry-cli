@@ -1,0 +1,66 @@
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.Http;
+using CloudNative.CloudEvents.SystemTextJson;
+
+{% for group_key in groups.keys() -%}
+{%- set group = groups[group_key] -%}
+{%- set parts = group.id.split('.') -%}
+{%- set pascalGroupName = parts|map('title')|join('.') -%}
+namespace {{ pascalGroupName }}
+{
+    public partial class {{ pascalGroupName.split('.')[-1]}}EventProducer
+    {
+        HttpClient client;
+        private readonly ContentMode contentMode;
+        private readonly CloudEventFormatter formatter;
+
+        public {{ pascalGroupName.split('.')[-1]}}EventProducer(HttpClient client, ContentMode contentMode, CloudEventFormatter formatter)
+        {
+            this.contentMode = contentMode;
+            this.formatter = formatter;
+        }
+
+        public {{ pascalGroupName.split('.')[-1]}}EventProducer(HttpClient client)
+            : this(client, ContentMode.Structured, new JsonEventFormatter())
+        {
+        }
+
+        {% for id in group.definitions -%}
+        {%- set definition = group.definitions[id] -%}
+        {%- set parts = definition.id.split('.') -%}
+        {%- set pascalDefinitionName = parts|map('title')|join('.') %}
+        public async Task Send{{pascalDefinitionName.split('.')[-1]}}Async(
+        {%- for attrname in definition.metadata.attributes -%}
+        {%- set attribute = definition.metadata.attributes[attrname] -%}
+            {%- if attribute.type == "uritemplate" -%}
+                {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+                    string {{ placeholder }},
+                {%- endfor -%}
+            {%- elif attribute.value is not defined -%}
+                string {{ attrname }} {%- if not attribute.required -%} = default {% endif %},
+            {%- endif -%}
+        {%- endfor -%} object data)
+        {
+            CloudEvent cloudEvent = new CloudEvent()
+            {
+            {%- for attrname in definition.metadata.attributes -%}
+            {%- set attribute = definition.metadata.attributes[attrname] -%}
+            {%- if attrname in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
+                {%- set attrProp = attrname | capitalize | replace("Datacontenttype", "DataContentType") %}
+                {{ attrProp }} = {% if attribute.value -%}$"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%},
+            {%- endif -%}
+            {%- endfor %}
+            };
+            {% for attrname in definition.metadata.attributes -%}
+            {%- set attribute = definition.metadata.attributes[attrname] -%}
+            {%- if attrname not in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
+            cloudEvent.SetAttributeAsString("{{attrname}}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
+            {%- endif %}
+            {%- endfor -%}
+            cloudEvent.Data = data;
+            await client.PostAsync(client.BaseAddress, cloudEvent.ToHttpContent(contentMode, formatter));
+        }
+        {%- endfor %}
+    }
+}
+{% endfor %}
