@@ -3,6 +3,7 @@ import json
 import jinja2
 import urllib.request
 import re
+import argparse
 
 def regex_search(string, pattern):
     if string:
@@ -43,4 +44,17 @@ def generate(language: str, style: str, output_dir: str, definitions_file: str):
                 f.write(template.render(groups=groups, project_name="MyProject"))
 
 if __name__ == "__main__":
-    generate("python", "proxy", "tmp", "https://cediscoveryinterop.azurewebsites.net/registry/groups?code=")
+    # Create an ArgumentParser object
+    parser = argparse.ArgumentParser()
+
+    # Specify the arguments
+    parser.add_argument("language", help="The language to use for the generated code")
+    parser.add_argument("style", help="The style of the generated code")
+    parser.add_argument("output_dir", help="The directory where the generated code should be saved")
+    parser.add_argument("definitions_file", help="The file or URL containing the definitions")
+
+    # Parse the command line arguments
+    args = parser.parse_args()
+
+    # Call the generate() function with the parsed arguments
+    generate(args.language, args.style, args.output_dir, args.definitions_file)
