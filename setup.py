@@ -12,7 +12,9 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/clemensv/cedisco-codegen",
-    packages=setuptools.find_packages(),
+    packages=["templates"],
+    py_modules=["cloudeventscg"],
+    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
@@ -25,7 +27,7 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
-            'cloudeventscg=cloudeventscg.cloudeventscg:main',
+            'cloudeventscg=cloudeventscg:main',
         ],
     },
 )

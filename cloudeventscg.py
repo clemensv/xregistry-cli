@@ -18,11 +18,12 @@ def generate(language: str, style: str, output_dir: str, definitions_file: str):
         with urllib.request.urlopen(definitions_file) as url:
             groups = json.loads(url.read().decode())
     else:
-        with open(definitions_file, "r") as f:
+        with open(os.path.join(os.getcwd(), definitions_file), "r") as f:
             groups = json.loads(f.read())
 
     # Load templates
-    template_dir = os.path.join("templates", language, style)
+    pt = os.path.dirname(os.path.realpath(__file__))
+    template_dir = os.path.join(pt, "templates", language, style)
     loader = jinja2.FileSystemLoader(template_dir)
     env = jinja2.Environment(loader=loader)
     env.filters['regex_search'] = regex_search
@@ -35,7 +36,7 @@ def generate(language: str, style: str, output_dir: str, definitions_file: str):
 
             template_path = file
             template = env.get_template(template_path)
-            output_path = os.path.join(output_dir, file[:-6])
+            output_path = os.path.join(os.getcwd(), output_dir, file[:-6])
 
             if not os.path.exists(os.path.dirname(output_path)):
                 os.makedirs(os.path.dirname(output_path))
