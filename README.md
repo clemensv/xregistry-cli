@@ -20,7 +20,7 @@ where language is the programming language to generate code for (e.g. python, cs
 ## Templates
 Templates for code generation are stored in the templates directory. The directory structure is as follows:
 
-Copy code
+```
 templates/
 ├── <language>/
 │   └── <style>/
@@ -35,5 +35,6 @@ templates/
 │       ├── ...
 │       └── <template>.jinja
 └── ...
+```
 
 The template files have the same name as the target file, with the .jinja extension.
