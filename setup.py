@@ -4,14 +4,14 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="codegen",
+    name="cloudeventscg",
     version="0.0.1",
-    author="Your Name",
-    author_email="your@email.com",
+    author="Clemens Vasters",
+    author_email="clemensv@microsoft.com",
     description="A code generator for CloudEvents definitions",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/your/repo",
+    url="https://github.com/clemensv/cedisco-codegen",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -25,7 +25,7 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
-            'codegen=codegen.__main__:main',
+            'cloudeventscg=cloudeventscg.cloudeventscg:main',
         ],
     },
 )

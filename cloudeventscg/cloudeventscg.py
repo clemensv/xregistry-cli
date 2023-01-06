@@ -43,18 +43,21 @@ def generate(language: str, style: str, output_dir: str, definitions_file: str):
             with open(output_path, "w") as f:
                 f.write(template.render(groups=groups, project_name="MyProject"))
 
-if __name__ == "__main__":
+def main():
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser()
 
     # Specify the arguments
-    parser.add_argument("language", help="The language to use for the generated code")
-    parser.add_argument("style", help="The style of the generated code")
-    parser.add_argument("output_dir", help="The directory where the generated code should be saved")
-    parser.add_argument("definitions_file", help="The file or URL containing the definitions")
+    parser.add_argument("--language", dest="language", required=True, help="The language to use for the generated code")
+    parser.add_argument("--style", dest="style", required=True, help="The style of the generated code")
+    parser.add_argument("--output", dest="output_dir", required=True, help="The directory where the generated code should be saved")
+    parser.add_argument("--definitions", dest="definitions_file", required=True, help="The file or URL containing the definitions")
 
     # Parse the command line arguments
     args = parser.parse_args()
 
     # Call the generate() function with the parsed arguments
     generate(args.language, args.style, args.output_dir, args.definitions_file)
+
+if __name__ == "__main__":
+    main()
