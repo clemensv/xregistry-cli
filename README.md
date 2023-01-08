@@ -1,7 +1,7 @@
 # CloudEvent Generator
 
 This project generates CloudEvent sender and receiver code from a given
-CloudEvent discovery definitions file.
+CloudEvent discovery event definitions service endpoint or file.
 
 ## Installation
 Install the script
@@ -14,7 +14,7 @@ pip install git+https://github.com/clemensv/cedisco-codegen.git
 To generate code, run the following command:
 
 ```
-cloudeventscg --language <language> --style <style> --output <output directory> --definitions <definitions file or URI>
+cloudeventscg --projectname <projectname> --language <language> --style <style> --output <output directory> --definitions <definitions file or URI>
 ```
 
 where language is the programming language to generate code for (e.g. python,
