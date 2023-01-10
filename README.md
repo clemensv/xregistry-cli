@@ -4,7 +4,8 @@ This (experimental, rapidly evolving) project generates CloudEvent sender and
 receiver code from a given CloudEvent discovery event definitions service
 endpoint or file.
 
-*** THE GENERATED CODE ISN'T EXPECTED TO WORK YET. CURRENT FOCUS IS THE CODEGEN INFRA ***
+> THE GENERATED CODE ISN'T EXPECTED TO WORK YET. 
+> CURRENT DEV FOCUS IS THE CODEGEN INFRA
 
 It can currently generate CloudEvents HTTP client proxies for Python, Java, and
 C# and Azure Functions handlers in C# for Azure Service Bus, Azure Event Grid,
@@ -30,7 +31,7 @@ There's currently one sample doc at [samples/cloudevents-discovery/Microsoft.Sto
 python3 cloudeventscg.py --language cs --definitions samples/cloudevents-discovery/Microsoft.Storage.disco --projectname MyServiceBusHandler --output ~/demos/grid --style azfunctioneventgrid
 ```
 
-Mind that this document's root will still shift and the templates will adjust accordingly.
+> Mind that this document's root will still shift and > the templates will adjust accordingly.
 
 ## Usage
 To generate code, run the following command:
