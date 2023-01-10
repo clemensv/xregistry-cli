@@ -1,0 +1,96 @@
+package {{ project_name }};
+
+import java.net.URL;
+import java.time.Instant;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.message.MessageReader;
+import io.cloudevents.core.message.MessageWriter;
+import io.cloudevents.core.v1.CloudEventBuilder;
+import io.cloudevents.http.HttpMessageFactory;
+
+{% set groups = root %}
+{% for group_key in groups.keys() -%}
+{%- set group = groups[group_key] -%}
+{%- set pascalGroupName = group.id | pascal %}
+public class {{ pascalGroupName | strip_namespace }}EventProducer {
+    
+    public {{ pascalGroupName | strip_namespace }}EventProducer() {
+    }
+
+    {% for id in group.definitions -%}
+    {%- set definition = group.definitions[id] -%}
+    {%- set pascalDefinitionName = definition.id | pascal %}
+    public void send{{ pascalDefinitionName | strip_namespace }}(
+        HttpURLConnection httpUrlConnection,
+    {%- for attrname in definition.metadata.attributes -%}
+    {%- set attribute = definition.metadata.attributes[attrname] -%}
+        {%- if attribute.type == "uritemplate" -%}
+            {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+                String {{ placeholder }},
+            {%- endfor -%}
+        {%- elif attribute.value is not defined -%}
+            String {{ attrname }} {%- if not attribute.required -%} = default {% endif %},
+        {%- endif -%}
+    {%- endfor -%} 
+    {%- if definition.schemaurl -%}
+    {{ definition.schemaurl | schema_type | strip_namespace }} data)
+    {%- else -%}
+    Object data)
+    {%- endif %}
+    {
+        CloudEvent cloudEvent = CloudEventBuilder.v1()
+        {%- for attrname in definition.metadata.attributes -%}
+        {%- set attribute = definition.metadata.attributes[attrname] -%}
+        {%- if attrname in ["id", "subject", "type", "datacontenttype"] -%}
+            {%- set attrProp = attrname | pascal | replace("Datacontenttype", "DataContentType") %}
+            .with{{ attrProp }}({% if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%})
+        {%- elif attrname in [ "source", "dataschema"] -%}
+            {%- set attrProp = attrname | pascal | replace("Dataschema", "DataSchema") %}
+            .with{{ attrProp }}(
+            {%- if attribute.value %}
+                {%- set url = attribute.value -%}
+                {%- set args = [] %}
+                {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+                    {{- args.append(placeholder) -}}
+                {%- endfor %}
+                {%- set url = url | regex_replace('\{([A-Za-z0-9_]+)\}', '%s') -%}
+                string.Format("{{ url }}" 
+                {%- for placeholder in args -%}
+                    {%- if loop.first -%},{%- endif %}
+                    {{ placeholder }}
+                    {%- if not loop.last -%},{%- endif %}
+                {%- endfor %})
+            {%- else -%}{{ attrname }}{%- endif -%})
+        {%- elif attrname in ["time"] %}
+            .with{{ attrname | pascal }}({% if attribute.value -%}
+                {%- if attribute.value == "0001-01-01T00:00:00+00:00" -%}
+                   Instant.now()
+                {%- else -%}   
+                   Instant.parse("{{- attribute.value -}}")
+                {%- endif -%}
+              {%- else -%}
+                 {{- attrname -}}
+              {%- endif -%})
+        {%- else -%}
+            .withExtension("{{ attrname }}",({% if attribute.value -%}{{ attribute.value }}){%- else -%}{{ attrname }}{%- endif -%})
+        {% endif -%}
+        {%- endfor %}
+            .withData( data )
+            .build();
+        
+        httpUrlConnection.setDoOutput(true);
+        MessageWriter writer = HttpMessageFactory.createWriter(
+            httpUrlConnection::setRequestProperty,
+            body -> {
+                        httpUrlConnection.setRequestProperty("content-length", String.valueOf(body.length));
+                        OutputStream outputStream = httpUrlConnection.getOutputStream();
+                        outputStream.write(body);
+                    });
+        writer.writeBinary(cloudEvent);
+    }
+    {% endfor %}
+}
+{% endfor %}

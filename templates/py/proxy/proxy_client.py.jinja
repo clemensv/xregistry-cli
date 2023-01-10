@@ -5,6 +5,7 @@ import requests
 from cloudevents.conversion import to_binary, to_structured
 from cloudevents.http import CloudEvent
 
+{%- set groups = root %}
 {% for group_key in groups.keys() -%}
 {%- set group = groups[group_key] -%}
 {%- set parts = group.id.split('.') -%}
@@ -24,12 +25,17 @@ class {{ groupName.split('.')[-1]}}_event_producer:
     {%- set attribute = definition.metadata.attributes[attrname] -%}
         {%- if attribute.type == "uritemplate" -%}
             {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
-                {{ placeholder }}: str,
+                {{ placeholder | snake }} : str,
             {%- endfor -%}
         {%- elif attribute.value is not defined -%}
             {{ attrname }}: str {%- if not attribute.required -%} = default {% endif %},
         {%- endif -%}
-    {%- endfor -%} data: object) -> None:
+    {%- endfor -%} 
+    data: {%- if definition.schemaurl -%}
+    {{ definition.schemaurl | schema_type | strip_namespace | snake }}
+    {%- else -%}
+    object
+    {%- endif -%}) -> None:
         attributes = {
         {%- for attrname in definition.metadata.attributes -%}
         {%- set attribute = definition.metadata.attributes[attrname] %}
@@ -39,7 +45,7 @@ class {{ groupName.split('.')[-1]}}_event_producer:
             {%- if attribute.type == "uritemplate" -%}
                 .format(
                 {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
-                    {{ placeholder }}= {{ placeholder }}
+                    {{ placeholder }} = {{ placeholder | snake }}
                 {%- if not loop.last -%},{%- endif%}
                 {%- endfor -%}
                 )           

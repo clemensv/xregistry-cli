@@ -1,0 +1,119 @@
+{%- set groups = root %}
+{% set function_name = project_name | pascal %}
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Threading;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.Protobuf;
+using CloudNative.CloudEvents.Avro;
+using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
+using CloudNative.CloudEvents.SystemTextJson;
+using CloudNative.CloudEvents.AspNetCore;
+
+namespace {{ project_name | pascal }}
+{
+    public static class {{ project_name | pascal | concat_namespace }}Functions
+    {
+        {% for group_key, group in groups.items() -%}
+        {% for id, definition in group.definitions.items() -%}
+        {% set pascalDefinitionName = definition.id | pascal %}
+
+        private static async Task On{{ pascalDefinitionName | concat_namespace }}(CloudEvent cloudEvent, ILogger log)
+        {
+            log.LogInformation("Received CloudEvent of type {eventType}", cloudEvent.Type);
+            {%- if definition.schemaurl %}
+            var data = ConvertData<{{ definition.schemaurl | schema_type | strip_namespace }}>(cloudEvent);
+            {%- else %}
+            var data = cloudEvent.Data;
+            {%- endif %}        
+            // TODO: Process the CloudEvent data for {{ definition.id }} event
+        }
+        {% endfor %}
+        {% endfor %}
+
+        [FunctionName("{{ project_name | pascal | concat_namespace }}")]
+        public static async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post", "options", Route = null)] HttpRequest req,
+            ILogger log,
+            CancellationToken cancellationToken)
+        {
+            if(req.Method == "OPTIONS")
+            {
+                var origin = req.Headers["WebHook-Request-Origin"];
+                if (!string.IsNullOrEmpty(origin) && allowedOrigins.Contains(origin))
+                {
+                    return new OkResult();
+                }
+                return new UnauthorizedResult();
+            }
+            
+            CloudEventFormatter formatter = null;
+            var contentType = req.ContentType.Split(";")[0];
+            if (contentType.EndsWith("+proto"))
+            {
+            formatter = new ProtobufEventFormatter();
+            }
+            else if (contentType.EndsWith("+avro"))
+            {
+                formatter = new AvroEventFormatter();
+            }
+            else 
+            {
+                formatter = new JsonEventFormatter();
+            }
+
+            var cloudEvent = await req.ToCloudEventAsync(formatter);
+            if(cloudEvent == null)
+            {
+                return new NoContentResult();
+            }
+
+            var cloudEventType = cloudEvent.Type;
+            switch (cloudEventType)
+            {
+                {% for group_key, group in groups.items() -%}
+                {% for id, definition in group.definitions.items() -%}
+                {% set pascalDefinitionName = definition.id | pascal %}
+                    case "{{ definition.id }}":
+                        await On{{ pascalDefinitionName | concat_namespace }}(cloudEvent,log);
+                        return new OkResult();
+                {% endfor %}
+                {% endfor %}
+                default:
+                    log.LogError("Unsupported CloudEvent type {eventType}", cloudEventType);
+                    return new BadRequestObjectResult($"Unsupported CloudEvent type {cloudEventType}");
+            }
+        }
+
+        private static readonly HashSet<string> allowedOrigins = new();
+
+        static {{ project_name | pascal | concat_namespace }}Functions()
+        {
+            var config = new ConfigurationBuilder()
+                .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
+                .Build();
+
+            foreach( var s in config["Values:ALLOWED_ORIGINS"].Split(';') )
+            {
+                allowedOrigins.Add(s);
+            }
+        }
+
+        static T ConvertData<T>(CloudEvent cloudEvent) where T  : class
+        {
+            return (cloudEvent.Data is JsonElement) ? JsonSerializer.Deserialize<T>((JsonElement)cloudEvent.Data) :
+                       (cloudEvent.Data is byte[]) ? JsonSerializer.Deserialize<T>((byte[])cloudEvent.Data) :
+                       (cloudEvent.Data is System.IO.Stream) ? JsonSerializer.Deserialize<T>((System.IO.Stream)cloudEvent.Data) : 
+                       cloudEvent.Data as T;
+        }
+    }
+}

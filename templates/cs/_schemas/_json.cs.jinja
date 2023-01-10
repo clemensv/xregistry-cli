@@ -2,6 +2,7 @@
 
 {%- set schema_name = "MySchema" | pascal -%}
 {%- set list_type = "List" %}
+{%- set schema = root %}
 using System;
 using System.Text.Json.Serialization;
 
@@ -14,8 +15,10 @@ namespace {{ project_name | pascal }}
     public class {{ typeName | pascal }}
     {%- if type.allOf -%}
         {%- for allOfType in type.allOf -%}
+            {%- if loop.first -%}
             {%- if allOfType['$ref'] -%}
                 : {{ allOfType['$ref'] | schema_type | pascal }}
+            {%- endif -%}
             {%- endif -%}
         {%- endfor -%}
     {%- endif %}
