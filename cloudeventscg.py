@@ -357,11 +357,14 @@ def main():
     # Parse the command line arguments
     args = parser.parse_args()
 
-    # ok to have = in base64 values
-    headers = {
-        header.split("=", 1)[0]: header.split("=", 1)[1]
-        for header in args.headers
-    }
+    if args.headers:
+        # ok to have = in base64 values
+        headers = {
+            header.split("=", 1)[0]: header.split("=", 1)[1]
+            for header in args.headers
+        }
+    else:
+        headers = {}
 
     # Call the generate() function with the parsed arguments
     generate(args.project_name, args.language, args.style, args.output_dir,
