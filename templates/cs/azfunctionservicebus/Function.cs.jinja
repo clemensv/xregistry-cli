@@ -1,0 +1,91 @@
+{%- set groups = root -%}
+{%- set function_name = project_name | pascal -%}
+using CloudNative.CloudEvents;
+using CloudEvent = CloudNative.CloudEvents.CloudEvent;
+using CloudNative.CloudEvents.Core;
+using CloudNative.CloudEvents.SystemTextJson;
+using CloudNative.CloudEvents.Protobuf;
+using CloudNative.CloudEvents.Avro;
+using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
+using Azure.Messaging;
+using Azure.Messaging.ServiceBus;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Threading;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Extensions.Logging;
+
+namespace {{ project_name | pascal }}
+{
+    public class {{ project_name | pascal | concat_namespace }}Functions
+    {
+        {% for group_key, group in groups.items() -%}
+        {% for id, definition in group.definitions.items() -%}
+        {% set pascalDefinitionName = definition.id | pascal %}
+
+        private static async Task On{{ pascalDefinitionName | concat_namespace }}(CloudEvent cloudEvent, ILogger log)
+        {
+             log.LogInformation("Received CloudEvent of type {eventType}", cloudEvent.Type);
+            {%- if definition.schemaurl %}
+            var data = ConvertData<{{ definition.schemaurl | schema_type | strip_namespace }}>(cloudEvent);
+            {%- else %}
+            var data = cloudEvent.Data;
+            {%- endif %}        
+            // TODO: Process the CloudEvent data for {{ definition.id }} event
+        }
+        {% endfor %}
+        {% endfor %}
+
+        [FunctionName("{{ project_name | pascal | concat_namespace }}")]
+         public static async Task Run(
+              [ServiceBusTrigger("myqueue", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message,
+              ILogger log)
+        {
+            CloudEventFormatter formatter = null;
+            var contentType = message.ContentType.Split(";")[0];
+            if (contentType.EndsWith("+proto"))
+            {
+            formatter = new ProtobufEventFormatter();
+            }
+            else if (contentType.EndsWith("+avro"))
+            {
+                formatter = new AvroEventFormatter();
+            }
+            else 
+            {
+                formatter = new JsonEventFormatter();
+            }
+
+            var cloudEvent = message.ToCloudEvent(formatter);
+            if(cloudEvent == null)
+            {
+                return;
+            }
+            var cloudEventType = cloudEvent.Type;
+            switch (cloudEventType)
+            {
+                {% for group_key, group in groups.items() -%}
+                {% for id, definition in group.definitions.items() -%}
+                {% set pascalDefinitionName = definition.id | pascal %}
+                    case "{{ definition.id }}":
+                        await On{{ pascalDefinitionName | concat_namespace }}(cloudEvent,log);
+                        break;
+                {% endfor %}
+                {% endfor %}
+                default:
+                    log.LogError("Unsupported CloudEvent type {eventType}", cloudEventType);
+                    break;
+            }
+        }
+        
+        static T ConvertData<T>(CloudEvent cloudEvent) where T  : class
+        {
+            return (cloudEvent.Data is JsonElement) ? JsonSerializer.Deserialize<T>((JsonElement)cloudEvent.Data) :
+                       (cloudEvent.Data is byte[]) ? JsonSerializer.Deserialize<T>((byte[])cloudEvent.Data) :
+                       (cloudEvent.Data is System.IO.Stream) ? JsonSerializer.Deserialize<T>((System.IO.Stream)cloudEvent.Data) : 
+                       cloudEvent.Data as T;
+        }
+    }
+}
