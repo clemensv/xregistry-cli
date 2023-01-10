@@ -28,7 +28,7 @@ hard to come by or you need a set of CloudEvent Discovery documents.
 There's currently one sample doc at [samples/cloudevents-discovery/Microsoft.Storage.disco](samples/cloudevents-discovery/Microsoft.Storage.disco) which you can point to with the --definitions option.
 
 ```
-python3 cloudeventscg.py --language cs --definitions samples/cloudevents-discovery/Microsoft.Storage.disco --projectname MyServiceBusHandler --output ~/demos/grid --style azfunctioneventgrid
+cedisco_codegen --language cs --definitions samples/cloudevents-discovery/Microsoft.Storage.disco --projectname MyServiceBusHandler --output ~/demos/grid --style azfunctioneventgrid
 ```
 
 > Mind that this document's root will still shift and > the templates will adjust accordingly.
@@ -37,7 +37,7 @@ python3 cloudeventscg.py --language cs --definitions samples/cloudevents-discove
 To generate code, run the following command:
 
 ```
-cloudeventscg --projectname <projectname> --language <language> --style <style> --output <output directory> --definitions <definitions file or URI>
+cedisco_codegen --projectname <projectname> --language <language> --style <style> --output <output directory> --definitions <definitions file or URI>
 ```
 
 where language is the programming language to generate code for (e.g. python,

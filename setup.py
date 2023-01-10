@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="cloudeventscg",
+    name="cedisco_codegen",
     version="0.0.1",
     author="Clemens Vasters",
     author_email="clemensv@microsoft.com",
@@ -12,8 +12,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/clemensv/cedisco-codegen",
-    packages=["templates"],
-    py_modules=["cloudeventscg"],
+    packages=["cedisco_codegen"],
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -27,7 +26,7 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
-            'cloudeventscg=cloudeventscg:main',
+            'cedisco_codegen=cedisco_codegen.cedisco_codegen:main',
         ],
     },
 )
