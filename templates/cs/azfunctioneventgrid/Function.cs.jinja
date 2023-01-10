@@ -14,6 +14,11 @@ namespace {{ project_name | pascal }}
 {
     public class {{ project_name | pascal | concat_namespace }}Functions
     {
+
+// remove this warning suppression when you have implemented all methods
+// this suppressess the warning that async method lacks 'await' operators and will run synchronously
+#pragma warning disable CS1998
+
         {% for group_key, group in groups.items() -%}
         {% for id, definition in group.definitions.items() -%}
         {% set pascalDefinitionName = definition.id | pascal %}

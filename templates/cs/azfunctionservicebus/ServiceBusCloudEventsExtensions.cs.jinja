@@ -48,8 +48,8 @@ namespace {{ project_name | pascal }}
         public static CloudEvent ToCloudEvent(
             this ServiceBusReceivedMessage message,
             CloudEventFormatter formatter,
-            params CloudEventAttribute[]? extensionAttributes) =>
-            ToCloudEvent(message, formatter, (IEnumerable<CloudEventAttribute>?)extensionAttributes);
+            params CloudEventAttribute[] extensionAttributes) =>
+            ToCloudEvent(message, formatter, (IEnumerable<CloudEventAttribute>)extensionAttributes);
 
         /// <summary>
         /// Converts this AMQP message into a CloudEvent object.
@@ -61,7 +61,7 @@ namespace {{ project_name | pascal }}
         public static CloudEvent ToCloudEvent(
             this ServiceBusReceivedMessage message,
             CloudEventFormatter formatter,
-            IEnumerable<CloudEventAttribute>? extensionAttributes)
+            IEnumerable<CloudEventAttribute> extensionAttributes)
         {
             if (HasCloudEventsContentType(message, out var contentType))
             {
