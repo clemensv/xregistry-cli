@@ -1,0 +1,76 @@
+{
+    "$schema": "https://cloudevents.io/schemas/discovery",
+    "specversion": "0.5-wip",
+    "endpoints" : {
+        "Contoso.MqttProducer" : {
+            "type": "endpoint",
+            "id" : "Contoso.MqttProducer",
+            "usage": "producer",
+            "config": {
+                "protocol": "MQTT",
+                "strict": false,
+                "endpoints": [
+                    "mqtt://mybroker.example.com"
+                ],
+                "options" : {
+                    "topic" : "events",
+                    "qos" : 1
+                }
+            },
+            "groups": [
+                "#/groups/mygroup"
+            ],
+            "format" : "CloudEvents/1.0"
+        },
+        "Contoso.HttpProducer" : {
+            "type": "endpoint",
+            "id" : "Contoso.HttpProducer",
+            "usage": "producer",
+            "config": {
+                "protocol": "HTTP",
+                "strict": false,
+                "endpoints": [
+                    "https://api.example.com"
+                ]
+            },
+            "groups": [
+                "#/groups/mygroup"
+            ],
+            "format" : "CloudEvents/1.0"
+        }
+    },
+    "groups": {
+        "Contoso.MyEventTypeGroup": {
+            "type": "group",
+            "definitions": {
+                "Contoso.MyFirstEvent": {
+                    "type": "cloudevent",
+                    "id": "Contoso.MyFirstEvent",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "myevent",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/me",
+                                "required": true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

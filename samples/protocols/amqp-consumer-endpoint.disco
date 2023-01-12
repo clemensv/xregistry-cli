@@ -1,0 +1,62 @@
+{
+    "$schema": "https://cloudevents.io/schemas/discovery",
+    "specversion": "0.5-wip",
+    "endpoints" : {
+        "myamqpconsumer" : {
+            "type": "endpoint",
+            "id" : "myamqpconsumer",
+            "usage": "producer",
+            "config": {
+                "protocol": "AMQP",
+                "strict": false,
+                "endpoints": [
+                    "amqps://cediscoveryinterop.example.com/queue"
+                ],
+                "options" : {
+                    "link-properties" : {
+                        "myprop" : "prop"
+                    },
+                    "distribution-mode" : "copy"
+                }
+            },
+            "groups": [
+                "#/groups/mygroup"
+            ],
+            "format" : "CloudEvents/1.0"
+        }
+    },
+    "groups": {
+        "mygroup": {
+            "type": "group",
+            "definitions": {
+                "myevent": {
+                    "type": "cloudevent",
+                    "id": "myevent",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "myevent",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/me",
+                                "required": true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

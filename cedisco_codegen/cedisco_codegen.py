@@ -105,12 +105,16 @@ def camel_case(string):
 # Jina filter that strips the namespace/package portion off
 # an expression. Assumes dot-notation, e.g. namespace.class
 def strip_namespace(class_reference):
-    return re.sub(r'^.+\.', '', class_reference)
+    if class_reference:
+        return re.sub(r'^.+\.', '', class_reference)
+    return class_reference    
 
 # Jina filter that concats the namespace/package portions of
 # an expression, removing the dots. 
 def concat_namespace(class_reference):
-    return "".join(class_reference.split("."))
+    if class_reference:
+        return "".join(class_reference.split("."))
+    return class_reference
 
 
 # Jina filter that determines the type name of an expression

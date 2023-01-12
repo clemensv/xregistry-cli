@@ -1,0 +1,216 @@
+using System;
+using System.Net.Http;
+using System.Collections.Generic;
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.Http;
+using CloudNative.CloudEvents.Mqtt;
+using CloudNative.CloudEvents.Amqp;
+using Amqp;
+using MQTTnet;
+using MQTTnet.Client;
+using MQTTnet.Client.Options;
+
+namespace {{ project_name | pascal }}
+{
+    public enum Protocol { Http, Amqp, Mqtt }
+
+    abstract public class ProducerEndpoint
+    {
+        protected Dictionary<string, string> options;
+        public delegate ProducerEndpoint ProducerEndpointFactory(Protocol protocol, Dictionary<string, string> options, List<Uri> endpoints);
+
+        private static ProducerEndpointFactory _httpProducerEndpointFactory;
+        public event ProducerEndpointFactory HttpProducerEndpointFactory
+        {
+            add
+            {
+                if (_httpProducerEndpointFactory == null)
+                    _httpProducerEndpointFactory += value;
+            }
+            remove
+            {
+                _httpProducerEndpointFactory -= value;
+            }
+        }
+        private static ProducerEndpointFactory _mqttProducerEndpointFactory;
+        public event ProducerEndpointFactory MqttProducerEndpointFactory
+        {
+            add
+            {
+                if (_mqttProducerEndpointFactory == null)
+                    _mqttProducerEndpointFactory += value;
+            }
+            remove
+            {
+                _mqttProducerEndpointFactory -= value;
+            }
+        }
+
+        private static ProducerEndpointFactory _amqpProducerEndpointFactory;
+        public event ProducerEndpointFactory AmqpProducerEndpointFactory
+        {
+            add
+            {
+                if (_amqpProducerEndpointFactory == null)
+                    _amqpProducerEndpointFactory += value;
+            }
+            remove
+            {
+                _amqpProducerEndpointFactory -= value;
+            }
+        }
+        
+        public static ProducerEndpoint Create(Protocol protocol, Dictionary<string, string> options, List<Uri> endpoints)
+        {
+            switch (protocol)
+            {
+                case Protocol.Http:
+                    if (_httpProducerEndpointFactory != null)
+                    {
+                        return _httpProducerEndpointFactory.Invoke(protocol, options, endpoints);
+                    }
+                    return new HttpProducerEndpoint(options, endpoints);
+                case Protocol.Amqp:
+                    if ( _amqpProducerEndpointFactory != null )
+                    {
+                        return _amqpProducerEndpointFactory.Invoke(protocol, options, endpoints);
+                    }
+                    return new AmqpProducerEndpoint(options, endpoints);
+                case Protocol.Mqtt:
+                    if ( _mqttProducerEndpointFactory != null )
+                    {
+                        return _mqttProducerEndpointFactory.Invoke(protocol, options, endpoints);
+                    }
+                    return new MqttProducerEndpoint(options, endpoints);
+                default:
+                    throw new NotSupportedException($"Protocol '{protocol}' is not supported.");
+            }
+        }
+
+        public abstract Task SendAsync(CloudEvent cloudEvent, ContentMode contentMode, CloudEventFormatter formatter);
+    }
+
+    class HttpProducerEndpoint : ProducerEndpoint
+    {
+        private HttpClient httpClient;
+        private List<Uri> endpoints;
+
+        public HttpProducerEndpoint(Dictionary<string, string> options, List<Uri> endpoints)
+        {
+            this.options = options;
+            this.endpoints = endpoints;
+            httpClient = new HttpClient();
+        }
+
+        public override async Task SendAsync(CloudEvent cloudEvent, ContentMode contentMode, CloudEventFormatter formatter)
+        {
+            foreach(var endpoint in endpoints)
+            {
+                await httpClient.PostAsync(endpoint, cloudEvent.ToHttpContent(contentMode, formatter));
+            }
+        }
+    }
+
+    class AmqpProducerEndpoint : ProducerEndpoint
+    {
+        private List<Uri> endpoints;
+        private Dictionary<Uri, Tuple<Connection, Session, SenderLink>> endpointConnections = new();
+
+        public AmqpProducerEndpoint(Dictionary<string, string> options, List<Uri> endpoints)
+        {
+            this.options = options;
+            this.endpoints = endpoints;
+        }
+
+        public override async Task SendAsync(CloudEvent cloudEvent, ContentMode contentMode, CloudEventFormatter formatter)
+        {
+            foreach ( var endpoint in endpoints)
+            {
+                var connectionTuple = await GetEndpointConnectionAsync(endpoint);
+                var sender = connectionTuple.Item3;
+                try
+                {
+                    await sender.SendAsync(cloudEvent.ToAmqpMessage(contentMode, formatter));
+                }
+                catch( AmqpException )
+                {
+                    this.endpoints.Remove(endpoint);
+                    throw;
+                }                
+            }            
+        }
+
+        private async Task<Tuple<Connection, Session, SenderLink>> GetEndpointConnectionAsync(Uri endpoint)
+        {
+            if (endpointConnections.TryGetValue(endpoint, out var connectionTuple))
+            {
+                return connectionTuple;
+            }
+
+            Address address = new Address(new UriBuilder(endpoint){Path = string.Empty}.ToString());
+            var connection = await Connection.Factory.CreateAsync(address);
+            var session = new Session(connection);
+            var sender = new SenderLink(session, "sender-link", endpoint.PathAndQuery);
+            connectionTuple = new Tuple<Connection, Session, SenderLink>(connection, session, sender);
+            endpointConnections.Add(endpoint, connectionTuple);
+            return connectionTuple;            
+        }
+    }
+
+    class MqttProducerEndpoint : ProducerEndpoint
+    {
+        private List<Uri> endpoints;
+        private Dictionary<Uri, IMqttClient> endpointConnections = new();
+        private string topic;
+        private int qos;
+
+        public MqttProducerEndpoint(Dictionary<string, string> options, List<Uri> endpoints)
+        {
+            this.options = options;
+            this.topic = options["topic"];
+            this.qos = options.ContainsKey("qos")?int.Parse(options["qos"]):1;
+            this.endpoints = endpoints;
+        }
+
+        public override async Task SendAsync(CloudEvent cloudEvent, ContentMode contentMode, CloudEventFormatter formatter)
+        {
+            foreach ( var endpoint in endpoints)
+            {
+                var connection = await GetEndpointConnectionAsync(endpoint);
+                var message = cloudEvent.ToMqttApplicationMessage(contentMode, formatter, topic);
+                message.Topic = topic;
+                message.QualityOfServiceLevel = (MQTTnet.Protocol.MqttQualityOfServiceLevel)qos;
+                try
+                {
+                    await connection.PublishAsync(message);
+                }
+                catch
+                {
+                    endpointConnections.Remove(endpoint);
+                    throw;
+                }
+            }
+        }
+
+        private async Task<IMqttClient> GetEndpointConnectionAsync(Uri endpoint)
+        {
+            if (endpointConnections.TryGetValue(endpoint, out var connection))
+            {
+                return connection;
+            }
+
+            var mqttClient = new MqttFactory().CreateMqttClient();
+            var options = new MqttClientOptionsBuilder()
+               .WithClientId(Guid.NewGuid().ToString())
+               .WithTcpServer(endpoint.Host, endpoint.Port)
+               .WithCleanSession();
+            if (endpoint.Scheme == "mqtts" )
+            {
+                options = options.WithTls(new MqttClientOptionsBuilderTlsParameters());
+            }
+            await mqttClient.ConnectAsync(options.Build(), CancellationToken.None);
+            endpointConnections.Add(endpoint, mqttClient);
+            return mqttClient;             
+        }
+    }
+}

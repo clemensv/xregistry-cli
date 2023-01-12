@@ -25,13 +25,13 @@ pip install git+https://github.com/clemensv/cedisco-codegen.git
 You will then need a working CloudEvents discovery endpoint, which are still
 hard to come by or you need a set of CloudEvent Discovery documents. 
 
-There's currently one sample doc at [samples/cloudevents-discovery/Microsoft.Storage.disco](samples/cloudevents-discovery/Microsoft.Storage.disco) which you can point to with the --definitions option.
+There's currently one sample doc at
+[samples/cloudevents-discovery/Microsoft.Storage.disco](samples/cloudevents-discovery/Microsoft.Storage.disco)
+which you can point to with the --definitions option.
 
 ```
 cedisco_codegen --language cs --definitions samples/cloudevents-discovery/Microsoft.Storage.disco --projectname MyServiceBusHandler --output ~/demos/grid --style azfunctioneventgrid
 ```
-
-> Mind that this document's root will still shift and > the templates will adjust accordingly.
 
 ## Usage
 To generate code, run the following command:

@@ -1,0 +1,56 @@
+{
+    "$schema": "https://cloudevents.io/schemas/discovery",
+    "specversion": "0.5-wip",
+    "endpoints" : {
+        "myhttpsubscriber" : {
+            "type": "endpoint",
+            "id" : "myhttpsubscriber",
+            "usage": "subscriber",
+            "config": {
+                "protocol": "HTTP",
+                "strict": false,
+                "endpoints": [
+                    "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
+                ]
+            },
+            "groups": [
+                "#/groups/mygroup"
+            ],
+            "format" : "CloudEvents/1.0"
+        }
+    },
+    "groups": {
+        "mygroup": {
+            "type": "group",
+            "definitions": {
+                "myevent": {
+                    "type": "cloudevent",
+                    "id": "myevent",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "myevent",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/me",
+                                "required": true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
