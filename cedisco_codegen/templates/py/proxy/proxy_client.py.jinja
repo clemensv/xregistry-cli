@@ -5,7 +5,7 @@ import requests
 from cloudevents.conversion import to_binary, to_structured
 from cloudevents.http import CloudEvent
 
-{%- set groups = root %}
+{%- set groups = root.groups %}
 {% for group_key in groups.keys() -%}
 {%- set group = groups[group_key] -%}
 {%- set parts = group.id.split('.') -%}

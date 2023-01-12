@@ -11,7 +11,7 @@ import io.cloudevents.core.message.MessageWriter;
 import io.cloudevents.core.v1.CloudEventBuilder;
 import io.cloudevents.http.HttpMessageFactory;
 
-{% set groups = root %}
+{% set groups = root.groups %}
 {% for group_key in groups.keys() -%}
 {%- set group = groups[group_key] -%}
 {%- set pascalGroupName = group.id | pascal %}

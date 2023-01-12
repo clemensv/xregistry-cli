@@ -6,6 +6,25 @@ import re
 import argparse
 import urllib.parse
 import glob
+from jinja2 import nodes
+from jinja2.ext import Extension
+
+
+# Jinja tag to exit the current template because 
+# something went wrong
+class ExitException(Exception):
+    pass
+
+class ExitExtension(Extension):
+    tags = set(['exit'])
+
+    def parse(self, parser):
+        lineno = next(parser.stream).lineno
+        return nodes.CallBlock(self.call_method('_exit', []), [], [], []).set_lineno(lineno)
+
+    def _exit(self, name, timeout, caller):
+        raise ExitException("¯\_(ツ)_/¯")
+
 
 # The current_url represents that last file that has been
 # loaded in the current process and is currently being handled
@@ -176,17 +195,28 @@ def render_code_templates(project_name, style, output_dir, docroot,
                 continue
 
             template_path = file
+            # all codegen for CE is anchored on the included groups
             scope = docroot
+            
             file_dir = file_dir_base = output_dir
             ## strip the jinja suffix
             file_name_base = file[:-6]
             template = env.get_template(template_path)
             file_name_base = file_name_base.replace("{projectname}", pascal(project_name))
             file_name = file_name_base
-            if file_name.startswith("{class"):
-                for id, group in scope.items():
-                    subscope = {}
-                    subscope[id] = group
+            if file_name.startswith("{class") and "groups" in scope:
+                
+                if "endpoints" in docroot: endpoints = docroot["endpoints"]
+                else: endpoints = None
+                if "schemagroups" in docroot: schemagroups = docroot["schemagroups"]
+                else: schemagroups = None
+
+                for id, group in scope["groups"].items():
+                    # create a snippet that only has the current group
+                    subscope = {"endpoints" : endpoints, 
+                                "schemagroups" : schemagroups,
+                                "groups" : { }}                    
+                    subscope["groups"][id] = group
                     scope_parts = id.split(".")
                     package_name = id
                     if not package_name:
@@ -222,7 +252,7 @@ def render_schema_templates(schema_type, template_dir, project_name, language,
             file_name_base = os.path.basename(definitions_file).split(".")[0] + "." + language
         file_name_base = file_name_base.replace("{projectname}", pascal(project_name))
         file_name = file_name_base
-        if file_name_base.startswith("{class"):
+        if file_name_base.startswith("{class") and "definitions" in scope:
             for id, definition in scope['definitions'].items():
                 subscope = {"definitions": {}}
                 subscope['definitions'][id] = definition
@@ -251,8 +281,11 @@ def render_template(project_name, scope, file_dir, file_name, template):
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
 
-    with open(output_path, "w") as f:
-        f.write(template.render(root=scope, project_name=project_name))
+    try:
+        with open(output_path, "w") as f:
+            f.write(template.render(root=scope, project_name=project_name))
+    except ExitException:
+        os.remove(output_path)
 
 
 # Load the definition file, which may be a JSON Schema
@@ -261,7 +294,7 @@ def render_template(project_name, scope, file_dir, file_name, template):
 # the function returns the actual URL as the first return
 # value and the parsed object representing the document's
 # information set
-def load_definitions(definitions_file: str, style: str, headers: dict):
+def load_definitions_core(definitions_file: str, style: str, headers: dict):
     docroot: dict = {}
     global current_url
     try:
@@ -294,21 +327,73 @@ def load_definitions(definitions_file: str, style: str, headers: dict):
     except IOError as e:
         print("An error occurred while trying to access the file: ", e)
         return None, None
+    
+    return definitions_file, docroot
 
+def load_definitions(definitions_file: str, style: str, headers: dict):
     # for a CloudEvents message definition group, we
     # normalize the document to be a groups doc
-    if style != "schema" and 'id' in docroot:
-        new_root = {}
-        new_root[docroot['id']] = docroot
-        docroot = new_root
+    definitions_file, docroot = load_definitions_core(definitions_file, style, headers)
 
+    if style == "schema":
+        return definitions_file, docroot
+
+    if "$schema" in docroot:
+        if docroot["$schema"] != "https://cloudevents.io/schemas/discovery":
+            print("unsupported schema:" + docroot["$schema"])
+            return None, None
+    if "groupsUrl" in docroot:
+        _, subroot = load_definitions_core(docroot["groupsUrl"], style, headers)
+        docroot["groups"] = subroot
+        docroot["groupsUrl"] = None
+    if "schemagroupsUrl" in docroot:
+        _, subroot = load_definitions_core(docroot["schemagroupsUrl"], style, headers)
+        docroot["schemagroups"] = subroot
+        docroot["schemagroupsUrl"] = None
+    if "endpointsUrl" in docroot:
+        _, subroot = load_definitions_core(docroot["endpointsUrl"], style, headers)
+        docroot["endpoints"] = subroot
+        docroot["endpointsUrl"] = None
+    
+    # make sure the document is always of the same form, even if
+    # the URL was a deep link. We can drill to the level of an 
+    # endpoint, a group, or a schemagroup
+    newroot = {"$schema" : "https://cloudevents.io/schemas/discovery" }
+    
+    # the doc is an dict 
+    if isinstance(docroot, dict) and "type" in docroot[list(docroot.keys())[0]]:
+        dictentry = docroot[list(docroot.keys())[0]]
+        if dictentry["type"] == "group":
+            newroot["groups"] = docroot
+        elif dictentry["type"] == "schemagroup":
+            newroot["schemagroups"] = docroot
+        elif dictentry["type"] == "endpoint":
+            newroot["endpoints"] = docroot
+        else:
+            print("unknown doc structure")
+            return None, None
+        docroot = newroot
+
+    # the doc is an object 
+    elif "type" in docroot:
+        if docroot["type"] == "group":
+            newroot["groups"] = { docroot["id"] : docroot }
+        elif docroot["type"] == "schemagroup":
+            newroot["schemagroups"] = { docroot["id"] : docroot }
+        elif docroot["type"] == "endpoints":
+            newroot["endpoints"] = { docroot["id"] : docroot }
+        else:
+            print("unknown type:" + docroot["type"])
+            return None, None
+        docroot = newroot
+        
     return definitions_file, docroot
 
 
 # creates the Jinja environment and loads the extensions
 def setup_jinja_env(template_dir):
     loader = jinja2.FileSystemLoader(template_dir)
-    env = jinja2.Environment(loader=loader)
+    env = jinja2.Environment(loader=loader, extensions=[ExitExtension])
     env.filters['regex_search'] = regex_search
     env.filters['regex_replace'] = regex_replace
     env.filters['pascal'] = pascal
