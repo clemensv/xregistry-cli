@@ -10,14 +10,43 @@ using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Options;
 
-namespace {{ project_name | pascal }}
+namespace ProxyTest
 {
     public enum Protocol { Http, Amqp, Mqtt }
+
+    public interface IProducerCredential
+    {
+    }
+
+    public interface IPlainProducerCredential : IProducerCredential
+    {
+        public string ClientId { get; }
+        public string ClientSecret { get; }
+    }
+
+    public class PlainProducerCredential : IPlainProducerCredential
+    {
+        private readonly string clientId;
+        private readonly string clientSecret;
+
+        public PlainProducerCredential(string clientId, string clientSecret)
+        {
+            this.clientId = clientId;
+            this.clientSecret = clientSecret;
+        }
+        public string ClientId => clientId;
+        public string ClientSecret => clientSecret;
+    }
+
+    public interface ITokenProducerCredential : IProducerCredential
+    {
+        public Task<string> GetTokenAsync();
+    }
 
     abstract public class ProducerEndpoint
     {
         protected Dictionary<string, string> options;
-        public delegate ProducerEndpoint ProducerEndpointFactory(Protocol protocol, Dictionary<string, string> options, List<Uri> endpoints);
+        public delegate ProducerEndpoint ProducerEndpointFactory(IProducerCredential credential, Protocol protocol, Dictionary<string, string> options, List<Uri> endpoints);
 
         private static ProducerEndpointFactory _httpProducerEndpointFactory;
         public event ProducerEndpointFactory HttpProducerEndpointFactory
@@ -60,28 +89,28 @@ namespace {{ project_name | pascal }}
             }
         }
         
-        public static ProducerEndpoint Create(Protocol protocol, Dictionary<string, string> options, List<Uri> endpoints)
+        public static ProducerEndpoint Create(IProducerCredential credential, Protocol protocol, Dictionary<string, string> options, List<Uri> endpoints)
         {
             switch (protocol)
             {
                 case Protocol.Http:
                     if (_httpProducerEndpointFactory != null)
                     {
-                        return _httpProducerEndpointFactory.Invoke(protocol, options, endpoints);
+                        return _httpProducerEndpointFactory.Invoke(credential, protocol, options, endpoints);
                     }
-                    return new HttpProducerEndpoint(options, endpoints);
+                    return new HttpProducerEndpoint(credential, options, endpoints);
                 case Protocol.Amqp:
                     if ( _amqpProducerEndpointFactory != null )
                     {
-                        return _amqpProducerEndpointFactory.Invoke(protocol, options, endpoints);
+                        return _amqpProducerEndpointFactory.Invoke(credential, protocol, options, endpoints);
                     }
-                    return new AmqpProducerEndpoint(options, endpoints);
+                    return new AmqpProducerEndpoint(credential, options, endpoints);
                 case Protocol.Mqtt:
                     if ( _mqttProducerEndpointFactory != null )
                     {
-                        return _mqttProducerEndpointFactory.Invoke(protocol, options, endpoints);
+                        return _mqttProducerEndpointFactory.Invoke(credential, protocol, options, endpoints);
                     }
-                    return new MqttProducerEndpoint(options, endpoints);
+                    return new MqttProducerEndpoint(credential, options, endpoints);
                 default:
                     throw new NotSupportedException($"Protocol '{protocol}' is not supported.");
             }
@@ -93,11 +122,13 @@ namespace {{ project_name | pascal }}
     class HttpProducerEndpoint : ProducerEndpoint
     {
         private HttpClient httpClient;
+        private readonly IProducerCredential credential;
         private List<Uri> endpoints;
 
-        public HttpProducerEndpoint(Dictionary<string, string> options, List<Uri> endpoints)
+        public HttpProducerEndpoint(IProducerCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
         {
             this.options = options;
+            this.credential = credential;
             this.endpoints = endpoints;
             httpClient = new HttpClient();
         }
@@ -113,12 +144,14 @@ namespace {{ project_name | pascal }}
 
     class AmqpProducerEndpoint : ProducerEndpoint
     {
+        private readonly IProducerCredential credential;
         private List<Uri> endpoints;
         private Dictionary<Uri, Tuple<Connection, Session, SenderLink>> endpointConnections = new();
 
-        public AmqpProducerEndpoint(Dictionary<string, string> options, List<Uri> endpoints)
+        public AmqpProducerEndpoint(IProducerCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
         {
             this.options = options;
+            this.credential = credential;
             this.endpoints = endpoints;
         }
 
@@ -159,16 +192,18 @@ namespace {{ project_name | pascal }}
 
     class MqttProducerEndpoint : ProducerEndpoint
     {
+        private readonly IProducerCredential credential;
         private List<Uri> endpoints;
         private Dictionary<Uri, IMqttClient> endpointConnections = new();
         private string topic;
         private int qos;
 
-        public MqttProducerEndpoint(Dictionary<string, string> options, List<Uri> endpoints)
+        public MqttProducerEndpoint(IProducerCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
         {
             this.options = options;
             this.topic = options["topic"];
             this.qos = options.ContainsKey("qos")?int.Parse(options["qos"]):1;
+            this.credential = credential;
             this.endpoints = endpoints;
         }
 

@@ -36,7 +36,7 @@
                 {%- set protocol = endpoint.config.protocol | lower -%}
                 {%- set options = endpoint.config.options -%}
                 {%- set endpoints = endpoint.config.endpoints %}
-        public static {{ pascalGroupName | strip_namespace }}EventProducer CreateFor{{ endpoint_key | pascal | strip_namespace }}(ContentMode contentMode, CloudEventFormatter formatter) 
+        public static {{ pascalGroupName | strip_namespace }}EventProducer CreateFor{{ endpoint_key | pascal | strip_namespace }}(IProducerCredential credential, ContentMode contentMode, CloudEventFormatter formatter) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -52,7 +52,7 @@
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };
-            return new {{ pascalGroupName | strip_namespace }}EventProducer(ProducerEndpoint.Create(Protocol.{{ protocol | pascal }}, {% if options %}options, {% else %}null, {% endif %}endpoints), 
+            return new {{ pascalGroupName | strip_namespace }}EventProducer(ProducerEndpoint.Create(credential, Protocol.{{ protocol | pascal }}, {% if options %}options, {% else %}null, {% endif %}endpoints), 
               contentMode, formatter);
         }
             {%- endfor -%}
