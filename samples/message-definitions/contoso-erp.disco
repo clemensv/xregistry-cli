@@ -1,0 +1,787 @@
+{
+    "$schema": "https://cloudevents.io/schemas/discovery",
+    "specversion": "0.5-wip",
+    "endpoints": {
+        "erpendpoint": {
+            "type": "endpoint",
+            "id": "erpendpoint",
+            "usage": "producer",
+            "config": {
+                "protocol": "HTTP",
+                "strict": false,
+                "endpoints": [
+                    "https://erpsystem.com/events"
+                ]
+            },
+            "groups": [
+                "#/groups/erpevents"
+            ],
+            "format": "CloudEvents/1.0"
+        }
+    },
+    "groups": {
+        "erpevents": {
+            "type": "group",
+            "definitions": {
+                "orderplaced": {
+                    "type": "cloudevent",
+                    "id": "orderplaced",
+                    "description": "An order has been placed",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "orderplaced",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/orders",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/orderdata"
+                },
+                "paymentsreceived": {
+                    "type": "cloudevent",
+                    "id": "paymentsreceived",
+                    "format": "CloudEvents/1.0",
+                    "description": "A payment has been received",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "paymentsreceived",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/payments",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/paymentdata"
+                },
+                "ordershipped": {
+                    "type": "cloudevent",
+                    "id": "ordershipped",
+                    "description": "An order has been shipped",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "ordershipped",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/orders",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/shipmentdata"
+                },
+                "ordercancelled": {
+                    "type": "cloudevent",
+                    "id": "ordercancelled",
+                    "description": "An order has been cancelled",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "ordercancelled",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/orders",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/cancellationdata"
+                },
+                "orderrefunded": {
+                    "type": "cloudevent",
+                    "id": "orderrefunded",
+                    "description": "An order has been refunded",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "orderrefunded",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/orders",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/refunddata"
+                },
+                "inventoryupdated": {
+                    "type": "cloudevent",
+                    "id": "inventoryupdated",
+                    "description": "Inventory has been updated",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "description": "The id of the inventory update event",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "inventoryupdated",
+                                "description": "The type of the inventory update event",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/inventory",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/inventorydata"
+                },
+                "productadded": {
+                    "type": "cloudevent",
+                    "id": "productadded",
+                    "description": "A product has been added",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "productadded",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/products",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/productdata"
+                },
+                "productdeleted": {
+                    "type": "cloudevent",
+                    "id": "productdeleted",
+                    "description": "A product has been deleted",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "productdeleted",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/products",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/productdeletiondata"
+                },
+                "productupdated": {
+                    "type": "cloudevent",
+                    "id": "productupdated",
+                    "description": "A product has been updated",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "productupdated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/products",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/productupdateddata"
+                },
+                "employeeadded": {
+                    "type": "cloudevent",
+                    "id": "employeeadded",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "employeeadded",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/employees",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/employeedata"
+                },
+                "employeedeleted": {
+                    "type": "cloudevent",
+                    "id": "employeedeleted",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "employeedeleted",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/employees",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/employeedeletiondata"
+                },
+                "employeeupdated": {
+                    "type": "cloudevent",
+                    "id": "employeeupdated",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "employeeupdated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/employees",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/employeeupdateddata"
+                },
+                "purchaseordercreated": {
+                    "type": "cloudevent",
+                    "id": "purchaseordercreated",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "purchaseordercreated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/purchaseorders",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/purchaseorderdata"
+                },
+                "purchaseorderupdated": {
+                    "type": "cloudevent",
+                    "id": "purchaseorderupdated",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "purchaseorderupdated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/purchaseorders",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schema": "#/schemagroups/erpevents/schemas/purchaseorderupdateddata"
+                },
+                "purchaseorderdeleted": {
+                    "type": "cloudevent",
+                    "id": "purchaseorderdeleted",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "purchaseorderdeleted",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/purchaseorders",
+                                "required": true
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "schemagroups": {
+            "erpevents": {
+                "schemas": {
+                    "orderdata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "orderid": {
+                                        "type": "string"
+                                    },
+                                    "customerid": {
+                                        "type": "string"
+                                    },
+                                    "total": {
+                                        "type": "number"
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "productid": {
+                                                    "type": "string"
+                                                },
+                                                "quantity": {
+                                                    "type": "number"
+                                                },
+                                                "price": {
+                                                    "type": "number"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "paymentdata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "transactionid": {
+                                        "type": "string"
+                                    },
+                                    "orderid": {
+                                        "type": "string"
+                                    },
+                                    "amount": {
+                                        "type": "number"
+                                    },
+                                    "status": {
+                                        "type": "string"
+                                    },
+                                    "paymentmethod": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "shipmentdata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "trackingnumber": {
+                                        "type": "string"
+                                    },
+                                    "orderid": {
+                                        "type": "string"
+                                    },
+                                    "status": {
+                                        "type": "string"
+                                    },
+                                    "couriername": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "cancellationdata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "orderid": {
+                                        "type": "string"
+                                    },
+                                    "reason": {
+                                        "type": "string"
+                                    },
+                                    "status": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "refunddata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "orderid": {
+                                        "type": "string"
+                                    },
+                                    "amount": {
+                                        "type": "number"
+                                    },
+                                    "reason": {
+                                        "type": "string"
+                                    },
+                                    "status": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "inventorydata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "productid": {
+                                        "type": "string"
+                                    },
+                                    "quantity": {
+                                        "type": "number"
+                                    },
+                                    "location": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "productdata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "productid": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "price": {
+                                        "type": "number"
+                                    },
+                                    "category": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "productdeletiondata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "productid": {
+                                        "type": "string",
+                                        "description": "The product id"
+                                    },
+                                    "reason": {
+                                        "type": "string",
+                                        "description": "The reason for deletion"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "productupdateddata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "productid": {
+                                        "type": "string",
+                                        "description": "The product id"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The product name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "The product description"
+                                    },
+                                    "price": {
+                                        "type": "number",
+                                        "description": "The product price"
+                                    },
+                                    "category": {
+                                        "type": "string",
+                                        "description": "The product category"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "employeedata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "employeeid": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "position": {
+                                        "type": "string"
+                                    },
+                                    "department": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "employeedeletiondata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "employeeid": {
+                                        "type": "string"
+                                    },
+                                    "reason": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "employeeupdateddata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "employeeid": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "position": {
+                                        "type": "string"
+                                    },
+                                    "department": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "purchaseorderdata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "purchaseorderid": {
+                                        "type": "string"
+                                    },
+                                    "suppliername": {
+                                        "type": "string"
+                                    },
+                                    "totalcost": {
+                                        "type": "number"
+                                    },
+                                    "status": {
+                                        "type": "string"
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "productid": {
+                                                    "type": "string"
+                                                },
+                                                "quantity": {
+                                                    "type": "number"
+                                                },
+                                                "unitcost": {
+                                                    "type": "number"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "purchaseorderupdateddata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "purchaseorderid": {
+                                        "type": "string"
+                                    },
+                                    "status": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "purchaseorderdeletiondata": {
+                        "versions": {
+                            "1": {
+                                "schema": {
+                                    "purchaseorderid": {
+                                        "type": "string"
+                                    },
+                                    "reason": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
