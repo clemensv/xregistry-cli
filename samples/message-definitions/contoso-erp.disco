@@ -17,6 +17,46 @@
                 "#/groups/erpevents"
             ],
             "format": "CloudEvents/1.0"
+        },
+        "myqueueconsumer" : {
+            "type": "endpoint",
+            "channel" : "myqueue"
+            "id" : "myqueueconsumer",
+            "usage": "consumer",
+            "config": {
+                "protocol": "AMQP",
+                "strict": false,
+                "endpoints": [
+                    "amqps://cediscoveryinterop.example.com/queue"
+                ],
+                "options" : {
+                    "link-properties" : {
+                        "myprop" : "prop"
+                    },
+                    "distribution-mode" : "copy"
+                }
+            },
+            "groups": [
+                "#/groups/mygroup"
+            ],
+            "format" : "CloudEvents/1.0"
+        },
+        "myqueueproducer" : {
+            "type": "endpoint",
+            "channel" : "myqueue",
+            "id" : "myqueueproducer",
+            "usage": "producer",
+            "config": {
+                "protocol": "AMQP",
+                "strict": false,
+                "endpoints": [
+                    "amqps://cediscoveryinterop.example.com/queue"
+                ]
+            },
+            "groups": [
+                "#/groups/mygroup"
+            ],
+            "format" : "CloudEvents/1.0"
         }
     },
     "groups": {

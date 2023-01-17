@@ -5,7 +5,7 @@
         "myamqpconsumer" : {
             "type": "endpoint",
             "id" : "myamqpconsumer",
-            "usage": "producer",
+            "usage": "consumer",
             "config": {
                 "protocol": "AMQP",
                 "strict": false,
