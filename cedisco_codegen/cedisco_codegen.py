@@ -35,7 +35,7 @@ class ExitExtension(Extension):
 current_url = None
 
 
-# Jinja filter to perform a regex search. Returns the found string.
+# Jinja filter to perform a regex search. Returns a list of matches.
 def regex_search(string, pattern):
     if string:
         match = re.findall(pattern, string)

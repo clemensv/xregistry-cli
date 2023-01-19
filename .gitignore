@@ -2,3 +2,4 @@ tmp/
 *.egg-info/
 build/
 .vscode/
+__pycache__/
