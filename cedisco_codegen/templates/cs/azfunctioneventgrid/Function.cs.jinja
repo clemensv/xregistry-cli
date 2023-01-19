@@ -2,6 +2,7 @@
 {%- set function_name = project_name | pascal -%}
 using Azure.Messaging;
 using System.Collections.Generic;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading;
@@ -27,9 +28,9 @@ namespace {{ project_name | pascal }}
         {
             log.LogInformation("Received CloudEvent of type {eventType}", cloudEvent.Type);
             {%- if definition.schemaurl %}
-            var data = cloudEvent.Data.ToObjectFromJson<{{ definition.schemaurl | schema_type | strip_namespace }}>();
+            var data = {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.FromData(cloudEvent.Data);
             {%- else %}
-            var data = cloudEvent.Data.ToObjectFromJson<object>();
+            var data = cloudEvent.Data;
             {%- endif %}        
             // TODO: Process the CloudEvent data for {{ definition.id }} event
         }

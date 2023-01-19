@@ -1,0 +1,113 @@
+{%- set groups = root.groups -%}
+{%- set function_name = project_name | pascal -%}
+using System;
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.Endpoints;
+using CloudNative.CloudEvents.SystemTextJson;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+ 
+{% for group_key, group in groups.items() -%}
+ {%- set pascalGroupName = group.id | default(group_key) | pascal -%}
+namespace {{ project_name | pascal }}.{{ pascalGroupName }}
+{
+    public class EventConsumer : IDisposable
+    {
+        {% for id, definition in group.definitions.items() -%}
+        {% set pascalDefinitionName = definition.id | pascal %}
+
+        private static async Task On{{ pascalDefinitionName | strip_namespace }}(CloudEvent cloudEvent, ILogger log)
+        {
+            log.LogInformation("Received CloudEvent of type {eventType}", cloudEvent.Type);
+            {%- if definition.schemaurl or definition.schema %}
+            // Convert to {{ definition.schemaurl | schema_type | strip_namespace | pascal }}
+            var data = {{ definition.schemaurl | schema_type | strip_namespace | pascal }}.FromData(cloudEvent.Data);
+            {%- else %}
+            var data = cloudEvent.Data;
+            {%- endif %}        
+            // TODO: Process the CloudEvent data for {{ definition.id }} event
+            await Task.CompletedTask;
+        }
+        {% endfor %}
+
+        public async Task DispatchAsync(
+                CloudEvent cloudEvent,
+                ILogger log)
+        {
+            var cloudEventType = cloudEvent.Type;
+            switch (cloudEventType)
+            {
+                {% for group_key, group in groups.items() -%}
+                {% for id, definition in group.definitions.items() -%}
+                {% set pascalDefinitionName = definition.id | pascal %}
+                    case "{{ definition.id }}":
+                        await On{{ pascalDefinitionName | strip_namespace }}(cloudEvent,log);
+                        break;
+                {% endfor %}
+                {% endfor %}
+                default:
+                    log.LogError("Unsupported CloudEvent type {eventType}", cloudEventType);
+                    break;
+            }
+        }
+
+        private readonly ContentMode contentMode;
+        private readonly CloudEventFormatter formatter;
+        private readonly ConsumerEndpoint endpoint;
+
+        public EventConsumer(ConsumerEndpoint endpoint, ContentMode contentMode, CloudEventFormatter formatter)
+        {
+            this.contentMode = contentMode;
+            this.formatter = formatter;
+            this.endpoint = endpoint;
+            this.endpoint.DispatchEventAsync += DispatchAsync;
+        }
+
+        public void Dispose()
+        {
+            this.endpoint.DispatchEventAsync -= DispatchAsync;
+        }
+
+        public ConsumerEndpoint Endpoint
+        {
+            get 
+            {
+                return this.endpoint;
+            }
+        }
+
+        {%- if root.endpoints -%} 
+         {%- for endpoint_key in root.endpoints.keys() -%}
+         {%- set endpoint = root.endpoints[endpoint_key] -%}
+         {%- if endpoint.usage == "consumer" -%}
+           {%- set protocol = endpoint.config.protocol | lower -%}
+           {%- set options = endpoint.config.options -%}
+           {%- set endpoints = endpoint.config.endpoints %}
+                
+        public static EventConsumer CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential, ContentMode contentMode, CloudEventFormatter formatter) 
+        {       
+            {%- if options %}
+            var options = new Dictionary<string, string> {
+            {%- for key, value in options.items()%}
+                { "{{ key }}" , "{{ value }}" }
+                {%- if not loop.last -%},{%- endif %}
+            {%- endfor %}
+            };
+            {%- endif %}
+            var endpoints = new List<Uri> {
+            {%- for uri in endpoints %}
+                new Uri("{{ uri }}")
+                {%- if not loop.last -%},{%- endif %}
+            {%- endfor %}
+            };
+            var endpoint = ConsumerEndpoint.Create(logger, credential, Protocol.{{ protocol | pascal }}, {% if options %}options, {% else %}null, {% endif %}endpoints);
+            var consumer = new EventConsumer(endpoint, contentMode, formatter);
+            endpoint.DispatchEventAsync += consumer.DispatchAsync;
+            return consumer;
+        }
+        {%- endif -%}
+        {%- endfor -%}
+        {% endif %}
+    }
+}
+{% endfor %}

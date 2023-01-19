@@ -1,1 +1,2 @@
 jinja2>=2.11.2
+jsonpointer>=2.0

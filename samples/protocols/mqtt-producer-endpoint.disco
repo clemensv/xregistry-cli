@@ -21,22 +21,6 @@
                 "#/groups/mygroup"
             ],
             "format" : "CloudEvents/1.0"
-        },
-        "Contoso.HttpProducer" : {
-            "type": "endpoint",
-            "id" : "Contoso.HttpProducer",
-            "usage": "producer",
-            "config": {
-                "protocol": "HTTP",
-                "strict": false,
-                "endpoints": [
-                    "https://api.example.com"
-                ]
-            },
-            "groups": [
-                "#/groups/mygroup"
-            ],
-            "format" : "CloudEvents/1.0"
         }
     },
     "groups": {

@@ -11,6 +11,11 @@ It can currently generate CloudEvents HTTP client proxies for Python, Java, and
 C# and Azure Functions handlers in C# for Azure Service Bus, Azure Event Grid,
 Azure Event Hubs, and HTTP triggers.
 
+Generated C# code has a dependency on
+https://github.com/clemensv/CloudNative.CloudEvents.Endpoints for which there is
+no official NuGet package as of yet. The code generator emits nuget.config files
+that point to "e:\packages" at the moment. Adjust that as needed. 
+
 Embedded is also a class generator for JSON using the same infra that is driven
 by the needs of the discovered message/event definition sets. 
 

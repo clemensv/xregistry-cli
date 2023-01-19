@@ -23,6 +23,7 @@ setuptools.setup(
     install_requires=[
         'jinja2',
         'requests',
+        'jsonpointer'
     ],
     entry_points={
         'console_scripts': [

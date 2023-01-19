@@ -35,7 +35,7 @@ namespace {{ project_name | pascal }}
         {
             log.LogInformation("Received CloudEvent of type {eventType}", cloudEvent.Type);
             {%- if definition.schemaurl %}
-            var data = ConvertData<{{ definition.schemaurl | schema_type | strip_namespace }}>(cloudEvent);
+            var data = {{ definition.schemaurl | schema_type | strip_namespace | pascal }}.FromData(cloudEvent.Data);
             {%- else %}
             var data = cloudEvent.Data;
             {%- endif %}        
@@ -111,14 +111,6 @@ namespace {{ project_name | pascal }}
             {
                 allowedOrigins.Add(s);
             }
-        }
-
-        static T ConvertData<T>(CloudEvent cloudEvent) where T  : class
-        {
-            return (cloudEvent.Data is JsonElement) ? JsonSerializer.Deserialize<T>((JsonElement)cloudEvent.Data) :
-                       (cloudEvent.Data is byte[]) ? JsonSerializer.Deserialize<T>((byte[])cloudEvent.Data) :
-                       (cloudEvent.Data is System.IO.Stream) ? JsonSerializer.Deserialize<T>((System.IO.Stream)cloudEvent.Data) : 
-                       cloudEvent.Data as T;
         }
     }
 }

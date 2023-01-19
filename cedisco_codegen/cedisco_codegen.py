@@ -6,21 +6,24 @@ import re
 import argparse
 import urllib.parse
 import glob
+import jsonpointer
 from jinja2 import nodes
 from jinja2.ext import Extension
 
 
-# Jinja tag to exit the current template because 
+# Jinja tag to exit the current template because
 # something went wrong
 class ExitException(Exception):
     pass
+
 
 class ExitExtension(Extension):
     tags = set(['exit'])
 
     def parse(self, parser):
         lineno = next(parser.stream).lineno
-        return nodes.CallBlock(self.call_method('_exit', []), [], [], []).set_lineno(lineno)
+        return nodes.CallBlock(self.call_method('_exit', []), [], [],
+                               []).set_lineno(lineno)
 
     def _exit(self, name, timeout, caller):
         raise ExitException("¯\_(ツ)_/¯")
@@ -40,6 +43,7 @@ def regex_search(string, pattern):
             return match
     return []
 
+
 # Jinja filter to perform a regex search. Returns the found string.
 def regex_replace(string, pattern, replacement):
     if string:
@@ -58,7 +62,7 @@ def csharp_identifier(string):
 # Jinja filter that turns a string expression into PascalCase
 # The input can be snake_case or camelCase or any other string
 def pascal(string):
-    if not string:
+    if not string or len(string) == 0:
         return string
     words = []
     if '_' in string:
@@ -73,14 +77,17 @@ def pascal(string):
     result = ''.join(word.capitalize() for word in words)
     return result
 
+
 #Jinja filter that turns a string expression into snake_case
 #The input can be PascalCase, camelCase, snake_case, or any other text
+
 
 def snake(string):
     if not string:
         return string
     result = re.sub(r'(?<!^)(?=[A-Z])', '_', string).lower()
     return result
+
 
 # Jinja filter that turns a string expression into camelCase
 # The input can be snake_case or PascalCase or any other string
@@ -107,10 +114,19 @@ def camel_case(string):
 def strip_namespace(class_reference):
     if class_reference:
         return re.sub(r'^.+\.', '', class_reference)
-    return class_reference    
+    return class_reference
+
+# Jina filter that gets the namespace/package portion off
+# an expression. Assumes dot-notation, e.g. namespace.class
+def namespace(class_reference):
+    if class_reference:
+        return re.sub(r'\.[^.]+$', '', class_reference)
+    return class_reference
+    
+
 
 # Jina filter that concats the namespace/package portions of
-# an expression, removing the dots. 
+# an expression, removing the dots.
 def concat_namespace(class_reference):
     if class_reference:
         return "".join(class_reference.split("."))
@@ -121,15 +137,26 @@ def concat_namespace(class_reference):
 # given a schema URL, specifically in CloudEvents' dataschema
 # attribute. Schema URLs are collected by the filter as a side
 # effect and then given to the generator
-schemas = set()
-
+schema_files_collected = set()
+schema_references_collected = set()
 
 def schema_type(schema_url: str):
-    global schemas
+    global schema_files_collected
     global current_url
+    global schema_references_collected
 
+    # if the schema URL is a fragment, then it is a local reference
     if schema_url.startswith("#"):
-        return schema_url.split("/")[-1]
+        if not schema_url in schema_references_collected:
+            schema_references_collected.add(schema_url)
+        # return the last element of the fragment unless the penultimate
+        # segment name is "versions". Then return the parent segment of
+        # versions.
+        path_elements = schema_url.split('/')
+        if path_elements[-2] == "versions":
+            return path_elements[-3]
+        else:
+            return path_elements[-1]
 
     if current_url:
         schema_url = urllib.parse.urljoin(current_url, schema_url)
@@ -139,12 +166,13 @@ def schema_type(schema_url: str):
         fragment = parsed_url.fragment
         path_elements = fragment.split('/')
         plain_url = urllib.parse.urlunparse(parsed_url._replace(fragment=''))
-        if plain_url not in schemas:
-            schemas.add(schema_url)
+        # if the URL is not already in the list of schemas, add it
+        if plain_url not in schema_files_collected:
+            schema_files_collected.add(schema_url)
         return path_elements[-1]
     else:
-        if schema_url not in schemas:
-            schemas.add(schema_url)
+        if schema_url not in schema_files_collected:
+            schema_files_collected.add(schema_url)
         match = re.search(r"/schemas/([\.\w]+)$", schema_url)
         if match:
             return match.group(1)
@@ -158,6 +186,7 @@ schemas_handled = set()
 def generate(project_name: str, language: str, style: str, output_dir: str,
              definitions_file: str, headers: dict):
     global current_url
+    global schema_references_collected
 
     # Load definitions
     definitions_file, docroot = load_definitions(definitions_file, style,
@@ -167,17 +196,102 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 
     # Load templates
     pt = os.path.dirname(os.path.realpath(__file__))
-    if style == "schema":
-        template_dir = os.path.join(pt, "templates", language, "_schemas")
-    else:
-        template_dir = os.path.join(pt, "templates", language, style)
+    schema_template_dir = os.path.join(pt, "templates", language, "_schemas")
+    code_template_dir = os.path.join(pt, "templates", language, style)
 
-    env = setup_jinja_env(template_dir)
+    code_env = setup_jinja_env(code_template_dir)
+    schema_env = setup_jinja_env(schema_template_dir)
     render_code_templates(project_name, style, output_dir, docroot,
-                          template_dir, env)
+                          code_template_dir, code_env)
+    
+    # now we need to handle any local schema references we found in the document
+ 
+    # we redo the overall loop until we have handled all the schema references
+    # check whether there are references in schema_references_collected 
+    # that are not in schemas_handled
+    while not schema_references_collected.issubset(schemas_handled):
+         # we need to iterate over a copy of the set because we may add to it
+        for schema_reference in set(schema_references_collected):
+            if schema_reference not in schemas_handled:
+                schemas_handled.add(schema_reference)
+                current_url = None
+
+                # if the scheme reference is a JSON Pointer reference, we resolve it
+                # to an object in the document. Remove a leading # if present
+                if schema_reference.startswith("#"):
+                    path_elements = schema_reference.split('/')
+                    if path_elements[-2] == "versions":
+                        definitions_file = path_elements[-3]
+                    else:
+                        definitions_file = path_elements[-1]
+
+                    try:
+                        match = jsonpointer.resolve_pointer(docroot, schema_reference[1:])
+                        if not match:
+                            continue
+                        schema_root = match
+                    except jsonpointer.JsonPointerException as e:
+                        print("Error resolving JSON Pointer: " + str(e))
+                        continue
+
+                if schema_root:
+                    # now we need to figure out what the reference points to. 
+                    # a) This could be an inline schema inside a message definition
+                    # b) This could be an inline schema inside a schema definition
+                    # c) This could yet be a schema definition in a separate file referenced 
+                    #    by the schemaUrl attribute inside a schema version referenced by
+                    #    the local reference 
+
+                    schema_version = None
+                    if "type" in schema_root and schema_root["type"] == "schema" and "versions" in schema_root:
+                        # the reference pointed to a schema definition. Now we need to find the
+                        # most recent version in the versions dictionary by sorting the keys
+                        # and picking the last one. To sort the keys, we need to make them the same length 
+                        # by prepending spaces to the keys that are shorter than the longest key
+                        versions = schema_root["versions"]
+                        max_key_length = max([len(key) for key in versions.keys()])
+                        sorted_keys = sorted(versions.keys(), key=lambda key: key.rjust(max_key_length))
+                        schema_version = versions[sorted_keys[-1]]
+                    elif "type" in schema_root and schema_root["type"] == "schemaversion":
+                        # the reference pointed to a schema version definition
+                        schema_version = schema_root
+
+                    if schema_version:
+                        # case c): if the schema version contains a schemaUrl attribute, then we need to
+                        # add the schemaUrl to the list of schemas to be processed and continue
+                        if "schemaUrl" in schema_version:
+                            schema_url = schema_version["schemaUrl"]
+                            if schema_url not in schema_files_collected:
+                                schema_files_collected.add(schema_url)
+                            continue
+                        elif "schema" in schema_version:
+                            # case b): the schema version does not contain a schemaUrl attribute, so we
+                            # assume that the schema is inline and we can proceed to render it
+                            schema_root = schema_version["schema"]
+                            current_url = schema_reference
+                            render_schema_templates("json", schema_template_dir, project_name, language,
+                                                    output_dir, definitions_file, schema_root, schema_env)
+                            continue
+                        else:
+                            print("Warning: unable to find schema reference " + schema_reference)
+
+                    else:
+                        # case a): the reference pointed to an inline schema in the message definition
+                        render_schema_templates("json", schema_template_dir, project_name, language,
+                                                    output_dir, definitions_file, schema_root, schema_env)
+                        continue
+
+                    render_schema_templates("json", schema_template_dir, project_name, language,
+                                            output_dir, definitions_file, schema_root, schema_env)
+                else:
+                    print("Warning: unable to find schema reference " + schema_reference)
+            
+    # reset the references collected in this file 
+    schema_references_collected = set()
+
     if style == "schema":
-        render_schema_templates("json", template_dir, project_name, language,
-                                output_dir, definitions_file, docroot, env)
+        render_schema_templates("json", schema_template_dir, project_name, language,
+                                output_dir, definitions_file, docroot, schema_env)
 
 
 # for templates, except in _schemas, the filename may lead (!) with the
@@ -192,7 +306,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 # remains anchored at "groups"
 def render_code_templates(project_name, style, output_dir, docroot,
                           template_dir, env):
-
+    class_name = None
     for root, dirs, files in os.walk(template_dir):
         for file in files:
             if not file.endswith(".jinja") or file.startswith("_"):
@@ -201,25 +315,30 @@ def render_code_templates(project_name, style, output_dir, docroot,
             template_path = file
             # all codegen for CE is anchored on the included groups
             scope = docroot
-            
+
             file_dir = file_dir_base = output_dir
             ## strip the jinja suffix
             file_name_base = file[:-6]
             template = env.get_template(template_path)
-            file_name_base = file_name_base.replace("{projectname}", pascal(project_name))
+            file_name_base = file_name_base.replace("{projectname}",
+                                                    pascal(project_name))
             file_name = file_name_base
             if file_name.startswith("{class") and "groups" in scope:
-                
+
                 if "endpoints" in docroot: endpoints = docroot["endpoints"]
                 else: endpoints = None
-                if "schemagroups" in docroot: schemagroups = docroot["schemagroups"]
-                else: schemagroups = None
+                if "schemagroups" in docroot:
+                    schemagroups = docroot["schemagroups"]
+                else:
+                    schemagroups = None
 
                 for id, group in scope["groups"].items():
                     # create a snippet that only has the current group
-                    subscope = {"endpoints" : endpoints, 
-                                "schemagroups" : schemagroups,
-                                "groups" : { }}                    
+                    subscope = {
+                        "endpoints": endpoints,
+                        "schemagroups": schemagroups,
+                        "groups": {}
+                    }
                     subscope["groups"][id] = group
                     scope_parts = id.split(".")
                     package_name = id
@@ -229,67 +348,82 @@ def render_code_templates(project_name, style, output_dir, docroot,
                     if file_name_base.startswith("{classdir}"):
                         file_dir = os.path.join(file_dir_base,
                                                 package_name.replace(".", "/"))
-                        file_name = file_name_base.replace("{classdir}", pascal(class_name))
+                        file_name = file_name_base.replace(
+                            "{classdir}", pascal(class_name))
                     else:
-                        file_name = file_name_base.replace("{classfull}", id).replace("{classname}", pascal(class_name))
-                    render_template(project_name, subscope, file_dir, file_name, template)
+                        file_name = file_name_base.replace(
+                            "{classfull}", id).replace("{classname}",
+                                                       pascal(class_name))
+                    render_template(project_name, class_name, subscope, file_dir,
+                                    file_name, template)
                 continue  # skip back to the outer loop
 
-            render_template(project_name, scope, file_dir, file_name, template)
+            render_template(project_name, class_name, scope, file_dir, file_name, template)
 
 
 def render_schema_templates(schema_type, template_dir, project_name, language,
                             output_dir, definitions_file, docroot, env):
     scope = docroot
     file_dir = file_dir_base = output_dir
+    class_name = os.path.basename(definitions_file).split(".")[0]
     schema_files = glob.glob(
-        os.path.join(template_dir, "_{schema_type}.*.jinja".format(schema_type=schema_type)))
+        os.path.join(template_dir,
+                     "_{schema_type}.*.jinja".format(schema_type=schema_type)))
     for schema_file in schema_files:
-        # we needed to add the template_dir to the path for glob, 
+        # we needed to add the template_dir to the path for glob,
         # but strip it back out here since we operate on teh plain name
         schema_file = os.path.basename(schema_file)
         template = env.get_template(schema_file)
         file_name_base = schema_file[len(schema_type) + 2:][:-6]
-        # if the file name is just the language indicator, 
+       
+        # if the file name is just the language indicator,
         # eg. "cs", take the filename of the schema doc
         if file_name_base == language:
-            file_name_base = os.path.basename(definitions_file).split(".")[0] + "." + language
-        file_name_base = file_name_base.replace("{projectname}", pascal(project_name))
+            file_name_base = pascal(class_name) + "." + language
+        file_name_base = file_name_base.replace("{projectname}",
+                                                pascal(project_name))
         file_name = file_name_base
-        if file_name_base.startswith("{class") and "definitions" in scope:
-            for id, definition in scope['definitions'].items():
-                subscope = {"definitions": {}}
-                subscope['definitions'][id] = definition
-                scope_parts = id.split(".")
-                package_name = ".".join(scope_parts[:-1])
-                if not package_name:
-                    package_name = project_name
-                class_name = scope_parts[-1]
-                if file_name_base.startswith("{classdir}"):
-                    file_dir = os.path.join(file_dir_base,
-                                            package_name.replace(".", "/"))
-                    file_name = file_name_base.replace("{classdir}", pascal(class_name))
-                else:
-                    file_name = file_name_base.replace("{classfull}", id).replace(
-                        "{classname}", pascal(class_name))
-                render_template(project_name, subscope, file_dir, file_name,
-                                template)
+        if file_name_base.startswith("{class"):
+            if "definitions" in scope:
+                for id, definition in scope['definitions'].items():
+                    subscope = {"definitions": {}}
+                    subscope['definitions'][id] = definition
+                    scope_parts = id.split(".")
+                    package_name = ".".join(scope_parts[:-1])
+                    if not package_name:
+                        package_name = project_name
+                    class_name = scope_parts[-1]
+                    if file_name_base.startswith("{classdir}"):
+                        file_dir = os.path.join(file_dir_base,
+                                                package_name.replace(".", "/"))
+                        file_name = file_name_base.replace(
+                            "{classdir}", pascal(class_name))
+                    else:
+                        file_name = file_name_base.replace(
+                            "{classfull}", id).replace("{classname}",
+                                                       pascal(class_name))
+                    render_template(project_name, class_name, subscope, file_dir,
+                                    file_name, template)
             continue  # skip back to the outer loop
 
-        render_template(project_name, scope, file_dir, file_name, template)
+        render_template(project_name, class_name, scope, file_dir, file_name, template)
 
 
-def render_template(project_name, scope, file_dir, file_name, template):
-    output_path = os.path.join(os.getcwd(), file_dir, file_name)
-
-    if not os.path.exists(os.path.dirname(output_path)):
-        os.makedirs(os.path.dirname(output_path))
-
+def render_template(project_name, class_name, scope, file_dir, file_name, template):
     try:
-        with open(output_path, "w") as f:
-            f.write(template.render(root=scope, project_name=project_name))
-    except ExitException:
-        os.remove(output_path)
+        output_path = os.path.join(os.getcwd(), file_dir, file_name)
+
+        if not os.path.exists(os.path.dirname(output_path)):
+            os.makedirs(os.path.dirname(output_path))
+
+        try:
+            with open(output_path, "w") as f:
+                f.write(template.render(root=scope, project_name=project_name, class_name=class_name))
+        except ExitException:
+            os.remove(output_path)
+    except Exception as err:
+        print(err)
+        exit(1)
 
 
 # Load the definition file, which may be a JSON Schema
@@ -331,13 +465,15 @@ def load_definitions_core(definitions_file: str, style: str, headers: dict):
     except IOError as e:
         print("An error occurred while trying to access the file: ", e)
         return None, None
-    
+
     return definitions_file, docroot
+
 
 def load_definitions(definitions_file: str, style: str, headers: dict):
     # for a CloudEvents message definition group, we
     # normalize the document to be a groups doc
-    definitions_file, docroot = load_definitions_core(definitions_file, style, headers)
+    definitions_file, docroot = load_definitions_core(definitions_file, style,
+                                                      headers)
 
     if style == "schema":
         return definitions_file, docroot
@@ -347,25 +483,29 @@ def load_definitions(definitions_file: str, style: str, headers: dict):
             print("unsupported schema:" + docroot["$schema"])
             return None, None
     if "groupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["groupsUrl"], style, headers)
+        _, subroot = load_definitions_core(docroot["groupsUrl"], style,
+                                           headers)
         docroot["groups"] = subroot
         docroot["groupsUrl"] = None
     if "schemagroupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["schemagroupsUrl"], style, headers)
+        _, subroot = load_definitions_core(docroot["schemagroupsUrl"], style,
+                                           headers)
         docroot["schemagroups"] = subroot
         docroot["schemagroupsUrl"] = None
     if "endpointsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["endpointsUrl"], style, headers)
+        _, subroot = load_definitions_core(docroot["endpointsUrl"], style,
+                                           headers)
         docroot["endpoints"] = subroot
         docroot["endpointsUrl"] = None
-    
+
     # make sure the document is always of the same form, even if
-    # the URL was a deep link. We can drill to the level of an 
+    # the URL was a deep link. We can drill to the level of an
     # endpoint, a group, or a schemagroup
-    newroot = {"$schema" : "https://cloudevents.io/schemas/discovery" }
-    
-    # the doc is an dict 
-    if isinstance(docroot, dict) and "type" in docroot[list(docroot.keys())[0]]:
+    newroot = {"$schema": "https://cloudevents.io/schemas/discovery"}
+
+    # the doc is an dict
+    if isinstance(docroot, dict) and "type" in docroot[list(
+            docroot.keys())[0]]:
         dictentry = docroot[list(docroot.keys())[0]]
         if dictentry["type"] == "group":
             newroot["groups"] = docroot
@@ -378,19 +518,19 @@ def load_definitions(definitions_file: str, style: str, headers: dict):
             return None, None
         docroot = newroot
 
-    # the doc is an object 
+    # the doc is an object
     elif "type" in docroot:
         if docroot["type"] == "group":
-            newroot["groups"] = { docroot["id"] : docroot }
+            newroot["groups"] = {docroot["id"]: docroot}
         elif docroot["type"] == "schemagroup":
-            newroot["schemagroups"] = { docroot["id"] : docroot }
+            newroot["schemagroups"] = {docroot["id"]: docroot}
         elif docroot["type"] == "endpoints":
-            newroot["endpoints"] = { docroot["id"] : docroot }
+            newroot["endpoints"] = {docroot["id"]: docroot}
         else:
             print("unknown type:" + docroot["type"])
             return None, None
         docroot = newroot
-        
+
     return definitions_file, docroot
 
 
@@ -403,6 +543,7 @@ def setup_jinja_env(template_dir):
     env.filters['pascal'] = pascal
     env.filters['snake'] = snake
     env.filters['strip_namespace'] = strip_namespace
+    env.filters['namespace'] = namespace
     env.filters['concat_namespace'] = concat_namespace
     env.filters['schema_type'] = schema_type
     env.filters['camel_case'] = camel_case
@@ -459,7 +600,8 @@ def main():
     generate(args.project_name, args.language, args.style, args.output_dir,
              args.definitions_file, headers)
 
-    for schema in schemas:
+    # generate external schemas
+    for schema in schema_files_collected:
         generate(args.project_name, args.language, "schema", args.output_dir,
                  schema, headers)
 

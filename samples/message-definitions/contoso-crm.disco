@@ -1,0 +1,701 @@
+{
+    "$schema": "https://cloudevents.io/schemas/discovery",
+    "specversion": "0.5-wip",
+    "endpoints": {
+        "Contoso.CRM.Eventing.Http": {
+            "type": "endpoint",
+            "id": "Contoso.CRM.Eventing.Http",
+            "usage": "producer",
+            "config": {
+                "protocol": "HTTP",
+                "strict": false,
+                "endpoints": [
+                    "https://erpsystem.com/events"
+                ]
+            },
+            "groups": [
+                "#/groups/Contoso.CRM.Events"
+            ],
+            "format": "CloudEvents/1.0"
+        }
+    },
+    "groups": {
+        "Contoso.CRM.Events": {
+            "id": "Contoso.CRM.Events",
+            "type": "group",
+            "definitions": {
+                "Contoso.CRM.Events.CustomerCreated": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerCreated",
+                    "description": "An order has been placed",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerCreated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerCreatedEventData"
+                },
+                "Contoso.CRM.Events.CustomerUpdated": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerUpdated",
+                    "description": "An order has been placed",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerUpdated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerUpdatedEventData"
+                },
+                "Contoso.CRM.Events.CustomerDeleted": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerDeleted",
+                    "description": "A customer has been deleted",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerDeleted",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerDeletedEventData"
+                },
+                "Contoso.CRM.Events.CustomerStatusUpdated": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerStatusUpdated",
+                    "description": "A customer's status has been updated",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerStatusUpdated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerStatusUpdatedEventData"
+                },
+                "Contoso.CRM.Events.CustomerAddressUpdated": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerAddressUpdated",
+                    "description": "A customer's address has been updated",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerAddressUpdated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerAddressUpdatedEventData"
+                },
+                "Contoso.CRM.Events.CustomerContactUpdated": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerContactUpdated",
+                    "description": "A customer's contact information has been updated",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerContactUpdated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerContactUpdatedEventData"
+                },
+                "Contoso.CRM.Events.CustomerNoteAdded": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerNoteAdded",
+                    "description": "A note has been added to a customer",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerNoteAdded",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteAddedEventData"
+                },
+                "Contoso.CRM.Events.CustomerNoteDeleted": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerNoteDeleted",
+                    "description": "A note has been deleted from a customer",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerNoteDeleted",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteDeletedEventData"
+                },
+                "Contoso.CRM.Events.CustomerNoteUpdated": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerNoteUpdated",
+                    "description": "A note has been updated on a customer",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerNoteUpdated",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteUpdatedEventData"
+                },
+                "Contoso.CRM.Events.CustomerContactAdded": {
+                    "type": "cloudevent",
+                    "id": "Contoso.CRM.Events.CustomerContactAdded",
+                    "description": "A contact has been added to a customer",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true,
+                                "description": "The unique identifier of the event"
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.CRM.Events.CustomerContactAdded",
+                                "required": true,
+                                "description": "The type of the event"
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true,
+                                "description": "The time the event occurred"
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/crm/customers",
+                                "required": true,
+                                "description": "The source of the event"
+                            },
+                            "subject": {
+                                "type": "string",
+                                "required": false,
+                                "description": "The subject of the event"
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerContactAddedEventData"
+                }
+            }
+        }
+    },
+    "schemagroups": {
+        "type" : "schemagroups",
+        "Contoso.CRM.Events": {
+            "schemas": {
+                "customerAddressUpdatedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "address": {
+                                        "type": "object",
+                                        "description": "The customer's address",
+                                        "required": true,
+                                        "properties": {
+                                            "street": {
+                                                "type": "string",
+                                                "description": "The customer's street",
+                                                "required": true
+                                            },
+                                            "city": {
+                                                "type": "string",
+                                                "description": "The customer's city",
+                                                "required": true
+                                            },
+                                            "state": {
+                                                "type": "string",
+                                                "description": "The customer's state",
+                                                "required": true
+                                            },
+                                            "zip": {
+                                                "type": "string",
+                                                "description": "The customer's zip code",
+                                                "required": true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerNoteAddedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "note": {
+                                        "type": "object",
+                                        "description": "The note that was added to the customer",
+                                        "required": true,
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "description": "The unique identifier of the note",
+                                                "required": true
+                                            },
+                                            "text": {
+                                                "type": "string",
+                                                "description": "The text of the note",
+                                                "required": true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerNoteDeletedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "noteId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the note that was deleted",
+                                        "required": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerNoteUpdatedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "note": {
+                                        "type": "object",
+                                        "description": "The note that was updated on the customer",
+                                        "required": true,
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "description": "The unique identifier of the note",
+                                                "required": true
+                                            },
+                                            "text": {
+                                                "type": "string",
+                                                "description": "The text of the note",
+                                                "required": true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerContactAddedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "contact": {
+                                        "type": "object",
+                                        "description": "The contact that was added to the customer",
+                                        "required": true,
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "description": "The unique identifier of the contact",
+                                                "required": true
+                                            },
+                                            "name": {
+                                                "type": "string",
+                                                "description": "The name of the contact",
+                                                "required": true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerContactDeletedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "contactId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the contact that was deleted",
+                                        "required": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerContactUpdatedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "contact": {
+                                        "type": "object",
+                                        "description": "The contact that was updated on the customer",
+                                        "required": true,
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "description": "The unique identifier of the contact",
+                                                "required": true
+                                            },
+                                            "name": {
+                                                "type": "string",
+                                                "description": "The name of the contact",
+                                                "required": true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerCreatedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The name of the customer",
+                                        "required": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerStatusUpdatedEventData" : {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "description": "The status of the customer",
+                                        "required": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerDeletedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The name of the customer",
+                                        "required": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "customerUpdatedEventData": {
+                    "type" : "schema",
+                    "versions": {
+                        "1.0": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "customerId": {
+                                        "type": "string",
+                                        "description": "The unique identifier of the customer",
+                                        "required": true
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The name of the customer",
+                                        "required": true
+                                    },
+                                    "address": {
+                                        "type": "object",
+                                        "description": "The address of the customer",
+                                        "required": true,
+                                        "properties": {
+                                            "street": {
+                                                "type": "string",
+                                                "description": "The street of the address",
+                                                "required": true
+                                            },
+                                            "city": {
+                                                "type": "string",
+                                                "description": "The city of the address",
+                                                "required": true
+                                            },
+                                            "state": {
+                                                "type": "string",
+                                                "description": "The state of the address",
+                                                "required": true
+                                            },
+                                            "zip": {
+                                                "type": "string",
+                                                "description": "The zip code of the address",
+                                                "required": true
+                                            }
+                                        }
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "description": "The phone number of the customer",
+                                        "required": true
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "description": "The email address of the customer",
+                                        "required": true
+                                    },
+                                    "website": {
+                                        "type": "string",
+                                        "description": "The website of the customer",
+                                        "required": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
