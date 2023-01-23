@@ -552,6 +552,7 @@ def setup_jinja_env(template_dir):
 
 
 def main():
+   
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser()
 
@@ -596,6 +597,17 @@ def main():
     else:
         headers = {}
 
+    # initialize globals
+    global schemas_handled
+    global schema_files_collected
+    global schema_references_collected
+    global current_url
+
+    schema_files_collected = set()
+    schemas_handled = set()
+    schema_references_collected = set()
+    current_url = None
+
     # Call the generate() function with the parsed arguments
     generate(args.project_name, args.language, args.style, args.output_dir,
              args.definitions_file, headers)
@@ -604,6 +616,7 @@ def main():
     for schema in schema_files_collected:
         generate(args.project_name, args.language, "schema", args.output_dir,
                  schema, headers)
+    
 
 
 if __name__ == "__main__":

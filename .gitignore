@@ -3,3 +3,5 @@ tmp/
 build/
 .vscode/
 __pycache__/
+.pytest_cache/
+dist/
