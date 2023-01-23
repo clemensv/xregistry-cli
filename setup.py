@@ -1,11 +1,12 @@
 import setuptools
+import os
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="cedisco_codegen",
-    version="0.0.1",
+    version=os.environ.get('CEDISCO_CODEGEN_VERSION', '0.0.1'),
     author="Clemens Vasters",
     author_email="clemensv@microsoft.com",
     description="A code generator for CloudEvents definitions",

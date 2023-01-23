@@ -24,7 +24,7 @@ jobs:
       uses: battila7/get-version-action@v2
     - name: Set version environment variable
       run: |
-        echo "VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
+        echo "CEDISCO_CODEGEN_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
     - name: Build package
       run: |
         python setup.py sdist -d dist
@@ -40,7 +40,7 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/cedisco-codegen-${{ env.VERSION }}.tar.gz
-        asset_name: cedisco-codegen-${{ env.VERSION }}.tar.gz
+        asset_path: dist/cedisco-codegen-${{steps.get_version.outputs.version-without-v}}.tar.gz
+        asset_name: cedisco-codegen-${{steps.get_version.outputs.version-without-v}}.tar.gz
         asset_content_type: application/gzip
     
