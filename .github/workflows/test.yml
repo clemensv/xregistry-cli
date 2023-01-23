@@ -1,0 +1,45 @@
+name: Python Test
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Set up .NET SDK 6.0
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 6.0
+    # section only required while we need the temp package
+    - run: mkdir $GITHUB_WORKSPACE/packages
+    - run: echo "CEDISCO_NUGET_LOCAL_FEED=$GITHUB_WORKSPACE/packages" >> $GITHUB_ENV
+    - name: Get CloudNative.CloudEvents.Endpoint package code
+      uses: actions/checkout@v3
+      with:
+        repository: clemensv/CloudNative.CloudEvents.Endpoints
+        path: csendpoints
+    - name: build CloudNative.CloudEvents.Endpoint package code
+      run: dotnet build $GITHUB_WORKSPACE/csendpoints/source/CloudNative.CloudEvents.Endpoints.csproj
+    - name: create package into temp feed 
+      run: dotnet pack --output $GITHUB_WORKSPACE/packages $GITHUB_WORKSPACE/csendpoints/source/CloudNative.CloudEvents.Endpoints.csproj 
+    # end section
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Run tests
+      run: |
+        pytest
+

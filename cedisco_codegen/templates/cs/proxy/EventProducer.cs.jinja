@@ -95,7 +95,7 @@
             {%- endif -%}
             {%- if attrname in [ "source", "dataschema"] -%}
                 {%- set attrProp = attrname | pascal | replace("Dataschema", "DataSchema") %}
-                {{ attrProp }} = {% if attribute.value -%}new Uri($"{{ attribute.value }}"){%- else -%}{{ attrname }}{%- endif -%},
+                {{ attrProp }} = {% if attribute.value -%}new Uri($"{{ attribute.value }}", UriKind.RelativeOrAbsolute){%- else -%}{{ attrname }}{%- endif -%},
             {%- endif -%}
             {%- if attrname in ["time"] %}
                 {{ attrname | pascal }} = {% if attribute.value -%}

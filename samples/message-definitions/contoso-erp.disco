@@ -63,10 +63,10 @@
         "Contoso.ERP.Events": {
             "type": "group",
             "definitions": {
-                "Contoso.ERP.Events.OrderPlaced": {
+                "Contoso.ERP.Events.ReservationPlaced": {
                     "type": "cloudevent",
-                    "id": "Contoso.ERP.Events.OrderPlaced",
-                    "description": "An order has been placed",
+                    "id": "Contoso.ERP.Events.ReservationPlaced",
+                    "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
                     "metadata": {
                         "attributes": {
@@ -76,7 +76,7 @@
                             },
                             "type": {
                                 "type": "string",
-                                "value": "Contoso.ERP.Events.OrderPlaced",
+                                "value": "Contoso.ERP.Events.ReservationPlaced",
                                 "required": true
                             },
                             "time": {
@@ -120,35 +120,6 @@
                         }
                     },
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/paymentData"
-                },
-                "Contoso.ERP.Events.OrderShipped": {
-                    "type": "cloudevent",
-                    "id": "Contoso.ERP.Events.OrderShipped",
-                    "description": "An order has been shipped",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                        "attributes": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.ERP.Events.OrderShipped",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/erp/orders",
-                                "required": true
-                            }
-                        }
-                    },
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
                 },
                 "Contoso.ERP.Events.ShipmentAccepted": {
                     "type": "cloudevent",
@@ -237,10 +208,10 @@
                     },
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/returnData"
                 },
-                "Contoso.ERP.Events.OrderCancelled": {
+                "Contoso.ERP.Events.ReservationCancelled": {
                     "type": "cloudevent",
-                    "id": "Contoso.ERP.Events.OrderCancelled",
-                    "description": "An order has been cancelled",
+                    "id": "Contoso.ERP.Events.ReservationCancelled",
+                    "description": "A reservation has been cancelled",
                     "format": "CloudEvents/1.0",
                     "metadata": {
                         "attributes": {
@@ -250,7 +221,7 @@
                             },
                             "type": {
                                 "type": "string",
-                                "value": "Contoso.ERP.Events.OrderCancelled",
+                                "value": "Contoso.ERP.Events.ReservationCancelled",
                                 "required": true
                             },
                             "time": {
@@ -266,10 +237,10 @@
                     },
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData"
                 },
-                "Contoso.ERP.Events.OrderRefunded": {
+                "Contoso.ERP.Events.ReservationRefunded": {
                     "type": "cloudevent",
-                    "id": "Contoso.ERP.Events.OrderRefunded",
-                    "description": "An order has been refunded",
+                    "id": "Contoso.ERP.Events.ReservationRefunded",
+                    "description": "A reservation has been refunded",
                     "format": "CloudEvents/1.0",
                     "metadata": {
                         "attributes": {
@@ -279,7 +250,7 @@
                             },
                             "type": {
                                 "type": "string",
-                                "value": "Contoso.ERP.Events.OrderRefunded",
+                                "value": "Contoso.ERP.Events.ReservationRefunded",
                                 "required": true
                             },
                             "time": {
@@ -309,7 +280,7 @@
                             },
                             "type": {
                                 "type": "string",
-                                "value": "inventoryupdated",
+                                "value": "Contoso.ERP.Events.InventoryUpdated",
                                 "description": "The type of the inventory update event",
                                 "required": true
                             },
