@@ -27,7 +27,7 @@ jobs:
         echo "VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
     - name: Build package
       run: |
-        python setup.py sdist
+        python setup.py sdist -d dist
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
