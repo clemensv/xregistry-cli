@@ -1,0 +1,10 @@
+{
+    "fileAssociations": [
+        { "extension": "disco", "icon": "disco" }
+    ],
+    "iconDefinitions": {
+        "disco": {
+            "iconPath": "./icons/cloudevents-icon-color.svg"
+        }
+    }
+}

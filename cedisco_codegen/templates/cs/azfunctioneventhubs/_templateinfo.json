@@ -1,0 +1,4 @@
+{
+    "description" : "C# Azure Function with Azure Event Hubs trigger",
+    "priority" : 2
+}

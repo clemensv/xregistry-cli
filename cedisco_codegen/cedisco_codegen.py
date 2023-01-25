@@ -1,5 +1,6 @@
 import os
 import json
+import yaml
 import jinja2
 import urllib.request
 import re
@@ -108,32 +109,40 @@ def camel_case(string):
         camel_case += word.capitalize()
     return camel_case
 
+# Jinja filter that left-justified pads a string with spaces
+# to the specified length
+def pad(string, length):
+    if string:
+        return string.ljust(length)
+    return string
 
-# Jina filter that strips the namespace/package portion off
+
+# Jinja filter that strips the namespace/package portion off
 # an expression. Assumes dot-notation, e.g. namespace.class
 def strip_namespace(class_reference):
     if class_reference:
         return re.sub(r'^.+\.', '', class_reference)
     return class_reference
 
-# Jina filter that gets the namespace/package portion off
+# Jinja filter that gets the namespace/package portion off
 # an expression. Assumes dot-notation, e.g. namespace.class
 def namespace(class_reference):
     if class_reference:
         return re.sub(r'\.[^.]+$', '', class_reference)
     return class_reference
     
-
-
-# Jina filter that concats the namespace/package portions of
+# Jinja filter that concats the namespace/package portions of
 # an expression, removing the dots.
 def concat_namespace(class_reference):
     if class_reference:
         return "".join(class_reference.split("."))
     return class_reference
 
+# Jinja filter that formats the given object as YAML
+def toyaml(obj : any, indent : int = 4):
+    return yaml.dump(obj, default_flow_style=False, indent=indent)
 
-# Jina filter that determines the type name of an expression
+# Jinja filter that determines the type name of an expression
 # given a schema URL, specifically in CloudEvents' dataschema
 # attribute. Schema URLs are collected by the filter as a side
 # effect and then given to the generator
@@ -548,6 +557,8 @@ def setup_jinja_env(template_dir):
     env.filters['schema_type'] = schema_type
     env.filters['camel_case'] = camel_case
     env.filters['csharp_identifier'] = csharp_identifier
+    env.filters['pad'] = pad
+    env.filters['toyaml'] = toyaml
     return env
 
 

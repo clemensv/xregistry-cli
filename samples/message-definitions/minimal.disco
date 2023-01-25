@@ -1,13 +1,16 @@
 {
     "$schema": "https://cloudevents.io/schemas/discovery",
     "specversion": "0.5-wip",
+    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "groups": {
-        "mygroup": {
+        "Contoso.ERP.Events": {
             "type": "group",
+            "id": "Contoso.ERP.Events",
             "definitions": {
-                "myevent": {
+                "Contoso.ERP.Events.ReservationPlaced": {
                     "type": "cloudevent",
-                    "id": "myevent",
+                    "id": "Contoso.ERP.Events.ReservationPlaced",
+                    "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
                     "metadata": {
                         "attributes": {
@@ -17,7 +20,7 @@
                             },
                             "type": {
                                 "type": "string",
-                                "value": "myevent",
+                                "value": "Contoso.ERP.Events.ReservationPlaced",
                                 "required": true
                             },
                             "time": {
@@ -26,8 +29,54 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/me",
+                                "value": "/erp/orders",
                                 "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
+                }
+            }
+        }
+    },
+    "schemagroups": {
+        "Contoso.ERP.Events": {
+            "schemas": {
+                "orderData": {
+                    "type": "schema",
+                    "versions": {
+                        "1": {
+                            "type": "schemaversion",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "orderId": {
+                                        "type": "string"
+                                    },
+                                    "customerId": {
+                                        "type": "string"
+                                    },
+                                    "total": {
+                                        "type": "number"
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "productId": {
+                                                    "type": "string"
+                                                },
+                                                "quantity": {
+                                                    "type": "number"
+                                                },
+                                                "price": {
+                                                    "type": "number"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

@@ -1,0 +1,92 @@
+{
+    "name": "cedisco-codegen",
+    "version": "0.0.2",
+    "displayName": "CEDisco Code Generator",
+    "description": "Code Generation for CloudEvents Discovery",
+    "publisher": "cedisco",
+    "license": "SEE LICENSE IN LICENSE.txt",
+    "icon": "cloudevents-icon-color.png",
+    "galleryBanner": {
+        "color": "#0078d7",
+        "theme": "light"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/clemensv/cedisco-codegen/cedisco_codegen_vscode"
+    },
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:cedisco-codegen.generate",
+        "onCommand:cedisco-codegen.file-actions"
+    ],
+    "main": "./out/extension.js",
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "*.disco"
+            ],
+            "url": "./schemas/ce_discovery_doc.json"
+        }
+    ],
+    "contributes": {
+        "commands": [
+            {
+                "command": "cedisco-codegen.generate",
+                "title": "CEDisco: Generate Code"
+            },
+            {
+                "command": "cedisco-codegen.file-actions",
+                "title": "CEDisco: Generate Code"
+            }
+        ],
+        "languages": [
+            {
+              "id": "json",
+
+                "aliases": [
+                    "CloudEvents Discovery"
+                ],
+                "extensions": [
+                    ".disco"
+                ],
+                "icon": {
+                    "light": "./themes/icons/cloudevents-icon-color.svg",
+                    "dark": "./themes/icons/cloudevents-icon-color.svg"
+                }
+            }
+          ],
+        "menus" : {
+            "explorer/context": [
+                {
+                    "label": "CEDisco: Generate Code",
+                    "command": "cedisco-codegen.file-actions",
+                    "group": "navigation",
+                    "when": "resourceExtname == disco"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run package",
+        "compile": "node ./esbuild.js",
+        "package": "cross-env NODE_ENV=production node ./esbuild.js",
+        "watch": "node ./esbuild.js --watch"
+    },
+    "dependencies": {
+        "@types/vscode": "^1.74.0",
+        "@vscode/webview-ui-toolkit": "^1.2.1",
+        "typescript": "^4.9.4"
+    },
+    "devDependencies": {
+        "@types/node": "^18.0.0",
+        "@types/vscode": "^1.74.0",
+        "@types/vscode-webview": "^1.57.1",
+        "esbuild": "^0.17.4",
+        "esbuild-plugin-copy": "^2.0.1"
+    }
+}

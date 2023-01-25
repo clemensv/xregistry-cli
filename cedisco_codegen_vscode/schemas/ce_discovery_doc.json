@@ -1,0 +1,1005 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "https://cloudevents.io/2022-12/discovery",
+  "title": "JSON Schema for CloudEvents Registry Docs",
+  "allOf": [
+    { "$ref": "#/components/schemas/manifest" }
+  ],
+  "components": {
+    "schemas": {
+      "manifest": {
+        "type": "object",
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "default": "https://cloudevents.io/schemas/discovery"
+          },
+          "specversion": {
+            "type": "string",
+            "default": "0.5-wip"
+          },
+          "endpoints": {
+            "$ref": "#/components/schemas/endpoints"
+          },
+          "endpointsUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "groups": {
+            "$ref": "#/components/schemas/groups"
+          },
+          "groupsUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "schemagroups": {
+            "$ref": "#/components/schemas/schemaGroups"
+          },
+          "schemagroupsUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "reference": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A unique identifier",
+            "format": "uri-reference"
+          },
+          "epoch": {
+            "type": "integer",
+            "description": "A number representing the version number of the resource.",
+            "format": "int64"
+          }
+        }
+      },
+      "groupReference": {
+        "$ref": "#/components/schemas/reference"
+      },
+      "groupReferences": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/groupReference"
+        }
+      },
+      "groupUriReferences": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "group": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` value of the Definitions associated with this Endpoint."
+          },
+          "definitions": {
+            "$ref": "#/components/schemas/definitions"
+          },
+          "definitionsUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "groups": {
+            "$ref": "#/components/schemas/groups"
+          },
+          "groupsUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          }
+        ]
+      },
+      "definitionReference": {
+        "$ref": "#/components/schemas/reference"
+      },
+      "definitionReferences": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/definitionReference"
+        }
+      },
+      "definition": {
+        "type": "object",
+        "description": "a message definition",
+        "properties": {
+          "schemaurl": {
+            "type": "string",
+            "description": "A URL to the schema of the message's data.",
+            "format": "uri"
+          },
+          "schema": {
+            "type": "object",
+            "description": "An in-line definition of the schema of the message's data."
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          }
+        ]
+      },
+      "cloudEventDefinition": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
+            "default": "CloudEvents/1.0"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/cloudEventMetadata"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/definition"
+          }
+        ]
+      },
+      "amqpDefinition": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
+            "default": "AMQP/1.0"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/amqpMetadata"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/definition"
+          }
+        ]
+      },
+      "mqttDefinition": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
+            "default": "MQTT/5.0"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/mqttMetadata"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/definition"
+          }
+        ]
+      },
+      "genericDefinition": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` value of the Definitions associated with this Endpoint."
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/definition"
+          }
+        ]
+      },
+      "amqpMetadata": {
+        "type": "object",
+        "properties": {
+          "application-properties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/metadataProperty"
+            }
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "message-id": {
+                "$ref": "#/components/schemas/metadataPropertyString"
+              },
+              "user-id": {
+                "$ref": "#/components/schemas/metadataPropertyBinary"
+              },
+              "to": {
+                "$ref": "#/components/schemas/metadataPropertyUriTemplate"
+              },
+              "subject": {
+                "$ref": "#/components/schemas/metadataPropertyString"
+              },
+              "reply-to": {
+                "$ref": "#/components/schemas/metadataPropertyUriTemplate"
+              },
+              "correlation-id": {
+                "$ref": "#/components/schemas/metadataPropertyString"
+              },
+              "content-type": {
+                "$ref": "#/components/schemas/metadataPropertySymbol"
+              },
+              "content-encoding": {
+                "$ref": "#/components/schemas/metadataPropertySymbol"
+              },
+              "absolute-expiry-time": {
+                "$ref": "#/components/schemas/metadataPropertyDateTime"
+              },
+              "creation-time": {
+                "$ref": "#/components/schemas/metadataPropertyDateTime"
+              },
+              "group-id": {
+                "$ref": "#/components/schemas/metadataPropertyString"
+              },
+              "group-sequence": {
+                "$ref": "#/components/schemas/metadataPropertyInteger"
+              },
+              "reply-to-group-id": {
+                "$ref": "#/components/schemas/metadataPropertyString"
+              }
+            }
+          },
+          "delivery-annotations": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/metadataProperty"
+            }
+          },
+          "message-annotations": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/metadataProperty"
+            }
+          },
+          "header": {
+            "type": "object",
+            "properties": {
+              "durable": {
+                "$ref": "#/components/schemas/metadataPropertyBoolean"
+              },
+              "priority": {
+                "$ref": "#/components/schemas/metadataPropertyInteger"
+              },
+              "ttl": {
+                "$ref": "#/components/schemas/metadataPropertyInteger"
+              },
+              "first-acquirer": {
+                "$ref": "#/components/schemas/metadataPropertyBoolean"
+              },
+              "delivery-count": {
+                "$ref": "#/components/schemas/metadataPropertyInteger"
+              }
+            }
+          },
+          "footer": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/metadataProperty"
+            }
+          }
+        }
+      },
+      "mqttMetadata": {
+        "type": "object",
+        "properties": {
+          "qos": {
+            "$ref": "#/components/schemas/metadataPropertyInteger"
+          },
+          "retain": {
+            "$ref": "#/components/schemas/metadataPropertyBoolean"
+          },
+          "topic-name": {
+            "$ref": "#/components/schemas/metadataPropertyUriTemplate"
+          },
+          "payload-format": {
+            "$ref": "#/components/schemas/metadataPropertyInteger"
+          },
+          "message-expiry-interval": {
+            "$ref": "#/components/schemas/metadataPropertyInteger"
+          },
+          "response-topic": {
+            "$ref": "#/components/schemas/metadataPropertyUriTemplate"
+          },
+          "correlation-data": {
+            "$ref": "#/components/schemas/metadataPropertyBinary"
+          },
+          "content-type": {
+            "$ref": "#/components/schemas/metadataPropertySymbol"
+          },
+          "user-properties": {
+            "type": "array",
+            "description": "User Property is allowed to appear multiple times to represent multiple name, value pairs. The same name is allowed to appear more than once.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "$ref": "#/components/schemas/metadataProperty"
+                }
+              }
+            }
+          }
+        }
+      },
+      "cloudEventMetadata": {
+        "type": "object",
+        "properties": {
+          "attributes": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/metadataPropertyString"
+              },
+              "type": {
+                "$ref": "#/components/schemas/metadataPropertyString"
+              },
+              "time": {
+                "$ref": "#/components/schemas/metadataPropertyDateTime"
+              },
+              "source": {
+                "$ref": "#/components/schemas/metadataPropertyUriTemplate"
+              },
+              "subject": {
+                "$ref": "#/components/schemas/metadataPropertyString"
+              },
+              "dataschema": {
+                "$ref": "#/components/schemas/metadataPropertyUriTemplate"
+              },
+              "datacontenttype": {
+                "$ref": "#/components/schemas/metadataPropertySymbol"
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/metadataProperty"
+            }
+          }
+        }
+      },
+      "metadataPropertyBase": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "var": "#/components/schemas/metadataProperty",
+            "boolean": "#/components/schemas/metadataPropertyBoolean",
+            "string": "#/components/schemas/metadataPropertyString",
+            "symbol": "#/components/schemas/metadataPropertySymbol",
+            "binary": "#/components/schemas/metadataPropertyBinary",
+            "datetime": "#/components/schemas/metadataPropertyDateTime",
+            "duration": "#/components/schemas/metadataPropertyDuration",
+            "uritemplate": "#/components/schemas/metadataPropertyUriTemplate",
+            "uri": "#/components/schemas/metadataPropertyUri",
+            "urireference": "#/components/schemas/metadataPropertyUriReference",
+            "number": "#/components/schemas/metadataPropertyNumber",
+            "integer": "#/components/schemas/metadataPropertyInteger"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "specurl": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "metadataProperty": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "object"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyBoolean": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyString": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertySymbol": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "pattern": "^[\\x32-\\x7F]*$"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyBinary": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "binary"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyDateTime": {
+        "description": "This is a date-time property, holding RFC3339 string expressions.",
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyDuration": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "duration"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyUriTemplate": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uri-template"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyInteger": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyNumber": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyUri": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "metadataPropertyUriReference": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uri-reference"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/metadataPropertyBase"
+          }
+        ]
+      },
+      "definitions": {
+        "type": "object",
+        "description": "A collection of Message Definitions.",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/definition"
+        }
+      },
+      "groups": {
+        "type": "object",
+        "description": "A set of Definition Groups.",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/group"
+        }
+      },
+      "resource": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "group": "#/components/schemas/group",
+            "definition": "#/components/schemas/definition",
+            "amqp": "#/components/schemas/amqpDefinition",
+            "mqtt": "#/components/schemas/mqttDefinition",
+            "cloudevent": "#/components/schemas/cloudEventDefinition",
+            "schemagroup": "#/components/schemas/schemaGroup",
+            "endpoint": "#/components/schemas/endpoint",
+            "schema": "#/components/schemas/schema",
+            "schemaversion": "#/components/schemas/schemaVersion"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "description": "A unique identifier for this Endpoint. This value MUST be globally unique",
+            "format": "uri-reference"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "Optional reference to a group that this resource is subordinate to",
+            "format": "uri-reference"
+          },
+          "version": {
+            "type": "integer",
+            "description": "A number representing the version number of the resource.",
+            "format": "int64"
+          },
+          "self": {
+            "type": "string",
+            "description": "A unique URI for the resource. The URI MUST be a combination of the base URI of the list of this resource type for the current Discovery Service appended with the `id` of this resource.",
+            "format": "uri"
+          },
+          "description": {
+            "type": "string",
+            "description": "A summary of the purpose of the resource."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the resource."
+          },
+          "docs": {
+            "type": "string",
+            "description": "Absolute URL that provides a link to additional documentation about the resource.",
+            "format": "uri"
+          },
+          "origin": {
+            "type": "string",
+            "description": "A URI reference to the original source of this resource.",
+            "format": "uri-reference"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "createdBy": {
+            "description": "Identity of who created this entity",
+            "type": "string"
+          },
+          "createdOn": {
+            "description": "Time when this entity was created",
+            "type": "string",
+            "format": "date-time"
+          },
+          "modifiedBy": {
+            "description": "Identity of who last modified this entity",
+            "type": "string"
+          },
+          "modifiedOn": {
+            "description": "Time when this entity was last modified",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "endpointReference": {
+        "$ref": "#/components/schemas/reference"
+      },
+      "endpointReferences": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/endpointReference"
+        }
+      },
+      "endpoints": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/endpoint"
+        }
+      },
+      "endpoint": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "description": "A string that can be used to correlate Endpoints"
+          },
+          "usage": {
+            "description": "The interaction model supported by this Endpoint",
+            "type": "string",
+            "enum": [
+              "consumer",
+              "producer",
+              "subscriber"
+            ]
+          },
+          "config": {
+            "$ref": "#/components/schemas/endpointConfig"
+          },
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` value of the Definitions associated with this Endpoint."
+          },
+          "deprecated": {
+            "type": "object",
+            "properties": {
+              "effective": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The time at which the endpoint will enter a deprecated state"
+              },
+              "removal": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The time at which the endpoint will be removed"
+              },
+              "alternative": {
+                "type": "string",
+                "format": "uri",
+                "description": "A URL to an possible alternative endpoint"
+              },
+              "docs": {
+                "type": "string",
+                "format": "uri",
+                "description": "A URL to additional information concerning the deprecation of this endpoint. Possible information might include rationale behind the action, or discussion of alternatives"
+              }
+            }
+          },
+          "authscope": {
+            "type": "string",
+            "description": "Authorization scope needed for creating subscriptions. The actual meaning of this field is determined on a per-endpoint basis",
+            "example": "storage.read"
+          },
+          "definitions": {
+            "$ref": "#/components/schemas/definitions"
+          },
+          "groups": {
+            "$ref": "#/components/schemas/groupUriReferences"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          }
+        ]
+      },
+      "endpointConfig": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "usage",
+          "mapping": {
+            "subscriber": "#/components/schemas/endpointConfigSubscriber",
+            "consumer": "#/components/schemas/endpointConfigConsumer",
+            "producer": "#/components/schemas/endpointConfigPublisher"
+          }
+        },
+        "properties": {
+          "usage": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "strict": {
+            "type": "boolean"
+          },
+          "endpoints": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              {
+                "type": "string",
+                "format": "uri"
+              }
+            ]
+          },
+          "options": {
+            "$ref": "#/components/schemas/endpointOptions"
+          }
+        }
+      },
+      "endpointConfigSubscriber": {
+        "type": "object",
+        "properties": {
+          "subscriptionconfig": {
+            "type": "object",
+            "description": "A map indicating supported options for the config parameter for the CloudSubscriptions subscribe() API call. Keys are the name of keys in the allowed config map, the values indicate the type of that parameter, confirming to the CloudEvents type system. TODO: Needs resolution with CloudSubscriptions API",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "filterdialects": {
+            "type": "array",
+            "description": "Filter dialects that can be used in subscriptions for this endpoint",
+            "items": {
+              "type": "string",
+              "description": "filter dialect"
+            },
+            "example": "[ \"basic\" ]"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointConfig"
+          }
+        ]
+      },
+      "endpointConfigConsumer": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointConfig"
+          }
+        ]
+      },
+      "endpointConfigPublisher": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointConfig"
+          }
+        ]
+      },
+      "endpointOptions": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "protocol",
+          "mapping": {
+            "mqtt": "#/components/schemas/endpointOptionsMqtt",
+            "amqp": "#/components/schemas/endpointOptionsAmqp",
+            "http": "#/components/schemas/endpointOptionsHttp"
+          }
+        },
+        "properties": {
+          "protocol": {
+            "type": "string"
+          }
+        }
+      },
+      "endpointOptionsMqtt": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptions"
+          }
+        ]
+      },
+      "endpointOptionsAmqp": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptions"
+          }
+        ]
+      },
+      "endpointOptionsHttp": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptions"
+          }
+        ]
+      },
+      "schemaGroupReference": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A unique identifier",
+            "format": "uri-reference"
+          },
+          "epoch": {
+            "type": "integer",
+            "description": "A number representing the version number of the resource.",
+            "format": "int64"
+          }
+        }
+      },
+      "schemaGroupReferences": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/schemaGroupReference"
+        }
+      },
+      "schemaGroupUriReferences": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "schemaGroups": {
+        "type": "object",
+        "description": "A collection of schemagroups",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/schemaGroup"
+        }
+      },
+      "schemaGroup": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Specifies the format of all schemas in this group",
+            "example": [
+              "json",
+              "avro",
+              "xsd",
+              "protobuf"
+            ]
+          },
+          "schemas": {
+            "$ref": "#/components/schemas/schemas"
+          },
+          "schemagroups": {
+            "$ref": "#/components/schemas/schemaGroups"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          }
+        ]
+      },
+      "schemaReference": {
+        "$ref": "#/components/schemas/reference"
+      },
+      "schemaReferences": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/schemaReference"
+        }
+      },
+      "schemas": {
+        "type": "object",
+        "description": "A collection of schemas",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/schema"
+        }
+      },
+      "schema": {
+        "type": "object",
+        "description": "a schema is a collection of schema version documents that describe semantically the same data item",
+        "properties": {
+          "versions": {
+            "type": "object",
+            "description": "A collection of schema versions",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/schemaVersion"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          }
+        ]
+      },
+      "schemaVersion": {
+        "type": "object",
+        "description": "a schema version (a document)",
+        "properties": {
+          "schemaurl": {
+            "type": "string",
+            "description": "A URL to the schema document.",
+            "format": "uri"
+          },
+          "schemaobject": {
+            "type": "object",
+            "description": "An in-line definition of the schema document (JSON)."
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          }
+        ]
+      }
+    }
+  }
+}

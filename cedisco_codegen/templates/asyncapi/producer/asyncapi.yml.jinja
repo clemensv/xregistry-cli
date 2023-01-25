@@ -1,0 +1,105 @@
+{#- This is a template that can convert a 
+    CloudEvents Discovery document into an 
+    AsyncAPI 2.0 document -#}
+asyncapi: 2.0.0
+info:
+  title: "{{ title }}"
+  version: "1.0"
+channels:
+  /:
+    publish:
+      operationId: "cloudEventsPublish"
+      message:
+        contentType: "application/cloudevents+json"
+        schemaFormat: "application/schema+json;version=draft-07"
+        payload:
+          oneOf:
+            {%- for groupkey, group in root.groups.items() -%}
+                {%- for eventkey, event in group.definitions.items() %}
+              - $ref: "#/components/schemas/{{ event.id }}"
+                {%- endfor -%}
+            {%- endfor %}
+components:
+  schemas:
+  {%- for groupkey, group in root.groups.items() -%}
+    {%- for eventkey, event in group.definitions.items() %}
+    {{ event.id }}:
+      type: "object"
+      properties:
+        {%- for attributeKey, attribute in event.metadata.attributes.items() %}
+        "{{ attributeKey }}":
+          {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
+          type: "string"
+          format: "date-time"
+          {%- elif attribute.type == "uri" %}
+          type: "string"
+          format: "uri"
+          {%- elif attribute.type == "uri-reference" %}
+          type: "string"
+          format: "uri-reference"
+          {%- elif attribute.type == "uri-template" %}
+          type: "string"
+          format: "uri-reference"
+          {%- elif attribute.type == "binary" %}
+          type: "string"
+          format: "binary"
+          {%- elif attribute.type == "boolean" %}
+          type: "boolean"
+          {%- elif attribute.type == "integer" %}
+          type: "integer"
+          {%- elif attribute.type == "number" %}
+          type: "number"
+          {%- else %}
+          type: "string"
+          {%- endif %}
+          {%- if attribute.value %}
+          default: "{{ attribute.value }}"
+          {%- endif %}
+        {%- endfor %}
+        data:
+        {%- if event.schemaurl %}
+            {%- if event.schemaurl.startswith('#') %}
+            $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+            {%- else %}
+            $ref: "{{ event.schemaurl }}"
+            {%- endif %}
+        {%- else %}
+            type: "object"
+        {%- endif %}
+      required:
+        {%- for attributeKey, attribute in event.metadata.attributes.items() %}
+        {%- if attribute.required %}
+        - "{{ attributeKey }}"
+        {%- endif %}
+        {%- endfor %}
+    {%- endfor -%}
+  {%- endfor -%}
+  {%- if root.schemagroups is defined -%}
+    {%- for schemagroupkey in root.schemagroups.keys() -%}
+    {%- if schemagroupkey != "type" -%}
+      {%- set schemagroup = root.schemagroups[schemagroupkey] -%}
+       {%- for schemakey, schema in schemagroup.schemas.items() -%}
+       {%- if schemakey != "type" -%}
+          {%- set ns = namespace(newest_schemaversion=null) -%}
+          {%- for schemaversionid, schemaversion in schema.versions.items() -%}
+             {%- if newest_schemaversion is not defined or schemaversionid > newest_schemaversion -%}
+                {%- set ns.newest_schemaversion = schemaversion -%}
+             {%- endif -%}
+          {%- endfor -%}
+          {%- if ns.newest_schemaversion is defined %} 
+    {{ schemagroupkey | pascal }}.{{ schemakey | pascal }}:
+            {%- if ns.newest_schemaversion.schemaurl -%}
+            {%- if ns.newest_schemaversion.schemaurl.startswith('#') %}
+            $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaurl.split('#/schemagroups/')[1] }}"
+            {%- else %}
+            $ref: "{{ ns.newest_schemaversion.schemaurl }}"
+            {%- endif -%}
+            {%- else %} 
+      {{ ns.newest_schemaversion.schema | toyaml(3) | indent(6) }}
+            {%- endif %} 
+            {%- endif -%}
+       {%- endif -%}
+       {%- endfor -%} 
+    {%- endif -%}
+  {%- endfor -%}
+  {%- endif -%}

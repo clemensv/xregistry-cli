@@ -327,11 +327,11 @@
         }
     },
     "schemagroups": {
-        "type" : "schemagroups",
+        "type": "schemagroups",
         "Contoso.CRM.Events": {
             "schemas": {
                 "customerAddressUpdatedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -340,43 +340,47 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "address": {
                                         "type": "object",
                                         "description": "The customer's address",
-                                        "required": true,
                                         "properties": {
                                             "street": {
                                                 "type": "string",
-                                                "description": "The customer's street",
-                                                "required": true
+                                                "description": "The customer's street"
                                             },
                                             "city": {
                                                 "type": "string",
-                                                "description": "The customer's city",
-                                                "required": true
+                                                "description": "The customer's city"
                                             },
                                             "state": {
                                                 "type": "string",
-                                                "description": "The customer's state",
-                                                "required": true
+                                                "description": "The customer's state"
                                             },
                                             "zip": {
                                                 "type": "string",
-                                                "description": "The customer's zip code",
-                                                "required": true
+                                                "description": "The customer's zip code"
                                             }
-                                        }
+                                        },
+                                        "required": [
+                                            "street",
+                                            "city",
+                                            "state",
+                                            "zip"
+                                        ]
                                     }
-                                }
+                                },
+                                "required": [
+                                    "customerId",
+                                    "address"
+                                ]
                             }
                         }
                     }
                 },
                 "customerNoteAddedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -385,23 +389,19 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "note": {
                                         "type": "object",
                                         "description": "The note that was added to the customer",
-                                        "required": true,
                                         "properties": {
                                             "id": {
                                                 "type": "string",
-                                                "description": "The unique identifier of the note",
-                                                "required": true
+                                                "description": "The unique identifier of the note"
                                             },
                                             "text": {
                                                 "type": "string",
-                                                "description": "The text of the note",
-                                                "required": true
+                                                "description": "The text of the note"
                                             }
                                         }
                                     }
@@ -411,7 +411,7 @@
                     }
                 },
                 "customerNoteDeletedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -420,13 +420,11 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "noteId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the note that was deleted",
-                                        "required": true
+                                        "description": "The unique identifier of the note that was deleted"
                                     }
                                 }
                             }
@@ -434,7 +432,7 @@
                     }
                 },
                 "customerNoteUpdatedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -443,23 +441,19 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "note": {
                                         "type": "object",
                                         "description": "The note that was updated on the customer",
-                                        "required": true,
                                         "properties": {
                                             "id": {
                                                 "type": "string",
-                                                "description": "The unique identifier of the note",
-                                                "required": true
+                                                "description": "The unique identifier of the note"
                                             },
                                             "text": {
                                                 "type": "string",
-                                                "description": "The text of the note",
-                                                "required": true
+                                                "description": "The text of the note"
                                             }
                                         }
                                     }
@@ -469,7 +463,7 @@
                     }
                 },
                 "customerContactAddedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -478,23 +472,19 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "contact": {
                                         "type": "object",
                                         "description": "The contact that was added to the customer",
-                                        "required": true,
                                         "properties": {
                                             "id": {
                                                 "type": "string",
-                                                "description": "The unique identifier of the contact",
-                                                "required": true
+                                                "description": "The unique identifier of the contact"
                                             },
                                             "name": {
                                                 "type": "string",
-                                                "description": "The name of the contact",
-                                                "required": true
+                                                "description": "The name of the contact"
                                             }
                                         }
                                     }
@@ -504,7 +494,7 @@
                     }
                 },
                 "customerContactDeletedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -513,13 +503,11 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "contactId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the contact that was deleted",
-                                        "required": true
+                                        "description": "The unique identifier of the contact that was deleted"
                                     }
                                 }
                             }
@@ -527,7 +515,7 @@
                     }
                 },
                 "customerContactUpdatedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -536,23 +524,19 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "contact": {
                                         "type": "object",
                                         "description": "The contact that was updated on the customer",
-                                        "required": true,
                                         "properties": {
                                             "id": {
                                                 "type": "string",
-                                                "description": "The unique identifier of the contact",
-                                                "required": true
+                                                "description": "The unique identifier of the contact"
                                             },
                                             "name": {
                                                 "type": "string",
-                                                "description": "The name of the contact",
-                                                "required": true
+                                                "description": "The name of the contact"
                                             }
                                         }
                                     }
@@ -562,7 +546,7 @@
                     }
                 },
                 "customerCreatedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -571,21 +555,19 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "name": {
                                         "type": "string",
-                                        "description": "The name of the customer",
-                                        "required": true
+                                        "description": "The name of the customer"
                                     }
                                 }
                             }
                         }
                     }
                 },
-                "customerStatusUpdatedEventData" : {
-                    "type" : "schema",
+                "customerStatusUpdatedEventData": {
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -594,13 +576,11 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "status": {
                                         "type": "string",
-                                        "description": "The status of the customer",
-                                        "required": true
+                                        "description": "The status of the customer"
                                     }
                                 }
                             }
@@ -608,7 +588,7 @@
                     }
                 },
                 "customerDeletedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -617,13 +597,11 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "name": {
                                         "type": "string",
-                                        "description": "The name of the customer",
-                                        "required": true
+                                        "description": "The name of the customer"
                                     }
                                 }
                             }
@@ -631,7 +609,7 @@
                     }
                 },
                 "customerUpdatedEventData": {
-                    "type" : "schema",
+                    "type": "schema",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
@@ -640,57 +618,60 @@
                                 "properties": {
                                     "customerId": {
                                         "type": "string",
-                                        "description": "The unique identifier of the customer",
-                                        "required": true
+                                        "description": "The unique identifier of the customer"
                                     },
                                     "name": {
                                         "type": "string",
-                                        "description": "The name of the customer",
-                                        "required": true
+                                        "description": "The name of the customer"
                                     },
                                     "address": {
                                         "type": "object",
                                         "description": "The address of the customer",
-                                        "required": true,
                                         "properties": {
                                             "street": {
                                                 "type": "string",
-                                                "description": "The street of the address",
-                                                "required": true
+                                                "description": "The street of the address"
                                             },
                                             "city": {
                                                 "type": "string",
-                                                "description": "The city of the address",
-                                                "required": true
+                                                "description": "The city of the address"
                                             },
                                             "state": {
                                                 "type": "string",
-                                                "description": "The state of the address",
-                                                "required": true
+                                                "description": "The state of the address"
                                             },
                                             "zip": {
                                                 "type": "string",
-                                                "description": "The zip code of the address",
-                                                "required": true
+                                                "description": "The zip code of the address"
                                             }
-                                        }
+                                        },
+                                        "required": [
+                                            "street",
+                                            "city",
+                                            "state",
+                                            "zip"
+                                        ]
                                     },
                                     "phone": {
                                         "type": "string",
-                                        "description": "The phone number of the customer",
-                                        "required": true
+                                        "description": "The phone number of the customer"
                                     },
                                     "email": {
                                         "type": "string",
-                                        "description": "The email address of the customer",
-                                        "required": true
+                                        "description": "The email address of the customer"
                                     },
                                     "website": {
                                         "type": "string",
-                                        "description": "The website of the customer",
-                                        "required": true
+                                        "description": "The website of the customer"
                                     }
-                                }
+                                },
+                                "required": [
+                                    "customerId",
+                                    "name",
+                                    "phone",
+                                    "email",
+                                    "website"
+                                ]
                             }
                         }
                     }
