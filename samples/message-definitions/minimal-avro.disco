@@ -1,0 +1,82 @@
+{
+    "$schema": "https://cloudevents.io/schemas/discovery",
+    "specversion": "0.5-wip",
+    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
+    "groups": {
+        "Contoso.ERP.Events": {
+            "type": "group",
+            "id": "Contoso.ERP.Events",
+            "definitions": {
+                "Contoso.ERP.Events.ReservationPlaced": {
+                    "type": "cloudevent",
+                    "id": "Contoso.ERP.Events.ReservationPlaced",
+                    "description": "A reservation has been placed",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.ERP.Events.ReservationPlaced",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/orders",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData#OrderData"
+                }
+            }
+        }
+    },
+    "schemagroups": {
+        "Contoso.ERP.Events": {
+            "schemas": {
+                "orderData": {
+                    "type": "schema",
+                    "format":"Avro/1.8.2",
+                    "versions": {
+                        "1": {
+                            "type": "schemaversion",
+                            "format":"Avro/1.8.2",
+                            "schema": {
+                                "type": "record",
+                                "name": "OrderData",
+                                "fields": [
+                                    { "name": "orderId", "type": "string" },
+                                    { "name": "customerId", "type": "string" },
+                                    { "name": "total", "type": "double" },
+                                    {
+                                        "name": "items",
+                                        "type": {
+                                            "type": "array",
+                                            "items": {
+                                                "name": "Item",
+                                                "type": "record",
+                                                "fields": [
+                                                    { "name": "productId", "type": "string" },
+                                                    { "name": "quantity", "type": "double" },
+                                                    { "name": "price", "type": "double" }
+                                                ]
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
