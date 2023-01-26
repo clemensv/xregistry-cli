@@ -12,6 +12,14 @@ from jinja2 import nodes
 from jinja2.ext import Extension
 
 
+# These are the global variables that are switched 
+# to True when a schema is found that uses Avro or Protobuf,
+# respectively. When either of these is True, the generator
+# will run a second time for the output to consistently include
+# Avro and/or Protobuf dependencies
+uses_avro : bool = False
+uses_protobuf : bool = False
+
 # Jinja tag to exit the current template because
 # something went wrong
 class ExitException(Exception):
@@ -54,7 +62,7 @@ def regex_replace(string, pattern, replacement):
 
 # Jinja filter to replace all characters that are not valid
 # in C# identifiers with an underscore
-def csharp_identifier(string):
+def strip_invalid_identifier_characters(string):
     if string:
         return re.sub("[^A-Za-z0-9_\.]", "_", string)
     return string
@@ -92,7 +100,7 @@ def snake(string):
 
 # Jinja filter that turns a string expression into camelCase
 # The input can be snake_case or PascalCase or any other string
-def camel_case(string):
+def camel(string):
     if not string:
         return string
     if '_' in string:
@@ -104,10 +112,10 @@ def camel_case(string):
     else:
         # default case: return string as-is
         return string
-    camel_case = words[0].lower()
+    camel = words[0].lower()
     for word in words[1:]:
-        camel_case += word.capitalize()
-    return camel_case
+        camel += word.capitalize()
+    return camel
 
 # Jinja filter that left-justified pads a string with spaces
 # to the specified length
@@ -142,6 +150,26 @@ def concat_namespace(class_reference):
 def toyaml(obj : any, indent : int = 4):
     return yaml.dump(obj, default_flow_style=False, indent=indent)
 
+def proto(proto_text : str):
+    # Add newlines after ';'
+    proto_text = re.sub(r"([;{}])", r"\1\n", proto_text)
+
+     # Indent all lines after '{' or '}'
+    indent = 0
+    lines = proto_text.split("\n")
+    for i in range(len(lines)):
+        line = re.sub(r"^\s*", "", lines[i])
+        if "}" in line: indent -= 1
+        lines[i] = "    "*indent + line
+        if "{" in line: indent += 1
+           
+    proto_text = "\n".join(lines)
+
+    # Remove extra newlines
+    proto_text = re.sub(r"\n{3,}", "\n\n", proto_text)
+
+    return proto_text
+
 # Jinja filter that determines the type name of an expression
 # given a schema URL, specifically in CloudEvents' dataschema
 # attribute. Schema URLs are collected by the filter as a side
@@ -158,9 +186,16 @@ def schema_type(schema_url: str):
     if schema_url.startswith("#"):
         if not schema_url in schema_references_collected:
             schema_references_collected.add(schema_url)
-        # return the last element of the fragment unless the penultimate
+        
+        # if the fragment ends with ":{type}" return that type
+        # otherwise return the last element of the fragment	unless the penultimate
         # segment name is "versions". Then return the parent segment of
-        # versions.
+        # versions. 
+
+        # handle the case where the fragment is "#/definitions/anything:{type}"
+        if ":" in schema_url:
+            return schema_url.split(":")[-1]        
+
         path_elements = schema_url.split('/')
         if path_elements[-2] == "versions":
             return path_elements[-3]
@@ -178,6 +213,12 @@ def schema_type(schema_url: str):
         # if the URL is not already in the list of schemas, add it
         if plain_url not in schema_files_collected:
             schema_files_collected.add(schema_url)
+        # if the fragment ends with ":{type}" return that type
+        # otherwise return the last element of the fragment
+        if ":" in fragment:
+            return fragment.split(":")[-1]
+        elif path_elements[-2] == "versions":
+            return path_elements[-3]        
         return path_elements[-1]
     else:
         if schema_url not in schema_files_collected:
@@ -196,6 +237,8 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
              definitions_file: str, headers: dict):
     global current_url
     global schema_references_collected
+
+    class_name = None
 
     # Load definitions
     definitions_file, docroot = load_definitions(definitions_file, style,
@@ -224,15 +267,23 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
             if schema_reference not in schemas_handled:
                 schemas_handled.add(schema_reference)
                 current_url = None
+                schema_format = None
 
                 # if the scheme reference is a JSON Pointer reference, we resolve it
                 # to an object in the document. Remove a leading # if present
                 if schema_reference.startswith("#"):
+                    # split off a suffix reference with ':'
+                    if ":" in schema_reference:
+                        schema_reference, class_name = schema_reference.split(":")
+
                     path_elements = schema_reference.split('/')
                     if path_elements[-2] == "versions":
                         definitions_file = path_elements[-3]
                     else:
                         definitions_file = path_elements[-1]
+
+                    if class_name is None:
+                        class_name = definitions_file
 
                     try:
                         match = jsonpointer.resolve_pointer(docroot, schema_reference[1:])
@@ -242,8 +293,8 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     except jsonpointer.JsonPointerException as e:
                         print("Error resolving JSON Pointer: " + str(e))
                         continue
-
-                if schema_root:
+  
+                if schema_root and isinstance(schema_root,dict):
                     # now we need to figure out what the reference points to. 
                     # a) This could be an inline schema inside a message definition
                     # b) This could be an inline schema inside a schema definition
@@ -265,7 +316,10 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         # the reference pointed to a schema version definition
                         schema_version = schema_root
 
-                    if schema_version:
+                    if schema_version and isinstance(schema_version,dict):
+                        if "schemaformat" in schema_version:
+                            schema_format = schema_version["schemaformat"]
+
                         # case c): if the schema version contains a schemaUrl attribute, then we need to
                         # add the schemaUrl to the list of schemas to be processed and continue
                         if "schemaUrl" in schema_version:
@@ -278,20 +332,34 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                             # assume that the schema is inline and we can proceed to render it
                             schema_root = schema_version["schema"]
                             current_url = schema_reference
-                            render_schema_templates("json", schema_template_dir, project_name, language,
+                            schema_format_short = None
+
+                            if "format" in schema_version:
+                                format_string = schema_version["format"].lower()
+                                if format_string.startswith("proto"):
+                                    schema_format_short = "proto"
+                                elif format_string.startswith("json"):
+                                    schema_format_short = "json"
+                                elif format_string.startswith("avro"):
+                                    schema_format_short = "avro"
+                            
+                            render_schema_templates(schema_format_short, schema_template_dir, project_name, class_name, language,
                                                     output_dir, definitions_file, schema_root, schema_env)
                             continue
                         else:
                             print("Warning: unable to find schema reference " + schema_reference)
 
+                    # schema_root is not a schema version or schema definition, so it is a schema      
+                    schema_format_short = None 
+                    if schema_format is not None and schema_format.lower().startswith("proto"):
+                        schema_format_short = "proto"
+                    elif schema_format is not None and schema_format.lower().startswith("avro"):
+                        schema_format_short = "avro"
                     else:
-                        # case a): the reference pointed to an inline schema in the message definition
-                        render_schema_templates("json", schema_template_dir, project_name, language,
-                                                    output_dir, definitions_file, schema_root, schema_env)
-                        continue
-
-                    render_schema_templates("json", schema_template_dir, project_name, language,
-                                            output_dir, definitions_file, schema_root, schema_env)
+                        schema_format_short = "json"
+                                               
+                    render_schema_templates(schema_format_short, schema_template_dir, project_name, class_name, language,
+                                                output_dir, definitions_file, schema_root, schema_env)
                 else:
                     print("Warning: unable to find schema reference " + schema_reference)
             
@@ -299,7 +367,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     schema_references_collected = set()
 
     if style == "schema":
-        render_schema_templates("json", schema_template_dir, project_name, language,
+        render_schema_templates(None, schema_template_dir, project_name, class_name, language,
                                 output_dir, definitions_file, docroot, schema_env)
 
 
@@ -370,11 +438,28 @@ def render_code_templates(project_name, style, output_dir, docroot,
             render_template(project_name, class_name, scope, file_dir, file_name, template)
 
 
-def render_schema_templates(schema_type, template_dir, project_name, language,
+def render_schema_templates(schema_type, template_dir, project_name, class_name, language,
                             output_dir, definitions_file, docroot, env):
+    global uses_protobuf
+    global uses_avro
+    
     scope = docroot
+    if schema_type is None:
+        if isinstance(docroot,str) and re.search(r"syntax[\s]*=[\s]*\"proto3\"", docroot):
+            schema_type = "proto"
+        elif isinstance(docroot,dict) and "type" in docroot and docroot["type"] == "record":
+            schema_type = "avro"
+        else:
+            schema_type = "json"
+
+    if schema_type == "proto":
+        uses_protobuf = True
+    if schema_type == "avro":
+        uses_avro = True
+
     file_dir = file_dir_base = output_dir
-    class_name = os.path.basename(definitions_file).split(".")[0]
+    if class_name is None:
+        class_name = os.path.basename(definitions_file).split(".")[0]
     schema_files = glob.glob(
         os.path.join(template_dir,
                      "_{schema_type}.*.jinja".format(schema_type=schema_type)))
@@ -387,8 +472,8 @@ def render_schema_templates(schema_type, template_dir, project_name, language,
        
         # if the file name is just the language indicator,
         # eg. "cs", take the filename of the schema doc
-        if file_name_base == language:
-            file_name_base = pascal(class_name) + "." + language
+        if file_name_base == language or file_name_base == "proto" or file_name_base == "avsc":
+            file_name_base = pascal(class_name) + "." + file_name_base
         file_name_base = file_name_base.replace("{projectname}",
                                                 pascal(project_name))
         file_name = file_name_base
@@ -419,6 +504,10 @@ def render_schema_templates(schema_type, template_dir, project_name, language,
 
 
 def render_template(project_name, class_name, scope, file_dir, file_name, template):
+
+    global uses_protobuf
+    global uses_avro
+    
     try:
         output_path = os.path.join(os.getcwd(), file_dir, file_name)
 
@@ -427,7 +516,7 @@ def render_template(project_name, class_name, scope, file_dir, file_name, templa
 
         try:
             with open(output_path, "w") as f:
-                f.write(template.render(root=scope, project_name=project_name, class_name=class_name))
+                f.write(template.render(root=scope, project_name=project_name, class_name=class_name, uses_avro=uses_avro, uses_protobuf=uses_protobuf))
         except ExitException:
             os.remove(output_path)
     except Exception as err:
@@ -457,14 +546,30 @@ def load_definitions_core(definitions_file: str, style: str, headers: dict):
                     schemas_handled.add(definitions_file)
                 else:
                     return None, None
-                docroot = json.loads(url.read().decode())
+                textDoc = url.read().decode()
+                try:
+                    docroot = json.loads(textDoc)
+                except json.decoder.JSONDecodeError as e:
+                    try:
+                        # if the JSON is invalid, try to parse it as YAML
+                        docroot = yaml.safe_load(textDoc)
+                    except yaml.YAMLError as e:
+                        docroot = textDoc
         else:
             if definitions_file not in schemas_handled:
                 schemas_handled.add(definitions_file)
             else:
                 return None, None
             with open(os.path.join(os.getcwd(), definitions_file), "r") as f:
-                docroot = json.loads(f.read())
+                textDoc = f.read()
+                try:
+                    docroot = json.loads(textDoc)
+                except json.decoder.JSONDecodeError as e:
+                    try:
+                        # if the JSON is invalid, try to parse it as YAML
+                        docroot = yaml.safe_load(textDoc)
+                    except yaml.YAMLError as e:
+                        docroot = textDoc
     except urllib.error.URLError as e:
         print("An error occurred while trying to open the URL: ", e)
         return None, None
@@ -555,10 +660,11 @@ def setup_jinja_env(template_dir):
     env.filters['namespace'] = namespace
     env.filters['concat_namespace'] = concat_namespace
     env.filters['schema_type'] = schema_type
-    env.filters['camel_case'] = camel_case
-    env.filters['csharp_identifier'] = csharp_identifier
+    env.filters['camel'] = camel
+    env.filters['strip_invalid_identifier_characters'] = strip_invalid_identifier_characters
     env.filters['pad'] = pad
     env.filters['toyaml'] = toyaml
+    env.filters['proto'] = proto
     return env
 
 
@@ -613,20 +719,30 @@ def main():
     global schema_files_collected
     global schema_references_collected
     global current_url
+    global uses_avro
+    global uses_protobuf
 
-    schema_files_collected = set()
-    schemas_handled = set()
-    schema_references_collected = set()
-    current_url = None
 
-    # Call the generate() function with the parsed arguments
-    generate(args.project_name, args.language, args.style, args.output_dir,
-             args.definitions_file, headers)
+    # ok, what? why is this a loop?
+    # if uses_avro or uses_protobuf are set in the first run, we need to run the loop a second time
+    for int in range(0, 2):
 
-    # generate external schemas
-    for schema in schema_files_collected:
-        generate(args.project_name, args.language, "schema", args.output_dir,
-                 schema, headers)
+        schema_files_collected = set()
+        schemas_handled = set()
+        schema_references_collected = set()
+        current_url = None
+
+        # Call the generate() function with the parsed arguments
+        generate(args.project_name, args.language, args.style, args.output_dir,
+                args.definitions_file, headers)
+
+        # generate external schemas
+        for schema in schema_files_collected:
+            generate(args.project_name, args.language, "schema", args.output_dir,
+                    schema, headers)
+        
+        if not uses_avro and not uses_protobuf:
+            break
     
 
 

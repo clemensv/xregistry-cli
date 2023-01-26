@@ -44,10 +44,13 @@
             "schemas": {
                 "orderData": {
                     "type": "schema",
+                    "format": "JsonSchema/draft-07",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "format": "JsonSchema/draft-07",
                             "schema": {
+                                "$schema": "http://json-schema.org/draft-07/schema",
                                 "type": "object",
                                 "properties": {
                                     "orderId": {

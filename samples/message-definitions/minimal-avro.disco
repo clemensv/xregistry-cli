@@ -34,7 +34,7 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData#OrderData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 }
             }
         }

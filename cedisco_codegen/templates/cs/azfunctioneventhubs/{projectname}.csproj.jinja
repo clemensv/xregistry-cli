@@ -3,7 +3,16 @@
     <TargetFramework>net6.0</TargetFramework>
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
   </PropertyGroup>
-
+ {%- if uses_protobuf %}
+  <ItemGroup>
+    <Protobuf Include="**\*.proto" GrpcServices="None" />
+  </ItemGroup>
+  {%- endif %}
+  {% if uses_avro %}
+   <ItemGroup>
+      <AvroSchemas Include="**\*.avsc" />
+    </ItemGroup>
+  {% endif %}
   <ItemGroup>
     <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.EventHubs" Version="5.1.2" />
      <PackageReference Include="Azure.Core.Amqp" Version="1.2.0" />
@@ -13,8 +22,32 @@
      <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.5.1" />
+    {%- if uses_protobuf %}
+    <PackageReference Include="Grpc.Tools" Version="2.50.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    {%- endif %}
+    {%- if uses_avro or uses_protobuf %}
+    <PackageReference Include="System.Memory.Data" Version="6.0.0"></PackageReference>
+    {%- endif %}
+    {%- if uses_avro %}
+    <PackageReference Include="Apache.Avro" Version="1.11.1" />
+    {%- endif %}
   </ItemGroup>
-
+{% if uses_avro %}  
+  <Target Name="GenerateAvroCode" BeforeTargets="PrepareForBuild">
+     <CombinePath BasePath="$(ProjectDir)" Paths="generated">
+      <Output TaskParameter="CombinedPaths" ItemName="GeneratedCodeDirectory" />
+    </CombinePath>
+    <RemoveDir Directories="@(GeneratedCodeDirectory)" />
+    <MakeDir Directories="@(GeneratedCodeDirectory)" />
+    <Exec Command="avrogen --namespace &quot;$(ProjectName):$(ProjectName)&quot; -s &quot;%(AvroSchemas.Identity)&quot; &quot;@(GeneratedCodeDirectory)&quot;">
+      <Output TaskParameter="ExitCode" PropertyName="AvroGenExitCode"/>
+    </Exec>
+    <Error Condition="'$(AvroGenExitCode)' != '0'" Text="AvroGen invocation failed with exit code $(AvroGenExitCode). if the tool is not installed, install it with 'dotnet tool install --global Apache.Avro.Tools --version 1.11.1'" />
+  </Target>
+  {% endif %}
   <ItemGroup>
     <None Update="host.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

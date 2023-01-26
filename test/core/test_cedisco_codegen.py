@@ -23,11 +23,11 @@ def test_snake():
     assert cedisco_codegen.snake("foo_bar_baz") == "foo_bar_baz"
 
 def test_camel():
-    assert cedisco_codegen.camel_case("foo") == "foo"
-    assert cedisco_codegen.camel_case("foo_bar") == "fooBar"
-    assert cedisco_codegen.camel_case("FooBarBaz") == "fooBarBaz"
-    assert cedisco_codegen.camel_case("foo_bar_baz") == "fooBarBaz"
-    assert cedisco_codegen.camel_case("fooBarBaz") == "fooBarBaz"
+    assert cedisco_codegen.camel("foo") == "foo"
+    assert cedisco_codegen.camel("foo_bar") == "fooBar"
+    assert cedisco_codegen.camel("FooBarBaz") == "fooBarBaz"
+    assert cedisco_codegen.camel("foo_bar_baz") == "fooBarBaz"
+    assert cedisco_codegen.camel("fooBarBaz") == "fooBarBaz"
 
 def test_regex_search():
     assert cedisco_codegen.regex_search("abc123", r"(\d+)")[0] == "123"
@@ -39,10 +39,10 @@ def test_regex_replace():
     assert cedisco_codegen.regex_replace("abc123", r"(\d+)", "456") == "abc456"
     assert cedisco_codegen.regex_replace("abc123", r"([a-z]+)", "456") == "456123"    
 
-def test_csharp_identifier():
-    assert cedisco_codegen.csharp_identifier("foo") == "foo"
-    assert cedisco_codegen.csharp_identifier("foo_bar") == "foo_bar"
-    assert cedisco_codegen.csharp_identifier("$foo") == "_foo"
-    assert cedisco_codegen.csharp_identifier("@foo") == "_foo"
-    assert cedisco_codegen.csharp_identifier("%foo") == "_foo"
+def test_strip_invalid_identifier_characters():
+    assert cedisco_codegen.strip_invalid_identifier_characters("foo") == "foo"
+    assert cedisco_codegen.strip_invalid_identifier_characters("foo_bar") == "foo_bar"
+    assert cedisco_codegen.strip_invalid_identifier_characters("$foo") == "_foo"
+    assert cedisco_codegen.strip_invalid_identifier_characters("@foo") == "_foo"
+    assert cedisco_codegen.strip_invalid_identifier_characters("%foo") == "_foo"
 

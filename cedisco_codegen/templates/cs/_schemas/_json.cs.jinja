@@ -5,7 +5,7 @@
 
 {%- macro emitclass(type, type_name) -%}
     {%- if type.type == 'object' or not type.type %}
-    public class {{ type_name | pascal }}
+    public partial class {{ type_name | pascal }}
     {%- if type.allOf -%}
         {%- for allOfType in type.allOf -%}
             {%- if loop.first -%}
@@ -35,7 +35,7 @@
         }
     {% if type.properties %}
     {% for pn, property in type.properties.items()  -%}
-        {%- set propertyName = pn | csharp_identifier %}
+        {%- set propertyName = pn | strip_invalid_identifier_characters %}
         {%- set csharpType = "" -%}
         {%- if property.type == 'integer' -%}
             {%- if property.format == 'int32' -%}
