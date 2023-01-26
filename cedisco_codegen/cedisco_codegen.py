@@ -238,8 +238,6 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     global current_url
     global schema_references_collected
 
-    class_name = None
-
     # Load definitions
     definitions_file, docroot = load_definitions(definitions_file, style,
                                                  headers)
@@ -268,6 +266,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                 schemas_handled.add(schema_reference)
                 current_url = None
                 schema_format = None
+                class_name = None
 
                 # if the scheme reference is a JSON Pointer reference, we resolve it
                 # to an object in the document. Remove a leading # if present
@@ -367,7 +366,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     schema_references_collected = set()
 
     if style == "schema":
-        render_schema_templates(None, schema_template_dir, project_name, class_name, language,
+        render_schema_templates(None, schema_template_dir, project_name, None, language,
                                 output_dir, definitions_file, docroot, schema_env)
 
 
