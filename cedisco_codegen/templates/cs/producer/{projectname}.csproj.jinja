@@ -1,5 +1,10 @@
 {%- set uses_protobuf = uses_protobuf | default(true) -%}
 {%- set uses_avro = uses_avro | default(true) -%}
+{%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
+{%- set uses_amqp_endpoint = (root | exists("protocol", "amqp" )) %}
+{%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
+{%- set uses_mqtt_endpoint = (root | exists("protocol", "mqtt" )) %}
+
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -20,12 +25,22 @@
   {% endif %}
   <ItemGroup>
     <PackageReference Include="CloudNative.CloudEvents" Version="2.5.1" />
+    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints" Version="1.2.0" />    
     <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.5.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Amqp" Version="2.5.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Mqtt" Version="2.5.1" />
+    {%- if uses_amqp_message or uses_amqp_endpoint %}
     <PackageReference Include="AMQPNetLite" Version="2.4.5" />
+    {%- endif %}
+    {%- if uses_mqtt_message or uses_mqtt_endpoint %}
     <PackageReference Include="MQTTnet" Version="3.0.15.0" />
-    <PackageReference Include="CloudNative.CloudEvents.Endpoints" Version="1.2.0" />    
+    {%- endif %}
+    {%- if uses_mqtt_endpoint %}
+    <PackageReference Include="CloudNative.CloudEvents.Mqtt" Version="2.5.1" />
+    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints.Mqtt" Version="1.2.0" /> 
+    {%- endif %}
+    {%- if uses_amqp_endpoint %}
+    <PackageReference Include="CloudNative.CloudEvents.Amqp" Version="2.5.1" />
+    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints.Amqp" Version="1.2.0" /> 
+    {%- endif %}
     {%- if uses_protobuf %}
     <PackageReference Include="Grpc.Tools" Version="2.50.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

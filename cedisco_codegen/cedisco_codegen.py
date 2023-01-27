@@ -8,6 +8,7 @@ import argparse
 import urllib.parse
 import glob
 import jsonpointer
+import pandas as pd
 from jinja2 import nodes
 from jinja2.ext import Extension
 
@@ -36,6 +37,14 @@ class ExitExtension(Extension):
 
     def _exit(self, name, timeout, caller):
         raise ExitException("¯\_(ツ)_/¯")
+
+
+# Jinja filter that checks whether the given property exists 
+# anywhere in the doc with the value prefixed with the given string (case-insensitive)
+def exists(obj, prop, value):
+    df = pd.json_normalize(obj)
+    result = df[df.filter(like=prop).applymap(lambda x: x.lower()).apply(lambda x: x.str.startswith(value))].any().any()
+    return result
 
 
 # The current_url represents that last file that has been
@@ -238,6 +247,8 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     global current_url
     global schema_references_collected
 
+    
+
     # Load definitions
     definitions_file, docroot = load_definitions(definitions_file, style,
                                                  headers)
@@ -248,9 +259,10 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     pt = os.path.dirname(os.path.realpath(__file__))
     schema_template_dir = os.path.join(pt, "templates", language, "_schemas")
     code_template_dir = os.path.join(pt, "templates", language, style)
+    code_include_dir = os.path.join(pt, "templates", language, "_common")
 
-    code_env = setup_jinja_env(code_template_dir)
-    schema_env = setup_jinja_env(schema_template_dir)
+    code_env = setup_jinja_env([code_template_dir, code_include_dir])
+    schema_env = setup_jinja_env([schema_template_dir])
     render_code_templates(project_name, style, output_dir, docroot,
                           code_template_dir, code_env)
     
@@ -648,8 +660,8 @@ def load_definitions(definitions_file: str, style: str, headers: dict):
 
 
 # creates the Jinja environment and loads the extensions
-def setup_jinja_env(template_dir):
-    loader = jinja2.FileSystemLoader(template_dir)
+def setup_jinja_env(template_dirs : list[str]):
+    loader = jinja2.FileSystemLoader(template_dirs, followlinks=True)
     env = jinja2.Environment(loader=loader, extensions=[ExitExtension])
     env.filters['regex_search'] = regex_search
     env.filters['regex_replace'] = regex_replace
@@ -664,6 +676,7 @@ def setup_jinja_env(template_dir):
     env.filters['pad'] = pad
     env.filters['toyaml'] = toyaml
     env.filters['proto'] = proto
+    env.filters['exists'] = exists
     return env
 
 

@@ -33,6 +33,11 @@
             }
             throw new NotSupportedException("Data is not of a supported type for conversion to {{ type_name | pascal }}");
         }
+
+        public byte[] ToByteArray() 
+        {
+            return JsonSerializer.SerializeToUtf8Bytes(this);
+        }
     {% if type.properties %}
     {% for pn, property in type.properties.items()  -%}
         {%- set propertyName = pn | strip_invalid_identifier_characters %}

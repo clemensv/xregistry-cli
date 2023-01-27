@@ -35,6 +35,15 @@ using System;
             var writer = new Avro.Specific.SpecificDatumReader<{{ type_name | pascal }}>({{ type_name | pascal }}._SCHEMA, {{ type_name | pascal }}._SCHEMA);
             return writer.Read(default({{ type_name | pascal }}), decoder);
         }
+
+        public byte[] ToByteArray() 
+        {
+            var stream = new MemoryStream();
+            var encoder = new Avro.IO.BinaryEncoder(stream);
+            var writer = new Avro.Specific.SpecificDatumWriter<{{ type_name | pascal }}>({{ type_name | pascal }}._SCHEMA);
+            writer.Write(this, encoder);
+            return stream.ToArray();
+        }
     }
     {%- endif %}
 {%- endmacro %}

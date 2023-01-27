@@ -32,6 +32,13 @@ using System;
             }
             return {{ type_name | pascal }}.Parser.ParseFrom(stream);
         }
+
+        public byte[] ToByteArray()
+        {
+            var memoryStream = new MemoryStream();
+            this.WriteTo(memoryStream);
+            return memoryStream.ToArray();
+        }
     }
 {%- endmacro %}
 

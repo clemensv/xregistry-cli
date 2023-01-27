@@ -2,7 +2,7 @@
 // to send and receive messages.
 
 using CloudNative.CloudEvents;
-using CloudNative.CloudEvents.Endpoints;
+using CloudNative.CloudEvents.Experimental.Endpoints;
 using CloudNative.CloudEvents.SystemTextJson;
 using Contoso.ERP.Consumer.Contoso.ERP.Events;
 using Contoso.ERP.Producer.Contoso.ERP.Events;

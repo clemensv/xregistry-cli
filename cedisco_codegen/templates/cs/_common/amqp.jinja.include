@@ -1,0 +1,97 @@
+{#- AMQP macros -#}
+
+{%- macro AmqpNetLiteHeaders() -%}
+using Amqp;
+using Amqp.Framing;
+using Amqp.Types;
+{%- endmacro -%}
+
+{%- macro EmitArguments(props) -%}
+{%- for propname, prop in props.items() %}
+{%- if prop.type == "uritemplate" -%}
+   {%- for placeholder in prop.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+   , string {{ placeholder }}
+   {%- endfor -%}
+{%- elif prop.value is not defined -%}
+   , string {{ propname }}{%- if not prop.required %} = default {%- endif %}{% endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{%- macro DeclareUriTemplateArguments(definition) -%}
+{%- if definition.metadata["header"] -%}{{ EmitArguments(definition.metadata["header"]) }}{%- endif -%}
+{%- if definition.metadata["footer"] -%}{{ EmitArguments(definition.metadata["footer"]) }}{%- endif -%}
+{%- if definition.metadata["message-annotations"] -%}{{ EmitArguments(definitions.metadata["message-annotations"]) }}{%- endif -%}
+{%- if definition.metadata["delivery-annotations"] -%}{{ EmitArguments(definitions.metadata["delivery-annotations"]) }}{%- endif -%}
+{%- if definition.metadata["properties"] -%}{{ EmitArguments(definition.metadata["properties"]) }}{%- endif -%}
+{%- if definition.metadata["application-properties"] -%}{{ EmitArguments(definition.metadata["application-properties"]) }}{%- endif -%}
+{%- endmacro %}
+
+{#- Helper macro for assigning properties -#}
+{%- macro AssignProps(props, as_dict = False) -%}
+{%- for propname, prop in props.items() -%}
+{%- if as_dict %}
+["{{ propname }}"] = {% else %}
+{{ propname | pascal }} = {% endif -%}
+{%- if prop.value -%}
+   {%- if prop.type in ["integer", "number", "boolean"] -%}
+      {{ prop.value }}
+   {%- elif prop.type == "uri" or prop.type == "uritemplate" -%}
+       new Uri($"{{ prop.value }}", UriKind.RelativeOrAbsolute),
+   {%- else -%}
+      $"{{ prop.value }}"
+   {%- endif -%}
+{%- else -%}
+   {{ propname }}
+{%- endif -%},
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates AMQP message objects from amqpDefinition as definition -#}
+{%- macro DeclareAmqpNetLiteMessage(variable, definition) -%}
+{%- set header = definition.metadata["header"] %}
+{%- set footer = definition.metadata["footer"] %}
+{%- set messageAnnotations = definition.metadata["message-annotations"] %}
+{%- set deliveryAnnotations = definition.metadata["delivery-annotations"] %}
+{%- set properties = definition.metadata["properties"] %}
+{%- set applicationProperties = definition.metadata["application-properties"] %}
+Amqp.Message {{ variable }} = new Amqp.Message()
+{
+{%- if header %}
+   Header = new Header() 
+   {
+   {{- AssignProps(header) | indent(6) }}
+   },
+{%- if footer %}
+   Footer = new Footer() 
+   {
+   {{- AssignProps(footer) | indent(6) }}
+   },
+{%- endif %}
+{%- if messageAnnotations %}
+   MessageAnnotations = new MessageAnnotations()
+   {
+   {{- AssignProps(messageAnnotations) | indent(6) }}
+   },
+{%- endif %}
+{%- if deliveryAnnotations %}
+   DeliveryAnnotations = new DeliveryAnnotations()
+   {
+   {{- AssignProps(deliveryAnnotations) | indent(6) }}
+   },
+{%- endif %}
+{%- if properties %}
+   Properties = new Properties()
+   {
+   {{- AssignProps(properties) | indent(6) }}
+   },
+{%- endif %}
+{%- if applicationProperties %}
+   ApplicationProperties = new ApplicationProperties()
+   {
+   {{- AssignProps(applicationProperties, True) | indent(6) }}
+   },
+{%- endif %}
+{%- endif %}
+};
+{%- endmacro -%}

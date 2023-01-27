@@ -15,7 +15,7 @@ C# and Azure Functions handlers in C# for Azure Service Bus, Azure Event Grid,
 Azure Event Hubs, and HTTP triggers.
 
 Generated C# code has a dependency on
-https://github.com/clemensv/CloudNative.CloudEvents.Endpoints for which there is
+https://github.com/clemensv/CloudNative.CloudEvents.Experimental.Endpoints for which there is
 no official NuGet package as of yet. 
 
 The code generator emits nuget.config files

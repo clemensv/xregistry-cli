@@ -1,0 +1,54 @@
+{#- CloudEvents macros -#}
+
+{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{%- macro DeclareUriTemplateArguments(definition) -%}
+{%- for attrname in definition.metadata.attributes -%}
+{%- set attribute = definition.metadata.attributes[attrname] -%}
+    {%- if attribute.type == "uritemplate" -%}
+        {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+        , string {{ placeholder }}
+        {%- endfor -%}
+    {%- elif attribute.value is not defined -%}
+        {%- if not attrname == "time" and not attrname == "id" -%}
+        , string {{ attrname }}{%- if not attribute.required %} = default {%- endif %}{% endif -%}
+    {%- endif -%}
+{%- endfor -%} 
+{%- endmacro -%}
+
+{#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as definition -#}
+{%- macro DeclareCloudNativeCloudEvent(variable, definition) -%}
+CloudEvent {{ variable }} = new CloudEvent()
+{
+{%- for attrname in definition.metadata.attributes -%}
+{%- set attribute = definition.metadata.attributes[attrname] -%}
+{%- if attrname in ["subject", "type", "datacontenttype"] -%}
+    {%- set attrProp = attrname | pascal | replace("Datacontenttype", "DataContentType") %}
+    {{ attrProp }} = {% if attribute.value -%}$"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%},
+{%- endif -%}
+{%- if attrname in [ "source", "dataschema"] -%}
+    {%- set attrProp = attrname | pascal | replace("Dataschema", "DataSchema") %}
+    {{ attrProp }} = {% if attribute.value -%}new Uri($"{{ attribute.value }}", UriKind.RelativeOrAbsolute){%- else -%}{{ attrname }}{%- endif -%},
+{%- endif -%}
+{%- if attrname in ["time"] %}
+    {{ attrname | pascal }} = {% if attribute.value -%}
+        {%- if attribute.value == "0001-01-01T00:00:00+00:00" -%}
+            DateTime.UtcNow
+        {%- else -%}   
+            DateTime.Parse("{{- attribute.value -}}")
+        {%- endif -%}
+        {%- else -%}
+            DateTime.UtcNow
+        {%- endif -%},
+{%- endif -%}
+{%- if attrname in ["id"] %}
+    {{ attrname | pascal }} = Guid.NewGuid().ToString(),
+{%- endif -%}
+{%- endfor %}
+};
+{% for attrname in definition.metadata.attributes -%}
+{%- set attribute = definition.metadata.attributes[attrname] -%}
+{%- if attrname not in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
+cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}

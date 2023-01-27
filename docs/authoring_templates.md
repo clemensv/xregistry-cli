@@ -117,7 +117,7 @@ variable's structure reflects the respective input document.
 
 The following Jinja filters are available for use in templates:
 
-### `pascal` 
+#### `pascal` 
 
 Converts a string (including those in camelCase and snake_case) to PascalCase
 
@@ -127,7 +127,7 @@ Example:
 {{ "foo_bar" | pascal }} -> FooBar
 ```
 
-### `camel` 
+#### `camel` 
 
 Converts a string (including those in snake_case and PascalCase) to camelCase
 
@@ -137,7 +137,7 @@ Example:
 {{ "foo_bar" | camel }} -> fooBar
 ```
 
-### `snake`
+#### `snake`
 
 Converts a string (including those in camelCase and PascalCase) to snake_case
 
@@ -147,7 +147,7 @@ Example:
 {{ "fooBar" | snake }} -> foo_bar
 ```
 
-### `pad(len)`
+#### `pad(len)`
 
 Left-justifies a string with spaces to the specified length. This is useful for
 sorting version strings in a template.
@@ -159,7 +159,7 @@ Example:
 {{ "1.0" | pad(5) }} -> " 11.0"
 ```
 
-### `strip_namespace`
+#### `strip_namespace`
 
 Strips the namespace/package portion off an expression 
 
@@ -169,7 +169,7 @@ Example:
 {{ "com.example.Foo" | strip_namespace }} -> Foo
 ```
 
-### `strip_invalid_identifier_characters`
+#### `strip_invalid_identifier_characters`
 
 Strips invalid characters from an identifier. This is useful for converting
 strings to identifiers in languages that have stricter rules for identifiers. All
@@ -183,7 +183,7 @@ Example:
 ```
 
         
-### `namespace`
+#### `namespace`
 
 Gets the namespace/package portion off an expression
 
@@ -193,7 +193,7 @@ Example:
 {{ "com.example.Foo" | namespace }} -> com.example
 ```
                 
-### `concat_namespace`
+#### `concat_namespace`
 
 Concatenates the namespace/package portions of an expression 
 
@@ -209,7 +209,7 @@ If you want to pascal case the expression, use the pascal filter first, e.g.
 {{ "com.example.Foo" | pascal | concat_namespace }} -> ComExampleFoo
 ```
 
-### `toyaml`
+#### `toyaml`
 
 Formats the given object as YAML. This is useful for emitting parts of the input
 document, for instance JSON Schema elements, into YAML documents.
@@ -220,7 +220,7 @@ Example:
 {{ root | toyaml }}
 ```
 
-### `proto`
+#### `proto`
 
 Pretty-prints the given string as a .proto file
 
@@ -231,7 +231,7 @@ Example:
 ```
 
 
-### `schema_type`
+#### `schema_type`
 
 Determines the type name of an expression given a schema URL. This filter has
 the side-effect that all schema URLs and schema types are collected by the
@@ -243,7 +243,7 @@ Example:
 {{ "https://example.com/schema.json#/definitions/MyType" | schema_type }} -> MyType
 ```
 
-### `{% exit %}`
+#### `{% exit %}`
 
 Exits the template without producing any output. This is useful for skipping the 
 file if the input document doesn't contain the required information.

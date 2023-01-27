@@ -24,12 +24,12 @@ jobs:
     - name: Get CloudNative.CloudEvents.Endpoint package code
       uses: actions/checkout@v3
       with:
-        repository: clemensv/CloudNative.CloudEvents.Endpoints
+        repository: clemensv/CloudNative.CloudEvents.Experimental.Endpoints
         path: csendpoints
     - name: build CloudNative.CloudEvents.Endpoint package code
-      run: dotnet build $GITHUB_WORKSPACE/csendpoints/source/CloudNative.CloudEvents.Endpoints.csproj
+      run: dotnet build $GITHUB_WORKSPACE/csendpoints/source/CloudNative.CloudEvents.Experimental.Endpoints.csproj
     - name: create package into temp feed 
-      run: dotnet pack --output $GITHUB_WORKSPACE/packages $GITHUB_WORKSPACE/csendpoints/source/CloudNative.CloudEvents.Endpoints.csproj 
+      run: dotnet pack --output $GITHUB_WORKSPACE/packages $GITHUB_WORKSPACE/csendpoints/source/CloudNative.CloudEvents.Experimental.Endpoints.csproj 
     # end section
     - name: Set up Python
       uses: actions/setup-python@v2

@@ -1,10 +1,9 @@
 {
-    "$schema": "https://cloudevents.io/schemas/discovery",
     "specversion": "0.5-wip",
-    "endpoints" : {
-        "myamqpproducer" : {
+    "endpoints": {
+        "Contoso.MyAmqpProducer": {
             "type": "endpoint",
-            "id" : "myamqpproducer",
+            "id": "Contoso.MyAmqpProducer",
             "usage": "producer",
             "config": {
                 "protocol": "AMQP",
@@ -14,38 +13,95 @@
                 ]
             },
             "groups": [
-                "#/groups/mygroup"
+                "#/groups/Contoso.MyGroup"
             ],
-            "format" : "CloudEvents/1.0"
+            "format": "CloudEvents/1.0"
         }
     },
     "groups": {
-        "mygroup": {
+        "Contoso.MyGroup": {
+            "id": "Contoso.MyGroup",
             "type": "group",
             "definitions": {
-                "myevent": {
+                "Contoso.MyGroup.MyEvent": {
                     "type": "cloudevent",
-                    "id": "myevent",
-                    "format": "CloudEvents/1.0",
+                    "id": "Contoso.MyGroup.MyEvent",
+                    "format": "AMQP/1.0",
                     "metadata": {
-                        "attributes": {
-                            "id": {
+                        "header": {
+                            "ttl": {
+                                "type": "integer",
+                                "value": 1000
+                            }
+                        },
+                        "properties": {
+                            "subject": {
                                 "type": "string",
-                                "required": true
+                                "value": "myvalue"
+                            }
+                        },
+                        "application-properties": {
+                            "myProperty1": {
+                                "type": "string"
                             },
-                            "type": {
-                                "type": "string",
-                                "value": "myevent",
-                                "required": true
+                            "myProperty2": {
+                                "type": "string"
                             },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/me",
-                                "required": true
+                            "myProperty3": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData",
+                }
+            }
+        }
+    },
+    "schemagroups": {
+        "Contoso.MyEvents": {
+            "type": "schemagroup",
+            "id": "Contoso.MyEvents",
+            "schemas": {
+                "MyEventData": {
+                    "id": "MyEventData",
+                    "type": "schema",
+                    "format": "JsonSchema/draft-07",
+                    "versions": {
+                        "1.0": {
+                            "id": "1.0",
+                            "type": "schemaversion",
+                            "format": "JsonSchema/draft-07",
+                            "schema": {
+                                "$schema": "http://json-schema.org/draft-07/schema",
+                                "type": "object",
+                                "properties": {
+                                    "orderId": {
+                                        "type": "string"
+                                    },
+                                    "customerId": {
+                                        "type": "string"
+                                    },
+                                    "total": {
+                                        "type": "number"
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "productId": {
+                                                    "type": "string"
+                                                },
+                                                "quantity": {
+                                                    "type": "number"
+                                                },
+                                                "price": {
+                                                    "type": "number"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

@@ -324,13 +324,13 @@
             "type": "array",
             "description": "User Property is allowed to appear multiple times to represent multiple name, value pairs. The same name is allowed to appear more than once.",
             "items": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string"
-                },
-                "value": {
-                  "$ref": "#/components/schemas/metadataProperty"
+              "allOf" : {
+                "$ref": "#/components/schemas/metadataProperty",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
                 }
               }
             }
