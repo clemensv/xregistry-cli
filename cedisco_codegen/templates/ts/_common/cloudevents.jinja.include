@@ -1,0 +1,42 @@
+{#- CloudEvents macros -#}
+{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{%- macro DeclareUriTemplateArguments(definition) -%}
+  {%- for attrname in definition.metadata.attributes -%}
+  {%- set attribute = definition.metadata.attributes[attrname] -%}
+      {%- if attribute.type == "uritemplate" -%}
+          {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+          , string {{ placeholder }}
+          {%- endfor -%}
+     {%- elif attribute.value is not defined -%}
+         {%- if not attrname == "time" and not attrname == "id" -%}
+         , string {{ attrname }}{%- if not attribute.required %} = default {%- endif %}{% endif -%}
+     {%- endif -%}
+ {%- endfor -%} 
+{%- endmacro -%}
+
+{#- Generates a CloudEvent object from cloudEventDefinition as definition -#}
+{%- macro DeclareCloudEvent(variable, definition, data_type) -%}
+  const {{ variable }} = new CloudEvent<{{ data_type }}>({
+  {%- for attrname in definition.metadata.attributes -%}
+  {%- set attribute = definition.metadata.attributes[attrname] -%}
+  {%- if attrname in ["time"] %}
+  {{ attrname }} : {% if attribute.value -%}
+  {%- if attribute.value == "0001-01-01T00:00:00+00:00" -%}
+  new Date().toUTCString()
+  {%- else -%}   
+  new Date("{{- attribute.value -}}").toUTCString()
+  {%- endif -%}
+  {%- else -%}
+  new Date().toUTCString()
+  {%- endif -%}
+  {%- endif -%}
+  {%- if attrname in ["id"] %}
+  {{ attrname | lower }} : uuidv4()
+  {%- endif -%}
+  {%- if attrname not in ["id", "time"] %}
+  {{ attrname | lower }} : {%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%}
+  {% endif -%}
+  {%- if not loop.last -%},{%- else -%}, data : data{%- endif -%}
+  {%- endfor -%}
+  });
+{%- endmacro -%}

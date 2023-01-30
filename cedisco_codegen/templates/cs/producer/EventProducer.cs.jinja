@@ -22,10 +22,11 @@ using Microsoft.Extensions.Logging;
  
 {% for group_key, group in groups.items() -%}
 {%- set pascalGroupName = group.id | default(group_key) | pascal -%}
-namespace {{ project_name | pascal }}.{{ pascalGroupName }}
+namespace {{ project_name | pascal }}
 {
-     public partial class EventProducer
+     public partial class {{ pascalGroupName }}EventProducer
      {
+        
          {%- if uses_cloudevents_message %}
          private readonly ContentMode contentMode;
          private readonly CloudEventFormatter formatter;

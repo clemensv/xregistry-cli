@@ -18,6 +18,22 @@
             ],
             "format": "CloudEvents/1.0"
         },
+        "Contoso.ERP.Eventing.HttpSubscriber": {
+            "type": "endpoint",
+            "id": "Contoso.ERP.Eventing.HttpSubscriber",
+            "usage": "subscriber",
+            "config": {
+                "protocol": "HTTP",
+                "strict": false,
+                "endpoints": [
+                    "https://erpsystem.com/events/subscriptions"
+                ]
+            },
+            "groups": [
+                "#/groups/Contoso.ERP.Events"
+            ],
+            "format": "CloudEvents/1.0"
+        },
         "Contoso.ERP.Eventing.QueueConsumer": {
             "type": "endpoint",
             "channel": "myqueue",

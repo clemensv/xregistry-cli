@@ -14,18 +14,20 @@
                 ]
             },
             "groups": [
-                "#/groups/mygroup"
+                "#/groups/Contoso.ERP.Events"
             ],
             "format" : "CloudEvents/1.0"
         }
     },
     "groups": {
-        "mygroup": {
+        "Contoso.ERP.Events": {
             "type": "group",
+            "id": "Contoso.ERP.Events",
             "definitions": {
-                "myevent": {
+                "Contoso.ERP.Events.ReservationPlaced": {
                     "type": "cloudevent",
-                    "id": "myevent",
+                    "id": "Contoso.ERP.Events.ReservationPlaced",
+                    "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
                     "metadata": {
                         "attributes": {
@@ -35,7 +37,7 @@
                             },
                             "type": {
                                 "type": "string",
-                                "value": "myevent",
+                                "value": "Contoso.ERP.Events.ReservationPlaced",
                                 "required": true
                             },
                             "time": {
@@ -44,8 +46,57 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/me",
+                                "value": "/erp/orders",
                                 "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
+                }
+            }
+        }
+    },
+    "schemagroups": {
+        "Contoso.ERP.Events": {
+            "schemas": {
+                "orderData": {
+                    "type": "schema",
+                    "format": "JsonSchema/draft-07",
+                    "versions": {
+                        "1": {
+                            "type": "schemaversion",
+                            "format": "JsonSchema/draft-07",
+                            "schema": {
+                                "$schema": "http://json-schema.org/draft-07/schema",
+                                "type": "object",
+                                "properties": {
+                                    "orderId": {
+                                        "type": "string"
+                                    },
+                                    "customerId": {
+                                        "type": "string"
+                                    },
+                                    "total": {
+                                        "type": "number"
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "productId": {
+                                                    "type": "string"
+                                                },
+                                                "quantity": {
+                                                    "type": "number"
+                                                },
+                                                "price": {
+                                                    "type": "number"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

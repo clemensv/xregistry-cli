@@ -1,0 +1,40 @@
+{%- macro DeclareEsLintRc(projectName) -%}
+{
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2015,
+    "sourceType": "module"
+  },
+  "extends": [
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "env": {
+    "es6": true,
+    "node": true,
+    "mocha": true
+  },
+  "plugins": [
+    "header"
+  ],
+  "ignorePatterns": ["**/schema/*"],
+  "rules": {
+    "no-var": "error",
+    "standard/no-callback-literal": "off",
+    "arrow-spacing": "error",
+    "arrow-parens": ["error", "always"],
+    "arrow-body-style": ["error", "as-needed"],
+    "prefer-template": "error",
+    "max-len": ["warn", { "code": 120 }],
+    "no-console": ["error", {
+      "allow": ["warn", "error"]
+    }],
+    "valid-jsdoc": "warn",
+    "semi": ["error", "always"],
+    "quotes": ["error", "double", { "allowTemplateLiterals": true }],
+    "@typescript-eslint/no-explicit-any": "off",
+    "header/header": [2, "block", ["", " Copyright 2021 The CloudEvents Authors"," SPDX-License-Identifier: Apache-2.0", ""], 2],
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": ["error"]
+  }
+}
+{%- endmacro -%}

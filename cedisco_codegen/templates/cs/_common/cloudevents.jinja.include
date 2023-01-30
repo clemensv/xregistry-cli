@@ -52,3 +52,83 @@ cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ a
 {%- endif -%}
 {%- endfor -%}
 {%- endmacro -%}
+
+{%- macro DeclareHandlerServices(project_name, class_name, groups) -%}
+{%- if groups | exists("format", "cloudevents" ) %}
+{%- for group_key, group in groups.items() if (group | exists("format", "cloudevents" )) -%}
+{%- set pascalGroupName = group.id | default(group_key) | pascal %}
+{{ pascalGroupName | namespace(project_name) | pascal }}.I{{ pascalGroupName | strip_namespace }}HandlerService _{{ group.id | default(group_key) | strip_namespace | camel }}HandlerService;
+{%- endfor -%}
+{{ class_name }}(
+    {%- for group_key, group in groups.items() -%}
+    {%- set pascalGroupName = group.id | default(group_key) | pascal -%} 
+    
+    {{ pascalGroupName | namespace(project_name) | pascal }}.I{{ pascalGroupName | strip_namespace }}HandlerService {{ group.id | default(group_key) | strip_namespace | camel }}HandlerService
+    {%- if not loop.last -%}, {%- endif -%}
+    {%- endfor -%}
+)
+{
+    {%- for group_key, group in groups.items() -%}
+    {%- set pascalGroupName = group.id | default(group_key) | pascal %}
+    this._{{ group.id | default(group_key) | strip_namespace | camel }}HandlerService = {{ group.id | default(group_key) | strip_namespace | camel }}HandlerService;
+    {%- endfor %}
+}
+{% endif -%}
+{%- endmacro -%}
+
+{%- macro DispatchToHandlerServices(cloudEvent, groups) -%}
+{%- if groups | exists("format", "cloudevents" ) -%}
+var cloudEventType = {{ cloudEvent }}.Type;
+switch (cloudEventType)
+{
+    {% for group_key, group in groups.items() if (group | exists("format", "cloudevents" )) -%}
+    {% for id, definition in group.definitions.items() -%}
+    {% set pascalDefinitionName = definition.id | pascal %}
+    case "{{ definition.id }}":
+        if ( this._{{ group.id | default(group_key) | strip_namespace | camel }}HandlerService != null )
+        {
+            await this._{{ group.id | default(group_key) | strip_namespace | camel }}HandlerService.On{{ pascalDefinitionName | strip_namespace }}Async({{ cloudEvent }},
+                {%- if definition.schemaurl -%}
+            {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ cloudEvent }}.Data)
+            {%- else -%}
+            {{ cloudEvent }}.Data
+            {%- endif %});
+            break;
+        }
+        break;
+    {% endfor %}
+    {% endfor %}
+    default:
+        log.LogError("Unsupported CloudEvent type {eventType}", cloudEventType);
+        break;
+}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- set groups = root.groups -%}
+{%- if groups | exists("format", "cloudevents" ) %}
+{%- set function_name = project_name | pascal -%}
+using System.Threading.Tasks;
+using CloudNative.CloudEvents;
+
+{%- for group_key, group in groups.items() if (group | exists("format", "cloudevents" )) -%}
+{%- set pascalGroupName = group.id | default(group_key) | pascal %}
+namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+{
+    public interface I{{ pascalGroupName | strip_namespace }}HandlerService
+    {
+        {%- for id, definition in group.definitions.items() if (definition | exists( "format", "cloudevents" )) -%}
+        {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}
+        {%- if definition.schemaurl -%}
+        {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
+        {%- else -%}
+        {%- set dataType = "object" -%}
+        {%- endif %}   
+        Task On{{ pascalDefinitionName | strip_namespace }}Async(CloudEvent cloudEvent, {{ dataType }} data);
+        {%- endfor %}
+    }
+}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}

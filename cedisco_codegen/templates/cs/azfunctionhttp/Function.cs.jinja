@@ -1,5 +1,7 @@
 {%- set groups = root.groups %}
 {% set function_name = project_name | pascal %}
+{%- import "cloudEvents.jinja.include" as cloudEvents -%}
+
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -20,32 +22,13 @@ using CloudNative.CloudEvents.AspNetCore;
 
 namespace {{ project_name | pascal }}
 {
-    public static class {{ project_name | pascal | concat_namespace }}Functions
+    {%- set class_name = (project_name | pascal | strip_namespace)+"Functions" %}
+    public class {{ class_name }}
     {
-
-// remove this warning suppression when you have implemented all methods
-// this suppressess the warning that async method lacks 'await' operators and will run synchronously
-#pragma warning disable CS1998
-        
-        {% for group_key, group in groups.items() -%}
-        {% for id, definition in group.definitions.items() -%}
-        {% set pascalDefinitionName = definition.id | pascal %}
-
-        private static async Task On{{ pascalDefinitionName | concat_namespace }}(CloudEvent cloudEvent, ILogger log)
-        {
-            log.LogInformation("Received CloudEvent of type {eventType}", cloudEvent.Type);
-            {%- if definition.schemaurl %}
-            var data = {{ definition.schemaurl | schema_type | strip_namespace | pascal }}.FromData(cloudEvent.Data);
-            {%- else %}
-            var data = cloudEvent.Data;
-            {%- endif %}        
-            // TODO: Process the CloudEvent data for {{ definition.id }} event
-        }
-        {% endfor %}
-        {% endfor %}
+       {{ cloudEvents.DeclareHandlerServices( project_name, class_name, groups) | indent(8) }}
 
         [FunctionName("{{ project_name | pascal | concat_namespace }}")]
-        public static async Task<IActionResult> Run(
+        public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "post", "options", Route = null)] HttpRequest req,
             ILogger log,
             CancellationToken cancellationToken)
@@ -81,26 +64,14 @@ namespace {{ project_name | pascal }}
                 return new NoContentResult();
             }
 
-            var cloudEventType = cloudEvent.Type;
-            switch (cloudEventType)
-            {
-                {% for group_key, group in groups.items() -%}
-                {% for id, definition in group.definitions.items() -%}
-                {% set pascalDefinitionName = definition.id | pascal %}
-                    case "{{ definition.id }}":
-                        await On{{ pascalDefinitionName | concat_namespace }}(cloudEvent,log);
-                        return new OkResult();
-                {% endfor %}
-                {% endfor %}
-                default:
-                    log.LogError("Unsupported CloudEvent type {eventType}", cloudEventType);
-                    return new BadRequestObjectResult($"Unsupported CloudEvent type {cloudEventType}");
-            }
+            {{ cloudEvents.DispatchToHandlerServices( "cloudEvent", groups ) | indent(12) }}
+
+            return new NoContentResult();
         }
 
         private static readonly HashSet<string> allowedOrigins = new();
 
-        static {{ project_name | pascal | concat_namespace }}Functions()
+        static {{ class_name }}()
         {
             var config = new ConfigurationBuilder()
                 .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)

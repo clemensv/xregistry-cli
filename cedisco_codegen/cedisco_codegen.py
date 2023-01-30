@@ -21,6 +21,33 @@ from jinja2.ext import Extension
 uses_avro : bool = False
 uses_protobuf : bool = False
 
+
+# Create a global stack structure
+context_stacks = dict()
+
+# Create a custom filter
+def push(value, stack_name):
+    global context_stacks
+    if stack_name not in context_stacks:
+        context_stacks[stack_name] = list()
+    context_stacks[stack_name].append(value)
+    return ""
+
+# Create a custom tag extension
+def pop(stack_name):
+    global context_stacks
+    if stack_name not in context_stacks:
+        context_stacks[stack_name] = list()
+    return context_stacks[stack_name].pop()
+
+# Create a custom tag extension
+def stack(stack_name):
+    global context_stacks
+    if stack_name not in context_stacks:
+        context_stacks[stack_name] = list()
+    return context_stacks[stack_name]
+
+
 # Jinja tag to exit the current template because
 # something went wrong
 class ExitException(Exception):
@@ -31,12 +58,12 @@ class ExitExtension(Extension):
     tags = set(['exit'])
 
     def parse(self, parser):
-        lineno = next(parser.stream).lineno
+        lineno = next(parser.stream)
         return nodes.CallBlock(self.call_method('_exit', []), [], [],
                                []).set_lineno(lineno)
 
     def _exit(self, name, timeout, caller):
-        raise ExitException("¯\_(ツ)_/¯")
+        raise ExitException()
 
 
 # Jinja filter that checks whether the given property exists 
@@ -143,7 +170,22 @@ def strip_namespace(class_reference):
 
 # Jinja filter that gets the namespace/package portion off
 # an expression. Assumes dot-notation, e.g. namespace.class
-def namespace(class_reference):
+def namespace(class_reference, namespace_prefix=""):
+    if class_reference:
+        ns = re.sub(r'\.[^.]+$', '', class_reference)
+        if namespace_prefix:
+            if ns.startswith(namespace_prefix):
+                return ns
+            if namespace_prefix.startswith(ns):
+                return namespace_prefix
+            else:
+                return namespace_prefix + "." + ns
+        else:
+            return ns
+    return class_reference
+
+
+
     if class_reference:
         return re.sub(r'\.[^.]+$', '', class_reference)
     return class_reference
@@ -264,7 +306,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     code_env = setup_jinja_env([code_template_dir, code_include_dir])
     schema_env = setup_jinja_env([schema_template_dir])
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dir, code_env)
+                          code_template_dir, code_env, False)
     
     # now we need to handle any local schema references we found in the document
  
@@ -374,6 +416,10 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                 else:
                     print("Warning: unable to find schema reference " + schema_reference)
             
+    render_code_templates(project_name, style, output_dir, docroot,
+                          code_template_dir, code_env, True)
+    
+    
     # reset the references collected in this file 
     schema_references_collected = set()
 
@@ -393,20 +439,27 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 # generator is fed just one CloudEvent definition but the information set
 # remains anchored at "groups"
 def render_code_templates(project_name, style, output_dir, docroot,
-                          template_dir, env):
+                          template_dir, env, post_process):
     class_name = None
     for root, dirs, files in os.walk(template_dir):
+        relpath = os.path.relpath(root, template_dir).replace("\\", "/")
+        if relpath == ".":
+            relpath = ""
+
         for file in files:
-            if not file.endswith(".jinja") or file.startswith("_"):
+            if not file.endswith(".jinja") or (not post_process and file.startswith("_")) or (post_process and not file.startswith("_")):
                 continue
 
-            template_path = file
+            template_path = relpath + "/" + file  
             # all codegen for CE is anchored on the included groups
             scope = docroot
 
-            file_dir = file_dir_base = output_dir
+            file_dir = file_dir_base = os.path.join(output_dir, os.path.join(*relpath.split("/")))
             ## strip the jinja suffix
             file_name_base = file[:-6]
+            if post_process:
+                file_name_base = file_name_base[1:]
+
             template = env.get_template(template_path)
             file_name_base = file_name_base.replace("{projectname}",
                                                     pascal(project_name))
@@ -471,15 +524,18 @@ def render_schema_templates(schema_type, template_dir, project_name, class_name,
     file_dir = file_dir_base = output_dir
     if class_name is None:
         class_name = os.path.basename(definitions_file).split(".")[0]
-    schema_files = glob.glob(
-        os.path.join(template_dir,
-                     "_{schema_type}.*.jinja".format(schema_type=schema_type)))
+    schema_files = glob.glob("**/_{schema_type}.*.jinja".format(schema_type=schema_type), root_dir=template_dir, recursive=True)
     for schema_file in schema_files:
         # we needed to add the template_dir to the path for glob,
-        # but strip it back out here since we operate on teh plain name
-        schema_file = os.path.basename(schema_file)
+        # but strip it back out here since we operate on the plain name
+        schema_file = schema_file.replace("\\", "/")
         template = env.get_template(schema_file)
+        relpath = os.path.dirname(schema_file)
+        if relpath == ".":
+            relpath = ""
+        schema_file = os.path.basename(schema_file)
         file_name_base = schema_file[len(schema_type) + 2:][:-6]
+        file_dir = os.path.join(file_dir_base, os.path.join(*relpath.split("/")))
        
         # if the file name is just the language indicator,
         # eg. "cs", take the filename of the schema doc
@@ -487,30 +543,13 @@ def render_schema_templates(schema_type, template_dir, project_name, class_name,
             file_name_base = pascal(class_name) + "." + file_name_base
         file_name_base = file_name_base.replace("{projectname}",
                                                 pascal(project_name))
+        file_name_base = file_name_base.replace("{classname}",
+                                                pascal(class_name))
         file_name = file_name_base
-        if file_name_base.startswith("{class"):
-            if "definitions" in scope:
-                for id, definition in scope['definitions'].items():
-                    subscope = {"definitions": {}}
-                    subscope['definitions'][id] = definition
-                    scope_parts = id.split(".")
-                    package_name = ".".join(scope_parts[:-1])
-                    if not package_name:
-                        package_name = project_name
-                    class_name = scope_parts[-1]
-                    if file_name_base.startswith("{classdir}"):
-                        file_dir = os.path.join(file_dir_base,
-                                                package_name.replace(".", "/"))
-                        file_name = file_name_base.replace(
-                            "{classdir}", pascal(class_name))
-                    else:
-                        file_name = file_name_base.replace(
-                            "{classfull}", id).replace("{classname}",
-                                                       pascal(class_name))
-                    render_template(project_name, class_name, subscope, file_dir,
-                                    file_name, template)
-            continue  # skip back to the outer loop
-
+        # remember the schema class name we generated a file for 
+        if not class_name in stack("classfiles"):
+            push(class_name, "classfiles")
+        # generate the file
         render_template(project_name, class_name, scope, file_dir, file_name, template)
 
 
@@ -526,8 +565,9 @@ def render_template(project_name, class_name, scope, file_dir, file_name, templa
             os.makedirs(os.path.dirname(output_path))
 
         try:
+            rendered = template.render(root=scope, project_name=project_name, class_name=class_name, uses_avro=uses_avro, uses_protobuf=uses_protobuf)
             with open(output_path, "w") as f:
-                f.write(template.render(root=scope, project_name=project_name, class_name=class_name, uses_avro=uses_avro, uses_protobuf=uses_protobuf))
+                f.write(rendered)
         except ExitException:
             os.remove(output_path)
     except Exception as err:
@@ -599,6 +639,9 @@ def load_definitions(definitions_file: str, style: str, headers: dict):
     # normalize the document to be a groups doc
     definitions_file, docroot = load_definitions_core(definitions_file, style,
                                                       headers)
+    
+    if docroot is None:
+        return None, None
 
     if style == "schema":
         return definitions_file, docroot
@@ -677,6 +720,9 @@ def setup_jinja_env(template_dirs : list[str]):
     env.filters['toyaml'] = toyaml
     env.filters['proto'] = proto
     env.filters['exists'] = exists
+    env.filters['push'] = push
+    env.globals['pop'] = pop
+    env.globals['stack'] = stack
     return env
 
 
@@ -733,6 +779,7 @@ def main():
     global current_url
     global uses_avro
     global uses_protobuf
+    global context_stacks
 
 
     # ok, what? why is this a loop?
@@ -743,6 +790,7 @@ def main():
         schemas_handled = set()
         schema_references_collected = set()
         current_url = None
+        context_stacks = dict()
 
         # Call the generate() function with the parsed arguments
         generate(args.project_name, args.language, args.style, args.output_dir,

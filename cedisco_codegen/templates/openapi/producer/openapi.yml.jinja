@@ -1,11 +1,27 @@
-{# This is a template that can convert 
+{#- This is a template that can convert 
    a CloudEvents Discovery document 
-   into an OpenAPI 3.0 document #}
-
+   into an OpenAPI 3.0 document -#}
 openapi: 3.0.0
 info:
   title: "{{ title }}"
   version: "1.0"
+{%- if root.endpoints %} 
+servers:
+{%- for endpoint_key in root.endpoints.keys() -%}
+{%- set endpoint = root.endpoints[endpoint_key] -%}
+{%- set protocol = endpoint.config.protocol | lower -%}
+{%- if endpoint.usage == "producer" and protocol == "http" -%}
+{%- set options = endpoint.config.options -%}
+{%- set endpoints = endpoint.config.endpoints -%}
+{%- for endpointUrl in endpoints %}
+- url: {{ endpointUrl }}
+{%- if endpoint.description %}
+  description: {{ endpoint.description }}
+{%- endif -%}
+{%- endfor -%}  
+{%- endif -%}
+{%- endfor -%}
+{%- endif %}
 paths:
   /:
     post:

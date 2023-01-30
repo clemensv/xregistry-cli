@@ -1,0 +1,6 @@
+{%- import "cloudEvents.jinja.include" as cloudEvents -%}
+{%- import "mqtt.jinja.include" as mqtt -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{{ cloudEvents.DeclareDispatchInterfaces( project_name, root) }}
+{{ mqtt.DeclareDispatchInterfaces( project_name, root) }}
+{{ amqp.DeclareDispatchInterfaces( project_name, root) }}

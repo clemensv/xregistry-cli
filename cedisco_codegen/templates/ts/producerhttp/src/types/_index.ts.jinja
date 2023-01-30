@@ -1,0 +1,14 @@
+
+{%- for file in stack("classfiles") %}
+import { 
+  {%- for type in stack((file | pascal)+"_classes") %}
+  {{ type }}{% if not loop.last %},{% endif %}
+  {%- endfor %}
+} from "./{{ file | pascal }}";
+{%- endfor %}
+
+export type {
+  {%- for type in stack("classes") %}
+    {{ type }}{% if not loop.last %},{% endif %}
+  {%- endfor %}
+};

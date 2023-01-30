@@ -24,7 +24,7 @@
             "type": "group",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
-                    "type": "cloudevent",
+                    "type": "amqp",
                     "id": "Contoso.MyGroup.MyEvent",
                     "format": "AMQP/1.0",
                     "metadata": {

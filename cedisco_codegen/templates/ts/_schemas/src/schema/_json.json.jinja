@@ -1,0 +1,7 @@
+{%- set schema = root -%}
+{
+    "$schema" : "http://json-schema.org/draft-07/schema",
+    {%- for propname, prop in root.items() %}
+    "{{ propname }}" : {{ prop | tojson(4) | indent(4) }}{%- if not loop.last %},{% endif %}
+    {%- endfor %}
+}

@@ -9,9 +9,16 @@
 {%- set uses_mqtt_endpoint = (root | exists( "protocol", "mqtt" )) %}
 {%- set function_name = project_name | pascal -%}
 using System;
-using CloudNative.CloudEvents;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Linq;
+using System.Text.RegularExpressions;
 using CloudNative.CloudEvents.Experimental.Endpoints;
+
+{%- if uses_cloudevents_message %}
+using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
+{%- endif %}
 {%- if uses_amqp_message %}
 {{ amqp.AmqpNetLiteHeaders() }}
 {%- endif %}
@@ -24,110 +31,65 @@ using Microsoft.Extensions.Logging;
  {%- set pascalGroupName = group.id | default(group_key) | pascal -%}
 namespace {{ project_name | pascal }}.{{ pascalGroupName }}
 {
-    public class EventConsumer : IDisposable
+     {%- set class_name = (project_name | pascal | strip_namespace)+"Consumer" %}
+    public class {{ class_name }} : IDisposable
     {
-        {% for id, definition in group.definitions.items() -%}
-        {% set pascalDefinitionName = definition.id | pascal %}
-        {%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
-        {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}
-        {%- set isMqtt = not isCloudEvent and definition.format.lower().startswith("mqtt") %}
-
-        private static async Task On{{ pascalDefinitionName | strip_namespace }}(
-            {%- if isCloudEvent -%}
-            CloudEvent cloudEvent
-            {%- elif isAmqp -%}
-            Message amqpMessage
-            {%- elif isMqtt -%}
-            MqttApplicationMessage mqttMessage
-            {%- endif -%}           
-            , ILogger log)
-        {
-            {%- if isCloudEvent %}
-            log.LogInformation("Received CloudEvent of type {eventType}", cloudEvent.Type);
-            {%- elif isAmqp %}
-            log.LogInformation("Received AMQP message");
-            {%- elif isMqtt %}
-            log.LogInformation("Received MQTT message");
-            {%- endif %}
-
-            {%- if definition.schemaurl or definition.schema %}
-            // Convert to {{ definition.schemaurl | schema_type | strip_namespace | pascal }}
-            var data = {{ definition.schemaurl | schema_type | strip_namespace | pascal }}.FromData(
-                {%- if isCloudEvent -%}                
-                cloudEvent.Data
-                {%- elif isAmqp -%}
-                amqpMessage.Body
-                {%- elif isMqtt -%}
-                mqttMessage.Payload
-                {%- endif -%}                
-                );
-            {%- else %}
-            var data =   
-                {%- if isCloudEvent -%}                
-                cloudEvent.Data
-                {%- elif isAmqp -%}
-                amqpMessage.Body
-                {%- elif isMqtt -%}
-                mqttMessage.Payload
-                {%- endif -%};
-            {%- endif %}        
-            // TODO: Process the received data
-            await Task.CompletedTask;
-        }
-        {% endfor %}
-
-        {%- if uses_cloudevents_message %}
-        public async Task DispatchAsync(
-               CloudEvent cloudEvent,
-               ILogger log)
-        {
-            var cloudEventType = cloudEvent.Type;
-            switch (cloudEventType)
-            {
-                {% for group_key, group in groups.items() -%}
-                {% for id, definition in group.definitions.items() -%}
-                {% set pascalDefinitionName = definition.id | pascal %}
-                    case "{{ definition.id }}":
-                        await On{{ pascalDefinitionName | strip_namespace }}(cloudEvent,log);
-                        break;
-                {% endfor %}
-                {% endfor %}
-                default:
-                    log.LogError("Unsupported CloudEvent type {eventType}", cloudEventType);
-                    break;
-            }
-        }
-        {%- endif %}
-
+        {{ cloudEvents.DeclareHandlerServices( project_name, class_name, groups) | indent(8) }}
+        {{ amqp.DeclareHandlerServices( project_name, class_name, groups) | indent(8) }}
+        {{ mqtt.DeclareHandlerServices( project_name, class_name, groups) | indent(8) }}
+        
         {%- if uses_cloudevents_message %}
         private readonly ContentMode contentMode;
         private readonly CloudEventFormatter formatter;
+        
+        public async Task DispatchCloudEventAsync(
+               CloudEvent cloudEvent,
+               ILogger log)
+        {
+             {{ cloudEvents.DispatchToHandlerServices( "cloudEvent", groups ) | indent(12) }}
+        }
         {%- endif %}
-        private readonly ConsumerEndpoint endpoint;
+
+        {%- if uses_amqp_message %}
+        public async Task DispatchMessageAsync(
+               Amqp.Message amqpMessage,
+               ILogger log)
+        {
+             {{ amqp.DispatchToHandlerServices( "amqpMessage", groups ) | indent(12) }}
+        }
+        {%- endif %}
+
+        {%- if uses_mqtt_message %}
+        public async Task DispatchApplicationMessageAsync(
+               MqttApplicationMessage mqttMessage,
+               ILogger log)
+        {
+             {{ mqtt.DispatchToHandlerServices( "mqttMessage", groups ) | indent(12) }}
+        }
+        {%- endif %}
+
+        private ConsumerEndpoint endpoint;
 
         {%- if uses_cloudevents_message %}
-        public EventConsumer(ConsumerEndpoint endpoint, ContentMode contentMode, CloudEventFormatter formatter)
+        public {{ class_name }}(ConsumerEndpoint endpoint, ContentMode contentMode, CloudEventFormatter formatter)
         {
             this.contentMode = contentMode;
             this.formatter = formatter;
             this.endpoint = endpoint;
-            this.endpoint.DispatchEventAsync += DispatchAsync;
         }
         {%- endif %}
 
         {%- if uses_amqp_message or uses_mqtt_message %}
-        public EventConsumer(ConsumerEndpoint endpoint)
+        public {{ class_name }}(ConsumerEndpoint endpoint)
         {
             this.endpoint = endpoint;
-            //this.endpoint.DispatchEventAsync += DispatchAsync;
         }
         {%- endif %}
 
         public void Dispose()
         {
-            {%- if uses_cloudevents_message %}
-            this.endpoint.DispatchEventAsync -= DispatchAsync;
-            {%- endif %}
+            this.endpoint.Dispose();
+            this.endpoint = null;
         }
 
         public ConsumerEndpoint Endpoint
@@ -149,7 +111,7 @@ namespace {{ project_name | pascal }}.{{ pascalGroupName }}
            {%- set isAmqp = not isCloudEvent and endpoint.format.lower().startswith("amqp") %}
            {%- set isMqtt = not isCloudEvent and endpoint.format.lower().startswith("mqtt") %}
                 
-        public static EventConsumer CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential {% if isCloudEvent %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential {% if isCloudEvent %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -166,7 +128,24 @@ namespace {{ project_name | pascal }}.{{ pascalGroupName }}
             {%- endfor %}
             };
             var endpoint = ConsumerEndpoint.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints);
-            var consumer = new EventConsumer(endpoint{% if isCloudEvent %}, contentMode, formatter{% endif %});
+            var consumer = new {{ class_name }}(endpoint{% if isCloudEvent %}, contentMode, formatter{% endif %});
+            {% if isAmqp %}
+            if ( endpoint is AmqpConsumerEndpoint)
+            {
+                var amqpEndpoint = endpoint as AmqpConsumerEndpoint;
+                amqpEndpoint.DispatchMessageAsync += consumer.DispatchMessageAsync;
+            }
+            {% endif %}
+            {% if isMqtt %}
+            if ( endpoint is MqttConsumerEndpoint)
+            {
+                var mqttEndpoint = endpoint as MqttConsumerEndpoint;
+                mqttEndpoint.DispatchApplicationMessageAsync += consumer.DispatchApplicationMessageAsync;
+            }
+            {% endif %}
+            {% if isCloudEvent %}
+            endpoint.DispatchAsync += consumer.DispatchAsync;
+            {% endif %}
             return consumer;
         }
         {%- endif -%}
