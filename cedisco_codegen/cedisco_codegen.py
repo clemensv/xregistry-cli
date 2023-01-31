@@ -464,41 +464,45 @@ def render_code_templates(project_name, style, output_dir, docroot,
             file_name_base = file_name_base.replace("{projectname}",
                                                     pascal(project_name))
             file_name = file_name_base
-            if file_name.startswith("{class") and "groups" in scope:
-
-                if "endpoints" in docroot: endpoints = docroot["endpoints"]
-                else: endpoints = None
-                if "schemagroups" in docroot:
-                    schemagroups = docroot["schemagroups"]
-                else:
-                    schemagroups = None
-
-                for id, group in scope["groups"].items():
-                    # create a snippet that only has the current group
-                    subscope = {
-                        "endpoints": endpoints,
-                        "schemagroups": schemagroups,
-                        "groups": {}
-                    }
-                    subscope["groups"][id] = group
-                    scope_parts = id.split(".")
-                    package_name = id
-                    if not package_name:
-                        package_name = project_name
-                    class_name = scope_parts[-1]
-                    if file_name_base.startswith("{classdir}"):
-                        file_dir = os.path.join(file_dir_base,
-                                                package_name.replace(".", "/"))
-                        file_name = file_name_base.replace(
-                            "{classdir}", pascal(class_name))
+            if file_name.startswith("{class"):
+                if "groups" in scope:
+                    if "endpoints" in docroot: endpoints = docroot["endpoints"]
+                    else: endpoints = None
+                    if "schemagroups" in docroot:
+                        schemagroups = docroot["schemagroups"]
                     else:
-                        file_name = file_name_base.replace(
-                            "{classfull}", id).replace("{classname}",
-                                                       pascal(class_name))
-                    render_template(project_name, class_name, subscope, file_dir,
-                                    file_name, template)
+                        schemagroups = None
+
+                    for id, group in scope["groups"].items():
+                        # create a snippet that only has the current group
+                        subscope = {
+                            "endpoints": endpoints,
+                            "schemagroups": schemagroups,
+                            "groups": {}
+                        }
+                        subscope["groups"][id] = group
+                        scope_parts = id.split(".")
+                        package_name = id
+                        if not package_name:
+                            package_name = project_name
+                        class_name = scope_parts[-1]
+                        if file_name_base.find("{classdir}") > -1:
+                            file_dir = os.path.join(file_dir_base, 
+                                                    os.path.join(*package_name.split("."))).lower()
+                            file_name = file_name_base.replace("{classdir}", pascal(class_name))
+                        else:
+                            file_name = file_name_base.replace(
+                                "{classfull}", id).replace("{classname}",
+                                                        pascal(class_name))
+                        render_template(project_name, class_name, subscope, file_dir,
+                                        file_name, template)
                 continue  # skip back to the outer loop
 
+            if file_name.startswith("{projectdir}"):
+                file_dir = os.path.join(file_dir_base, os.path.join(*package_name.split("."))).lower()
+                file_name = file_name_base.replace("{projectdir}", "")
+
+            
             render_template(project_name, class_name, scope, file_dir, file_name, template)
 
 
@@ -545,10 +549,18 @@ def render_schema_templates(schema_type, template_dir, project_name, class_name,
                                                 pascal(project_name))
         file_name_base = file_name_base.replace("{classname}",
                                                 pascal(class_name))
+        
         file_name = file_name_base
+        if file_name_base.find("{classdir}") > -1:
+            file_dir = os.path.join(file_dir, os.path.join(*project_name.split(".")).lower())
+            file_name = file_name_base.replace("{classdir}", pascal(class_name))
+                
+        
         # remember the schema class name we generated a file for 
         if not class_name in stack("classfiles"):
             push(class_name, "classfiles")
+        
+        
         # generate the file
         render_template(project_name, class_name, scope, file_dir, file_name, template)
 

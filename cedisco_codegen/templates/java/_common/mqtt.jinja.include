@@ -1,0 +1,185 @@
+{#- MQTT macros -#}
+
+{%- macro PahoImports() -%}
+import org.eclipse.paho.client.mqttv3.MqttMessage as MqttMessageV2;
+iomport org.eclipse.paho.mqttv5.common.packet.MqttWireMessage as MqttMessageV5;
+
+{%- endmacro -%}
+
+{%- macro EmitArguments(props) -%}
+{%- for propname, prop in props.items() %}
+{%- if propname != "user-properties" -%}
+{%- if propname == "qos" -%}{%- set propname = "qualityOfServiceLevel" -%}{%- endif -%}
+{%- if propname == "topic-name" -%}{%- set propname = "topic" -%}{%- endif -%}
+{%- if propname == "content-type" -%}{%- set propname = "contentType" -%}{%- endif -%}
+{%- if propname == "response-topic" -%}{%- set propname = "responseTopic" -%}{%- endif -%}
+{%- if propname == "payload-format" -%}{%- set propname = "payloadFormatIndicator" -%}{%- endif -%}
+{%- if propname == "correlation-data" -%}{%- set propname = "correlationData" -%}{%- endif -%}
+{%- if propname == "retain" -%}{%- set propname = "retain" -%}{%- endif -%}
+{%- if prop.type == "uritemplate" -%}
+   {%- for placeholder in prop.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+   , String {{ placeholder }}
+   {%- endfor -%}
+{%- elif prop.value is not defined -%}
+   , String {{ propname }}{%- if not prop.required %} = default {%- endif %}
+{%- endif -%}
+{%- endif -%}
+{%- endfor -%}
+{%- if "user-properties" in props %}
+  {%- for prop in props["user-properties"] %}
+  {%- if prop.type == "uritemplate" -%}
+   {%- for placeholder in prop.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+   , String {{ placeholder }}
+   {%- endfor -%}
+   {%- elif prop.value is not defined -%}
+   , String {{ prop.name }}{%- if not prop.required %} = default {%- endif -%}
+   {%- endif -%}
+  {%- endfor %}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{%- macro DeclareUriTemplateArguments(definition) -%}
+{%- if definition.metadata["properties"] -%}{{ EmitArguments(definition.metadata["properties"]) }}{%- endif -%}
+{%- endmacro %}
+
+{#- Helper macro for assigning properties -#}
+{%- macro AssignProps(props, as_dict = False) -%}
+{%- for propname, prop in props.items() -%}
+{%- if propname != "user-properties" -%}
+{%- if propname == "qos" -%}{%- set propname = "qualityOfServiceLevel" -%}{%- endif -%}
+{%- if propname == "topic-name" -%}{%- set propname = "topic" -%}{%- endif -%}
+{%- if propname == "content-type" -%}{%- set propname = "contentType" -%}{%- endif -%}
+{%- if propname == "response-topic" -%}{%- set propname = "responseTopic" -%}{%- endif -%}
+{%- if propname == "payload-format" -%}{%- set propname = "payloadFormatIndicator" -%}{%- endif -%}
+{%- if propname == "correlation-data" -%}{%- set propname = "correlationData" -%}{%- endif -%}
+{%- if as_dict %}
+["{{ propname }}"] = {% else %}
+{{ propname | pascal }} = {% endif -%}
+{%- if prop.value is defined -%}
+   {%- if prop.type in ["integer", "number", "boolean"] -%}
+      {%- if propname == "qualityOfServiceLevel" -%}
+         (MqttQualityOfServiceLevel){{ prop.value }}
+      {%- elif propname == "payloadFormatIndicator" -%}
+         (MqttPayloadFormatIndicator){{ prop.value }}
+      {%- else -%}
+         {{ prop.value | lower }}
+      {%- endif -%}
+   {%- else -%}
+      $"{{ prop.value }}"
+   {%- endif -%}
+{%- else -%}
+   {{ propname }}
+{%- endif -%},
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Helper macro for assigning user properties -#}
+{%- macro AssignUserProps(props) -%}
+{%- for prop in props["user-properties"] %}
+new MqttUserProperty("{{ prop.name }}", 
+{%- if prop.value -%}
+   {%- if prop.type in ["integer", "number", "boolean"] -%}
+      {{ prop.value }}
+   {%- else -%}
+      $"{{ prop.value }}"
+   {%- endif -%}
+{%- else -%}
+   {{ prop.name }}
+{%- endif -%}){%- if not loop.last -%},{% endif %}
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates AMQP message objects from mqttDefinition as definition -#}
+{%- macro DeclareMqttNetMessage(variable, definition) -%}
+{%- set properties = definition.metadata["properties"] %}
+MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
+{
+   {{- AssignProps(properties) | indent(3) }}
+   UserProperties = new List<MqttUserProperty> {
+      {{- AssignUserProps(properties) | indent(9) }}
+   }
+};
+{%- endmacro -%}
+
+
+{%- macro DeclareHandlerServices(project_name, class_name, groups) -%}
+{%- if groups | exists("format", "mqtt" ) %}
+{%- for group_key, group in groups.items() if (group | exists("format", "mqtt" )) -%}
+{%- set pascalGroupName = group.id | default(group_key) | pascal %}
+{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttHandlerService" -%}
+{%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttHandlerService" -%}
+{{ handlerType }} _{{ handlerName }};
+{%- endfor %}
+
+{{ class_name }}(
+    {%- for group_key, group in groups.items() -%}
+    {%- set pascalGroupName = group.id | default(group_key) | pascal -%} 
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttHandlerService" -%}
+    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttHandlerService" -%}
+    {{ handlerType }} {{ handlerName }}
+    {%- if not loop.last -%}, {%- endif -%}
+    {%- endfor -%})
+{
+    {% for group_key, group in groups.items() -%}
+    {%- set pascalGroupName = group.id | default(group_key) | pascal %}
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttHandlerService" -%}
+   {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttHandlerService" -%}
+    this._{{ handlerName }} = {{ handlerName }};
+    {%- endfor %}
+}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DispatchToHandlerServices(message, groups) -%}
+{%- if groups | exists("format", "mqtt" ) %}
+Regex regex; 
+Match match; 
+var messageTopic = {{ message }}.Topic;
+{% for group_key, group in groups.items() if (group | exists("format", "mqtt" )) -%}
+{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttHandlerService" -%}
+{% for id, definition in group.definitions.items() if (definition | exists("format", "mqtt" )) -%}
+{% set pascalDefinitionName = definition.id | pascal %}
+regex = new Regex("^" + "{{ definition.metadata.properties.topic.value}}".Replace("{", "(?<").Replace("}", ">[^/]+)") + "$");
+match = regex.Match(messageTopic);
+if (match.Success)
+{
+   await this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
+   {%- if definition.schemaurl -%}
+   {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Payload)
+   {%- else -%}
+   {{ message }}.Data
+   {%- endif %}, match.Groups.Values.Where(g => g.Name != "0").ToDictionary(g => g.Name, g => g.Value));
+}   
+{% endfor %}
+{% endfor %}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- set groups = root.groups -%}
+{%- if groups | exists("format", "mqtt" ) %}
+{%- set function_name = project_name | pascal -%}
+{%- for group_key, group in groups.items() if (group | exists("format", "mqtt" )) -%}
+{%- set pascalGroupName = group.id | default(group_key) | pascal %}
+
+
+namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+{
+    public interface I{{ pascalGroupName | strip_namespace }}MqttHandlerService
+    {
+        {%- for id, definition in group.definitions.items() if ( definition | exists("format", "mqtt" )) -%}
+        {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}
+        {%- if definition.schemaurl -%}
+        {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
+        {%- else -%}
+        {%- set dataType = "object" -%}
+        {%- endif %}   
+        Future On{{ pascalDefinitionName | strip_namespace }}Async(MqttApplicationMessage mqttMessage, {{ dataType }} data, IDictionary<String, String> parameters);
+        {%- endfor %}
+    }
+}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}

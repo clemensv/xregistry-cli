@@ -1,0 +1,6 @@
+syntax="proto3";
+
+option java_multiple_files = true;
+package {{ project_name | lower }};
+
+{{ root | proto | regex_replace('syntax[\s]*=[\s]*["\']proto3["\'];[\s]*\n', '') }}

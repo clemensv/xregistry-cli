@@ -582,13 +582,16 @@
                                 "type": "object",
                                 "properties": {
                                     "orderId": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "minLength": 1
                                     },
                                     "customerId": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "minLength": 1
                                     },
                                     "total": {
-                                        "type": "number"
+                                        "type": "number",
+                                        "minimum": 0
                                     },
                                     "items": {
                                         "type": "array",
@@ -596,13 +599,16 @@
                                             "type": "object",
                                             "properties": {
                                                 "productId": {
-                                                    "type": "string"
+                                                    "type": "string",
+                                                    "minLength": 1
                                                 },
                                                 "quantity": {
-                                                    "type": "number"
+                                                    "type": "number",
+                                                    "minimum": 0
                                                 },
                                                 "price": {
-                                                    "type": "number"
+                                                    "type": "number",
+                                                    "minimum": 0
                                                 }
                                             }
                                         }
@@ -627,7 +633,8 @@
                                         "type": "string"
                                     },
                                     "amount": {
-                                        "type": "number"
+                                        "type": "number",
+                                        "minimum": 0
                                     },
                                     "status": {
                                         "type": "string"
@@ -831,7 +838,8 @@
                                         "type": "string"
                                     },
                                     "email": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "format": "email"
                                     },
                                     "position": {
                                         "type": "string"
@@ -878,7 +886,8 @@
                                         "type": "string"
                                     },
                                     "email": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "format": "email"
                                     },
                                     "position": {
                                         "type": "string"

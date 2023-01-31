@@ -1,0 +1,182 @@
+{#- AMQP macros -#}
+
+{%- macro AmqpImports() -%}
+import com.azure.amqp;
+{%- endmacro -%}
+
+{%- macro EmitArguments(props) -%}
+{%- for propname, prop in props.items() %}
+{%- if prop.type == "uritemplate" -%}
+   {%- for placeholder in prop.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+   String {{ placeholder }}
+   {%- endfor -%}
+{%- elif prop.value is not defined -%}
+   , String {{ propname }}{%- if not prop.required %} = default {%- endif %}{% endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{%- macro DeclareUriTemplateArguments(definition) -%}
+{%- if definition.metadata["header"] -%}{{ EmitArguments(definition.metadata["header"]) }}{%- endif -%}
+{%- if definition.metadata["footer"] -%}{{ EmitArguments(definition.metadata["footer"]) }}{%- endif -%}
+{%- if definition.metadata["message-annotations"] -%}{{ EmitArguments(definitions.metadata["message-annotations"]) }}{%- endif -%}
+{%- if definition.metadata["delivery-annotations"] -%}{{ EmitArguments(definitions.metadata["delivery-annotations"]) }}{%- endif -%}
+{%- if definition.metadata["properties"] -%}{{ EmitArguments(definition.metadata["properties"]) }}{%- endif -%}
+{%- if definition.metadata["application-properties"] -%}{{ EmitArguments(definition.metadata["application-properties"]) }}{%- endif -%}
+{%- endmacro %}
+
+{#- Helper macro for assigning properties -#}
+{%- macro AssignProps(props, as_dict = False) -%}
+{%- for propname, prop in props.items() -%}
+{%- if as_dict %}
+["{{ propname }}"] = {% else %}
+{{ propname | pascal }} = {% endif -%}
+{%- if prop.value -%}
+   {%- if prop.type in ["integer", "number", "boolean"] -%}
+      {{ prop.value }}
+   {%- elif prop.type == "uri" or prop.type == "uritemplate" -%}
+       new Uri($"{{ prop.value }}", UriKind.RelativeOrAbsolute),
+   {%- else -%}
+      $"{{ prop.value }}"
+   {%- endif -%}
+{%- else -%}
+   {{ propname }}
+{%- endif -%},
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates AMQP message objects from amqpDefinition as definition -#}
+{%- macro DeclareAmqpNetLiteMessage(variable, definition) -%}
+{%- set header = definition.metadata["header"] %}
+{%- set footer = definition.metadata["footer"] %}
+{%- set messageAnnotations = definition.metadata["message-annotations"] %}
+{%- set deliveryAnnotations = definition.metadata["delivery-annotations"] %}
+{%- set properties = definition.metadata["properties"] %}
+{%- set applicationProperties = definition.metadata["application-properties"] %}
+Amqp.Message {{ variable }} = new Amqp.Message()
+{
+{%- if header %}
+   Header = new Header() 
+   {
+   {{- AssignProps(header) | indent(6) }}
+   },
+{%- if footer %}
+   Footer = new Footer() 
+   {
+   {{- AssignProps(footer) | indent(6) }}
+   },
+{%- endif %}
+{%- if messageAnnotations %}
+   MessageAnnotations = new MessageAnnotations()
+   {
+   {{- AssignProps(messageAnnotations) | indent(6) }}
+   },
+{%- endif %}
+{%- if deliveryAnnotations %}
+   DeliveryAnnotations = new DeliveryAnnotations()
+   {
+   {{- AssignProps(deliveryAnnotations) | indent(6) }}
+   },
+{%- endif %}
+{%- if properties %}
+   Properties = new Properties()
+   {
+   {{- AssignProps(properties) | indent(6) }}
+   },
+{%- endif %}
+{%- if applicationProperties %}
+   ApplicationProperties = new ApplicationProperties()
+   {
+   {{- AssignProps(applicationProperties, True) | indent(6) }}
+   },
+{%- endif %}
+{%- endif %}
+};
+{%- endmacro -%}
+
+
+{%- macro DeclareHandlerServices(project_name, class_name, groups) -%}
+{%- if groups | exists("format", "amqp" ) %}
+{%- for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
+{%- set pascalGroupName = group.id | default(group_key) | pascal %}
+{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpHandlerService" -%}
+{%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpHandlerService" -%}
+{{ handlerType }} _{{ handlerName }};
+{%- endfor %}
+
+{{ class_name }}(
+    {%- for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
+    {%- set pascalGroupName = group.id | default(group_key) | pascal -%} 
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpHandlerService" -%}
+    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpHandlerService" -%}
+    {{ handlerType }} {{ handlerName }}
+    {%- if not loop.last -%}, {%- endif -%}
+    {%- endfor -%})
+{
+    {% for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
+    {%- set pascalGroupName = group.id | default(group_key) | pascal %}
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpHandlerService" -%}
+    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpHandlerService" -%}
+    this._{{ handlerName }} = {{ handlerName }};
+    {%- endfor %}
+}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DispatchToHandlerServices(message, groups) -%}
+{%- if groups | exists("format", "amqp" ) %}
+var messageSubject = {{ message }}.Properties.Subject;
+switch (messageSubject)
+{
+    {% for group_key, group in groups.items() if (group | exists("format", "amqp" )) -%}
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpHandlerService" -%}
+    {% for id, definition in group.definitions.items() if (definition | exists("format", "amqp" )) -%}
+    {% set pascalDefinitionName = definition.id | pascal %}
+    case "{{ definition.id }}":
+        if ( this._{{ handlerName }} != null )
+        {
+            await this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
+                {%- if definition.schemaurl -%}
+            {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Body)
+            {%- else -%}
+            {{ message }}.Data
+            {%- endif %});
+            break;
+        }
+        break;
+    {% endfor %}
+    {% endfor %}
+    default:
+        log.LogError($"Unsupported message subject {messageSubject}");
+        break;
+}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- set groups = root.groups -%}
+{%- if groups | exists("format", "amqp" ) %}
+{%- set function_name = project_name | pascal -%}
+{%- for group_key, group in groups.items() if (group | exists("format", "amqp" )) -%}
+{%- set pascalGroupName = group.id | default(group_key) | pascal %}
+{{- AmqpImports() }}
+using System.Threading.Tasks;
+
+namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+{
+    public interface I{{ pascalGroupName | strip_namespace }}AmqpHandlerService
+    {
+        {%- for id, definition in group.definitions.items() if (definition | exists("format", "amqp" )) -%}
+        {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}
+        {%- if definition.schemaurl -%}
+        {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
+        {%- else -%}
+        {%- set dataType = "object" -%}
+        {%- endif %}   
+        Future On{{ pascalDefinitionName | strip_namespace }}Async(Message amqpMessage, {{ dataType }} data);
+        {%- endfor %}
+    }
+}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}

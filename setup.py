@@ -26,6 +26,7 @@ setuptools.setup(
         'requests',
         'jsonpointer',
         'pandas',
+        'pyyaml',
     ],
     entry_points={
         'console_scripts': [

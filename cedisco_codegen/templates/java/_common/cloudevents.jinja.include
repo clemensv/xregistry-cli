@@ -6,62 +6,61 @@
 {%- set attribute = definition.metadata.attributes[attrname] -%}
     {%- if attribute.type == "uritemplate" -%}
         {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
-        , string {{ placeholder }}
+        , String {{ placeholder }}
         {%- endfor -%}
     {%- elif attribute.value is not defined -%}
         {%- if not attrname == "time" and not attrname == "id" -%}
-        , string {{ attrname }}{%- if not attribute.required %} = default {%- endif %}{% endif -%}
+        , String {{ attrname }}{%- if not attribute.required %} = default {%- endif %}{% endif -%}
     {%- endif -%}
 {%- endfor -%} 
 {%- endmacro -%}
 
 {#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as definition -#}
-{%- macro DeclareCloudNativeCloudEvent(variable, definition) -%}
-CloudEvent {{ variable }} = new CloudEvent()
-{
+{%- macro DeclareCloudNativeCloudEvent(variable, data, definition) -%}
+CloudEvent {{ variable }} = new CloudEventBuilder()
 {%- for attrname in definition.metadata.attributes -%}
 {%- set attribute = definition.metadata.attributes[attrname] -%}
 {%- if attrname in ["subject", "type", "datacontenttype"] -%}
     {%- set attrProp = attrname | pascal | replace("Datacontenttype", "DataContentType") %}
-    {{ attrProp }} = {% if attribute.value -%}$"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%},
-{%- endif -%}
-{%- if attrname in [ "source", "dataschema"] -%}
-    {%- set attrProp = attrname | pascal | replace("Dataschema", "DataSchema") %}
-    {{ attrProp }} = {% if attribute.value -%}new Uri($"{{ attribute.value }}", UriKind.RelativeOrAbsolute){%- else -%}{{ attrname }}{%- endif -%},
-{%- endif -%}
-{%- if attrname in ["time"] %}
-    {{ attrname | pascal }} = {% if attribute.value -%}
+    .with{{ attrProp }}({% if attribute.value -%}"{{ attribute.value }}"
+    {%- if attribute.type == "uritemplate" -%}
+    {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+    .replace("{ {{- placeholder -}} }", placeholder)
+    {%- endfor -%}
+    {%- endif -%}{%- else -%}{{ attrname }}{%- endif -%})
+{%- elif attrname in ["id"] %}
+    .with{{ attrname | pascal }}(UUID.randomUUID().toString())
+{%- elif attrname in [ "source"] -%}
+    {%- set attrProp = attrname | pascal %}
+    .with{{ attrProp }}({% if attribute.value -%}URI.create("{{ attribute.value }}"
+    {%- if attribute.type == "uritemplate" -%}
+    {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+    .replace("{ {{- placeholder -}} }", placeholder)
+    {%- endfor -%}
+    {%- endif -%}){%- else -%}{{ attrname }}{%- endif -%})
+{%- elif attrname in ["time"] %}
+    .with{{ attrname | pascal }}({% if attribute.value -%}
         {%- if attribute.value == "0001-01-01T00:00:00+00:00" -%}
-            DateTime.UtcNow
+            OffsetDateTime.now()
         {%- else -%}   
-            DateTime.Parse("{{- attribute.value -}}")
+            OffsetDateTime.parse("{{- attribute.value -}}")
         {%- endif -%}
         {%- else -%}
-            DateTime.UtcNow
-        {%- endif -%},
-{%- endif -%}
-{%- if attrname in ["id"] %}
-    {{ attrname | pascal }} = Guid.NewGuid().ToString(),
+            OffsetDateTime.now()
+        {%- endif -%})
+{%- else -%}
+    .withExtension( "{{ attrProp }}", ({% if attribute.value -%}$"{{ attribute.value }}"
+    {%- if attribute.type == "uritemplate" -%}
+    {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+    .replace("{ {{- placeholder -}} }", placeholder)
+    {%- endfor -%}
+    {%- endif -%}
+    {%- else -%}{{ attrname }}{%- endif -%})
 {%- endif -%}
 {%- endfor %}
-};
-{% for attrname in definition.metadata.attributes -%}
-{%- set attribute = definition.metadata.attributes[attrname] -%}
-{%- if attrname not in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
-cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
-{%- endif -%}
-{%- endfor -%}
-{%- endmacro -%}
-
-{#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as definition -#}
-{%- macro DeclareCloudNativeCloudEventFromJson(variable, json, definition) -%}
-};
-{% for attrname in definition.metadata.attributes -%}
-{%- set attribute = definition.metadata.attributes[attrname] -%}
-{%- if attrname not in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
-cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
-{%- endif -%}
-{%- endfor -%}
+    .withData({%- if definition.metadata.datacontenttype -%}"{{ definition.metadata.datacontenttype.value }}", {% endif -%}
+              {%- if definition.metadata.dataschema -%}"{{ definition.metadata.dataschema }}", {% endif -%} {{ data }} )
+    .build();
 {%- endmacro -%}
 
 {%- macro DeclareHandlerServices(project_name, class_name, groups) -%}
@@ -136,7 +135,7 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   
-        Task On{{ pascalDefinitionName | strip_namespace }}Async(CloudEvent cloudEvent, {{ dataType }} data);
+        Future On{{ pascalDefinitionName | strip_namespace }}Async(CloudEvent cloudEvent, {{ dataType }} data);
         {%- endfor %}
     }
 }
