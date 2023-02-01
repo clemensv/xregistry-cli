@@ -1,0 +1,130 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Python: Code Generator EventHubs",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language cs --style azfunctioneventhubs --definitions .\\samples\\message-definitions\\contoso-erp.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testeh"
+    },
+    {
+      "name": "Python: Code Generator C# SB",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language cs --style azfunctionservicebus --definitions .\\samples\\message-definitions\\contoso-erp.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testsb"
+    },
+    {
+      "name": "Python: Code Generator C# HTTP",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language cs --style azfunctionhttp --definitions .\\samples\\message-definitions\\contoso-erp.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testhttp"
+    }
+    ,
+    {
+      "name": "Python: Code Generator C# Consumer",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language cs --style consumer --definitions .\\samples\\protocols\\http-consumer-endpoint.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testconsumer"
+    },
+    {
+      "name": "Python: Code Generator openAPI Producer",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language openapi --style producer --definitions .\\samples\\protocols\\http-producer-endpoint.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testopenapi"
+    }
+    ,
+    {
+      "name": "Python: Code Generator openAPI Subscriber",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language openapi --style subscriber --definitions .\\samples\\message-definitions\\contoso-erp.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testopenapi2"
+    }
+    ,
+    {
+      "name": "Python: Code Generator Java producer",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language java --style producer --definitions .\\samples\\message-definitions\\contoso-erp.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testjavap"
+    },
+    {
+      "name": "Python: Code Generator Java producer Proto",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language java --style producer --definitions .\\samples\\message-definitions\\minimal-proto.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testjavaproto"
+    },
+    {
+      "name": "Python: Code Generator Java producer Avro",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language java --style producer --definitions .\\samples\\message-definitions\\minimal-avro.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testjavaavro"
+    },
+    
+    {
+      "name": "Python: Code Generator Java consumer",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "args": "--language java --style consumer --definitions .\\samples\\message-definitions\\contoso-erp.disco --projectname Contoso.ERP.Events --output tmp/testjavac"
+    },
+    {
+      "name": "Python: Code Generator Java consumer Proto",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language java --style consumer --definitions .\\samples\\message-definitions\\minimal-proto.disco --projectname Contoso.ERP.Events --output tmp/testjavacproto"
+    },
+    {
+      "name": "Python: Code Generator Java consumer Avro",
+      "type": "python",
+      "request": "launch",
+      "program": "cedisco_codegen/cedisco_codegen.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "--language java --style consumer --definitions .\\samples\\message-definitions\\minimal-avro.disco --projectname Contoso.ERP.Events --output tmp/testjavacavro"
+    }
+
+  ]
+}

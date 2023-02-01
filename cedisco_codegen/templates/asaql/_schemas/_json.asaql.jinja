@@ -1,0 +1,63 @@
+{%- set schema_name = class_name | pascal -%}
+{%- set schema = root -%}
+
+{%- macro emitselectclause(type, type_name, record) -%}
+    {%- if type.type == 'object' or not type.type %}
+    {%- if type.properties -%}
+    {%- for pn, property in type.properties.items()  -%}
+      {%- set propertyName = pn | strip_invalid_identifier_characters %}
+      {%- if property.type != 'array' -%}
+        {%- if (not property.type) or property.type == "object"  -%}
+            {%- if not property['$ref'] -%}
+                {{ emitselectclause(property, pn ) }}{%- if not loop.last -%},{%- endif -%}
+            {%- endif -%}
+        {%- endif -%}
+        {%- if record -%}
+        GetRecordPropertyValue({{type_name}}, '{{ pn }}') AS {{type_name}}{{ propertyName }}{%- if not loop.last -%},{%- endif -%}
+        {%- else -%}
+        {%- if type_name %}{{type_name}}.{%endif%}{{ pn }} AS {{ propertyName }}{%- if not loop.last -%},{%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- endif %}
+    {%- endif %}
+{%- endmacro -%}
+
+{%- macro emitselectitemclause(type, type_name) -%}
+    {%- if type.type == 'object' or not type.type %}
+    {%- if type.properties -%}
+    {%- for pn, property in type.properties.items()  -%}
+        {%- set propertyName = pn | strip_invalid_identifier_characters -%}
+        {%- if property.type == 'array' -%}
+        {{ emitselectclause(property["items"], pn, true ) }}{%- if not loop.last -%},{%- endif -%}
+        {%- endif -%}
+    {%- endfor -%}
+    {%- endif %}
+    {%- endif %}
+{%- endmacro -%}
+
+{%- macro emitapplyclause(type, type_name) -%}
+    {%- if type.type == 'object' or not type.type %}
+    {%- if type.properties -%}
+    {%- for pn, property in type.properties.items()  -%}
+        {%- set propertyName = pn | strip_invalid_identifier_characters %}
+        {%- if property.type == 'array' -%}
+        GetArrayElements({% if type_name %}{{type_name}}.{%endif%}{{ pn }}) AS {{ propertyName }}{% if not loop.last %},{% endif %}
+        {%- endif -%}
+    {%- endfor -%}
+    {%- endif %}
+    {%- endif %}
+{%- endmacro -%}
+
+{%- macro emit() -%}
+WITH {{ schema_name }} AS (
+    SELECT {{ emitselectclause( schema, "" ) }} 
+    FROM {{ schema_name }}
+)
+{%- endmacro -%}
+
+{{- emitapplyclause( schema, class_name | pascal ) | save("apply:"+class_name) -}}
+{{- emitselectclause( schema, class_name | pascal, false ) | save("select:"+class_name) -}}
+{{- emitselectitemclause( schema, class_name | pascal ) | save("selectitem:"+class_name) -}}
+{{- emit() | save("with:"+class_name) -}}
+{% exit %}

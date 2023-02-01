@@ -1,0 +1,4 @@
+{
+    "description" : "Java CloudEvents SDK endpoint consumer class",
+    "priority" : 1
+}

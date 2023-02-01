@@ -30,6 +30,7 @@ import java.util.logging.Logger;
 import java.util.concurrent.CompletableFuture;
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.HashMap;
 import java.net.URI;
 import java.time.OffsetDateTime;
 
@@ -66,9 +67,9 @@ public class {{ className }}
         
     public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(Logger logger, IEndpointCredential credential {% if uses_cloudevents_message %}, Encoding encoding, EventFormat eventFormat {% endif %})  {       
         {%- if options %}
-        var options = new Map<String, String>();
+        var options = new HashMap<String, String>();
         {%- for key, value in options.items()%}
-        options.add("{{ key }}" , "{{ value }}" );
+        options.put("{{ key }}" , "{{ value }}" );
         {%- endfor %}
         {%- endif %}
         var endpoints = new ArrayList<URI>();

@@ -104,41 +104,41 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endmacro -%}
 
 
-{%- macro DeclareHandlerServices(project_name, class_name, groups) -%}
+{%- macro DeclareDispatchObjects(project_name, class_name, groups) -%}
 {%- if groups | exists("format", "mqtt" ) %}
 {%- for group_key, group in groups.items() if (group | exists("format", "mqtt" )) -%}
 {%- set pascalGroupName = group.id | default(group_key) | pascal %}
-{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttHandlerService" -%}
-{%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttHandlerService" -%}
+{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttDispatcher" -%}
+{%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
 {{ handlerType }} _{{ handlerName }};
 {%- endfor %}
 
 {{ class_name }}(
     {%- for group_key, group in groups.items() -%}
     {%- set pascalGroupName = group.id | default(group_key) | pascal -%} 
-    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttHandlerService" -%}
-    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttHandlerService" -%}
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttDispatcher" -%}
+    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
 {
     {% for group_key, group in groups.items() -%}
     {%- set pascalGroupName = group.id | default(group_key) | pascal %}
-    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttHandlerService" -%}
-   {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttHandlerService" -%}
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttDispatcher" -%}
+   {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
     this._{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
 }
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToHandlerServices(message, groups) -%}
+{%- macro DispatchToDispatchObjects(message, groups) -%}
 {%- if groups | exists("format", "mqtt" ) %}
 Regex regex; 
 Match match; 
 var messageTopic = {{ message }}.Topic;
 {% for group_key, group in groups.items() if (group | exists("format", "mqtt" )) -%}
-{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttHandlerService" -%}
+{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttDispatcher" -%}
 {% for id, definition in group.definitions.items() if (definition | exists("format", "mqtt" )) -%}
 {% set pascalDefinitionName = definition.id | pascal %}
 regex = new Regex("^" + "{{ definition.metadata.properties.topic.value}}".Replace("{", "(?<").Replace("}", ">[^/]+)") + "$");
@@ -170,7 +170,7 @@ using System.Threading.Tasks;
 
 namespace {{ pascalGroupName | namespace(project_name) | pascal }}
 {
-    public interface I{{ pascalGroupName | strip_namespace }}MqttHandlerService
+    public interface I{{ pascalGroupName | strip_namespace }}MqttDispatcher
     {
         {%- for id, definition in group.definitions.items() if ( definition | exists("format", "mqtt" )) -%}
         {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}

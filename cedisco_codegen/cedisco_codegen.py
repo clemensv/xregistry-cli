@@ -1,5 +1,7 @@
+import datetime
 import os
 import json
+import uuid
 import yaml
 import jinja2
 import urllib.request
@@ -11,6 +13,7 @@ import jsonpointer
 import pandas as pd
 from jinja2 import nodes
 from jinja2.ext import Extension
+from jinja2 import TemplateAssertionError, TemplateSyntaxError, TemplateRuntimeError
 
 
 # These are the global variables that are switched 
@@ -24,8 +27,9 @@ uses_protobuf : bool = False
 
 # Create a global stack structure
 context_stacks = dict()
+context_dict = dict()
 
-# Create a custom filter
+# Jinja extension to push a value onto a named stack
 def push(value, stack_name):
     global context_stacks
     if stack_name not in context_stacks:
@@ -33,37 +37,80 @@ def push(value, stack_name):
     context_stacks[stack_name].append(value)
     return ""
 
-# Create a custom tag extension
+current_dir = ""
+
+def pushfile(value, name):
+    global context_stacks
+    if "files" not in context_stacks:
+        context_stacks["files"] = list()
+    context_stacks["files"].append((os.path.join(current_dir,name), value))
+    return ""
+
+# Jinja extension to pop a value from a named stack
 def pop(stack_name):
     global context_stacks
     if stack_name not in context_stacks:
         context_stacks[stack_name] = list()
     return context_stacks[stack_name].pop()
 
-# Create a custom tag extension
+# Jinja extension to get the full contents of a named stack
 def stack(stack_name):
     global context_stacks
     if stack_name not in context_stacks:
         context_stacks[stack_name] = list()
     return context_stacks[stack_name]
 
+# Jinja extension to set a value
+def save(value, prop_name):
+    global context_dict
+    context_dict[prop_name] = value
+    return value
+
+# Jinja extension to get a value
+def get(prop_name):
+    global context_dict
+    if prop_name in context_dict:
+        return context_dict[prop_name]
+    return ""
+
+
 
 # Jinja tag to exit the current template because
 # something went wrong
-class ExitException(Exception):
-    pass
-
-
 class ExitExtension(Extension):
     tags = set(['exit'])
 
     def parse(self, parser):
-        lineno = next(parser.stream)
+        lineno = next(parser.stream)        
         return nodes.CallBlock(self.call_method('_exit', []), [], [],
                                []).set_lineno(lineno)
 
-    def _exit(self, name, timeout, caller):
-        raise ExitException()
+    def _exit(self, caller):
+        raise StopIteration()
+
+class UuidExtension(Extension):
+    tags = { 'uuid'}
+
+    def parse(self, parser: "Parser") -> nodes.Output:
+        lineno = parser.stream.expect("name:uuid").lineno
+        context = nodes.ContextReference()
+        result = self.call_method("_render", [context], lineno=lineno)
+        return nodes.Output([result], lineno=lineno)
+
+    def _render(self, context) -> str:
+        return uuid.uuid4()
+
+class TimeExtension(Extension):
+    tags = { 'time'}
+
+    def parse(self, parser: "Parser") -> nodes.Output:
+        lineno = parser.stream.expect("name:time").lineno
+        context = nodes.ContextReference()
+        result = self.call_method("_render", [context], lineno=lineno)
+        return nodes.Output([result], lineno=lineno)
+
+    def _render(self, context) -> str:
+        return datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 # Jinja filter that checks whether the given property exists 
@@ -460,7 +507,15 @@ def render_code_templates(project_name, style, output_dir, docroot,
             if post_process:
                 file_name_base = file_name_base[1:]
 
-            template = env.get_template(template_path)
+            try:
+                template = env.get_template(template_path)
+            except TemplateAssertionError as err:
+                print("{file} ({lineno}): {msg}".format(file=err.name, lineno=lineno, msg=err))
+                exit(1)
+            except TemplateSyntaxError as err:
+                print("{file}: ({lineno}): {msg}".format(file=err.name, lineno=err.lineno, msg=err))
+                exit(1)
+            
             file_name_base = file_name_base.replace("{projectname}",
                                                     pascal(project_name))
             file_name = file_name_base
@@ -533,7 +588,13 @@ def render_schema_templates(schema_type, template_dir, project_name, class_name,
         # we needed to add the template_dir to the path for glob,
         # but strip it back out here since we operate on the plain name
         schema_file = schema_file.replace("\\", "/")
-        template = env.get_template(schema_file)
+        
+        try:
+            template = env.get_template(schema_file)
+        except Exception as err:
+            print(err)
+            exit(1)
+
         relpath = os.path.dirname(schema_file)
         if relpath == ".":
             relpath = ""
@@ -569,6 +630,7 @@ def render_template(project_name, class_name, scope, file_dir, file_name, templa
 
     global uses_protobuf
     global uses_avro
+    global current_dir
     
     try:
         output_path = os.path.join(os.getcwd(), file_dir, file_name)
@@ -577,12 +639,20 @@ def render_template(project_name, class_name, scope, file_dir, file_name, templa
             os.makedirs(os.path.dirname(output_path))
 
         try:
+            current_dir = os.path.dirname(output_path)
             rendered = template.render(root=scope, project_name=project_name, class_name=class_name, uses_avro=uses_avro, uses_protobuf=uses_protobuf)
             with open(output_path, "w") as f:
                 f.write(rendered)
-        except ExitException:
-            os.remove(output_path)
-    except Exception as err:
+        except TypeError as err:
+            # this is the result of the exit tag in the template
+            if err.args[0].find("Undefined found") > -1:
+                if ( os.path.exists(output_path) ):
+                    os.remove(output_path)
+            else:
+                print("{file}: {msg}".format(file=template.name, msg=err))
+                exit(1)
+            
+    except TemplateRuntimeError as err:
         print(err)
         exit(1)
 
@@ -717,7 +787,7 @@ def load_definitions(definitions_file: str, style: str, headers: dict):
 # creates the Jinja environment and loads the extensions
 def setup_jinja_env(template_dirs : list[str]):
     loader = jinja2.FileSystemLoader(template_dirs, followlinks=True)
-    env = jinja2.Environment(loader=loader, extensions=[ExitExtension])
+    env = jinja2.Environment(loader=loader, extensions=[ExitExtension, UuidExtension, TimeExtension])
     env.filters['regex_search'] = regex_search
     env.filters['regex_replace'] = regex_replace
     env.filters['pascal'] = pascal
@@ -733,8 +803,11 @@ def setup_jinja_env(template_dirs : list[str]):
     env.filters['proto'] = proto
     env.filters['exists'] = exists
     env.filters['push'] = push
+    env.filters['pushfile'] = pushfile
+    env.filters['save'] = save
     env.globals['pop'] = pop
     env.globals['stack'] = stack
+    env.globals['get'] = get
     return env
 
 
@@ -804,17 +877,25 @@ def main():
         current_url = None
         context_stacks = dict()
 
-        # Call the generate() function with the parsed arguments
-        generate(args.project_name, args.language, args.style, args.output_dir,
-                args.definitions_file, headers)
+        try:
+            # Call the generate() function with the parsed arguments
+            generate(args.project_name, args.language, args.style, args.output_dir,
+                    args.definitions_file, headers)
 
-        # generate external schemas
-        for schema in schema_files_collected:
-            generate(args.project_name, args.language, "schema", args.output_dir,
-                    schema, headers)
-        
-        if not uses_avro and not uses_protobuf:
-            break
+            # generate external schemas
+            for schema in schema_files_collected:
+                generate(args.project_name, args.language, "schema", args.output_dir,
+                        schema, headers)
+            
+            if stack("files"):
+                for file, content in stack("files"):
+                    with open(file, "w") as f:
+                        f.write(content)
+
+            if not uses_avro and not uses_protobuf:
+                break
+        except SystemExit as err:
+            return err.code
     
 
 

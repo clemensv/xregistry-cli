@@ -1,0 +1,9 @@
+{%- for groupkey, group in root.groups.items() -%}
+   {%- for eventkey, event in group.definitions.items() %}
+SELECT type, *
+INTO [output{{event.id | strip_namespace | pascal }}] 
+FROM [input]
+WHERE type = '{{event.id}}'
+
+    {% endfor -%}
+{%- endfor %}

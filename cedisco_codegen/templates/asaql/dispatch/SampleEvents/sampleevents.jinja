@@ -1,0 +1,31 @@
+{%- macro generate(event) -%}
+{
+    "id" : "{% uuid %}",
+    "time": "{% time %}",
+    "specversion" : "1.0",
+    {%- if "type" in event %}
+    "type" : "{{ event.type.value }}",
+    {%- endif %}
+    {%- if "subject" in event %}
+    "subject" : "{{ event.subject.value }}",
+    {%- endif %}
+    {%- if "dataschema" in event %}
+    "dataschema" : "{{ event.dataschema.value }}",
+    {%- endif %}
+    {%- if "source" in event %}
+    "source" : "{{ event.source.value }}",
+    {%- endif %}
+    {%- if "datacontenttype" in event %}
+    "datacontenttype" : "{{ event.datacontenttype.value }}",
+    {%- endif %}
+    "data" : {
+        "Hello" : "World"
+    }
+}
+{% endmacro %}
+{%- for groupkey, group in root.groups.items() -%}
+{%- for eventkey, event in group.definitions.items() %}
+{{ generate(event.metadata.attributes) | pushfile("event_" + (event.id | strip_namespace | snake) + ".json") }}
+{%- endfor %}
+{%- endfor %}
+{% exit %}

@@ -1,7 +1,8 @@
 tmp/
 *.egg-info/
 build/
-.vscode/
+**/.vscode/**
+!**/.vscode/launch.json
 __pycache__/
 .pytest_cache/
 dist/

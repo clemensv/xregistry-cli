@@ -94,89 +94,112 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 };
 {%- endmacro -%}
 
+{%- macro DeclareDispatchObjectsArgs(groups, withType) -%}
+{%- for group_key, group in groups.items() if (group | exists("format", "amqp" )) -%}
+{%- set pascalGroupName = group.id | default(group_key) | pascal %}
+{%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ group.id | default(group_key) | strip_namespace | camel }}AmqpDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- endfor %}
+{%- endmacro-%}
 
-{%- macro DeclareHandlerServices(project_name, class_name, groups) -%}
+{%- macro DeclareDispatchObjectsFields(project_name, class_name, groups) -%}
+{%- for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
+{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+{%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
+{{ handlerType }} _{{ handlerName }};
+{%- endfor %}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, groups, args, body) -%}
 {%- if groups | exists("format", "amqp" ) %}
 {%- for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
 {%- set pascalGroupName = group.id | default(group_key) | pascal %}
-{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpHandlerService" -%}
-{%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpHandlerService" -%}
+{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+{%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
 {{ handlerType }} _{{ handlerName }};
 {%- endfor %}
 
-{{ class_name }}(
+{{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
     {%- set pascalGroupName = group.id | default(group_key) | pascal -%} 
-    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpHandlerService" -%}
-    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpHandlerService" -%}
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
 {
     {% for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
     {%- set pascalGroupName = group.id | default(group_key) | pascal %}
-    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpHandlerService" -%}
-    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpHandlerService" -%}
+    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
     this._{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
+    {{ body | indent(4) }}
 }
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToHandlerServices(message, groups) -%}
+{%- macro DispatchToDispatchObjects(message, groups) -%}
 {%- if groups | exists("format", "amqp" ) %}
-var messageSubject = {{ message }}.Properties.Subject;
-switch (messageSubject)
-{
-    {% for group_key, group in groups.items() if (group | exists("format", "amqp" )) -%}
-    {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpHandlerService" -%}
-    {% for id, definition in group.definitions.items() if (definition | exists("format", "amqp" )) -%}
-    {% set pascalDefinitionName = definition.id | pascal %}
-    case "{{ definition.id }}":
-        if ( this._{{ handlerName }} != null )
-        {
-            await this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
-                {%- if definition.schemaurl -%}
-            {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Body)
-            {%- else -%}
-            {{ message }}.Data
-            {%- endif %});
-            break;
-        }
-        break;
-    {% endfor %}
-    {% endfor %}
-    default:
-        log.LogError($"Unsupported message subject {messageSubject}");
-        break;
+try {
+   var messageSubject = {{ message }}.Properties.Subject;
+   switch (messageSubject)
+   {
+      {% for group_key, group in groups.items() if (group | exists("format", "amqp" )) -%}
+      {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+      {% for id, definition in group.definitions.items() if (definition | exists("format", "amqp" )) -%}
+      {% set pascalDefinitionName = definition.id | pascal %}
+      case "{{ definition.id }}":
+         if ( this._{{ handlerName }} != null )
+         {
+               return this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
+                  {%- if definition.schemaurl -%}
+               {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Body)
+               {%- else -%}
+               {{ message }}.Data
+               {%- endif %});
+         }
+         break;
+      {% endfor %}
+      {% endfor %}
+      default:
+         log.LogError($"Unsupported message subject {messageSubject}");
+         break;
+   }
+} catch ( Exception exception ) {
+    log.log(Level.WARNING, "Error while dispatching CloudEvent", exception);
 }
+return CompletableFuture.completedFuture(null);
 {%- endif -%}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchInterface(project_name, group, pascalGroupName, interfaceName) -%}
+package {{ pascalGroupName | namespace(project_name) | lower() }};
+
+import io.cloudevents.CloudEvent;
+import java.util.concurrent.CompletableFuture;
+{{ AmqpImports() }}
+
+public interface {{ interfaceName }}
+{
+    {%- for id, definition in group.definitions.items() if (definition | exists( "format", "amqp" )) -%}
+    {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}
+    {%- if definition.schemaurl -%}
+    {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
+    {%- else -%}
+    {%- set dataType = "Object" -%}
+    {%- endif %}   
+    CompletableFuture<Void> on{{ pascalDefinitionName | strip_namespace }}Async(Message amqpMessage, {{ dataType }} data);
+    {%- endfor %}
+}
 {%- endmacro -%}
 
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
 {%- set groups = root.groups -%}
 {%- if groups | exists("format", "amqp" ) %}
-{%- set function_name = project_name | pascal -%}
 {%- for group_key, group in groups.items() if (group | exists("format", "amqp" )) -%}
-{%- set pascalGroupName = group.id | default(group_key) | pascal %}
-{{- AmqpImports() }}
-using System.Threading.Tasks;
-
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
-{
-    public interface I{{ pascalGroupName | strip_namespace }}AmqpHandlerService
-    {
-        {%- for id, definition in group.definitions.items() if (definition | exists("format", "amqp" )) -%}
-        {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}
-        {%- if definition.schemaurl -%}
-        {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
-        {%- else -%}
-        {%- set dataType = "object" -%}
-        {%- endif %}   
-        Future On{{ pascalDefinitionName | strip_namespace }}Async(Message amqpMessage, {{ dataType }} data);
-        {%- endfor %}
-    }
-}
+{%- set pascalGroupName = group.id | default(group_key) | pascal -%}
+{%- set interfaceName = "I"+(pascalGroupName | strip_namespace)+"AmqpDispatcher" -%}
+{{- DeclareDispatchInterface(project_name, group, pascalGroupName, interfaceName) | pushfile(interfaceName+".java") -}}
 {%- endfor -%}
 {%- endif -%}
 {%- endmacro -%}

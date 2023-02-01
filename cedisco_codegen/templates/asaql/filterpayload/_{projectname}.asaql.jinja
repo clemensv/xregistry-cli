@@ -1,0 +1,58 @@
+{#-
+
+WITH ContosoERPEventsPurchaseOrderCreated AS (
+    SELECT id, type, data AS PurchaseOrderData, *
+    FROM [input]
+    WHERE type = 'Contoso.ERP.Events.PurchaseOrderCreated'
+)
+
+SELECT event.id, event.type, event.time, event.source, event.PurchaseOrderData.orderId, event.PurchaseOrderData.customerId, event.PurchaseOrderData.total,
+       GetRecordPropertyValue(items, 'productId' ) as productId, GetRecordPropertyValue(items, 'quantity' ) as quantity, GetRecordPropertyValue(items, 'unitCost' ) as unitCost
+INTO [output]
+FROM ContosoERPEventsPurchaseOrderCreated as event
+CROSS APPLY
+    GetArrayElements(PurchaseOrderData.items) AS items 
+
+
+-#}
+
+WITH {% for groupkey, group in root.groups.items() -%}
+{%- for definitionid, definition in group.definitions.items() %}
+{%- if not loop.first -%},
+{% endif %}{{ definition.id | concat_namespace  | pascal }} AS (
+    SELECT type, {% if definition.schemaurl -%}data AS {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}, {% endif -%} *
+    FROM [input]
+    WHERE type = '{{definition.id}}'
+)
+{%- endfor -%}
+{%- endfor -%}
+
+{%- for groupkey, group in root.groups.items() -%}
+{%- for definitionid, definition in group.definitions.items() %}
+{%- if definition.schemaurl %}
+SELECT {% for attrname, attribute in definition.metadata.attributes.items() %}
+{%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor -%}
+{%- set schemalist = get("select:"+(definition.schemaurl | schema_type)).split(",") -%}
+{%- for item in schemalist if item.strip() -%}
+,event.{{ item }}
+{%- endfor -%}
+{%- set itemlist= get("selectitem:"+(definition.schemaurl | schema_type)).split(",") %}
+{%- for item in itemlist if item.strip() -%}
+,{{ item }}
+{%- endfor %}
+INTO [output{{ definition.id | strip_namespace | pascal }}]
+FROM {{ definition.id | concat_namespace  | pascal }} as event
+{% set apply = get("apply:"+(definition.schemaurl | schema_type)) %}
+{%- if apply -%}
+CROSS APPLY
+    {{ apply }}
+{% endif -%}
+{%- else %}
+SELECT {% for attrname, attribute in definition.metadata.attributes.items() %}
+{%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor %}
+INTO [output{{ definition.id | strip_namespace | pascal }}]
+FROM {{ definition.id | concat_namespace  | pascal }} as event
+{%- endif -%}
+{%- endfor -%}
+{%- endfor -%}
+

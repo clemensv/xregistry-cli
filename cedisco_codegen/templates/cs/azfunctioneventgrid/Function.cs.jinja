@@ -19,14 +19,14 @@ namespace {{ project_name | pascal }}
     {%- set class_name = (project_name | pascal | concat_namespace)+"Functions" %}
     public class {{ class_name }}
     {
-        {{ cloudEvents.DeclareHandlerServices( project_name, class_name, groups) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, groups) | indent(8) }}
         
         [FunctionName("{{ project_name | pascal | concat_namespace }}")]
         public async Task Run(
                 [EventGridTrigger] CloudEvent cloudEvent,
                 ILogger log)
         {
-            {{ cloudEvents.DispatchToHandlerServices( "cloudEvent", groups ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", groups ) | indent(12) }}
         }
     }
 }

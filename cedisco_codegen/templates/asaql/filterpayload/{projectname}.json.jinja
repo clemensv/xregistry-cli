@@ -1,0 +1,18 @@
+{#- triggering generation of all schema-based elements with this loop #}
+{%- for groupkey, group in root.groups.items() -%}
+   {%- for definitionid, definition in group.definitions.items() %}
+    {%- if definition.schemaurl -%}
+        {% set x=definition.schemaurl | schema_type -%}
+    {%-endif -%}
+    {%- endfor -%}
+{%- endfor %}
+{
+    "name": "{{ project_name }}",
+    "startFile": "{{ project_name }}.asaql",
+    "configurations": [
+        {
+            "filePath": "JobConfig.json",
+            "subType": "JobConfig"
+        }
+    ]
+}
