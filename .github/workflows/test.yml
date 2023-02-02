@@ -30,7 +30,7 @@ jobs:
     - name: build CloudNative.CloudEvents.Endpoint package code
       run: dotnet build $GITHUB_WORKSPACE/csendpoints/source/CloudNative.CloudEvents.Experimental.Endpoints.sln
     - name: create package into temp feed 
-      run: cp $GITHUB_WORKSPACE/csendpoints/packages/* $GITHUB_WORKSPACE/packages 
+      run: cp $GITHUB_WORKSPACE/csendpoints/source/packages/* $GITHUB_WORKSPACE/packages 
     # end section
     - name: Set up Python
       uses: actions/setup-python@v2
