@@ -4,6 +4,7 @@ import sys
 import os
 import subprocess
 import shutil
+import time
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root, 'cedisco_codegen'))
@@ -40,6 +41,9 @@ def test_mqtt_end_to_end():
     start_command = "docker run --name {} -p 127.11.0.1:1883:1883 -v {}:/mosquitto/config/ -v {}:/mosquitto/log -d eclipse-mosquitto".\
                           format(container_name, os.path.join(os.path.dirname(__file__), 'mosquitto', 'config'), os.path.join(os.path.dirname(__file__), 'mosquitto', 'logs'))
     subprocess.run(start_command, shell=True, check=True)
+    # give the broker a chance to start. wait 20 seconds
+    time.sleep(15)
+    
     try:
         run_test()
     finally:

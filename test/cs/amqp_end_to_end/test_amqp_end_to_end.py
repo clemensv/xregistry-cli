@@ -4,6 +4,7 @@ import sys
 import os
 import subprocess
 import shutil
+import time
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root, 'cedisco_codegen'))
@@ -40,6 +41,8 @@ def test_amqp_end_to_end():
     start_command = "docker run --name {} -d -p 127.11.0.2:5672:5672 -e AMQ_USER=test -e AMQ_PASSWORD=password quay.io/artemiscloud/activemq-artemis-broker".\
                       format(container_name)
     subprocess.run(start_command, shell=True, check=True)
+    # give the broker a chance to start. wait 20 seconds
+    time.sleep(15)
     try:
         run_test()
     finally:
