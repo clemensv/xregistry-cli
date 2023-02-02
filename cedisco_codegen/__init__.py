@@ -1,1 +1,1 @@
-from .cedisco_codegen import main
+from .cedisco_codegen import *
