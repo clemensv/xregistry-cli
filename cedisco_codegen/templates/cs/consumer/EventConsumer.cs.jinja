@@ -141,23 +141,6 @@ namespace {{ project_name | pascal }}
             };
             var endpoint = ConsumerEndpoint.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints);
             var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( groups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( groups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( groups, false ) -}});
-            {% if isAmqp %}
-            if ( endpoint is AmqpConsumerEndpoint)
-            {
-                var amqpEndpoint = endpoint as AmqpConsumerEndpoint;
-                amqpEndpoint.DispatchMessageAsync += consumer.DispatchMessageAsync;
-            }
-            {% endif %}
-            {% if isMqtt %}
-            if ( endpoint is MqttConsumerEndpoint)
-            {
-                var mqttEndpoint = endpoint as MqttConsumerEndpoint;
-                mqttEndpoint.DispatchApplicationMessageAsync += consumer.DispatchApplicationMessageAsync;
-            }
-            {% endif %}
-            {% if isCloudEvent %}
-            endpoint.DispatchCloudEventAsync += consumer.DispatchCloudEventAsync;
-            {% endif %}
             return consumer;
         }
         {%- endif -%}
