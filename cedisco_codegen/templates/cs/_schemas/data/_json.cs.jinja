@@ -5,6 +5,9 @@
 
 {%- macro emitclass(type, type_name) -%}
     {%- if type.type == 'object' or not type.type %}
+    /// <summary>
+    /// {{ type.description | default(type_name | pascal, true) }}
+    /// </summary>
     public partial class {{ type_name | pascal }}
     {%- if type.allOf -%}
         {%- for allOfType in type.allOf -%}
@@ -16,6 +19,12 @@
         {%- endfor -%}
     {%- endif %}
     {
+        /// <summary>
+        /// Creates a new instance of {{ type_name | pascal }} from the provided data
+        /// </summary>
+        /// <param name="data">The data to use to create the new instance. 
+        /// This may be a string or JsonElement or an instance of this class.</param>
+        /// <returns>{{ type_name | pascal }}</returns>
         public static {{ type_name | pascal }} FromData(object data)
         {
             // generated from a JSON schema and therefore only supporting JSON
@@ -34,10 +43,32 @@
             throw new NotSupportedException("Data is not of a supported type for conversion to {{ type_name | pascal }}");
         }
 
+        /// <summary>
+        /// Serializes this object into a byte array using the JSON serializer
+        /// </summary>
         public byte[] ToByteArray() 
         {
             return JsonSerializer.SerializeToUtf8Bytes(this);
         }
+
+        /// <summary>
+        /// Creates a deep copy of this object
+        /// </summary>
+        /// <returns>{{ type_name | pascal }}</returns>
+        // <remarks>All data objects are cloned once before sending to trigger setter validations</remarks>
+        public {{ type_name | pascal }} Clone() 
+        {
+            return new {{ type_name | pascal }}(){% if not type.properties %};
+            {% else %}
+            {
+            {%- for pn, property in type.properties.items() %}   
+                {%- set propertyName = pn | strip_invalid_identifier_characters | pascal %}   
+                {{ propertyName }} = this.{{ propertyName }}{% if not loop.last %},{% endif %}
+            {%- endfor %} 
+            };
+            {%- endif %}
+        }
+        
     {% if type.properties %}
     {% for pn, property in type.properties.items()  -%}
         {%- set propertyName = pn | strip_invalid_identifier_characters %}
@@ -156,13 +187,23 @@
             {%- endif -%}
         {%- endif -%}
         {%- if property.enum %}
+        /// <summary>
+        /// {{ propertyName | pascal }}Enum
+        /// </summary>
         public enum {{ propertyName | pascal }}Enum
         {
             {% for value in property.enum %}
                 {{ value | pascal }} = {{ loop.index - 1 }},
             {% endfor %}
         }
+        
+        /// <summary>
+        /// {{ propertyName | pascal }}
+        /// </summary>
         private {{ propertyName | pascal }}Enum _{{ propertyName }} = {{ propertyName | pascal }}Enum.{{ property.enum[0] | pascal }};
+        /// <summary>
+        /// {{ propertyName | pascal }}
+        /// </summary>
         {%- if property.description %} 
         /// <description>{{property.description}}</description> 
         {%- endif %}
@@ -184,6 +225,9 @@
         }
         {%- else %}
         private {{ csharpType }} _{{ propertyName }} { get; set; }
+        /// <summary>
+        /// {{ propertyName | pascal }}
+        /// </summary>
         {%- if property.description %} 
         /// <description>{{property.description}}</description> 
         {%- endif %}
@@ -221,25 +265,25 @@
                 }
                 {%- endif -%}
                     {%- if property.maxLength -%}
-                if (value.ToString().Length > {{ property.maxLength }})
+                if (!string.IsNullOrEmpty(value) && value.ToString().Length > {{ property.maxLength }})
                 {
                     throw new ArgumentOutOfRangeException("{{ propertyName | pascal }}", string.Format(ExceptionMessages.ValueIsTooLong, value, {{ property.maxLength }}));
                 }
                 {%- endif -%}
                 {%- if property.minLength -%}
-                if (value.ToString().Length < {{ property.minLength }})
+                if (string.IsNullOrEmpty(value) || value.ToString().Length < {{ property.minLength }})
                 {
                     throw new ArgumentOutOfRangeException("{{ propertyName | pascal }}", string.Format(ExceptionMessages.ValueIsTooShort, value, {{ property.minLength }}));
                 }
                 {%- endif -%}
                 {%- if property.pattern -%}
-                if (!System.Text.RegularExpressions.Regex.IsMatch(value.ToString(), Patterns.{{ property.pattern | pascal }}))
+                if (!string.IsNullOrEmpty(value) && !System.Text.RegularExpressions.Regex.IsMatch(value.ToString(), RegexPatterns.{{ property.pattern | pascal }}))
                 {
                     throw new ArgumentOutOfRangeException("{{ propertyName | pascal }}", ExceptionMessages.ValueIsInvalid);
                 }
                 {%- endif -%}
                 {%- if property.format == "email" -%}
-                if (!System.Text.RegularExpressions.Regex.IsMatch(System.Text.Json.JsonSerializer.ToJson(value), Patterns.Email, System.Text.RegularExpressions.RegexOptions.Singleline))
+                if (!string.IsNullOrEmpty(value) && !System.Text.RegularExpressions.Regex.IsMatch(System.Text.Json.JsonSerializer.Serialize(value), RegexPatterns.Email, System.Text.RegularExpressions.RegexOptions.Singleline))
                 {
                     throw new System.ArgumentException(ExceptionMessages.ValueIsNotAnEmail, "{{ propertyName | pascal }}");
                 }

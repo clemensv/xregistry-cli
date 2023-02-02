@@ -97,7 +97,22 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- endmacro -%}
 
 
-{%- macro DeclareDispatchObjects(project_name, class_name, groups) -%}
+{%- macro DeclareDispatchObjectsArgs(groups, withType) -%}
+{%- for group_key, group in groups.items() if (group | exists("format", "amqp" )) -%}
+{%- set pascalGroupName = group.id | default(group_key) | pascal %}
+{%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ group.id | default(group_key) | strip_namespace | camel }}AmqpDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- endfor %}
+{%- endmacro-%}
+
+{%- macro DeclareDispatchObjectsFields(project_name, class_name, groups) -%}
+{%- for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
+{%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+{%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
+{{ handlerType }} _{{ handlerName }};
+{%- endfor %}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, groups, args, body) -%}
 {%- if groups | exists("format", "amqp" ) %}
 {%- for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
 {%- set pascalGroupName = group.id | default(group_key) | pascal %}
@@ -106,7 +121,7 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {{ handlerType }} _{{ handlerName }};
 {%- endfor %}
 
-{{ class_name }}(
+public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- for group_key, group in groups.items() if group | exists("format", "amqp" ) -%}
     {%- set pascalGroupName = group.id | default(group_key) | pascal -%} 
     {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
@@ -121,6 +136,7 @@ Amqp.Message {{ variable }} = new Amqp.Message()
     {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
     this._{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
+    {{ body | indent(4) }}
 }
 {%- endif -%}
 {%- endmacro -%}

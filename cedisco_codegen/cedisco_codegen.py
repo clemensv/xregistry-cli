@@ -91,7 +91,7 @@ class ExitExtension(Extension):
 class UuidExtension(Extension):
     tags = { 'uuid'}
 
-    def parse(self, parser: "Parser") -> nodes.Output:
+    def parse(self, parser) -> nodes.Output:
         lineno = parser.stream.expect("name:uuid").lineno
         context = nodes.ContextReference()
         result = self.call_method("_render", [context], lineno=lineno)
@@ -103,7 +103,7 @@ class UuidExtension(Extension):
 class TimeExtension(Extension):
     tags = { 'time'}
 
-    def parse(self, parser: "Parser") -> nodes.Output:
+    def parse(self, parser) -> nodes.Output:
         lineno = parser.stream.expect("name:time").lineno
         context = nodes.ContextReference()
         result = self.call_method("_render", [context], lineno=lineno)
@@ -354,6 +354,8 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     schema_env = setup_jinja_env([schema_template_dir])
     render_code_templates(project_name, style, output_dir, docroot,
                           code_template_dir, code_env, False)
+    render_code_templates(project_name, style, output_dir, docroot,
+                          schema_template_dir, schema_env, False)
     
     # now we need to handle any local schema references we found in the document
  
@@ -510,7 +512,7 @@ def render_code_templates(project_name, style, output_dir, docroot,
             try:
                 template = env.get_template(template_path)
             except TemplateAssertionError as err:
-                print("{file} ({lineno}): {msg}".format(file=err.name, lineno=lineno, msg=err))
+                print("{file} ({lineno}): {msg}".format(file=err.name, lineno=err.lineno, msg=err))
                 exit(1)
             except TemplateSyntaxError as err:
                 print("{file}: ({lineno}): {msg}".format(file=err.name, lineno=err.lineno, msg=err))

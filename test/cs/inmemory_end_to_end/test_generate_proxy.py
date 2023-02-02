@@ -16,9 +16,9 @@ def test_generate_proxy():
         shutil.rmtree(os.path.join(project_root, 'tmp/test/cs/inmemory_end_to_end/'))
     # generate the producer
     sys.argv = ['cedisco_codegen', 
-                '--style', 'proxy', 
+                '--style', 'producer', 
                 '--language', 'cs',
-                '--definitions', os.path.join(project_root, 'samples/message-definitions/contoso-erp.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'inmemory_end_to_end.disco'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/inmemory_end_to_end/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
     cedisco_codegen.main()
@@ -26,7 +26,7 @@ def test_generate_proxy():
     sys.argv = [ 'cedisco_codegen', 
                 '--style', 'consumer', 
                 '--language', 'cs',
-                '--definitions', os.path.join(project_root, 'samples/message-definitions/contoso-erp.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'inmemory_end_to_end.disco'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/inmemory_end_to_end/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
     cedisco_codegen.main()

@@ -171,13 +171,13 @@ export class {{ type_name | pascal }}
         }
         {%- endif -%}
         {%- if property.pattern -%}
-        if (!System.Text.RegularExpressions.Regex.IsMatch(value.ToString(), Patterns.{{ property.pattern | pascal }}))
+        if (!System.Text.RegularExpressions.Regex.IsMatch(value.ToString(), RegexPatterns.{{ property.pattern | pascal }}))
         {
             throw new RangeError("{{ propertyName | pascal }}", ExceptionMessages.ValueIsInvalid);
         }
         {%- endif -%}
         {%- if property.format == "email" -%}
-        if (!System.Text.RegularExpressions.Regex.IsMatch(System.Text.Json.JsonSerializer.ToJson(value), Patterns.Email, System.Text.RegularExpressions.RegexOptions.Singleline))
+        if (!System.Text.RegularExpressions.Regex.IsMatch(System.Text.Json.JsonSerializer.Serialize(value), RegexPatterns.Email, System.Text.RegularExpressions.RegexOptions.Singleline))
         {
             throw new System.ArgumentException(ExceptionMessages.ValueIsNotAnEmail, "{{ propertyName | pascal }}");
         }

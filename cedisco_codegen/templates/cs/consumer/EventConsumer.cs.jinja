@@ -29,24 +29,48 @@ using Microsoft.Extensions.Logging;
  
 {% for group_key, group in groups.items() -%}
  {%- set pascalGroupName = group.id | default(group_key) | pascal -%}
-namespace {{ project_name | pascal }}.{{ pascalGroupName }}
+namespace {{ project_name | pascal }}
 {
-     {%- set class_name = (project_name | pascal | strip_namespace)+"Consumer" %}
+     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventConsumer" %}
     public class {{ class_name }} : IDisposable
     {
-        {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, groups) | indent(8) }}
-        {{ amqp.DeclareDispatchObjects( project_name, class_name, groups) | indent(8) }}
-        {{ mqtt.DeclareDispatchObjects( project_name, class_name, groups) | indent(8) }}
+        {%- if uses_cloudevents_message %}
+        {{ cloudEvents.DeclareDispatchObjectsFields( groups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, groups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
+        {%- endif %}
+        {%- if uses_amqp_message %}
+        {{ amqp.DeclareDispatchObjectsFields( groups ) | indent(8) }}
+        {{ amqp.DeclareDispatchObjectsConstructor( project_name, class_name, groups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchMessageAsync += DispatchMessageAsync;") | indent(8) }}
+        {%- endif %}
+        {%- if uses_mqtt_message %}
+        {{ mqtt.DeclareDispatchObjectsFields( groups ) | indent(8) }}
+        {{ mqtt.DeclareDispatchObjectsConstructor( project_name, class_name, groups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchApplicationMessageAsync += DispatchApplicationMessageAsync;") | indent(8) }}
+        {%- endif %}
+
+        private ConsumerEndpoint endpoint;
+        public ConsumerEndpoint Endpoint
+        {
+            get 
+            {
+                return this.endpoint;
+            }
+        }
+
         
         {%- if uses_cloudevents_message %}
-        private readonly ContentMode contentMode;
-        private readonly CloudEventFormatter formatter;
         
         public async Task DispatchCloudEventAsync(
                CloudEvent cloudEvent,
                ILogger log)
         {
-             {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", groups ) | indent(12) }}
+            try 
+            {
+                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", groups ) | indent(16) }}
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "Error dispatching message");
+            }
         }
         {%- endif %}
 
@@ -55,7 +79,14 @@ namespace {{ project_name | pascal }}.{{ pascalGroupName }}
                Amqp.Message amqpMessage,
                ILogger log)
         {
-             {{ amqp.DispatchToDispatchObjects( "amqpMessage", groups ) | indent(12) }}
+            try 
+            {
+                {{ amqp.DispatchToDispatchObjects( "amqpMessage", groups ) | indent(16) }}
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "Error dispatching message");
+            }
         }
         {%- endif %}
 
@@ -64,25 +95,14 @@ namespace {{ project_name | pascal }}.{{ pascalGroupName }}
                MqttApplicationMessage mqttMessage,
                ILogger log)
         {
-             {{ mqtt.DispatchToDispatchObjects( "mqttMessage", groups ) | indent(12) }}
-        }
-        {%- endif %}
-
-        private ConsumerEndpoint endpoint;
-
-        {%- if uses_cloudevents_message %}
-        public {{ class_name }}(ConsumerEndpoint endpoint, ContentMode contentMode, CloudEventFormatter formatter)
-        {
-            this.contentMode = contentMode;
-            this.formatter = formatter;
-            this.endpoint = endpoint;
-        }
-        {%- endif %}
-
-        {%- if uses_amqp_message or uses_mqtt_message %}
-        public {{ class_name }}(ConsumerEndpoint endpoint)
-        {
-            this.endpoint = endpoint;
+            try 
+            {
+               {{ mqtt.DispatchToDispatchObjects( "mqttMessage", groups ) | indent(16) }}
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "Error dispatching message");
+            }
         }
         {%- endif %}
 
@@ -90,14 +110,6 @@ namespace {{ project_name | pascal }}.{{ pascalGroupName }}
         {
             this.endpoint.Dispose();
             this.endpoint = null;
-        }
-
-        public ConsumerEndpoint Endpoint
-        {
-            get 
-            {
-                return this.endpoint;
-            }
         }
 
         {%- if root.endpoints -%} 
@@ -111,7 +123,7 @@ namespace {{ project_name | pascal }}.{{ pascalGroupName }}
            {%- set isAmqp = not isCloudEvent and endpoint.format.lower().startswith("amqp") %}
            {%- set isMqtt = not isCloudEvent and endpoint.format.lower().startswith("mqtt") %}
                 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential {% if isCloudEvent %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( groups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( groups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( groups, true ) }}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -128,7 +140,7 @@ namespace {{ project_name | pascal }}.{{ pascalGroupName }}
             {%- endfor %}
             };
             var endpoint = ConsumerEndpoint.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints);
-            var consumer = new {{ class_name }}(endpoint{% if isCloudEvent %}, contentMode, formatter{% endif %});
+            var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( groups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( groups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( groups, false ) -}});
             {% if isAmqp %}
             if ( endpoint is AmqpConsumerEndpoint)
             {
@@ -144,7 +156,7 @@ namespace {{ project_name | pascal }}.{{ pascalGroupName }}
             }
             {% endif %}
             {% if isCloudEvent %}
-            endpoint.DispatchAsync += consumer.DispatchAsync;
+            endpoint.DispatchCloudEventAsync += consumer.DispatchCloudEventAsync;
             {% endif %}
             return consumer;
         }

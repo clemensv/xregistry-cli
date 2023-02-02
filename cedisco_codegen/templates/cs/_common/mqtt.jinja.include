@@ -104,16 +104,24 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endmacro -%}
 
 
-{%- macro DeclareDispatchObjects(project_name, class_name, groups) -%}
-{%- if groups | exists("format", "mqtt" ) %}
+{%- macro DeclareDispatchObjectsArgs(groups, withType) -%}
 {%- for group_key, group in groups.items() if (group | exists("format", "mqtt" )) -%}
 {%- set pascalGroupName = group.id | default(group_key) | pascal %}
+{%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ group.id | default(group_key) | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- endfor %}
+{%- endmacro-%}
+
+{%- macro DeclareDispatchObjectsFields(groups) -%}
+{%- for group_key, group in groups.items() if (group | exists("format", "mqtt" )) -%}
 {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttDispatcher" -%}
 {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
 {{ handlerType }} _{{ handlerName }};
 {%- endfor %}
+{%- endmacro-%}
 
-{{ class_name }}(
+{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, groups, args, body) -%}
+{%- if groups | exists("format", "mqtt" ) %}
+public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- for group_key, group in groups.items() -%}
     {%- set pascalGroupName = group.id | default(group_key) | pascal -%} 
     {%- set handlerName=(group.id | default(group_key) | strip_namespace | camel)+"MqttDispatcher" -%}
@@ -128,6 +136,7 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
    {%- set handlerType="I"+(group.id | default(group_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
     this._{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
+    {{ body | indent(4) }}
 }
 {%- endif -%}
 {%- endmacro -%}

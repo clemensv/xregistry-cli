@@ -25,7 +25,7 @@
   {% endif %}
   <ItemGroup>
     <PackageReference Include="CloudNative.CloudEvents" Version="2.5.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints" Version="1.2.0" />    
+    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints" Version="1.2.1" />    
     <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.5.1" />
     {%- if uses_amqp_message or uses_amqp_endpoint %}
     <PackageReference Include="AMQPNetLite" Version="2.4.5" />
@@ -35,11 +35,11 @@
     {%- endif %}
     {%- if uses_mqtt_endpoint %}
     <PackageReference Include="CloudNative.CloudEvents.Mqtt" Version="2.5.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints.Mqtt" Version="1.2.0" /> 
+    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints.Mqtt" Version="1.2.1" /> 
     {%- endif %}
     {%- if uses_amqp_endpoint %}
     <PackageReference Include="CloudNative.CloudEvents.Amqp" Version="2.5.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints.Amqp" Version="1.2.0" /> 
+    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints.Amqp" Version="1.2.1" /> 
     {%- endif %}
     {%- if uses_protobuf %}
     <PackageReference Include="Grpc.Tools" Version="2.50.0">
