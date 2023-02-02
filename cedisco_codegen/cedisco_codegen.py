@@ -231,12 +231,6 @@ def namespace(class_reference, namespace_prefix=""):
             return ns
     return class_reference
 
-
-
-    if class_reference:
-        return re.sub(r'\.[^.]+$', '', class_reference)
-    return class_reference
-    
 # Jinja filter that concats the namespace/package portions of
 # an expression, removing the dots.
 def concat_namespace(class_reference):
@@ -326,6 +320,13 @@ def schema_type(schema_url: str):
             return match.group(1)
     return "object"
 
+def schema_object(root: dict, schema_url: str):
+    try:
+        obj = jsonpointer.resolve_pointer(root, schema_url[1:].split(":")[0])
+    except jsonpointer.JsonPointerException:
+        return None
+    return obj
+    
 
 # the core generator function that drives the Jinja templates
 schemas_handled = set()
@@ -810,6 +811,7 @@ def setup_jinja_env(template_dirs : list[str]):
     env.globals['pop'] = pop
     env.globals['stack'] = stack
     env.globals['get'] = get
+    env.globals['schema_object'] = schema_object
     return env
 
 

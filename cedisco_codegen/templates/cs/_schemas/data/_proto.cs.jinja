@@ -36,8 +36,12 @@ using System;
         public byte[] ToByteArray()
         {
             var memoryStream = new MemoryStream();
-            this.WriteTo(memoryStream);
-            return memoryStream.ToArray();
+            using (var output = new Google.Protobuf.CodedOutputStream(memoryStream))
+            {
+                this.WriteTo(output);
+                output.Flush();
+                return memoryStream.ToArray();
+            }
         }
     }
 {%- endmacro %}

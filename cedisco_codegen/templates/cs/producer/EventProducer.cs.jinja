@@ -104,7 +104,14 @@ namespace {{ project_name | pascal }}
         {
             {% if isCloudEvent %}
             {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12)}}
-            cloudEvent.Data = {% if definition.schemaurl -%}data.Clone(){%- else -%}data{%- endif %};
+            cloudEvent.Data = {% if definition.schemaurl -%}
+            {%- set schemaObj = schema_object(root, definition.schemaurl ) -%}
+            {%- if schemaObj and "format" in schemaObj and not schemaObj.format.lower().startswith("JSON") -%}
+            data.Clone().ToByteArray()
+            {%- else -%}
+            data.Clone()
+            {%- endif -%}
+            {%- else -%}data{%- endif %};
             await endpoint.SendAsync(cloudEvent, contentMode, formatter);
             {% elif isAmqp %}
             {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", definition) | indent(12)}}
