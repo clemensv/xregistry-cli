@@ -42,7 +42,7 @@ def test_mqtt_end_to_end():
                           format(container_name, os.path.join(os.path.dirname(__file__), 'mosquitto', 'config'), os.path.join(os.path.dirname(__file__), 'mosquitto', 'logs'))
     subprocess.run(start_command, shell=True, check=True)
     # give the broker a chance to start. wait 20 seconds
-    time.sleep(15)
+    time.sleep(30)
     
     try:
         run_test()

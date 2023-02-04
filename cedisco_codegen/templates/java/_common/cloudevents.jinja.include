@@ -5,7 +5,7 @@
 {%- for attrname in definition.metadata.attributes -%}
 {%- set attribute = definition.metadata.attributes[attrname] -%}
     {%- if attribute.type == "uritemplate" -%}
-        {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
         , String {{ placeholder }}
         {%- endfor -%}
     {%- elif attribute.value is not defined -%}
@@ -24,7 +24,7 @@ CloudEvent {{ variable }} = new CloudEventBuilder()
     {%- set attrProp = attrname | pascal | replace("Datacontenttype", "DataContentType") %}
     .with{{ attrProp }}({% if attribute.value -%}"{{ attribute.value }}"
     {%- if attribute.type == "uritemplate" -%}
-    {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+    {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
     .replace("{ {{- placeholder -}} }", placeholder)
     {%- endfor -%}
     {%- endif -%}{%- else -%}{{ attrname }}{%- endif -%})
@@ -34,7 +34,7 @@ CloudEvent {{ variable }} = new CloudEventBuilder()
     {%- set attrProp = attrname | pascal %}
     .with{{ attrProp }}({% if attribute.value -%}URI.create("{{ attribute.value }}"
     {%- if attribute.type == "uritemplate" -%}
-    {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+    {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
     .replace("{ {{- placeholder -}} }", placeholder)
     {%- endfor -%}
     {%- endif -%}){%- else -%}{{ attrname }}{%- endif -%})
@@ -51,7 +51,7 @@ CloudEvent {{ variable }} = new CloudEventBuilder()
 {%- else -%}
     .withExtension( "{{ attrProp }}", ({% if attribute.value -%}$"{{ attribute.value }}"
     {%- if attribute.type == "uritemplate" -%}
-    {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+    {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
     .replace("{ {{- placeholder -}} }", placeholder)
     {%- endfor -%}
     {%- endif -%}

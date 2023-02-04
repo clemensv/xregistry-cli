@@ -1,6 +1,7 @@
-{%- set groups = root.groups %}
-{% set function_name = project_name | pascal %}
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set groups = root.groups %}
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set function_name = project_name | pascal -%}
 
 using System.Collections.Generic;
 using System.Linq;
@@ -25,7 +26,8 @@ namespace {{ project_name | pascal }}
     {%- set class_name = (project_name | pascal | strip_namespace)+"Functions" %}
     public class {{ class_name }}
     {
-       {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, groups) | indent(8) }}
+       {{ cloudEvents.DeclareDispatchObjectsFields( groups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, groups, "", "") | indent(8) }}
 
         [FunctionName("{{ project_name | pascal | concat_namespace }}")]
         public async Task<IActionResult> Run(
@@ -78,9 +80,12 @@ namespace {{ project_name | pascal }}
                 .AddEnvironmentVariables()
                 .Build();
 
-            foreach( var s in config["Values:ALLOWED_ORIGINS"].Split(';') )
+            if (config["ALLOWED_ORIGINS"] != null)
             {
-                allowedOrigins.Add(s);
+                foreach( var s in config["ALLOWED_ORIGINS"].Split(';') )
+                {
+                    allowedOrigins.Add(s);
+                }
             }
         }
     }

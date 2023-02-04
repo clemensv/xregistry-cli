@@ -10,23 +10,7 @@
                 "protocol": "HTTP",
                 "strict": false,
                 "endpoints": [
-                    "http://localhost:11001/events/"
-                ]
-            },
-            "groups": [
-                "#/groups/Contoso.ERP.Events"
-            ],
-            "format": "CloudEvents/1.0"
-        },
-        "Contoso.ERP.Eventing.HttpConsumer": {
-            "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.HttpConsumer",
-            "usage": "consumer",
-            "config": {
-                "protocol": "HTTP",
-                "strict": false,
-                "endpoints": [
-                    "http://localhost:11001/events/"
+                    "http://localhost:11000/api/ContosoERPAzureFunction"
                 ]
             },
             "groups": [

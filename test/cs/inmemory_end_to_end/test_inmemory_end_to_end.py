@@ -31,5 +31,5 @@ def test_inmemory_end_to_end():
                 '--projectname', 'Contoso.ERP.Consumer']
     cedisco_codegen.main()
     # run dotnet build on the csproj here that references the generated files already
-    subprocess.check_call(['dotnet', 'run'], cwd=os.path.dirname(__file__))
+    subprocess.check_call(['dotnet', 'run'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     

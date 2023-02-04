@@ -40,13 +40,13 @@ def test_amqp_end_to_end():
     container_name = ''.join(random.choices(string.ascii_lowercase, k=10))
     start_command = "docker run --name {} -d -p 127.11.0.2:5672:5672 -e AMQ_USER=test -e AMQ_PASSWORD=password quay.io/artemiscloud/activemq-artemis-broker".\
                       format(container_name)
-    subprocess.run(start_command, shell=True, check=True)
+    subprocess.run(start_command, shell=True, check=True, stdout=sys.stdout, stderr=sys.stderr)
     # give the broker a chance to start. wait 20 seconds
     time.sleep(15)
     try:
         run_test()
     finally:
         stop_command = "docker stop {}".format(container_name)
-        subprocess.run(stop_command, shell=True, check=True)
+        subprocess.run(stop_command, shell=True, check=True, stdout=sys.stdout, stderr=sys.stderr)
         delete_command = "docker rm {}".format(container_name)
-        subprocess.run(delete_command, shell=True, check=True)
+        subprocess.run(delete_command, shell=True, check=True, stdout=sys.stdout, stderr=sys.stderr)

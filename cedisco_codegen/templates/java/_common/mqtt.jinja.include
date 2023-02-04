@@ -16,7 +16,7 @@ iomport org.eclipse.paho.mqttv5.common.packet.MqttWireMessage as MqttMessageV5;
 {%- if propname == "correlation-data" -%}{%- set propname = "correlationData" -%}{%- endif -%}
 {%- if propname == "retain" -%}{%- set propname = "retain" -%}{%- endif -%}
 {%- if prop.type == "uritemplate" -%}
-   {%- for placeholder in prop.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+   {%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
    , String {{ placeholder }}
    {%- endfor -%}
 {%- elif prop.value is not defined -%}
@@ -27,7 +27,7 @@ iomport org.eclipse.paho.mqttv5.common.packet.MqttWireMessage as MqttMessageV5;
 {%- if "user-properties" in props %}
   {%- for prop in props["user-properties"] %}
   {%- if prop.type == "uritemplate" -%}
-   {%- for placeholder in prop.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+   {%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
    , String {{ placeholder }}
    {%- endfor -%}
    {%- elif prop.value is not defined -%}

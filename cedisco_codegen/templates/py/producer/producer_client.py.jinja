@@ -24,7 +24,7 @@ class {{ groupName.split('.')[-1]}}_event_producer:
     {%- for attrname in definition.metadata.attributes -%}
     {%- set attribute = definition.metadata.attributes[attrname] -%}
         {%- if attribute.type == "uritemplate" -%}
-            {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
                 {{ placeholder | snake }} : str,
             {%- endfor -%}
         {%- elif attribute.value is not defined -%}
@@ -44,7 +44,7 @@ class {{ groupName.split('.')[-1]}}_event_producer:
             "{{ attribute.value }}"
             {%- if attribute.type == "uritemplate" -%}
                 .format(
-                {%- for placeholder in attribute.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+                {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
                     {{ placeholder }} = {{ placeholder | snake }}
                 {%- if not loop.last -%},{%- endif%}
                 {%- endfor -%}

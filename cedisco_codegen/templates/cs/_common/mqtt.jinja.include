@@ -17,7 +17,7 @@ using MQTTnet.Protocol;
 {%- if propname == "correlation-data" -%}{%- set propname = "correlationData" -%}{%- endif -%}
 {%- if propname == "retain" -%}{%- set propname = "retain" -%}{%- endif -%}
 {%- if prop.type == "uritemplate" -%}
-   {%- for placeholder in prop.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+   {%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
    , string {{ placeholder }}
    {%- endfor -%}
 {%- elif prop.value is not defined -%}
@@ -28,7 +28,7 @@ using MQTTnet.Protocol;
 {%- if "user-properties" in props %}
   {%- for prop in props["user-properties"] %}
   {%- if prop.type == "uritemplate" -%}
-   {%- for placeholder in prop.value | regex_search('\{([A-Za-z0-9_]+)\}') -%}
+   {%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
    , string {{ placeholder }}
    {%- endfor -%}
    {%- elif prop.value is not defined -%}

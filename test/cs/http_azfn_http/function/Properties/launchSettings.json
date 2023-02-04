@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TestFunction": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 11000"
+    }
+  }
+}
