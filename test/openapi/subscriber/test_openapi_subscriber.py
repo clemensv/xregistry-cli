@@ -1,3 +1,4 @@
+import platform
 import sys
 import os
 import subprocess
@@ -24,5 +25,6 @@ def test_openapi_subscriber():
                 '--projectname', 'ContosoErpSubscriber']
     cedisco_codegen.main()
     # run dotnet build on the csproj here that references the generated files already
-    subprocess.check_call(['openapi-generator-cli', 'validate', '-i', os.path.join(output_dir, "ContosoErpSubscriber.yml")], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    cmd = 'openapi-generator-cli validate -i ' + os.path.join(output_dir, "ContosoErpSubscriber.yml")
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
     

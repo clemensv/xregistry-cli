@@ -1,3 +1,4 @@
+import platform
 import sys
 import os
 import subprocess
@@ -25,7 +26,8 @@ def test_asyncapi_producer():
                 '--template-args', 'ce_content_mode=binary']
     cedisco_codegen.main()
     # run dotnet build on the csproj here that references the generated files already
-    subprocess.check_call(['asyncapi', 'validate', os.path.join(output_dir, "ContosoErpProducerBinary.yml")], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    cmd = 'asyncapi validate ' + os.path.join(output_dir, "ContosoErpProducerBinary.yml")
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
 
     # generate the producer
     sys.argv = ['cedisco_codegen', 
@@ -37,5 +39,6 @@ def test_asyncapi_producer():
                 '--template-args', 'ce_content_mode=structured']
     cedisco_codegen.main()
     # run dotnet build on the csproj here that references the generated files already
-    subprocess.check_call(['asyncapi', 'validate', os.path.join(output_dir, "ContosoErpProducerStructured.yml")], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    cmd = 'asyncapi validate ' + os.path.join(output_dir, "ContosoErpProducerStructured.yml")
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
 
