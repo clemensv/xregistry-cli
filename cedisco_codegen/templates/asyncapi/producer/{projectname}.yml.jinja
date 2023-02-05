@@ -1,0 +1,280 @@
+{#- This is a template that can convert a CloudEvents Discovery document into an AsyncAPI 2.6 document -#}
+{%- if ce_content_mode is not defined or mode not in ["structured", "binary"] -%}
+{%- set ce_content_mode="binary" -%}
+{%- endif -%}
+asyncapi: 2.6.0
+id: "{{ root.id }}"
+tags: 
+- name: cedisco
+info:
+  title: "{{ root.description }}"
+  version: "1.0"
+  description: "{{ root.description }}"
+  
+defaultContentType: "application/cloudevents+json"
+servers:
+{%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.config -%}
+{%- set options = endpoint.config.options -%}
+{%- set endpoints = endpoint.config.endpoints -%}
+{%- for endpointUrl in endpoints %}
+  {{ endpoint_key | concat_namespace }}:
+      url: {{ endpointUrl }}
+{%- if endpoint.description is defined %}
+      description: {{ endpoint.description }}
+{%- endif -%}
+{%- if endpoint.config.protocol is defined %}
+      protocol: {{ endpoint.config.protocol | lower }}
+{%- endif %}
+{%- endfor -%}  
+{%- endfor %}
+channels:
+{%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.config -%}
+{%- set protocol = endpoint.config.protocol | lower() -%}
+{%- set options = endpoint.config.options -%}
+{%- set endpoints = endpoint.config.endpoints %}
+  {{ endpoint_key | concat_namespace }}:
+    servers: ["{{ endpoint_key | concat_namespace }}"]
+    {% if endpoint.usage == "producer" -%}publish:{%-else-%}subscribe:{%- endif %}
+      operationId: "{{ endpoint_key | concat_namespace }}"
+      {%- if protocol.startswith("http") %}
+      bindings:
+        http:
+          type: request
+          method: POST
+          bindingVersion: '0.1.0'
+      {%- endif %}
+  {%- if ce_content_mode == "structured" -%}
+  {# structured mode #}
+      message:
+        messageId: "{{ endpoint_key | concat_namespace }}.cloudEvent"
+        contentType: "application/cloudevents+json"
+        schemaFormat: "application/schema+json;version=draft-07"
+        correlationId:
+          location: "$message.payload#/id"
+        {%- if protocol.startswith("http") %}
+        bindings:
+          http:
+            headers:
+              type: object
+              properties:
+                Content-Type:
+                  type: string
+                  enum: ["application/cloudevents+json"]
+            bindingVersion: '0.1.0'
+        {%- endif %}
+        payload:
+          oneOf:
+          {%- for group in endpoint.groups -%}
+            {%- set groupObject = schema_object(root, group) %}
+            {%- if groupObject is mapping %}
+            {%- for eventkey, event in groupObject.definitions.items() -%}
+            - $ref: "#/components/schemas/{{ event.id }}"
+            {%- endfor -%}
+            {%- endif -%}
+          {%- endfor %}
+  {%- else %}
+  {#- binary mode #}
+      message:
+        oneOf:  
+        {%- for group in endpoint.groups -%}
+          {%- set groupObject = schema_object(root, group) %}
+          {%- if groupObject is mapping %}
+          {%- for eventkey, event in groupObject.definitions.items() -%}         
+           {%- set x = (protocol+":"+groupObject.id+":"+event.id) | push("messages") %}
+          - $ref: "#/components/messages/{{protocol | pascal}}{{ event.id | concat_namespace | pascal }}"
+          {%- endfor -%}
+          {%- endif -%}
+        {%- endfor -%}
+  {%- endif %}
+{%- endfor %}
+components:
+  {%- if ce_content_mode == "binary" -%}
+  {# binary mode messages#}
+  messages:
+  {%- for message in stack("messages") | unique -%}
+    {%- set protocol = message.split(':')[0] -%}
+    {%- set groupid = message.split(':')[1] -%}
+    {%- set eventid = message.split(':')[2] -%}
+    {%- for groupkey, group in root.groups.items() if groupkey == groupid -%}
+    {%- for eventkey, event in group.definitions.items() if eventkey == eventid %}
+    {{protocol | pascal}}{{ event.id | concat_namespace | pascal }}:
+      messageId: "{{protocol | pascal}}{{ event.id | concat_namespace | pascal }}"
+      title: "{{ event.id }}"
+      summary: "{{ event.description }}"
+      {%- if event.metadata.attributes.datacontenttype is defined and event.metadata.attributes.datacontenttype.value is defined %}
+      contentType: {{ event.metadata.attributes.datacontenttype.value }}
+      {%- else %}
+      contentType: "application/json"
+      {%- endif %}
+      correlationId:
+        location: "$message.header#/{% if protocol == "http" -%}ce-{% elif protocol == "amqp"%}ce_{%- endif -%}id"
+      headers:
+        type: object
+        properties:
+          {%- for attributeKey, attribute in event.metadata.attributes.items() %}
+          {% if protocol == "http" -%}ce-{% elif protocol == "amqp"%}ce_{%- endif -%}        
+          {{ attributeKey }}:
+            {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
+            type: "string"
+            format: "date-time"
+            {%- elif attribute.type == "uri" %}
+            type: "string"
+            format: "uri"
+            {%- elif attribute.type == "uri-reference" %}
+            type: "string"
+            format: "uri-reference"
+            {%- elif attribute.type == "uri-template" %}
+            type: "string"
+            format: "uri-reference"
+            {%- elif attribute.type == "binary" %}
+            type: "string"
+            format: "binary"
+            {%- elif attribute.type == "boolean" %}
+            type: "boolean"
+            {%- elif attribute.type == "integer" %}
+            type: "integer"
+            {%- elif attribute.type == "number" %}
+            type: "number"
+            {%- else %}
+            type: "string"
+            {%- endif %}
+            {%- if attribute.value %}
+            default: "{{ attribute.value }}"
+            {%- endif %}
+          {%- endfor %}
+        {%- if protocol.startswith("http") %}
+        bindings:
+          http:
+            headers:
+              type: object
+              properties:
+                Content-Type:
+                  type: string
+                   {%- if event.metadata.attributes.datacontenttype is defined and event.metadata.attributes.datacontenttype.value is defined %}
+                  enum: ["{{ event.metadata.attributes.datacontenttype.value }}"]
+                   {%- else %}
+                  enum: ["application/json"]
+                   {%- endif %}
+            bindingVersion: '0.1.0'
+        {%- endif %}
+        {%- if event.schemaurl %}
+            {%- if event.schemaurl.startswith('#') %}
+              {%- set schemaObj = schema_object(root, event.schemaurl ) -%}
+                {%- if schemaObj.type == "schema" -%}
+                  {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
+                  {%- if schemaVersion.schema is defined -%}
+                  {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
+      schemaFormat: "application/schema+json;version=draft-07"
+      payload:
+          $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+                  {%- elif schemaObj.format.lower().startswith("protobuf")%}
+                  {%- set fileName = (schemaObj.id | lower | snake) +".proto" -%}
+                  {%- set x = schemaVersion.schema | pushfile(fileName) %}
+      schemaFormat: "application/vnd.google.protobuf;version={{schemaObj.format.split('/')[-1]}};type=proto"
+      payload:
+          $ref: "{{ fileName }}"
+                  {%- elif schemaObj.format.lower().startswith("avro")%}
+                  {%- set fileName = (schemaObj.id | lower | snake) +".avsc" -%}
+                  {%- set x = schemaVersion.schema | tojson | pushfile(fileName) %}
+      schemaFormat: "application/vnd.apache.avro;version={{schemaObj.format.split('/')[-1]}}"
+      payload:
+          $ref: "{{ fileName }}"
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- else %}
+            $ref: "{{ event.schemaurl }}"
+            {%- endif %}
+        {%- else %}
+            type: "object"
+        {%- endif %}
+    {%- endfor -%}
+    {%- endfor -%}
+  {%- endfor %}
+  {%- endif %}  
+  schemas:
+  {%- if ce_content_mode == "structured" -%}
+  {%- for groupkey, group in root.groups.items() -%}
+    {%- for eventkey, event in group.definitions.items() %}
+    {{ event.id }}:
+      type: "object"
+      properties:
+        {%- for attributeKey, attribute in event.metadata.attributes.items() %}
+        "{{ attributeKey }}":
+          {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
+          type: "string"
+          format: "date-time"
+          {%- elif attribute.type == "uri" %}
+          type: "string"
+          format: "uri"
+          {%- elif attribute.type == "uri-reference" %}
+          type: "string"
+          format: "uri-reference"
+          {%- elif attribute.type == "uri-template" %}
+          type: "string"
+          format: "uri-reference"
+          {%- elif attribute.type == "binary" %}
+          type: "string"
+          format: "binary"
+          {%- elif attribute.type == "boolean" %}
+          type: "boolean"
+          {%- elif attribute.type == "integer" %}
+          type: "integer"
+          {%- elif attribute.type == "number" %}
+          type: "number"
+          {%- else %}
+          type: "string"
+          {%- endif %}
+          {%- if attribute.value %}
+          enum: ["{{ attribute.value }}"]
+          {%- endif %}
+        {%- endfor %}
+        data:
+        {%- if event.schemaurl %}
+             {%- if event.schemaurl.startswith('#') %}
+              {%- set schemaObj = schema_object(root, event.schemaurl ) -%}
+                {%- if schemaObj.type == "schema" -%}
+                  {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
+                  {%- if schemaVersion.schema is defined -%}
+                  {%- if schemaObj.format.lower().startswith("protobuf")%}
+                  {%- set x = schemaVersion.schema | pushfile(schemaObj.id+".proto") -%}
+                  {%- elif schemaObj.format.lower().startswith("avro")%}
+                  {%- set x = schemaVersion.schema | tojson | pushfile(schemaObj.id+".avsc") -%}
+                  {%- elif schemaObj.format.lower().startswith("json")%}
+                  $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- else %}
+            $ref: "{{ event.schemaurl }}"
+            {%- endif %}
+        {%- else %}
+            type: "object"
+        {%- endif %}
+      required:
+        {%- for attributeKey, attribute in event.metadata.attributes.items() %}
+        {%- if attribute.required %}
+        - "{{ attributeKey }}"
+        {%- endif %}
+        {%- endfor %}
+    {%- endfor -%}
+  {%- endfor -%}
+  {%- endif %}
+  {%- if root.schemagroups is defined -%}
+    {%- for schemagroupkey in root.schemagroups.keys() if schemagroupkey != "type" -%}
+      {%- set schemagroup = root.schemagroups[schemagroupkey] -%}
+       {%- for schemakey, schema in schemagroup.schemas.items() if schemakey != "type" and not schema.format is defined or schema.format.lower().startswith("json") -%}
+          {%- set newest_schemaversion = latest_dict_entry(schema.versions) %} 
+    {{ schemagroupkey | pascal }}.{{ schemakey | pascal }}:
+            {%- if newest_schemaversion.schemaurl is defined -%}
+            {%- if ns.newest_schemaversion.schemaurl.startswith('#') %}
+      $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaurl.split('#/schemagroups/')[1] }}"
+            {%- else %}
+            $ref: "{{ newest_schemaversion.schemaurl }}"
+            {%- endif -%}
+            {%- else %} 
+      {{ newest_schemaversion.schema | toyaml(3) | indent(6) }}
+            {%- endif %} 
+       {%- endfor -%} 
+  {%- endfor -%}
+  {%- endif -%}

@@ -326,14 +326,21 @@ def schema_object(root: dict, schema_url: str):
     except jsonpointer.JsonPointerException:
         return None
     return obj
-    
+
+def latest_dict_entry(dict: dict):
+   # find the length m of the longest key in the dictionary
+   # left justify each key with spaces to length m to make a list in which all keys have same length 
+   # then sort the keys and trim them
+   # return the dictionary entry with the last key
+    m = max([len(k) for k in dict.keys()])
+    return dict[sorted([k.ljust(m) for k in dict.keys()])[-1].strip()] 
 
 # the core generator function that drives the Jinja templates
 schemas_handled = set()
 
 
 def generate(project_name: str, language: str, style: str, output_dir: str,
-             definitions_file: str, headers: dict):
+             definitions_file: str, headers: dict, template_dirs: list, template_args: dict):
     global current_url
     global schema_references_collected
 
@@ -354,9 +361,9 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     code_env = setup_jinja_env([code_template_dir, code_include_dir])
     schema_env = setup_jinja_env([schema_template_dir])
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dir, code_env, False)
+                          code_template_dir, code_env, False, template_dirs, template_args)
     render_code_templates(project_name, style, output_dir, docroot,
-                          schema_template_dir, schema_env, False)
+                          schema_template_dir, schema_env, False, template_dirs, template_args)
     
     # now we need to handle any local schema references we found in the document
  
@@ -447,7 +454,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                                     schema_format_short = "avro"
                             
                             render_schema_templates(schema_format_short, schema_template_dir, project_name, class_name, language,
-                                                    output_dir, definitions_file, schema_root, schema_env)
+                                                    output_dir, definitions_file, schema_root, schema_env, template_dirs, template_args)
                             continue
                         else:
                             print("Warning: unable to find schema reference " + schema_reference)
@@ -462,12 +469,12 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         schema_format_short = "json"
                                                
                     render_schema_templates(schema_format_short, schema_template_dir, project_name, class_name, language,
-                                                output_dir, definitions_file, schema_root, schema_env)
+                                                output_dir, definitions_file, schema_root, schema_env, template_dirs, template_args)
                 else:
                     print("Warning: unable to find schema reference " + schema_reference)
             
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dir, code_env, True)
+                          code_template_dir, code_env, True, template_dirs, template_args)
     
     
     # reset the references collected in this file 
@@ -488,8 +495,9 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 # the {class*} patterns break the input information set up such that the
 # generator is fed just one CloudEvent definition but the information set
 # remains anchored at "groups"
-def render_code_templates(project_name, style, output_dir, docroot,
-                          template_dir, env, post_process):
+def render_code_templates(project_name : str, style : str, output_dir : str, docroot : dict,
+                          template_dir : str, env : jinja2.Environment, post_process : bool, 
+                          template_dirs : list, template_args : dict):
     class_name = None
     for root, dirs, files in os.walk(template_dir):
         relpath = os.path.relpath(root, template_dir).replace("\\", "/")
@@ -553,7 +561,7 @@ def render_code_templates(project_name, style, output_dir, docroot,
                                 "{classfull}", id).replace("{classname}",
                                                         pascal(class_name))
                         render_template(project_name, class_name, subscope, file_dir,
-                                        file_name, template)
+                                        file_name, template, template_args)
                 continue  # skip back to the outer loop
 
             if file_name.startswith("{projectdir}"):
@@ -561,11 +569,12 @@ def render_code_templates(project_name, style, output_dir, docroot,
                 file_name = file_name_base.replace("{projectdir}", "")
 
             
-            render_template(project_name, class_name, scope, file_dir, file_name, template)
+            render_template(project_name, class_name, scope, file_dir, file_name, template, template_args)
 
 
-def render_schema_templates(schema_type, template_dir, project_name, class_name, language,
-                            output_dir, definitions_file, docroot, env):
+def render_schema_templates(schema_type : str, template_dir : str, project_name : str, class_name : str, language : str,
+                            output_dir : str, definitions_file : str, docroot : dict, env : jinja2.Environment,
+                            template_dirs : list, template_args : dict):
     global uses_protobuf
     global uses_avro
     
@@ -626,10 +635,10 @@ def render_schema_templates(schema_type, template_dir, project_name, class_name,
         
         
         # generate the file
-        render_template(project_name, class_name, scope, file_dir, file_name, template)
+        render_template(project_name, class_name, scope, file_dir, file_name, template, template_args)
 
 
-def render_template(project_name, class_name, scope, file_dir, file_name, template):
+def render_template(project_name : str, class_name : str, scope : dict, file_dir : str, file_name : str, template : str, template_args : dict):
 
     global uses_protobuf
     global uses_avro
@@ -643,7 +652,13 @@ def render_template(project_name, class_name, scope, file_dir, file_name, templa
 
         try:
             current_dir = os.path.dirname(output_path)
-            rendered = template.render(root=scope, project_name=project_name, class_name=class_name, uses_avro=uses_avro, uses_protobuf=uses_protobuf)
+            args = template_args.copy() if template_args is not None else {}
+            args["root"]=scope
+            args["project_name"]=project_name
+            args["class_name"]=class_name
+            args["uses_avro"]=uses_avro
+            args["uses_protobuf"]=uses_protobuf
+            rendered = template.render(args)
             with open(output_path, "w") as f:
                 f.write(rendered)
         except TypeError as err:
@@ -812,6 +827,7 @@ def setup_jinja_env(template_dirs : list[str]):
     env.globals['stack'] = stack
     env.globals['get'] = get
     env.globals['schema_object'] = schema_object
+    env.globals['latest_dict_entry'] = latest_dict_entry
     return env
 
 
@@ -848,6 +864,18 @@ def main():
                         dest="headers",
                         required=False,
                         help="Extra HTTP headers in the format 'key=value'")
+    parser.add_argument("--templates",
+                        nargs="*",
+                        dest="template_dirs",
+                        required=False,
+                        help="The directories containing the templates")
+    parser.add_argument("--template-args",
+                        nargs="*",
+                        dest="template_args",
+                        required=False,
+                        help="Extra arguments to pass to the templates in teh form 'key=value")
+    
+
 
     # Parse the command line arguments
     args = parser.parse_args()
@@ -860,6 +888,12 @@ def main():
         }
     else:
         headers = {}
+
+    template_args = {}
+    if args.template_args:
+        for arg in args.template_args:
+            key, value = arg.split("=", 1)
+            template_args[key] = value
 
     # initialize globals
     global schemas_handled
@@ -884,12 +918,12 @@ def main():
         try:
             # Call the generate() function with the parsed arguments
             generate(args.project_name, args.language, args.style, args.output_dir,
-                    args.definitions_file, headers)
+                    args.definitions_file, headers, args.template_dirs, template_args)
 
             # generate external schemas
             for schema in schema_files_collected:
                 generate(args.project_name, args.language, "schema", args.output_dir,
-                        schema, headers)
+                        schema, headers, args.template_dirs, template_args)
             
             if stack("files"):
                 for file, content in stack("files"):

@@ -106,7 +106,7 @@ namespace {{ project_name | pascal }}
             {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12)}}
             cloudEvent.Data = {% if definition.schemaurl -%}
             {%- set schemaObj = schema_object(root, definition.schemaurl ) -%}
-            {%- if schemaObj and "format" in schemaObj and not schemaObj.format.lower().startswith("JSON") -%}
+            {%- if schemaObj and "format" in schemaObj and not schemaObj.format.lower().startswith("json") -%}
             data.Clone().ToByteArray()
             {%- else -%}
             data.Clone()
