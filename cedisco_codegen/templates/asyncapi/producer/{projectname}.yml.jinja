@@ -1,5 +1,5 @@
 {#- This is a template that can convert a CloudEvents Discovery document into an AsyncAPI 2.6 document -#}
-{%- if ce_content_mode is not defined or mode not in ["structured", "binary"] -%}
+{%- if ce_content_mode is not defined or ce_content_mode not in ["structured", "binary"] -%}
 {%- set ce_content_mode="binary" -%}
 {%- endif -%}
 asyncapi: 2.6.0
@@ -67,7 +67,7 @@ channels:
           {%- for group in endpoint.groups -%}
             {%- set groupObject = schema_object(root, group) %}
             {%- if groupObject is mapping %}
-            {%- for eventkey, event in groupObject.definitions.items() -%}
+            {%- for eventkey, event in groupObject.definitions.items() %}
             - $ref: "#/components/schemas/{{ event.id }}"
             {%- endfor -%}
             {%- endif -%}
@@ -236,12 +236,16 @@ components:
                 {%- if schemaObj.type == "schema" -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
                   {%- if schemaVersion.schema is defined -%}
-                  {%- if schemaObj.format.lower().startswith("protobuf")%}
-                  {%- set x = schemaVersion.schema | pushfile(schemaObj.id+".proto") -%}
-                  {%- elif schemaObj.format.lower().startswith("avro")%}
-                  {%- set x = schemaVersion.schema | tojson | pushfile(schemaObj.id+".avsc") -%}
-                  {%- elif schemaObj.format.lower().startswith("json")%}
+                  {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
                   $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+                  {%- elif schemaObj.format.lower().startswith("protobuf")%}
+                  {%- set x = schemaVersion.schema | pushfile(schemaObj.id+".proto") %}
+                  type: string
+                  format: binary
+                  {%- elif schemaObj.format.lower().startswith("avro")%}
+                  {%- set x = schemaVersion.schema | tojson | pushfile(schemaObj.id+".avsc") %}
+                  type: string
+                  format: binary
                   {%- endif -%}
                 {%- endif -%}
               {%- endif -%}
