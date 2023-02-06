@@ -1,6 +1,6 @@
 {
-    "$schema": "https://cloudevents.io/schemas/discovery",
-    "specversion": "0.5-wip",
+    "$schema": "https://cloudevents.io/schemas/registry",
+    "specversion": "0.3-wip",
     "groups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",

@@ -1,5 +1,5 @@
 {
-    "specversion": "0.5-wip",
+    "specversion": "0.3-wip",
     "endpoints": {
         "Contoso.MyAmqpProducer": {
             "type": "endpoint",

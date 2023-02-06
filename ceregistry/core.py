@@ -100,7 +100,7 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
         return definitions_file, docroot
 
     if "$schema" in docroot:
-        if docroot["$schema"] != "https://cloudevents.io/schemas/discovery":
+        if docroot["$schema"] != "https://cloudevents.io/schemas/registry":
             print("unsupported schema:" + docroot["$schema"])
             return None, None
     if "groupsUrl" in docroot:
@@ -122,7 +122,7 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
     # make sure the document is always of the same form, even if
     # the URL was a deep link. We can drill to the level of an
     # endpoint, a group, or a schemagroup
-    newroot = {"$schema": "https://cloudevents.io/schemas/discovery"}
+    newroot = {"$schema": "https://cloudevents.io/schemas/registry"}
 
     # the doc is an dict
     if isinstance(docroot, dict) and "type" in docroot[list(

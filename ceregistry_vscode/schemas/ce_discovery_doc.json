@@ -12,11 +12,11 @@
         "properties": {
           "$schema": {
             "type": "string",
-            "default": "https://cloudevents.io/schemas/discovery"
+            "default": "https://cloudevents.io/schemas/registry"
           },
           "specversion": {
             "type": "string",
-            "default": "0.5-wip"
+            "default": "0.3-wip"
           },
           "endpoints": {
             "$ref": "#/components/schemas/endpoints"

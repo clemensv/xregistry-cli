@@ -40,8 +40,8 @@ def main():
     validate.add_argument("--requestheaders", nargs="*", dest="headers", required=False,help="Extra HTTP headers in the format 'key=value'")
 
     # specify the arguments for the list command
-    list1.add_argument("--language", dest="language", required=True, help="The language to use for the generated code")
-    list1.add_argument("--style", dest="style", required=True, help="The style of the generated code")
+    list1.add_argument("--language", dest="language", required=False, help="The language to use for the generated code")
+    list1.add_argument("--style", dest="style", required=False, help="The style of the generated code")
     list1.add_argument("--templates", nargs="*", dest="template_dirs", required=False, help="Paths of extra directories containing custom templates")
     
     # Parse the command line arguments

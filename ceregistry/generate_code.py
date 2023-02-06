@@ -16,6 +16,8 @@ from jinja2 import nodes
 from jinja2.ext import Extension
 from jinja2 import TemplateAssertionError, TemplateSyntaxError, TemplateRuntimeError
 
+from ceregistry.validate_definitions import validate
+
 from .core import *
 
 # These are the global variables that are switched 
@@ -730,6 +732,9 @@ def generate_code(args) -> int:
 
         try:
             # Call the generate() function with the parsed arguments
+            if validate(args.definitions_file, headers) != 0:
+                return 1
+            
             generate(args.project_name, args.language, args.style, args.output_dir,
                     args.definitions_file, headers, args.template_dirs, template_args)
 
