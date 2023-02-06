@@ -1,8 +1,8 @@
 {
-    "name": "cedisco-codegen",
+    "name": "ceregistry",
     "version": "0.0.2",
-    "displayName": "CEDisco Code Generator",
-    "description": "Code Generation for CloudEvents Discovery",
+    "displayName": "CeRegistry",
+    "description": "CloudEvents Registry",
     "publisher": "cedisco",
     "license": "SEE LICENSE IN LICENSE.txt",
     "icon": "cloudevents-icon-color.png",
@@ -12,7 +12,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/clemensv/cedisco-codegen/cedisco_codegen_vscode"
+        "url": "https://github.com/clemensv/cedisco-codegen/ceregistry_vscode"
     },
     "engines": {
         "vscode": "^1.74.0"
@@ -21,8 +21,8 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:cedisco-codegen.generate",
-        "onCommand:cedisco-codegen.file-actions"
+        "onCommand:ceregistry.generate",
+        "onCommand:ceregistry.file-actions"
     ],
     "main": "./out/extension.js",
     "json.schemas": [
@@ -36,11 +36,11 @@
     "contributes": {
         "commands": [
             {
-                "command": "cedisco-codegen.generate",
+                "command": "ceregistry.generate",
                 "title": "CEDisco: Generate Code"
             },
             {
-                "command": "cedisco-codegen.file-actions",
+                "command": "ceregistry.file-actions",
                 "title": "CEDisco: Generate Code"
             }
         ],
@@ -64,7 +64,7 @@
             "explorer/context": [
                 {
                     "label": "CEDisco: Generate Code",
-                    "command": "cedisco-codegen.file-actions",
+                    "command": "ceregistry.file-actions",
                     "group": "navigation",
                     "when": "resourceExtname == disco"
                 }

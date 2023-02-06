@@ -1,0 +1,34 @@
+[build-system]
+build-backend = "flit_scm:buildapi"
+requires = ["flit_scm"]
+
+[project]
+name = "ceregistry"
+dynamic = ["version"]
+authors = [
+    { name = "Clemens Vasters", email = "clemensv@microsoft.com"}
+]
+description = "A command line utility for the CloudEvents Registry"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "jinja2>=2.11.2",
+    "jsonpointer>=2.0",
+    "pytest>=7.2.1",
+    "pandas>=1.1.5",
+    "pyyaml>=6.0",
+    "jsonschema>=4.17.3",
+    "pydot>=1.4.2",
+    "anytree>=2.8.0",
+]
+
+[project.scripts]
+ceregistry = "ceregistry.cli:main"
+
+[tool.setuptools_scm]
+write_to = "ceregistry/_version.py"

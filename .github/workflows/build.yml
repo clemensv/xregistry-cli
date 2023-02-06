@@ -24,7 +24,7 @@ jobs:
       uses: battila7/get-version-action@v2
     - name: Set version environment variable
       run: |
-        echo "CEDISCO_CODEGEN_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
+        echo "CEREGISTRY_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
     - name: Build package
       run: |
         python setup.py sdist
@@ -45,7 +45,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/cedisco-codegen-${{steps.get_version.outputs.version-without-v}}.tar.gz
-        asset_name: cedisco-codegen-${{steps.get_version.outputs.version-without-v}}.tar.gz
+        asset_path: dist/ceregistry-${{steps.get_version.outputs.version-without-v}}.tar.gz
+        asset_name: ceregistry-${{steps.get_version.outputs.version-without-v}}.tar.gz
         asset_content_type: application/gzip
     

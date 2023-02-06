@@ -253,14 +253,17 @@ groups:
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerContactAddedEvent\
           Data"
 schemagroups:
-  type: schemagroups
   Contoso.CRM.Events:
+    type: schemagroup
+    id: Contoso.CRM.Events
     schemas:
       customerAddressUpdatedEventData:
         type: schema
+        id: customerAddressUpdatedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -293,9 +296,11 @@ schemagroups:
                 - address
       customerNoteAddedEventData:
         type: schema
+        id: customerNoteAddedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -314,9 +319,11 @@ schemagroups:
                       description: The text of the note
       customerNoteDeletedEventData:
         type: schema
+        id: customerNoteDeletedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -328,9 +335,11 @@ schemagroups:
                   description: The unique identifier of the note that was deleted
       customerNoteUpdatedEventData:
         type: schema
+        id: customerNoteUpdatedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -349,9 +358,11 @@ schemagroups:
                       description: The text of the note
       customerContactAddedEventData:
         type: schema
+        id: customerContactAddedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -370,9 +381,11 @@ schemagroups:
                       description: The name of the contact
       customerContactDeletedEventData:
         type: schema
+        id: customerContactDeletedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -384,9 +397,11 @@ schemagroups:
                   description: The unique identifier of the contact that was deleted
       customerContactUpdatedEventData:
         type: schema
+        id: customerContactUpdatedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -405,9 +420,11 @@ schemagroups:
                       description: The name of the contact
       customerCreatedEventData:
         type: schema
+        id: customerCreatedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -419,9 +436,11 @@ schemagroups:
                   description: The name of the customer
       customerStatusUpdatedEventData:
         type: schema
+        id: customerStatusUpdatedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -433,9 +452,11 @@ schemagroups:
                   description: The status of the customer
       customerDeletedEventData:
         type: schema
+        id: customerDeletedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:
@@ -447,9 +468,11 @@ schemagroups:
                   description: The name of the customer
       customerUpdatedEventData:
         type: schema
+        id: customerUpdatedEventData
         versions:
           "1.0":
             type: schemaversion
+            id: "1.0"
             schema:
               type: object
               properties:

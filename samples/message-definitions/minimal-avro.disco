@@ -41,14 +41,18 @@
     },
     "schemagroups": {
         "Contoso.ERP.Events": {
+            "type": "schemagroup",
+            "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
                     "type": "schema",
                     "format":"Avro/1.8.2",
+                    "id": "orderData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
                             "format":"Avro/1.8.2",
+                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "OrderData",

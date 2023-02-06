@@ -22,6 +22,7 @@
     "groups": {
         "mygroup": {
             "type": "group",
+            "id": "mygroup",
             "definitions": {
                 "myevent": {
                     "type": "cloudevent",

@@ -243,7 +243,7 @@ export class CodeGeneratorWizardPanel {
                 <div class="control-container">
                     <div class="header">
                         <h1>CloudEvents Discovery Code Generator</h1>
-                        <p>This wizard helps you creating code for producing or consuming CloudEvents with the CloudEvents SDK. The wizard wraps the "cedisco-codegen" tool that uses CloudEvents Discovery registry endpoints or documents as input. The code generator always (re-)creates full projects (assemblies, modules, packages, depending on the nomenclature of the chosen language) that you can easily integrate into your own code-bases.</p>
+                        <p>This wizard helps you creating code for producing or consuming CloudEvents with the CloudEvents SDK. The wizard wraps the "ceregistry" tool that uses CloudEvents Discovery registry endpoints or documents as input. The code generator always (re-)creates full projects (assemblies, modules, packages, depending on the nomenclature of the chosen language) that you can easily integrate into your own code-bases.</p>
                     </div>
                     <vscode-divider></vscode-divider>
                     <div class="content">

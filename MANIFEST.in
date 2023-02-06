@@ -1,1 +1,1 @@
-recursive-include cedisco_codegen/templates *.jinja *.json
+recursive-include ceregistry/templates *.jinja *.json

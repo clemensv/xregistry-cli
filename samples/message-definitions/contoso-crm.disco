@@ -327,14 +327,17 @@
         }
     },
     "schemagroups": {
-        "type": "schemagroups",
         "Contoso.CRM.Events": {
+            "type": "schemagroup",
+            "id": "Contoso.CRM.Events",
             "schemas": {
                 "customerAddressUpdatedEventData": {
                     "type": "schema",
+                    "id": "customerAddressUpdatedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -381,9 +384,11 @@
                 },
                 "customerNoteAddedEventData": {
                     "type": "schema",
+                    "id": "customerNoteAddedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -412,9 +417,11 @@
                 },
                 "customerNoteDeletedEventData": {
                     "type": "schema",
+                    "id": "customerNoteDeletedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -433,9 +440,11 @@
                 },
                 "customerNoteUpdatedEventData": {
                     "type": "schema",
+                    "id": "customerNoteUpdatedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -464,9 +473,11 @@
                 },
                 "customerContactAddedEventData": {
                     "type": "schema",
+                    "id" : "customerContactAddedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -495,9 +506,11 @@
                 },
                 "customerContactDeletedEventData": {
                     "type": "schema",
+                    "id" : "customerContactDeletedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -516,9 +529,11 @@
                 },
                 "customerContactUpdatedEventData": {
                     "type": "schema",
+                    "id" : "customerContactUpdatedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -547,9 +562,11 @@
                 },
                 "customerCreatedEventData": {
                     "type": "schema",
+                    "id" : "customerCreatedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -568,9 +585,11 @@
                 },
                 "customerStatusUpdatedEventData": {
                     "type": "schema",
+                    "id" : "customerStatusUpdatedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -589,9 +608,11 @@
                 },
                 "customerDeletedEventData": {
                     "type": "schema",
+                    "id" : "customerDeletedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -610,9 +631,11 @@
                 },
                 "customerUpdatedEventData": {
                     "type": "schema",
+                    "id" : "customerUpdatedEventData",
                     "versions": {
                         "1.0": {
                             "type": "schemaversion",
+                            "id": "1.0",
                             "schema": {
                                 "type": "object",
                                 "properties": {

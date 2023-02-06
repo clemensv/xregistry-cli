@@ -3,3 +3,6 @@ jsonpointer>=2.0
 pytest>=7.2.1
 pandas>=1.1.5
 pyyaml>=6.0
+jsonschema>=4.17.3
+pydot>=1.4.2
+anytree>=2.8.0

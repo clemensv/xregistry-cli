@@ -11,10 +11,12 @@ import urllib.parse
 import glob
 import jsonpointer
 import pandas as pd
+
 from jinja2 import nodes
 from jinja2.ext import Extension
 from jinja2 import TemplateAssertionError, TemplateSyntaxError, TemplateRuntimeError
 
+from .core import *
 
 # These are the global variables that are switched 
 # to True when a schema is found that uses Avro or Protobuf,
@@ -119,12 +121,6 @@ def exists(obj, prop, value):
     df = pd.json_normalize(obj)
     result = df[df.filter(like=prop).applymap(lambda x: x.lower()).apply(lambda x: x.str.startswith(value))].any().any()
     return result
-
-
-# The current_url represents that last file that has been
-# loaded in the current process and is currently being handled
-# this is used to resolve relative URLs in found URL references
-current_url = None
 
 
 # Jinja filter to perform a regex search. Returns a list of matches.
@@ -271,7 +267,6 @@ schema_references_collected = set()
 
 def schema_type(schema_url: str):
     global schema_files_collected
-    global current_url
     global schema_references_collected
 
     # if the schema URL is a fragment, then it is a local reference
@@ -294,8 +289,8 @@ def schema_type(schema_url: str):
         else:
             return path_elements[-1]
 
-    if current_url:
-        schema_url = urllib.parse.urljoin(current_url, schema_url)
+    if get_current_url():
+        schema_url = urllib.parse.urljoin(get_current_url(), schema_url)
 
     parsed_url = urllib.parse.urlparse(schema_url)
     if parsed_url.fragment:
@@ -336,21 +331,14 @@ def latest_dict_entry(dict: dict):
     return dict[sorted([k.ljust(m) for k in dict.keys()])[-1].strip()] 
 
 # the core generator function that drives the Jinja templates
-schemas_handled = set()
-
-
 def generate(project_name: str, language: str, style: str, output_dir: str,
-             definitions_file: str, headers: dict, template_dirs: list, template_args: dict):
-    global current_url
+             definitions_file_arg: str, headers: dict, template_dirs: list, template_args: dict):
     global schema_references_collected
-
     
-
     # Load definitions
-    definitions_file, docroot = load_definitions(definitions_file, style,
-                                                 headers)
+    definitions_file, docroot = load_definitions(definitions_file_arg, headers, style == "schema")
     if not definitions_file:
-        return
+        raise RuntimeError("definitions file not found or invalid {}".format(definitions_file_arg))
 
     # Load templates
     pt = os.path.dirname(os.path.realpath(__file__))
@@ -369,13 +357,13 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
  
     # we redo the overall loop until we have handled all the schema references
     # check whether there are references in schema_references_collected 
-    # that are not in schemas_handled
-    while not schema_references_collected.issubset(schemas_handled):
+    # that are not in   handled
+    while not schema_references_collected.issubset(get_schemas_handled()):
          # we need to iterate over a copy of the set because we may add to it
         for schema_reference in set(schema_references_collected):
-            if schema_reference not in schemas_handled:
-                schemas_handled.add(schema_reference)
-                current_url = None
+            if schema_reference not in get_schemas_handled():
+                add_schema_to_handled(schema_reference)
+                set_current_url(None)
                 schema_format = None
                 class_name = None
 
@@ -441,7 +429,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                             # case b): the schema version does not contain a schemaUrl attribute, so we
                             # assume that the schema is inline and we can proceed to render it
                             schema_root = schema_version["schema"]
-                            current_url = schema_reference
+                            set_current_url (schema_reference)
                             schema_format_short = None
 
                             if "format" in schema_version:
@@ -675,131 +663,6 @@ def render_template(project_name : str, class_name : str, scope : dict, file_dir
         exit(1)
 
 
-# Load the definition file, which may be a JSON Schema
-# or CloudEvents message group definition. Since URLs
-# found in documents may be redirected by their hosts,
-# the function returns the actual URL as the first return
-# value and the parsed object representing the document's
-# information set
-def load_definitions_core(definitions_file: str, style: str, headers: dict):
-    docroot: dict = {}
-    global current_url
-    try:
-        if definitions_file.startswith("http"):
-            req = urllib.request.Request(definitions_file, headers=headers)
-            with urllib.request.urlopen(req) as url:
-                # URIs may redirect and we only want to handle each file once
-                current_url = url.url
-                parsed_url = urllib.parse.urlparse(url.url)
-                definitions_file = urllib.parse.urlunparse(
-                    parsed_url._replace(fragment=''))
-                if definitions_file not in schemas_handled:
-                    schemas_handled.add(definitions_file)
-                else:
-                    return None, None
-                textDoc = url.read().decode()
-                try:
-                    docroot = json.loads(textDoc)
-                except json.decoder.JSONDecodeError as e:
-                    try:
-                        # if the JSON is invalid, try to parse it as YAML
-                        docroot = yaml.safe_load(textDoc)
-                    except yaml.YAMLError as e:
-                        docroot = textDoc
-        else:
-            if definitions_file not in schemas_handled:
-                schemas_handled.add(definitions_file)
-            else:
-                return None, None
-            with open(os.path.join(os.getcwd(), definitions_file), "r") as f:
-                textDoc = f.read()
-                try:
-                    docroot = json.loads(textDoc)
-                except json.decoder.JSONDecodeError as e:
-                    try:
-                        # if the JSON is invalid, try to parse it as YAML
-                        docroot = yaml.safe_load(textDoc)
-                    except yaml.YAMLError as e:
-                        docroot = textDoc
-    except urllib.error.URLError as e:
-        print("An error occurred while trying to open the URL: ", e)
-        return None, None
-    except json.decoder.JSONDecodeError as e:
-        print("An error occurred while trying to parse the JSON file: ", e)
-        return None, None
-    except IOError as e:
-        print("An error occurred while trying to access the file: ", e)
-        return None, None
-
-    return definitions_file, docroot
-
-
-def load_definitions(definitions_file: str, style: str, headers: dict):
-    # for a CloudEvents message definition group, we
-    # normalize the document to be a groups doc
-    definitions_file, docroot = load_definitions_core(definitions_file, style,
-                                                      headers)
-    
-    if docroot is None:
-        return None, None
-
-    if style == "schema":
-        return definitions_file, docroot
-
-    if "$schema" in docroot:
-        if docroot["$schema"] != "https://cloudevents.io/schemas/discovery":
-            print("unsupported schema:" + docroot["$schema"])
-            return None, None
-    if "groupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["groupsUrl"], style,
-                                           headers)
-        docroot["groups"] = subroot
-        docroot["groupsUrl"] = None
-    if "schemagroupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["schemagroupsUrl"], style,
-                                           headers)
-        docroot["schemagroups"] = subroot
-        docroot["schemagroupsUrl"] = None
-    if "endpointsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["endpointsUrl"], style,
-                                           headers)
-        docroot["endpoints"] = subroot
-        docroot["endpointsUrl"] = None
-
-    # make sure the document is always of the same form, even if
-    # the URL was a deep link. We can drill to the level of an
-    # endpoint, a group, or a schemagroup
-    newroot = {"$schema": "https://cloudevents.io/schemas/discovery"}
-
-    # the doc is an dict
-    if isinstance(docroot, dict) and "type" in docroot[list(
-            docroot.keys())[0]]:
-        dictentry = docroot[list(docroot.keys())[0]]
-        if dictentry["type"] == "group":
-            newroot["groups"] = docroot
-        elif dictentry["type"] == "schemagroup":
-            newroot["schemagroups"] = docroot
-        elif dictentry["type"] == "endpoint":
-            newroot["endpoints"] = docroot
-        else:
-            print("unknown doc structure")
-            return None, None
-        docroot = newroot
-
-    # the doc is an object
-    elif "type" in docroot:
-        if docroot["type"] == "group":
-            newroot["groups"] = {docroot["id"]: docroot}
-        elif docroot["type"] == "schemagroup":
-            newroot["schemagroups"] = {docroot["id"]: docroot}
-        elif docroot["type"] == "endpoints":
-            newroot["endpoints"] = {docroot["id"]: docroot}
-        else:
-            print("unknown type:" + docroot["type"])
-            return None, None
-        docroot = newroot
-
-    return definitions_file, docroot
 
 
 # creates the Jinja environment and loads the extensions
@@ -831,55 +694,7 @@ def setup_jinja_env(template_dirs : list[str]):
     return env
 
 
-def main():
-   
-    # Create an ArgumentParser object
-    parser = argparse.ArgumentParser()
-
-    # Specify the arguments
-    parser.add_argument(
-        "--projectname",
-        dest="project_name",
-        required=True,
-        help="The project name (namespace name) for the output")
-    parser.add_argument("--language",
-                        dest="language",
-                        required=True,
-                        help="The language to use for the generated code")
-    parser.add_argument("--style",
-                        dest="style",
-                        required=True,
-                        help="The style of the generated code")
-    parser.add_argument(
-        "--output",
-        dest="output_dir",
-        required=True,
-        help="The directory where the generated code should be saved")
-    parser.add_argument("--definitions",
-                        dest="definitions_file",
-                        required=True,
-                        help="The file or URL containing the definitions")
-    parser.add_argument("--requestheaders",
-                        nargs="*",
-                        dest="headers",
-                        required=False,
-                        help="Extra HTTP headers in the format 'key=value'")
-    parser.add_argument("--templates",
-                        nargs="*",
-                        dest="template_dirs",
-                        required=False,
-                        help="The directories containing the templates")
-    parser.add_argument("--template-args",
-                        nargs="*",
-                        dest="template_args",
-                        required=False,
-                        help="Extra arguments to pass to the templates in teh form 'key=value")
-    
-
-
-    # Parse the command line arguments
-    args = parser.parse_args()
-
+def generate_code(args) -> int:
     if args.headers:
         # ok to have = in base64 values
         headers = {
@@ -896,10 +711,8 @@ def main():
             template_args[key] = value
 
     # initialize globals
-    global schemas_handled
     global schema_files_collected
     global schema_references_collected
-    global current_url
     global uses_avro
     global uses_protobuf
     global context_stacks
@@ -910,9 +723,9 @@ def main():
     for int in range(0, 2):
 
         schema_files_collected = set()
-        schemas_handled = set()
+        reset_schemas_handled()
         schema_references_collected = set()
-        current_url = None
+        set_current_url(None)
         context_stacks = dict()
 
         try:
@@ -933,9 +746,9 @@ def main():
             if not uses_avro and not uses_protobuf:
                 break
         except SystemExit as err:
-            return err.code
-    
-
-
-if __name__ == "__main__":
-    main()
+            return int(err.code)
+        except Exception as err:
+            print(err)
+            return 1
+        
+    return 0

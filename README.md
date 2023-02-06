@@ -41,14 +41,14 @@ There's currently one sample doc at
 which you can point to with the --definitions option.
 
 ```
-cedisco_codegen --language cs --definitions samples/cloudevents-discovery/Microsoft.Storage.disco --projectname MyServiceBusHandler --output ~/demos/grid --style azfunctioneventgrid
+ceregistry --language cs --definitions samples/cloudevents-discovery/Microsoft.Storage.disco --projectname MyServiceBusHandler --output ~/demos/grid --style azfunctioneventgrid
 ```
 
 ## Usage
 To generate code, run the following command:
 
 ```
-cedisco_codegen --projectname <projectname> --language <language> --style <style> --output <output directory> --definitions <definitions file or URI>
+ceregistry --projectname <projectname> --language <language> --style <style> --output <output directory> --definitions <definitions file or URI>
 ```
 
 where language is the programming language to generate code for (e.g. python,

@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     let packageLocation = '';
-    let packageName = 'cedisco-codegen';
+    let packageName = 'ceregistry';
     let packageInstalled = false;
     do {
         try {
@@ -54,10 +54,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
     } while (!packageInstalled);
 
-    let scriptLocation = path.join(packageLocation, "cedisco_codegen", "cedisco_codegen.py");
+    let scriptLocation = path.join(packageLocation, "ceregistry", "main.py");
         
     let options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } } = {};
-    const templateLocation = path.join(packageLocation, "cedisco_codegen", "templates");
+    const templateLocation = path.join(packageLocation, "ceregistry", "templates");
     let languages = fs.readdirSync(templateLocation, { withFileTypes: true }).filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
     for (let i = 0; i < languages.length; i++) {
         let infoPath = path.join(templateLocation, languages[i], "_templateinfo.json");
@@ -71,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
         options[languages[i]] = { description: description, templates: {} };
 
-        let templates = fs.readdirSync(path.join(packageLocation, "cedisco_codegen", "templates", languages[i]), { withFileTypes: true }).filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name );
+        let templates = fs.readdirSync(path.join(packageLocation, "ceregistry", "templates", languages[i]), { withFileTypes: true }).filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name );
         // remove the _schemas folder from the list
         templates = templates.filter((style) => {
             return style !== "_schemas";
@@ -96,7 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }
 
-    let disposable = vscode.commands.registerCommand('cedisco-codegen.generate', async () => {
+    let disposable = vscode.commands.registerCommand('ceregistry.generate', async () => {
         let definitionsFile = "";
         let editor = vscode.window.activeTextEditor;
         if (editor) {
@@ -137,7 +137,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(disposable);
 
-    disposable = vscode.commands.registerCommand('cedisco-codegen.file-actions',
+    disposable = vscode.commands.registerCommand('ceregistry.file-actions',
         (filePath) => {
             let definitionsFile = "";
             if (filePath) {
