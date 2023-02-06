@@ -44,6 +44,7 @@
     "groups": {
         "Contoso.ERP.Events": {
             "type": "group",
+            "id": "Contoso.ERP.Events",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "type": "cloudevent",
@@ -538,12 +539,16 @@
     },
     "schemagroups": {
         "Contoso.ERP.Events": {
+            "type": "schemagroup",
+            "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
                     "type": "schema",
+                    "id": "orderData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -586,9 +591,11 @@
                 },
                 "paymentData": {
                     "type": "schema",
+                    "id": "paymentData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -615,9 +622,11 @@
                 },
                 "shipmentData": {
                     "type": "schema",
+                    "id": "shipmentData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -640,9 +649,11 @@
                 },
                 "cancellationData": {
                     "type": "schema",
+                    "id": "cancellationData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -662,9 +673,11 @@
                 },
                 "refundData": {
                     "type": "schema",
+                    "id": "refundData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -687,9 +700,11 @@
                 },
                 "inventoryData": {
                     "type": "schema",
+                    "id": "inventoryData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -709,9 +724,11 @@
                 },
                 "productData": {
                     "type": "schema",
+                    "id": "productData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -737,9 +754,11 @@
                 },
                 "productDeletionData": {
                     "type": "schema",
+                    "id": "productDeletionData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -758,9 +777,11 @@
                 },
                 "productUpdatedData": {
                     "type": "schema",
+                    "id": "productUpdatedData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -791,9 +812,11 @@
                 },
                 "employeeData": {
                     "type": "schema",
+                    "id": "employeeData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -820,9 +843,11 @@
                 },
                 "employeeDeletionData": {
                     "type": "schema",
+                    "id": "employeeDeletionData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -839,9 +864,11 @@
                 },
                 "employeeUpdatedData": {
                     "type": "schema",
+                    "id": "employeeUpdatedData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -868,9 +895,11 @@
                 },
                 "purchaseOrderData": {
                     "type": "schema",
+                    "id": "purchaseOrderData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -910,9 +939,11 @@
                 },
                 "purchaseOrderUpdatedData": {
                     "type": "schema",
+                    "id": "purchaseOrderUpdatedData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -929,9 +960,11 @@
                 },
                 "purchaseOrderDeletionData": {
                     "type": "schema",
+                    "id": "purchaseOrderDeletionData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -948,9 +981,11 @@
                 },
                 "returnData": {
                     "type": "schema",
+                    "id": "returnData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "schema": {
                                 "type": "object",
                                 "properties": {

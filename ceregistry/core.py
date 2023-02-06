@@ -34,7 +34,7 @@ def get_schemas_handled():
 # the function returns the actual URL as the first return
 # value and the parsed object representing the document's
 # information set
-def load_definitions_core(definitions_file: str, headers: dict):
+def load_definitions_core(definitions_file: str, headers: dict, ignore_handled: bool = False):
     docroot: dict = {}
     global current_url
     try:
@@ -46,10 +46,11 @@ def load_definitions_core(definitions_file: str, headers: dict):
                 parsed_url = urllib.parse.urlparse(url.url)
                 definitions_file = urllib.parse.urlunparse(
                     parsed_url._replace(fragment=''))
-                if definitions_file not in schemas_handled:
-                    schemas_handled.add(definitions_file)
-                else:
-                    return None, None
+                if not ignore_handled:
+                    if definitions_file not in schemas_handled:
+                        schemas_handled.add(definitions_file)
+                    else:
+                        return None, None
                 textDoc = url.read().decode()
                 try:
                     docroot = json.loads(textDoc)
@@ -60,10 +61,11 @@ def load_definitions_core(definitions_file: str, headers: dict):
                     except yaml.YAMLError as e:
                         docroot = textDoc
         else:
-            if definitions_file not in schemas_handled:
-                schemas_handled.add(definitions_file)
-            else:
-                return None, None
+            if not ignore_handled:
+                if definitions_file not in schemas_handled:
+                    schemas_handled.add(definitions_file)
+                else:
+                    return None, None
             with open(os.path.join(os.getcwd(), definitions_file), "r") as f:
                 textDoc = f.read()
                 try:
@@ -87,11 +89,11 @@ def load_definitions_core(definitions_file: str, headers: dict):
     return definitions_file, docroot
 
 
-def load_definitions(definitions_file: str, headers: dict, load_schema: bool = False):
+def load_definitions(definitions_file: str, headers: dict, load_schema: bool = False, ignore_handled: bool = False):
     # for a CloudEvents message definition group, we
     # normalize the document to be a groups doc
     definitions_file, docroot = load_definitions_core(definitions_file, 
-                                                      headers)
+                                                      headers, ignore_handled)
     
     if docroot is None:
         return None, None

@@ -22,7 +22,7 @@ def validate_definition(args) -> int:
 
 def validate(definitions_uri, headers):
     # load the definitions file
-    definitions_file, docroot = load_definitions(definitions_uri, headers, False)
+    definitions_file, docroot = load_definitions(definitions_uri, headers, False, True)
     if not docroot:
         print("Error: could not load definitions file {}".format(definitions_uri))
         return 2

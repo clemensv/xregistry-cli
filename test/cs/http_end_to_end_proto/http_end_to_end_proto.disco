@@ -38,6 +38,7 @@
     "groups": {
         "Contoso.ERP.Events": {
             "type": "group",
+            "id": "Contoso.ERP.Events",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "type": "cloudevent",
@@ -194,13 +195,17 @@
     },
     "schemagroups": {
         "Contoso.ERP.Events": {
+            "type": "schemagroup",
+            "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
                     "type": "schema",
+                    "id": "orderData",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message OrderData { string orderId = 1; string customerId = 2; double total = 3; repeated Item items = 4; } message Item { string productId = 1; double quantity = 2; double price = 3; }"
                         }
@@ -208,10 +213,12 @@
                 },
                 "paymentData": {
                     "type": "schema",
+                    "id": "paymentData",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message PaymentData { string transactionId = 1; string orderId = 2; double amount = 3; string status = 4; string paymentMethod = 5; }"
                         }
@@ -219,10 +226,12 @@
                 },
                 "shipmentData": {
                     "type": "schema",
+                    "id": "shipmentData",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message ShipmentData { string trackingNumber = 1; string orderId = 2; string status = 3; string courierName = 4; }"
                         }
@@ -230,10 +239,12 @@
                 },
                 "cancellationData": {
                     "type": "schema",
+                    "id": "cancellationData",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message CancellationData { string orderId = 1; string reason = 2; string status = 3; }"
                         }
