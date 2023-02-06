@@ -14,6 +14,7 @@ This project is a command line client for the *CloudEvents Registry*.
 * [Usage](#usage)
 
 
+
 ## Introduction
 
 The CloudEvents Registry is an API and a file format for describing messaging
@@ -186,6 +187,32 @@ referenced by URL, with a "schemaurl" property replacing the "schema" property.
 }   }   }   }   }   }   }   }   }   }   }   }
 ```
 
+The `samples` directory contains a set of sample definition files that can be
+used to test the tool and which also illustrate the format further.
+
+For instance, the following files are available:
+
+- [contoso-crm.disco](samples/message-definitions/contoso-crm.disco) is a set of fictional event definitions for a fictional CRM system.
+- [contoso-erp.disco](samples/message-definitions/contoso-erp.disco) is a set of fictional event definitions for a fictional ERP system.
+- [Microsoft.Storage.disco](samples/message-definitions/Microsoft.Storage.disco) is a set of event definitions for Azure Storage Blobs.
+- [minimal-avro.disco](samples/message-definitions/minimal-avro.disco) uses an embedded Apache Avro schema for its payloads.
+- [minimal-proto.disco](samples/message-definitions/minimal-proto.disco) uses an embedded Google Protocol Buffers schema for its payloads.
+- [mqtt-producer-endpoint.disco](samples/protocols/mqtt-producer-endpoint.disco) shows how to define an MQTT producer endpoint with the MQTT packet format (not CloudEvents)
+- [amqp-producer-endpoint.disco](samples/protocols/amqp-producer-endpoint.disco) shows how to define an AMQP producer endpoint with the AMQP message format (not CloudEvents)
+
+There are several other examples in the [samples](samples) directory.
+
+An extreme example that demonstrates the versatility of the format is a full
+declaration of the Eclipse Sparkplug B industrial protocol for MQTT, including
+schemas and message definitions, in a single file:
+[sparkplugb.disco](samples/message-definitions/mqtt-sparkplugb.disco).
+
+Mind that not all of these samples are compatible with all code generator
+templates and not all templates yet refuse to render for incompatible files and
+might therefore yield confusing output or cause the generator to fail. For
+instance, an HTTP producer template is generally not compatible with a file that
+contains an MQTT producer endpoint.
+
 ## Installation
 
 The tool requires Python 3.10 or later. Until the tool is published in an official package source (*this is a prototype, remember?*), you can install the tool with pip directly from the repo:
@@ -247,6 +274,44 @@ The tool supports the following languages and styles (as emitted by the `list` c
 │   └── <DirEntry 'producer'>
 └── ts: JavaScript/TypeScript
     └── producerhttp: JavaScript/TypeScript HTTP Producer
+```
+
+Especially noteworthy might be the support for both AsyncAPI and OpenAPI. 
+
+##### OpenAPI
+
+The tool can generate AsyncAPI definitions for producer endpoints with: 
+```shell
+ceregistry generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.disco --output=MyProjectProducer
+``` 
+
+This will yield a `MyProjectProducer/MyProjectProducer.yml' file that can be used to generate a
+producer client for the given endpoint.
+
+Similarly, the tool can generate OpenAPI definitions for subscriber endpoints with: 
+
+```shell
+ceregistry generate --language=openapi --style=subscriber --projectname=MyProjectSubscriber --definitions=definitions.disco --output=MyProjectSubscriber
+```
+
+This will yield a `MyProjectSubscriber/MyProjectSubcriber.yml' file that can be
+used to generate a subscriber server for the given endpoint, which is compatible
+with the CloudEvents Subscription API.
+
+##### AsyncAPI
+
+The tool can generate AsyncAPI definitions with: 
+
+```shell
+ceregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.disco --output=MyProjectProducer
+```
+
+For AsyncAPI, the tool support an extension parameter ce_content_mode that can be used to control the CloudEvents content mode of the generated AsyncAPI definition. The default is "structured" and the other supported value is "binary". The AsyncAPI template supports HTTP, MQTT, and AMQP 1.0 endpoints and injects the appropriate headers for the selected content mode for each protocol.
+
+Use it like this:
+
+```shell
+ceregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.disco --output=MyProjectProducer --template-args ce_content_mode=binary
 ```
 
 #### Custom Templates
