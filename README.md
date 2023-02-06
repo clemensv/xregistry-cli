@@ -194,7 +194,7 @@ The tool requires Python 3.10 or later. Until the tool is published in an offici
 pip install git+https://github.com/clemensv/cedisco-codegen.git
 ```
 
-If you want to develop locally and/or run the included tests follow the instructions in [DEVELOP.md](DEVELOP.md).
+If you want to develop locally and/or run the included tests follow the instructions in [Development Environment](docs/development_environment.md).
 
 ## Usage
 
