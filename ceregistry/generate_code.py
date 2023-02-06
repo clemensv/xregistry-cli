@@ -16,8 +16,7 @@ from jinja2 import nodes
 from jinja2.ext import Extension
 from jinja2 import TemplateAssertionError, TemplateSyntaxError, TemplateRuntimeError
 
-from ceregistry.validate_definitions import validate
-
+from .validate_definitions import validate
 from .core import *
 
 # These are the global variables that are switched 

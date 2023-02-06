@@ -7,7 +7,6 @@ sys.path.append(os.path.join(project_root))
 
 from ceregistry.generate_code import *
 
-
 def test_pascal():
     assert pascal("foo") == "Foo"
     assert pascal("fooBar") == "FooBar"
