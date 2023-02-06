@@ -205,7 +205,7 @@ There are several other examples in the [samples](samples) directory.
 An extreme example that demonstrates the versatility of the format is a full
 declaration of the Eclipse Sparkplug B industrial protocol for MQTT, including
 schemas and message definitions, in a single file:
-[sparkplugb.disco](samples/message-definitions/mqtt-sparkplugb.disco).
+[sparkplugb.disco](samples/message-definitions/mqtt-sparkplugB.disco).
 
 Mind that not all of these samples are compatible with all code generator
 templates and not all templates yet refuse to render for incompatible files and
