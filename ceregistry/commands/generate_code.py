@@ -14,7 +14,7 @@ import pandas as pd
 
 from jinja2 import nodes
 from jinja2.ext import Extension
-from jinja2 import TemplateAssertionError, TemplateSyntaxError, TemplateRuntimeError
+from jinja2 import TemplateAssertionError, TemplateSyntaxError, TemplateRuntimeError, TemplateNotFound
 
 from .validate_definitions import validate
 from .core import *
@@ -342,17 +342,31 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
         raise RuntimeError("definitions file not found or invalid {}".format(definitions_file_arg))
 
     # Load templates
-    pt = os.path.dirname(os.path.realpath(__file__))
-    schema_template_dir = os.path.join(pt, "templates", language, "_schemas")
+    pt = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
     code_template_dir = os.path.join(pt, "templates", language, style)
-    code_include_dir = os.path.join(pt, "templates", language, "_common")
+    code_template_dirs = [code_template_dir] # without includes
+    code_template_and_include_dirs = [code_template_dir, os.path.join(pt, "templates", language, "_common")] # with includes
+    schema_template_dirs = [os.path.join(pt, "templates", language, "_schemas")]
 
-    code_env = setup_jinja_env([code_template_dir, code_include_dir])
-    schema_env = setup_jinja_env([schema_template_dir])
+    for template_dir in template_dirs if template_dirs else []:
+        template_dir = os.path.join(os.path.curdir, template_dir)
+        if not os.path.isdir(template_dir):
+            raise RuntimeError("template directory not found {}".format(template_dir))
+        # if a template directory exists for the language and style, override the default
+        code_template_dir = os.path.join(template_dir, language, style)
+        if os.path.exists(code_template_dir) and os.path.isdir(code_template_dir):
+            code_template_dirs = [code_template_dir] # without includes
+            code_template_and_include_dirs = [code_template_dir, os.path.join(pt, "templates", language, "_common")] # with includes
+            schema_template_dirs = [os.path.join(pt, "templates", language, "_schemas")]
+            # first found wins
+            break
+
+    code_env = setup_jinja_env(code_template_and_include_dirs)
+    schema_env = setup_jinja_env(schema_template_dirs)
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dir, code_env, False, template_dirs, template_args)
+                          code_template_dirs, code_env, False, template_args)
     render_code_templates(project_name, style, output_dir, docroot,
-                          schema_template_dir, schema_env, False, template_dirs, template_args)
+                          schema_template_dirs, schema_env, False, template_args)
     
     # now we need to handle any local schema references we found in the document
  
@@ -442,8 +456,8 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                                 elif format_string.startswith("avro"):
                                     schema_format_short = "avro"
                             
-                            render_schema_templates(schema_format_short, schema_template_dir, project_name, class_name, language,
-                                                    output_dir, definitions_file, schema_root, schema_env, template_dirs, template_args)
+                            render_schema_templates(schema_format_short, project_name, class_name, language,
+                                                    output_dir, definitions_file, schema_root, schema_template_dirs, schema_env, template_args)
                             continue
                         else:
                             print("Warning: unable to find schema reference " + schema_reference)
@@ -457,21 +471,21 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     else:
                         schema_format_short = "json"
                                                
-                    render_schema_templates(schema_format_short, schema_template_dir, project_name, class_name, language,
-                                                output_dir, definitions_file, schema_root, schema_env, template_dirs, template_args)
+                    render_schema_templates(schema_format_short, project_name, class_name, language,
+                                            output_dir, definitions_file, schema_root, schema_template_dirs, schema_env, template_args)
                 else:
                     print("Warning: unable to find schema reference " + schema_reference)
             
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dir, code_env, True, template_dirs, template_args)
+                          code_template_dirs, code_env, True, template_args)
     
     
     # reset the references collected in this file 
     schema_references_collected = set()
 
     if style == "schema":
-        render_schema_templates(None, schema_template_dir, project_name, None, language,
-                                output_dir, definitions_file, docroot, schema_env)
+        render_schema_templates(None, project_name, None, language,
+                                output_dir, definitions_file, docroot, schema_template_dirs, schema_env)
 
 
 # for templates, except in _schemas, the filename may lead (!) with the
@@ -485,85 +499,85 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 # generator is fed just one CloudEvent definition but the information set
 # remains anchored at "groups"
 def render_code_templates(project_name : str, style : str, output_dir : str, docroot : dict,
-                          template_dir : str, env : jinja2.Environment, post_process : bool, 
-                          template_dirs : list, template_args : dict):
+                          code_template_dirs : list, env : jinja2.Environment, post_process : bool, template_args : dict):
     class_name = None
-    for root, dirs, files in os.walk(template_dir):
-        relpath = os.path.relpath(root, template_dir).replace("\\", "/")
-        if relpath == ".":
-            relpath = ""
+    for template_dir in code_template_dirs:
+        for root, dirs, files in os.walk(template_dir):
+            relpath = os.path.relpath(root, template_dir).replace("\\", "/")
+            if relpath == ".":
+                relpath = ""
 
-        for file in files:
-            if not file.endswith(".jinja") or (not post_process and file.startswith("_")) or (post_process and not file.startswith("_")):
-                continue
+            for file in files:
+                if not file.endswith(".jinja") or (not post_process and file.startswith("_")) or (post_process and not file.startswith("_")):
+                    continue
 
-            template_path = relpath + "/" + file  
-            # all codegen for CE is anchored on the included groups
-            scope = docroot
+                template_path = relpath + "/" + file  
+                # all codegen for CE is anchored on the included groups
+                scope = docroot
 
-            file_dir = file_dir_base = os.path.join(output_dir, os.path.join(*relpath.split("/")))
-            ## strip the jinja suffix
-            file_name_base = file[:-6]
-            if post_process:
-                file_name_base = file_name_base[1:]
+                file_dir = file_dir_base = os.path.join(output_dir, os.path.join(*relpath.split("/")))
+                ## strip the jinja suffix
+                file_name_base = file[:-6]
+                if post_process:
+                    file_name_base = file_name_base[1:]
 
-            try:
-                template = env.get_template(template_path)
-            except TemplateAssertionError as err:
-                print("{file} ({lineno}): {msg}".format(file=err.name, lineno=err.lineno, msg=err))
-                exit(1)
-            except TemplateSyntaxError as err:
-                print("{file}: ({lineno}): {msg}".format(file=err.name, lineno=err.lineno, msg=err))
-                exit(1)
-            
-            file_name_base = file_name_base.replace("{projectname}",
-                                                    pascal(project_name))
-            file_name = file_name_base
-            if file_name.startswith("{class"):
-                if "groups" in scope:
-                    if "endpoints" in docroot: endpoints = docroot["endpoints"]
-                    else: endpoints = None
-                    if "schemagroups" in docroot:
-                        schemagroups = docroot["schemagroups"]
-                    else:
-                        schemagroups = None
-
-                    for id, group in scope["groups"].items():
-                        # create a snippet that only has the current group
-                        subscope = {
-                            "endpoints": endpoints,
-                            "schemagroups": schemagroups,
-                            "groups": {}
-                        }
-                        subscope["groups"][id] = group
-                        scope_parts = id.split(".")
-                        package_name = id
-                        if not package_name:
-                            package_name = project_name
-                        class_name = scope_parts[-1]
-                        if file_name_base.find("{classdir}") > -1:
-                            file_dir = os.path.join(file_dir_base, 
-                                                    os.path.join(*package_name.split("."))).lower()
-                            file_name = file_name_base.replace("{classdir}", pascal(class_name))
+                try:
+                    template = env.get_template(template_path)
+                except TemplateAssertionError as err:
+                    print("{file} ({lineno}): {msg}".format(file=err.name, lineno=err.lineno, msg=err))
+                    exit(1)
+                except TemplateSyntaxError as err:
+                    print("{file}: ({lineno}): {msg}".format(file=err.name, lineno=err.lineno, msg=err))
+                    exit(1)
+                
+                file_name_base = file_name_base.replace("{projectname}",
+                                                        pascal(project_name))
+                file_name = file_name_base
+                if file_name.startswith("{class"):
+                    if "groups" in scope:
+                        if "endpoints" in docroot: endpoints = docroot["endpoints"]
+                        else: endpoints = None
+                        if "schemagroups" in docroot:
+                            schemagroups = docroot["schemagroups"]
                         else:
-                            file_name = file_name_base.replace(
-                                "{classfull}", id).replace("{classname}",
-                                                        pascal(class_name))
-                        render_template(project_name, class_name, subscope, file_dir,
-                                        file_name, template, template_args)
-                continue  # skip back to the outer loop
+                            schemagroups = None
 
-            if file_name.startswith("{projectdir}"):
-                file_dir = os.path.join(file_dir_base, os.path.join(*package_name.split("."))).lower()
-                file_name = file_name_base.replace("{projectdir}", "")
+                        for id, group in scope["groups"].items():
+                            # create a snippet that only has the current group
+                            subscope = {
+                                "endpoints": endpoints,
+                                "schemagroups": schemagroups,
+                                "groups": {}
+                            }
+                            subscope["groups"][id] = group
+                            scope_parts = id.split(".")
+                            package_name = id
+                            if not package_name:
+                                package_name = project_name
+                            class_name = scope_parts[-1]
+                            if file_name_base.find("{classdir}") > -1:
+                                file_dir = os.path.join(file_dir_base, 
+                                                        os.path.join(*package_name.split("."))).lower()
+                                file_name = file_name_base.replace("{classdir}", pascal(class_name))
+                            else:
+                                file_name = file_name_base.replace(
+                                    "{classfull}", id).replace("{classname}",
+                                                            pascal(class_name))
+                            render_template(project_name, class_name, subscope, file_dir,
+                                            file_name, template, template_args)
+                    continue  # skip back to the outer loop
 
-            
-            render_template(project_name, class_name, scope, file_dir, file_name, template, template_args)
+                if file_name.startswith("{projectdir}"):
+                    file_dir = os.path.join(file_dir_base, os.path.join(*package_name.split("."))).lower()
+                    file_name = file_name_base.replace("{projectdir}", "")
+
+                
+                render_template(project_name, class_name, scope, file_dir, file_name, template, template_args)
 
 
-def render_schema_templates(schema_type : str, template_dir : str, project_name : str, class_name : str, language : str,
-                            output_dir : str, definitions_file : str, docroot : dict, env : jinja2.Environment,
-                            template_dirs : list, template_args : dict):
+def render_schema_templates(schema_type : str, project_name : str, class_name : str, language : str,
+                            output_dir : str, definitions_file : str, docroot : dict, schema_template_dirs : list, env : jinja2.Environment,
+                            template_args : dict):
     global uses_protobuf
     global uses_avro
     
@@ -584,47 +598,48 @@ def render_schema_templates(schema_type : str, template_dir : str, project_name 
     file_dir = file_dir_base = output_dir
     if class_name is None:
         class_name = os.path.basename(definitions_file).split(".")[0]
-    schema_files = glob.glob("**/_{schema_type}.*.jinja".format(schema_type=schema_type), root_dir=template_dir, recursive=True)
-    for schema_file in schema_files:
-        # we needed to add the template_dir to the path for glob,
-        # but strip it back out here since we operate on the plain name
-        schema_file = schema_file.replace("\\", "/")
-        
-        try:
-            template = env.get_template(schema_file)
-        except Exception as err:
-            print(err)
-            exit(1)
+    for template_dir in schema_template_dirs:
+        schema_files = glob.glob("**/_{schema_type}.*.jinja".format(schema_type=schema_type), root_dir=template_dir, recursive=True)
+        for schema_file in schema_files:
+            # we needed to add the template_dir to the path for glob,
+            # but strip it back out here since we operate on the plain name
+            schema_file = schema_file.replace("\\", "/")
+            
+            try:
+                template = env.get_template(schema_file)
+            except Exception as err:
+                print(err)
+                exit(1)
 
-        relpath = os.path.dirname(schema_file)
-        if relpath == ".":
-            relpath = ""
-        schema_file = os.path.basename(schema_file)
-        file_name_base = schema_file[len(schema_type) + 2:][:-6]
-        file_dir = os.path.join(file_dir_base, os.path.join(*relpath.split("/")))
-       
-        # if the file name is just the language indicator,
-        # eg. "cs", take the filename of the schema doc
-        if file_name_base == language or file_name_base == "proto" or file_name_base == "avsc":
-            file_name_base = pascal(class_name) + "." + file_name_base
-        file_name_base = file_name_base.replace("{projectname}",
-                                                pascal(project_name))
-        file_name_base = file_name_base.replace("{classname}",
-                                                pascal(class_name))
+            relpath = os.path.dirname(schema_file)
+            if relpath == ".":
+                relpath = ""
+            schema_file = os.path.basename(schema_file)
+            file_name_base = schema_file[len(schema_type) + 2:][:-6]
+            file_dir = os.path.join(file_dir_base, os.path.join(*relpath.split("/")))
         
-        file_name = file_name_base
-        if file_name_base.find("{classdir}") > -1:
-            file_dir = os.path.join(file_dir, os.path.join(*project_name.split(".")).lower())
-            file_name = file_name_base.replace("{classdir}", pascal(class_name))
-                
-        
-        # remember the schema class name we generated a file for 
-        if not class_name in stack("classfiles"):
-            push(class_name, "classfiles")
-        
-        
-        # generate the file
-        render_template(project_name, class_name, scope, file_dir, file_name, template, template_args)
+            # if the file name is just the language indicator,
+            # eg. "cs", take the filename of the schema doc
+            if file_name_base == language or file_name_base == "proto" or file_name_base == "avsc":
+                file_name_base = pascal(class_name) + "." + file_name_base
+            file_name_base = file_name_base.replace("{projectname}",
+                                                    pascal(project_name))
+            file_name_base = file_name_base.replace("{classname}",
+                                                    pascal(class_name))
+            
+            file_name = file_name_base
+            if file_name_base.find("{classdir}") > -1:
+                file_dir = os.path.join(file_dir, os.path.join(*project_name.split(".")).lower())
+                file_name = file_name_base.replace("{classdir}", pascal(class_name))
+                    
+            
+            # remember the schema class name we generated a file for 
+            if not class_name in stack("classfiles"):
+                push(class_name, "classfiles")
+            
+            
+            # generate the file
+            render_template(project_name, class_name, scope, file_dir, file_name, template, template_args)
 
 
 def render_template(project_name : str, class_name : str, scope : dict, file_dir : str, file_name : str, template : str, template_args : dict):
@@ -659,6 +674,9 @@ def render_template(project_name : str, class_name : str, scope : dict, file_dir
                 print("{file}: {msg}".format(file=template.name, msg=err))
                 exit(1)
             
+    except TemplateNotFound as err:
+        print("{file}: Include file not found: {err}".format(file=template.name, err=err))
+        exit(1)
     except TemplateRuntimeError as err:
         print(err)
         exit(1)
@@ -731,7 +749,7 @@ def generate_code(args) -> int:
 
         try:
             # Call the generate() function with the parsed arguments
-            if validate(args.definitions_file, headers) != 0:
+            if validate(args.definitions_file, headers, False) != 0:
                 return 1
             
             generate(args.project_name, args.language, args.style, args.output_dir,
@@ -750,7 +768,7 @@ def generate_code(args) -> int:
             if not uses_avro and not uses_protobuf:
                 break
         except SystemExit as err:
-            return int(err.code)
+            return err.code if err.code is int else 1
         except Exception as err:
             print(err)
             return 1

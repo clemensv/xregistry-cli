@@ -124,7 +124,20 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "--language java --style consumer --definitions .\\samples\\message-definitions\\minimal-avro.disco --projectname Contoso.ERP.Events --output tmp/testjavacavro"
+    },
+    {
+      "name": "Python: Code Generator Fropp",
+      "type": "python",
+      "request": "launch",
+      "program": "ceregistry",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": "generate --definitions e:\\code\\cedisco-sb\\namespace-clemensv-erp.disco --output e:\\code\\cedisco-sb\\tmp --language fropp --style producer --templates e:\\code\\cedisco-sb\\ --projectname foo"
     }
+
+
+
+    
 
   ]
 }

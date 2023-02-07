@@ -5,7 +5,7 @@ import pytest
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(project_root))
 
-from ceregistry.generate_code import *
+from ceregistry.commands.generate_code import *
 
 def test_pascal():
     assert pascal("foo") == "Foo"

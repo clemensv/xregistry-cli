@@ -6,7 +6,7 @@ import shutil
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root))
 
-from ceregistry import cli
+import ceregistry
 
 # this test invokes the ceregistry command line tool to generate a C# proxy and a consumer
 # and then builds the proxy and the consumer and runs a prepared test that integrates both
@@ -21,7 +21,7 @@ def test_http_end_to_end():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end.disco'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/http_end_to_end/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
-    cli.main()
+    ceregistry.main()
     # generate the consumer
     sys.argv = [ 'ceregistry', 'generate',  
                 '--style', 'consumer', 
@@ -29,7 +29,7 @@ def test_http_end_to_end():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end.disco'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/http_end_to_end/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
-    cli.main()
+    ceregistry.main()
     # run dotnet build on the csproj here that references the generated files already
     subprocess.check_call(['dotnet', 'run'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     

@@ -32,7 +32,8 @@ def sort_tree(node):
         sort_tree(child)
 
 def list_templates(args) -> int:
-    dirs = [os.path.join(os.path.dirname(__file__), "templates")]
+    basepath = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
+    dirs = [os.path.join(basepath, "templates")]
     if args.template_dirs:
         dirs.extend(args.template_dirs)
     

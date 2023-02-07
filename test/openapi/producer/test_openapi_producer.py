@@ -7,7 +7,7 @@ import shutil
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root))
 
-from ceregistry import cli
+import ceregistry
 
 # this test invokes the ceregistry command line tool to generate a C# proxy and a consumer
 # and then builds the proxy and the consumer and runs a prepared test that integrates both
@@ -23,7 +23,7 @@ def test_openapi_producer():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_producer.disco'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducer']
-    cli.main()
+    ceregistry.main()
     # run dotnet build on the csproj here that references the generated files already
     cmd = 'openapi-generator-cli validate -i ' + os.path.join(output_dir, "ContosoErpProducer.yml")
     

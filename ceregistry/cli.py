@@ -1,8 +1,8 @@
 import argparse
 
-from .validate_definitions import validate_definition
-from .generate_code import generate_code
-from .list_templates import list_templates
+from .commands.validate_definitions import validate_definition
+from .commands.generate_code import generate_code
+from .commands.list_templates import list_templates
 
 def main():
    

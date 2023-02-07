@@ -18,9 +18,9 @@ def validate_definition(args) -> int:
         headers = {}
     
     # Call the validate() function with the parsed arguments
-    return validate(definitions_file, headers)
+    return validate(definitions_file, headers, True)
 
-def validate(definitions_uri, headers):
+def validate(definitions_uri, headers, verbose=False):
     # load the definitions file
     definitions_file, docroot = load_definitions(definitions_uri, headers, False, True)
     if not docroot:
@@ -30,7 +30,8 @@ def validate(definitions_uri, headers):
     # validate the definitions file using the JSON schema in schemas/ce_registry_doc.json
 
     # load the schema
-    schema_file = os.path.join(os.path.dirname(__file__), "schemas", "ce_registry_doc.json")
+    basepath = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
+    schema_file = os.path.join(basepath, "schemas", "ce_registry_doc.json")
     with open(schema_file, "r") as f:
         schema = json.load(f)
 
@@ -42,5 +43,6 @@ def validate(definitions_uri, headers):
             print("at {}, {}".format(error.json_path, error.message))
         return 1
         
-    print("OK: definitions file {} is valid".format(definitions_uri))
+    if verbose:
+        print("OK: definitions file {} is valid".format(definitions_uri))
     return 0
