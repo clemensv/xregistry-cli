@@ -36,7 +36,7 @@ def test_azfn_http():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.disco'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
-    ceregistry.main()
+    ceregistry.cli()
     # generate the consumer
     sys.argv = [ 'ceregistry', 'generate',  
                 '--style', 'azfunctionhttp', 
@@ -44,7 +44,7 @@ def test_azfn_http():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.disco'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/azfn/'),
                 '--projectname', 'Contoso.ERP.AzureFunction']
-    ceregistry.main()
+    ceregistry.cli()
     
     sentFileName = os.path.join(os.path.dirname(__file__),  "client", "sent.txt")
     receivedFileName = os.path.join(os.path.dirname(__file__), "function","bin","output","received.txt")

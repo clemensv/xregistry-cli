@@ -17,12 +17,12 @@ def test_validate():
         # generate the producer
         sys.argv = ['ceregistry', 'validate',  
                     '--definitions', os.path.join(input_dir, disco_file)]
-        if ceregistry.main() != 0:
+        if ceregistry.cli() != 0:
             raise Exception("validation failed")
     disco_files = glob.glob("**/*.disco.yaml", root_dir=input_dir, recursive=True)
     for disco_file in disco_files:
         # generate the producer
         sys.argv = ['ceregistry', 'validate',  
                     '--definitions', os.path.join(input_dir, disco_file)]
-        if ceregistry.main() != 0:
+        if ceregistry.cli() != 0:
             raise Exception("validation failed")

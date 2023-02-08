@@ -3,14 +3,14 @@
     "specversion": "0.3-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "groups": {
-        "Contoso.ERP.Events": {
+        "com.example.grp1": {
             "type": "group",
-            "id": "Contoso.ERP.Events",
+            "id": "com.example.grp1",
             "definitions": {
-                "Contoso.ERP.Events.ReservationPlaced": {
+                "com.example.grp1.ev1": {
                     "type": "cloudevent",
-                    "id": "Contoso.ERP.Events.ReservationPlaced",
-                    "description": "A reservation has been placed",
+                    "id": "com.example.grp1.ev1",
+                    "description": "",
                     "format": "CloudEvents/1.0",
                     "metadata": {
                         "attributes": {
@@ -20,40 +20,120 @@
                             },
                             "type": {
                                 "type": "string",
-                                "value": "Contoso.ERP.Events.ReservationPlaced",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
+                                "value": "com.example.grp1.ev1",
                                 "required": true
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/orders",
+                                "value": "",
                                 "required": true
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
+                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1:x1"
+                }
+            }
+        },
+        "com.example.grp2": {
+            "type": "group",
+            "id": "com.example.grp2",
+            "definitions": {
+                "com.example.grp2.ev1": {
+                    "type": "cloudevent",
+                    "id": "com.example.grp2.ev1",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "com.example.grp2.ev1",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/com.example.grp2/schemas/s2:q1"
+                },
+                "com.example.grp2.ev2": {
+                    "type": "cloudevent",
+                    "id": "com.example.grp2.ev2",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "com.example.grp2.ev2",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaurl": "#/schemagroups/com.example.grp2/schemas/s1:q2"
                 }
             }
         }
     },
     "schemagroups": {
-        "Contoso.ERP.Events": {
+        "com.example.grp1": {
             "type": "schemagroup",
-            "id": "Contoso.ERP.Events",
+            "id": "com.example.grp1",
             "schemas": {
-                "orderData": {
+                "s1": {
                     "type": "schema",
-                    "id": "orderData",
+                    "id": "s1",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
                             "id": "1",
                             "format": "Protobuf/3.0",
-                            "schema": "syntax = \"proto3\"; message OrderData { string orderId = 1; string customerId = 2; double total = 3; repeated Item items = 4; } message Item { string productId = 1; double quantity = 2; double price = 3; }"
+                            "schema": "syntax = \"proto3\"; message x1 { string a = 1; } }"
+                        }
+                    }
+                }
+            }
+        },
+        "com.example.grp2": {
+            "type": "schemagroup",
+            "id": "com.example.grp2",
+            "schemas": {
+                "s1": {
+                    "type": "schema",
+                    "id": "s1",
+                    "format": "Protobuf/3.0",
+                    "versions": {
+                        "1": {
+                            "type": "schemaversion",
+                            "id": "1",
+                            "format": "Protobuf/3.0",
+                            "schema": "syntax = \"proto3\"; message q1 { string a = 1; } }"
+                        }
+                    }
+                },
+                "s2": {
+                    "type": "schema",
+                    "id": "s2",
+                    "format": "Protobuf/3.0",
+                    "versions": {
+                        "1": {
+                            "type": "schemaversion",
+                            "id": "1",
+                            "format": "Protobuf/3.0",
+                            "schema": "syntax = \"proto3\"; message q2 { string a = 1; } }"
                         }
                     }
                 }

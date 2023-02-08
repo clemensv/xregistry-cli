@@ -23,7 +23,7 @@ def test_openapi_producer():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_producer.disco'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducer']
-    ceregistry.main()
+    ceregistry.cli()
     # run dotnet build on the csproj here that references the generated files already
     cmd = 'openapi-generator-cli validate -i ' + os.path.join(output_dir, "ContosoErpProducer.yml")
     

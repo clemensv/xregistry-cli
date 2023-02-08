@@ -21,7 +21,7 @@ def test_inmemory_end_to_end():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'inmemory_end_to_end.disco'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/inmemory_end_to_end/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
-    ceregistry.main()
+    ceregistry.cli()
     # generate the consumer
     sys.argv = [ 'ceregistry', 'generate', 
                 '--style', 'consumer', 
@@ -29,7 +29,7 @@ def test_inmemory_end_to_end():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'inmemory_end_to_end.disco'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/inmemory_end_to_end/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
-    ceregistry.main()
+    ceregistry.cli()
     # run dotnet build on the csproj here that references the generated files already
     subprocess.check_call(['dotnet', 'run'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     

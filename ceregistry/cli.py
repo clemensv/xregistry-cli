@@ -2,7 +2,15 @@ import argparse
 
 from .commands.validate_definitions import validate_definition
 from .commands.generate_code import generate_code
-from .commands.list_templates import list_templates
+from .commands.list_templates import list_templates, enum_languages, enum_templates
+
+# delay output for the generator choices until we actually need them
+class TemplateChoicesHelpFormatter(argparse.HelpFormatter):
+
+    def _format_text(self, text):
+        if text == "...":
+            return "Generate code from a definition file based on a template set (style).\n\nBuilt-in choices for --language/--style:\n\n"+ "\n ".join(enum_templates())
+        return argparse.RawDescriptionHelpFormatter._format_text(self, text)
 
 def main():
    
@@ -17,7 +25,7 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command", help="The command to execute: generate, validate or list")
     subparsers.default = "generate"
-    generate = subparsers.add_parser("generate", help="Generate code")
+    generate = subparsers.add_parser("generate", help="Generate code.", epilog="...", formatter_class=TemplateChoicesHelpFormatter) 
     generate.set_defaults(func=generate_code)
     validate = subparsers.add_parser("validate", help="Validate a definition")
     validate.set_defaults(func=validate_definition)
@@ -34,20 +42,14 @@ def main():
     generate.add_argument("--requestheaders", nargs="*", dest="headers", required=False,help="Extra HTTP headers in the format 'key=value'")
     generate.add_argument("--templates", nargs="*", dest="template_dirs", required=False, help="Paths of extra directories containing custom templates")
     generate.add_argument("--template-args", nargs="*", dest="template_args", required=False, help="Extra template arguments to pass to the code generator in the form 'key=value")
-
+    
     # specify the arguments for the validate command
     validate.add_argument("--definitions", dest="definitions_file", required=True, help="The file or URL containing the definitions")
     validate.add_argument("--requestheaders", nargs="*", dest="headers", required=False,help="Extra HTTP headers in the format 'key=value'")
 
     # specify the arguments for the list command
-    list1.add_argument("--language", dest="language", required=False, help="The language to use for the generated code")
-    list1.add_argument("--style", dest="style", required=False, help="The style of the generated code")
     list1.add_argument("--templates", nargs="*", dest="template_dirs", required=False, help="Paths of extra directories containing custom templates")
-    
+        
     # Parse the command line arguments
     args = parser.parse_args()
     return args.func(args)    
-
-
-if __name__ == "__main__":
-    main()
