@@ -1,5 +1,5 @@
 {%- set schema_name = class_name | pascal -%}
-{%- set list_type = "ArrayList" %}
+{%- set list_type = "java.util.ArrayList" %}
 {%- set schema = root %}
 
 {%- macro emitclass(type, typeName) -%}
@@ -60,7 +60,7 @@ public class {{ typeName }}
             {%- endif -%}
         {%- elif property.type == 'string' -%}
             {%- if property.format == 'date-time' -%}
-                {%- set javaType = "LocalDateTime" -%}
+                {%- set javaType = "java.time.LocalDateTime" -%}
             {%- endif -%}
             {%- if property.format == 'email' -%}
                 {%- set javaType = "String" -%}
@@ -69,19 +69,19 @@ public class {{ typeName }}
                 {%- set javaType = "URL" -%}
             {%- endif -%}
             {%- if property.format == 'date' -%}
-                {%- set javaType = "LocalDate" -%}
+                {%- set javaType = "java.time.LocalDate" -%}
             {%- endif -%}
             {%- if property.format == 'time' -%}
-                {%- set javaType = "LocalTime" -%}
+                {%- set javaType = "java.time.LocalTime" -%}
             {%- endif -%}
             {%- if property.format == 'uuid' -%}
-                {%- set javaType = "UUID" -%}
+                {%- set javaType = "java.util.UUID" -%}
             {%- endif -%}
             {%- if property.format == 'ipv4' -%}
-                {%- set javaType = "Inet4Address" -%}
+                {%- set javaType = "java.net.Inet4Address" -%}
             {%- endif -%}
             {%- if property.format == 'ipv6' -%}
-                {%- set javaType = "Inet6Address" -%}
+                {%- set javaType = "java.net.Inet6Address" -%}
             {%- endif -%}
             {%- if property.format == 'hostname' -%}
                 {%- set javaType = "String" -%}
@@ -92,45 +92,45 @@ public class {{ typeName }}
         {%- elif property.type == 'array' -%}
             {%- if property.items.type == 'integer' -%}
                 {%- if property.items.format == 'int32' or not property.items.format -%}
-                    {%- set javaType = list_type+"<Integer>" -%}
+                    {%- set javaType = list_type+"<int>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'int64' -%}
-                    {%- set javaType = list_type+"<Long>" -%}
+                    {%- set javaType = list_type+"<long>" -%}
                 {%- endif -%}
             {%- elif property.items.type == 'number' -%}
                 {%- if property.items.format == 'float' -%}
-                    {%- set javaType = list_type+"<Float>" -%}
+                    {%- set javaType = list_type+"<gloat>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'double' or not property.items.format -%}
-                    {%- set javaType = list_type+"<Double>" -%}
+                    {%- set javaType = list_type+"<double>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'decimal' -%}
                     {%- set javaType = list_type+"<BigDecimal>" -%}
                 {%- endif -%}
             {%- elif property.items.type == 'string' -%}
                 {%- if property.items.format == 'date-time' -%}
-                    {%- set javaType = list_type+"LocalDateTime>" -%}
+                    {%- set javaType = list_type+"<LocalDate>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'email' -%}
-                    {%- set javaType = list_type+"String>" -%}
+                    {%- set javaType = list_type+"<String>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'uri' -%}
-                    {%- set javaType = list_type+"URI>" -%}
+                    {%- set javaType = list_type+"<java.net.URI>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'uuid' -%}
-                    {%- set javaType = list_type+"UUID>" -%}
+                    {%- set javaType = list_type+"<java.util.UUID>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'ipv4' -%}
-                    {%- set javaType = list_type+"Inet4Address>" -%}
+                    {%- set javaType = list_type+"<java.net.Inet4Address>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'ipv6' -%}
-                    {%- set javaType = list_type+"<IPAddress>" -%}
+                    {%- set javaType = list_type+"<java.net.IPAddress>" -%}
                 {%- endif -%}
                 {%- if property.items.format == 'hostname' -%}
-                    {%- set javaType = list_type+"<string>" -%}
+                    {%- set javaType = list_type+"<String>" -%}
                 {%- endif -%}
                 {%- if not property.items.format -%}
-                    {%- set javaType = list_type+"<string>" -%}
+                    {%- set javaType = list_type+"<String>" -%}
                 {%- endif -%}
             {%- elif property.items['$ref'] -%}
                 {%- set ref = property.items['$ref'] -%}
@@ -179,49 +179,49 @@ public class {{ typeName }}
     {%- if property.minimum is defined %}
         if (value < {{ property.minimum }})
         {
-            throw new IllegalArgumentException(String.format(ExceptionMessages.ValueIsTooSmall, value, {{ property.minimum }}));
+            throw new IllegalArgumentException(String.format({{ project_name | lower }}.ExceptionMessages.ValueIsTooSmall, value, {{ property.minimum }}));
         }
     {%- endif %}
     {%- if property.exclusiveMinimum is defined %}
         if (value <= {{ property.exclusiveMinimum }})
         {
-            throw new IllegalArgumentException(String.format(ExceptionMessages.ValueIsTooSmall, value, {{ property.exclusiveMinimum }}));
+            throw new IllegalArgumentException(String.format({{ project_name | lower }}.ExceptionMessages.ValueIsTooSmall, value, {{ property.exclusiveMinimum }}));
         }
     {%- endif %}
     {%- if property.maximum is defined %}
         if (value > {{ property.maximum }})
         {
-            throw new IllegalArgumentException(String.format(ExceptionMessages.ValueIsTooBig, value, {{ property.maximum }}));
+            throw new IllegalArgumentException(String.format({{ project_name | lower }}.ExceptionMessages.ValueIsTooBig, value, {{ property.maximum }}));
         }
     {%- endif %}
     {%- if property.exclusiveMaximum is defined %}
         if (value >= {{ property.exclusiveMaximum }})
         {
-            throw new IllegalArgumentException(String.format(ExceptionMessages.ValueIsTooBig, value, {{ property.exclusiveMaximum }}));
+            throw new IllegalArgumentException(String.format({{ project_name | lower }}.ExceptionMessages.ValueIsTooBig, value, {{ property.exclusiveMaximum }}));
         }
     {%- endif %}
     {%- if property.maxLength is defined %}
         if (value.toString().length() > {{ property.maxLength }})
         {
-            throw new IllegalArgumentException(String.format(ExceptionMessages.ValueIsTooLong, value, {{ property.maxLength }}));
+            throw new IllegalArgumentException(String.format({{ project_name | lower }}.ExceptionMessages.ValueIsTooLong, value, {{ property.maxLength }}));
         }
     {%- endif %}
     {%- if property.minLength is defined %}
         if (value.toString().length() < {{ property.minLength }})
         {
-            throw new IllegalArgumentException(String.format(ExceptionMessages.ValueIsTooShort, value, {{ property.minLength }}));
+            throw new IllegalArgumentException(String.format({{ project_name | lower }}.ExceptionMessages.ValueIsTooShort, value, {{ property.minLength }}));
         }
     {%- endif %}
     {%- if property.pattern is defined %}
-        if (!Pattern.matches("{{ property.pattern }}", value))
+        if (!java.util.regex.Pattern.matches("{{ property.pattern }}", value))
         {
-            throw new IllegalArgumentException(String.format(ExceptionMessages.ValueIsInvalid, value));
+            throw new IllegalArgumentException(String.format({{ project_name | lower }}.ExceptionMessages.ValueIsInvalid, value));
         }
     {%- endif %}
     {%- if property.format == "email" %}
-        if (!Pattern.matches(RegexPatterns.Email, value))
+        if (!java.util.regex.Pattern.matches({{ project_name | lower }}.RegexPatterns.Email, value))
         {
-            throw new IllegalArgumentException(String.format(ExceptionMessages.ValueIsNotAnEmail, value));
+            throw new IllegalArgumentException(String.format({{ project_name | lower }}.ExceptionMessages.ValueIsNotAnEmail, value));
         }
     {%- endif %}
         {{ propertyName }} = value;
@@ -233,14 +233,10 @@ public class {{ typeName }}
 {%- endmacro -%}
 package {{ project_name | lower }};
 
-import {{ project_name | lower }}.ExceptionMessages;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import java.util.*;
-import java.time.*;
-import java.util.regex.*;
 
 {{ emitclass(schema, schema_name) }}

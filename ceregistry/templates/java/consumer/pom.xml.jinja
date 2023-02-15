@@ -13,46 +13,56 @@
   <version>1.0-SNAPSHOT</version>
   <properties>
     <avro.version>1.11.1</avro.version>
+    <protobuf.version>3.11.4</protobuf.version>
+    <log4j.version>2.19.0</log4j.version>
+    <io.cloudevents.version>2.4.0</io.cloudevents.version>
+    <io.cloudevents.experimental.version>0.1.1-SNAPSHOT</io.cloudevents.experimental.version>
   </properties>
   <dependencies>
      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${log4j.version}</version>
+        <scope>provided</scope>
+     </dependency>
+     <dependency>
       <groupId>io.cloudevents</groupId>
       <artifactId>cloudevents-http-basic</artifactId>
-      <version>2.4.0</version>
+      <version>${io.cloudevents.version}</version>
     </dependency>
     <dependency>
       <groupId>io.cloudevents</groupId>
       <artifactId>cloudevents-api</artifactId>
-      <version>2.4.0</version>
+      <version>${io.cloudevents.version}</version>
     </dependency>
     <dependency>
       <groupId>io.cloudevents.experimental</groupId>
       <artifactId>endpoints</artifactId>
-      <version>1.0-SNAPSHOT</version>
+      <version>${io.cloudevents.experimental.version}</version>
     </dependency>
     <dependency>
       <groupId>io.cloudevents.experimental</groupId>
       <artifactId>endpoints-amqp</artifactId>
-      <version>1.0-SNAPSHOT</version>
+      <version>${io.cloudevents.experimental.version}</version>
     </dependency>
     {%- if uses_protobuf %}
     <dependency>
       <groupId>io.cloudevents</groupId>
       <artifactId>cloudevents-protobuf</artifactId>
-      <version>2.4.0</version>
+      <version>${io.cloudevents.version}</version>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <version>3.11.4</version>
+      <version>${protobuf.version}</version>
     </dependency>
     {%- endif %}
     {%- if uses_avro %}
-    <!-- :-(      
+    <!-- :-( No Avro support in the CloudEvents SDK yet      
      <dependency>
       <groupId>io.cloudevents</groupId>
       <artifactId>cloudevents-avro</artifactId>
-      <version>2.4.0</version>
+      <version>${io.cloudevents.version}</version>
      </dependency> -->
      <dependency>
       <groupId>org.apache.avro</groupId>
@@ -85,7 +95,7 @@
          <plugin>
             <groupId>com.github.os72</groupId>
             <artifactId>protoc-jar-maven-plugin</artifactId>
-            <version>3.11.4</version>
+            <version>${protobuf.version}</version>
             <executions>
                 <execution>
                     <phase>generate-sources</phase>
@@ -93,7 +103,7 @@
                         <goal>run</goal>
                     </goals>
                     <configuration>
-                        <protocVersion>3.11.4</protocVersion>
+                        <protocVersion>${protobuf.version}</protocVersion>
                         <inputDirectories>
                             <include>main/protobuf</include>
                         </inputDirectories>

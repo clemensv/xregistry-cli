@@ -17,7 +17,7 @@ import io.cloudevents.core.format.EventFormat;
 import io.cloudevents.core.message.Encoding;
 import io.cloudevents.experimental.endpoints.ProducerEndpoint;
 import io.cloudevents.experimental.endpoints.IEndpointCredential;
-import io.cloudevents.experimental.endpoints.HttpProtocol;
+import io.cloudevents.experimental.endpoints.http.HttpProtocol;
 import io.cloudevents.experimental.endpoints.amqp.AmqpProtocol;
 
 {%- if uses_amqp_message %}
@@ -26,13 +26,9 @@ import io.cloudevents.experimental.endpoints.amqp.AmqpProtocol;
 {%- if uses_mqtt_message %}
 {{ mqtt.PahoImports() }}
 {%- endif %}
-import java.util.logging.Logger;
 import java.util.concurrent.CompletableFuture;
 import java.util.ArrayList;
-import java.util.UUID;
-import java.util.HashMap;
-import java.net.URI;
-import java.time.OffsetDateTime;
+
 
 {% for group_key, group in groups.items() -%}
 {%- set pascalGroupName = group.id | default(group_key) | pascal -%}
@@ -65,18 +61,18 @@ public class {{ className }}
     {%- set options = endpoint.config.options -%}
     {%- set endpoints = endpoint.config.endpoints %}
         
-    public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(Logger logger, IEndpointCredential credential {% if uses_cloudevents_message %}, Encoding encoding, EventFormat eventFormat {% endif %})  {       
+    public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(IEndpointCredential credential {% if uses_cloudevents_message %}, Encoding encoding, EventFormat eventFormat {% endif %})  {       
         {%- if options %}
-        var options = new HashMap<String, String>();
+        var options = new java.util.HashMap<String, String>();
         {%- for key, value in options.items()%}
         options.put("{{ key }}" , "{{ value }}" );
         {%- endfor %}
         {%- endif %}
-        var endpoints = new ArrayList<URI>();
+        var endpoints = new ArrayList<java.net.URI>();
         {%- for uri in endpoints %}
-        endpoints.add(URI.create("{{ uri }}"));
+        endpoints.add(java.net.URI.create("{{ uri }}"));
         {%- endfor %}
-        return new {{ className }}(ProducerEndpoint.create(logger, credential, {{ protocol | pascal }}Protocol.NAME, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, encoding, eventFormat{%- endif %});
+        return new {{ className }}(ProducerEndpoint.create(credential, {{ protocol | pascal }}Protocol.NAME, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, encoding, eventFormat{%- endif %});
     }
     {%- endif -%}
     {%- endfor -%}

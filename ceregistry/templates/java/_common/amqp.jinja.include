@@ -162,11 +162,11 @@ try {
       {% endfor %}
       {% endfor %}
       default:
-         log.LogError($"Unsupported message subject {messageSubject}");
+         _logger.error(String.format("Unsupported message subject %s", messageSubject));
          break;
    }
 } catch ( Exception exception ) {
-    log.log(Level.WARNING, "Error while dispatching CloudEvent", exception);
+    _logger.warn("Error while dispatching CloudEvent", exception);
 }
 return CompletableFuture.completedFuture(null);
 {%- endif -%}

@@ -164,7 +164,7 @@ try {
    {% endfor %}
    {% endfor %}
 } catch ( Exception exception ) {
-    log.log(Level.WARNING, "Error while dispatching message", exception);
+    _logger.warn("Error while dispatching message", exception);
 }
 return CompletableFuture.completedFuture(null);
 {%- endif -%}
