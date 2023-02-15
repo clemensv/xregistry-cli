@@ -19,6 +19,9 @@ import io.cloudevents.experimental.endpoints.http.HttpProtocol;
 {%- if uses_amqp_endpoint %}
 import io.cloudevents.experimental.endpoints.amqp.AmqpProtocol;
 {%- endif %}
+{%- if uses_mqtt_endpoint %}
+import io.cloudevents.experimental.endpoints.mqtt.MqttProtocol;
+{%- endif %}
 {%- if uses_amqp_message %}
 {{ amqp.AmqpImports() }}
 import io.cloudevents.experimental.endpoints.amqp.AmqpConsumerEndpoint.DispatchMessageAsync;
@@ -41,6 +44,18 @@ import org.apache.logging.log4j.LogManager;
 {%- set className = (pascalGroupName | strip_namespace)+"EventConsumer" %}
 public class {{ className }}
 {
+    static {
+        {%- if uses_http_endpoint %}
+        HttpProtocol.register();
+        {%- endif %}
+        {%- if uses_amqp_endpoint %}
+        AmqpProtocol.register();
+        {%- endif %}
+        {%- if uses_mqtt_endpoint %}
+        MqttProtocol.register();
+        {%- endif %}
+    }
+    
     private Logger _logger = LogManager.getLogger({{ className }}.class);
     private ConsumerEndpoint endpoint;
     

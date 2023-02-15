@@ -3,6 +3,7 @@
 {%- import "mqtt.jinja.include" as mqtt -%}
 {%- set groups = root.groups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_http_endpoint = (root | exists( "protocol", "http" )) %}
 {%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
 {%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
@@ -17,8 +18,16 @@ import io.cloudevents.core.format.EventFormat;
 import io.cloudevents.core.message.Encoding;
 import io.cloudevents.experimental.endpoints.ProducerEndpoint;
 import io.cloudevents.experimental.endpoints.IEndpointCredential;
+
+{%- if uses_http_endpoint %}
 import io.cloudevents.experimental.endpoints.http.HttpProtocol;
+{%- endif %}
+{% if uses_amqp_endpoint %}
 import io.cloudevents.experimental.endpoints.amqp.AmqpProtocol;
+{% endif %}
+{% if uses_mqtt_endpoint %}
+import io.cloudevents.experimental.endpoints.mqtt.MqttProtocol;
+{% endif %}
 
 {%- if uses_amqp_message %}
 {{ amqp.AmqpImports() }}
@@ -35,6 +44,18 @@ import java.util.ArrayList;
 {%- set className = (pascalGroupName | strip_namespace)+"EventProducer" %}
 public class {{ className }}
 {
+    static {
+        {%- if uses_http_endpoint %}
+        HttpProtocol.register();
+        {%- endif %}
+        {%- if uses_amqp_endpoint %}
+        AmqpProtocol.register();
+        {%- endif %}
+        {%- if uses_mqtt_endpoint %}
+        MqttProtocol.register();
+        {%- endif %}
+    }
+
     {%- if uses_cloudevents_message %}
     private Encoding encoding;
     private EventFormat eventFormat;

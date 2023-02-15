@@ -8,8 +8,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.example</groupId>
-  <artifactId>{{ project_name | lower }}</artifactId>
+  <groupId>{{ project_name | lower }}</groupId>
+  <artifactId>consumer</artifactId>
   <version>1.0-SNAPSHOT</version>
   <properties>
     <avro.version>1.11.1</avro.version>
@@ -20,11 +20,17 @@
   </properties>
   <dependencies>
      <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-api</artifactId>
-        <version>${log4j.version}</version>
-        <scope>provided</scope>
-     </dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <version>${log4j.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${log4j.version}</version>
+      <scope>provided</scope>
+    </dependency>
      <dependency>
       <groupId>io.cloudevents</groupId>
       <artifactId>cloudevents-http-basic</artifactId>
@@ -40,11 +46,20 @@
       <artifactId>endpoints</artifactId>
       <version>${io.cloudevents.experimental.version}</version>
     </dependency>
+    {%- if uses_amqp_endpoint %}
     <dependency>
       <groupId>io.cloudevents.experimental</groupId>
       <artifactId>endpoints-amqp</artifactId>
       <version>${io.cloudevents.experimental.version}</version>
     </dependency>
+    {%- endif %}
+    {%- if uses_mqtt_endpoint %}
+    <dependency>
+      <groupId>io.cloudevents.experimental</groupId>
+      <artifactId>endpoints-mqtt</artifactId>
+      <version>${io.cloudevents.experimental.version}</version>
+    </dependency>
+    {%- endif %}
     {%- if uses_protobuf %}
     <dependency>
       <groupId>io.cloudevents</groupId>
