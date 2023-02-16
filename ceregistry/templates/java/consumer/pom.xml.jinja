@@ -1,5 +1,5 @@
-{%- set uses_protobuf = uses_protobuf | default(true) -%}
-{%- set uses_avro = uses_avro | default(true) -%}
+{%- set uses_protobuf = uses_protobuf | default(false) -%}
+{%- set uses_avro = uses_avro | default(false) -%}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists("protocol", "amqp" )) %}
@@ -12,8 +12,12 @@
   <artifactId>consumer</artifactId>
   <version>1.0-SNAPSHOT</version>
   <properties>
+    {%- if uses_avro %}
     <avro.version>1.11.1</avro.version>
+    {%- endif %}
+    {%- if uses_protobuf %}
     <protobuf.version>3.11.4</protobuf.version>
+    {%- endif %}
     <log4j.version>2.19.0</log4j.version>
     <io.cloudevents.version>2.4.0</io.cloudevents.version>
     <io.cloudevents.experimental.version>0.1.1-SNAPSHOT</io.cloudevents.experimental.version>
