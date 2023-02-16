@@ -1,6 +1,7 @@
 #  gitignore for Java
 #  http://www.gitignore.io/api/java
 #
+dependency-reduced-pom.xml
 .vs/
 
 # Compiled class file
