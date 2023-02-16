@@ -17,10 +17,21 @@ This project is a command line client for the *CloudEvents Registry*.
 
 ## Introduction
 
-The CloudEvents Registry is an API and a file format for describing messaging
+CloudEvents Discovery is an API and a file format for describing messaging
 and eventing endpoints, groups of message definitions, and payload schemas. The
-formal specification is available at
+formal specification for the foundational "CloudEvents Registry" is available at
 [https://github.com/cloudevents/spec/blob/main/registry/spec.md](https://github.com/cloudevents/spec/blob/main/registry/spec.md).
+The formal specification for the "CloudEvents Discovery" features layered onto the registry 
+resides at [https://github.com/cloudevents/spec/blob/main/discovery/spec.md](https://github.com/cloudevents/spec/blob/main/discovery/spec.md).
+
+The "registry" is an API or document store (like a repo) where metadata is organized. 
+"Discovery" using that registry for finding out about concrete metadata for messaging 
+and eventing objects. This project is a client for interacting with a CloudEvents registry that 
+can, as one feature, generate code from the discovery metadata held in the registry.
+
+A current, formal document schema for discovery documents (.disco) is embedded in this
+project at [schemas/ce_registry_doc.json](schemas/ce_registry_doc.json). The schema 
+may reflects changes not yet merged into the formal spec docs.
 
 While the CloudEvents Registry emerged from the CNCF CloudEvents project and has
 been designed for enabling robust development of CloudEvents-based flows, the
