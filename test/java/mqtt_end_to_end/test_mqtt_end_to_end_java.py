@@ -15,8 +15,8 @@ import ceregistry
 # and then builds the proxy and the consumer and runs a prepared test that integrates both
 def run_test():
     # clean the output directory
-    if os.path.exists(os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/'.replace('/', os.path.sep))):
-        shutil.rmtree(os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/'.replace('/', os.path.sep)))
+    if os.path.exists(os.path.join(project_root, 'tmp/test/java/'.replace('/', os.path.sep))):
+        shutil.rmtree(os.path.join(project_root, 'tmp/test/java/'.replace('/', os.path.sep)))
 
     local_repo_arg = '-Dmaven.repo.local='+os.path.join(project_root, 'tmp/test/java/repo'.replace('/', os.path.sep))
     local_ce_libs = os.path.join(project_root, 'tmp/test/java/ce_libs'.replace('/', os.path.sep))
