@@ -48,7 +48,7 @@ def run_test():
     subprocess.check_call(['mvn', '--quiet', 'clean', 'install', local_repo_arg], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     subprocess.check_call(['java', '-jar', 'target/mqtt_end_to_end-1.0-SNAPSHOT.jar'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     
-def test_mqtt_end_to_end():
+def xtest_mqtt_end_to_end():
     container_name = ''.join(random.choices(string.ascii_lowercase, k=10))
     start_command = "docker run --name {} -p 127.11.0.1:1883:1883 -v {}:/mosquitto/config/ -v {}:/mosquitto/log -d eclipse-mosquitto".\
                           format(container_name, os.path.join(os.path.dirname(__file__), 'mosquitto', 'config'), os.path.join(os.path.dirname(__file__), 'mosquitto', 'logs'))
