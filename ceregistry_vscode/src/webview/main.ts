@@ -32,6 +32,7 @@ function main() {
 
     language.selectFirstOption();
     handleLanguageChange.call(language, new Event('change'));
+    handleStyleChange.call(style, new Event('change'));
 }
 
 function handleLanguageChange(this: HTMLElement, event: Event) {
@@ -83,11 +84,6 @@ function handleFormSubmit(this: Button, event: Event) {
     });
 }
 
-
-function handleProjectNameChange(this: HTMLElement, ev: Event) {
-    
-}
-
 window.addEventListener('message', event => {
     const message = event.data; // The JSON data from the extension
     switch (message.command) {
@@ -126,6 +122,14 @@ function handlePickOutputChange(this: HTMLElement, ev: Event) {
 }
 
 function handleStyleChange(this: HTMLElement, ev: Event) {
-  
+    const style = document.getElementById('style') as Dropdown;
+    const projectName = document.getElementById('projectName') as TextField;
+    if (style) {
+        projectName.value = style.value;
+    }
 }
 
+
+function handleProjectNameChange(this: HTMLElement, ev: Event) {
+    
+}

@@ -40,6 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     let disposable = vscode.commands.registerCommand('ceregistry.ui', async (filePath) => {
         let definitionsFile = filePath ? filePath.fsPath : "";
+        
         if (!filePath) {
             let editor = vscode.window.activeTextEditor;
             if (editor) {
@@ -76,7 +77,10 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }
 
-        CodeGeneratorWizardPanel.render(context.extensionUri, definitionsFile, options);
+        let projectName = "";
+        let outputFile = vscode.workspace.workspaceFolders?path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, "generated"):"";
+
+        CodeGeneratorWizardPanel.render(context.extensionUri, definitionsFile, projectName, outputFile, options);
 
     });
     context.subscriptions.push(disposable);

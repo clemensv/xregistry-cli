@@ -16,9 +16,11 @@ export class CodeGeneratorWizardPanel {
         panel: vscode.WebviewPanel,
         extensionUri: vscode.Uri,
         definitionsFile: string,
+        projectName: string,
+        outputDir : string,
         options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } }) {
         this._panel = panel;
-        this._panel.webview.html = this._getWebviewContent(this._panel.webview, extensionUri, definitionsFile, options);
+        this._panel.webview.html = this._getWebviewContent(this._panel.webview, extensionUri, definitionsFile, projectName, outputDir, options);
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._setWebviewMessageListener(this._panel.webview);
     }
@@ -26,6 +28,8 @@ export class CodeGeneratorWizardPanel {
     public static render(
         extensionUri: vscode.Uri,
         definitionsFile: string,
+        projectName: string,
+        outputDir : string,
         options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } })
     {
         if (CodeGeneratorWizardPanel.currentPanel)
@@ -41,7 +45,7 @@ export class CodeGeneratorWizardPanel {
                 localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out')]
             });
 
-            CodeGeneratorWizardPanel.currentPanel = new CodeGeneratorWizardPanel(panel, extensionUri, definitionsFile, options);
+            CodeGeneratorWizardPanel.currentPanel = new CodeGeneratorWizardPanel(panel, extensionUri, definitionsFile, projectName, outputDir, options);
         }
     }
 
@@ -225,6 +229,8 @@ export class CodeGeneratorWizardPanel {
         webview: vscode.Webview,
         extensionUri: vscode.Uri,
         definitionsFile: string,
+        projectName: string,
+        outputDir: string,
         options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } }): string {
         const webviewUri = getUri(webview, extensionUri, ["out", "webview.js"]);
         const styleUri = getUri(webview, extensionUri, ["out", "style.css"]);
@@ -264,22 +270,6 @@ export class CodeGeneratorWizardPanel {
                                 </vscode-text-field>
                             </section>
                             <section class="component-control">
-                                <vscode-text-field id="projectName" name="projectName" value="" required size="80">
-                                    Name of the output project. This name is used for project files names and namespaces as applicable
-                                </vscode-text-field>
-                            </section>
-                            <section class="component-control">
-                            <vscode-text-field id="output" name="output" required size="80">
-                                Output directory
-                                <section slot="end" style="display:flex; align-items: center;">
-                                    <vscode-button id="pickOutput" appearance="icon">
-                                        <span class="codicon codicon-search"></span>
-                                    </vscode-button>    
-                                </section>
-                            </vscode-text-field>
-                            </section>
-                            
-                            <section class="component-control">
                                 Programming language/runtime<br/>
                                 <vscode-dropdown id="language" name="language" position="below" required>
                                     ${Object.keys(options).map((key) => {
@@ -291,6 +281,22 @@ export class CodeGeneratorWizardPanel {
                             <section class="component-control">
                                 The style of template to choose for the code generator for the chosen language option<br/>
                                 <vscode-dropdown id="style" name="style" position="below" required></vscode-dropdown>
+                            </section>
+
+                            <section class="component-control">
+                                <vscode-text-field id="projectName" name="projectName" value="${projectName}" required size="80">
+                                    Name of the output project. This name is used for project files names and namespaces as applicable
+                                </vscode-text-field>
+                            </section>
+                            <section class="component-control">
+                            <vscode-text-field id="output" name="output" value="${outputDir}" required size="80">
+                                Output directory
+                                <section slot="end" style="display:flex; align-items: center;">
+                                    <vscode-button id="pickOutput" appearance="icon">
+                                        <span class="codicon codicon-search"></span>
+                                    </vscode-button>    
+                                </section>
+                            </vscode-text-field>
                             </section>
                            
                             <section class="component-control">
