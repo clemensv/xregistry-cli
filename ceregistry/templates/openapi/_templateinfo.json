@@ -1,3 +1,4 @@
 {
-    "description" : "Open API 3.0"
+    "description" : "Open API 3.0",
+    "priority" : 3
 }

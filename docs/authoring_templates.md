@@ -293,7 +293,7 @@ variable's structure reflects the respective input document.
 
 - For code generators for message payload schemas, the `root` variable is the
   root of the CloudEvents Discovery document, corresponding to the CloudEvent
-  Discovery schema type `manifest`. Underneath `root` are three collections:
+  Discovery schema type `document`. Underneath `root` are three collections:
   - `groups` - a dictionary of message definition groups, keyed by the group's
     ID.
   - `schemagroups` - a dictionary of schema definition groups, keyed by the

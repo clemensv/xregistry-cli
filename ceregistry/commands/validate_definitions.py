@@ -27,20 +27,29 @@ def validate(definitions_uri, headers, verbose=False):
         print("Error: could not load definitions file {}".format(definitions_uri))
         return 2
 
-    # validate the definitions file using the JSON schema in schemas/ce_registry_doc.json
+    # validate the definitions file using the JSON schema in schemas/ce_discovery_doc.json
 
     # load the schema
-    basepath = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
-    schema_file = os.path.join(basepath, "schemas", "ce_registry_doc.json")
-    with open(schema_file, "r") as f:
-        schema = json.load(f)
+    try:
+        basepath = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
+        schema_file = os.path.join(basepath, "schemas", "ce_discovery_doc.json")
+        with open(schema_file, "r") as f:
+            schema = json.load(f)
+    except IOError as e:
+        print("Error: could not load schema file {}: {}".format(schema_file, e))
+        return 2
+    except json.JSONDecodeError as e:
+        print("Error: could not parse schema file {}: {}".format(schema_file, e))
+        return 2
+    
 
     # validate the definitions file
     errors = list(jsonschema.Draft7Validator(schema).iter_errors(docroot))
     if errors:
         print("{} Validation errors:".format(definitions_file))
         for i, error in enumerate(errors):
-            print("at {}, {}".format(error.json_path, error.message))
+            for suberror in sorted(error.context, key=lambda e: e.schema_path):
+                print("at {}: {}".format(suberror.json_path, suberror.message))
         return 1
         
     if verbose:

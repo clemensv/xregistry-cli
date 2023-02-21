@@ -1,18 +1,18 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "https://cloudevents.io/2022-12/discovery",
-  "title": "JSON Schema for CloudEvents Registry Docs",
+  "title": "JSON Schema for CloudEvents Discovery Docs",
   "allOf": [
-    { "$ref": "#/components/schemas/manifest" }
+    { "$ref": "#/components/schemas/document" }
   ],
   "components": {
     "schemas": {
-      "manifest": {
+      "document": {
         "type": "object",
         "properties": {
           "$schema": {
             "type": "string",
-            "default": "https://cloudevents.io/schemas/registry"
+            "default": "https://cloudevents.io/2022-12/discovery"
           },
           "specversion": {
             "type": "string",
@@ -39,7 +39,39 @@
             "type": "string",
             "format": "uri-reference"
           }
-        }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "endpoints"
+            ]
+          },
+          {
+            "required": [
+              "endpointsUrl"
+            ]
+          },
+          {
+            "required": [
+              "groups"
+            ]
+          },
+          {
+            "required": [
+              "groupsUrl"
+            ]
+          },
+          {
+            "required": [
+              "schemagroups"
+            ]
+          },
+          {
+            "required": [
+              "schemagroupsUrl"
+            ]
+          }
+        ]
       },
       "reference": {
         "type": "object",

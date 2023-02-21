@@ -17,6 +17,16 @@ const extensionConfig = {
     entryPoints: ["./src/extension.ts"],
     outfile: "./out/extension.js",
     external: ["vscode"],
+    plugins: [
+        // copy schema file(s) from parent cergistry/schemas directory to out directory
+        copy({
+            resolveFrom: "cwd",
+            assets: {
+              from: ["../ceregistry/schemas/*.json"],
+              to: ["./schemas"],
+            },
+        })
+    ]
 };
 
 const watchConfig = {

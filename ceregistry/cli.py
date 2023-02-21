@@ -2,7 +2,7 @@ import argparse
 
 from .commands.validate_definitions import validate_definition
 from .commands.generate_code import generate_code
-from .commands.list_templates import list_templates, enum_languages, enum_templates
+from .commands.list_templates import list_templates, enum_templates
 
 # delay output for the generator choices until we actually need them
 class TemplateChoicesHelpFormatter(argparse.HelpFormatter):
@@ -49,6 +49,8 @@ def main():
 
     # specify the arguments for the list command
     list1.add_argument("--templates", nargs="*", dest="template_dirs", required=False, help="Paths of extra directories containing custom templates")
+    list1.add_argument("--format", dest="listformat", required=False, help="Format for the output: text or json", choices=["text", "json"], default="text")
+    
         
     # Parse the command line arguments
     args = parser.parse_args()

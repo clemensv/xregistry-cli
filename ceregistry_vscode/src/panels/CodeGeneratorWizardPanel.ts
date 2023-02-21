@@ -1,4 +1,3 @@
-// file: src/panels/HelloWorldPanel.ts
 
 import * as vscode from "vscode";
 import { getUri } from "../utilities/getUri";
@@ -11,26 +10,23 @@ export class CodeGeneratorWizardPanel {
     public static currentPanel: CodeGeneratorWizardPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
-    private scriptLocation: string;
+    
 
     private constructor(
         panel: vscode.WebviewPanel,
         extensionUri: vscode.Uri,
         definitionsFile: string,
-        options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } },
-        scriptLocation: string) {
+        options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } }) {
         this._panel = panel;
         this._panel.webview.html = this._getWebviewContent(this._panel.webview, extensionUri, definitionsFile, options);
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._setWebviewMessageListener(this._panel.webview);
-        this.scriptLocation = scriptLocation;
     }
 
     public static render(
         extensionUri: vscode.Uri,
         definitionsFile: string,
-        options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } },
-        scriptLocation: string)
+        options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } })
     {
         if (CodeGeneratorWizardPanel.currentPanel)
         {
@@ -45,7 +41,7 @@ export class CodeGeneratorWizardPanel {
                 localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out')]
             });
 
-            CodeGeneratorWizardPanel.currentPanel = new CodeGeneratorWizardPanel(panel, extensionUri, definitionsFile, options, scriptLocation);
+            CodeGeneratorWizardPanel.currentPanel = new CodeGeneratorWizardPanel(panel, extensionUri, definitionsFile, options);
         }
     }
 
@@ -77,23 +73,23 @@ export class CodeGeneratorWizardPanel {
                         let output = message.output;
 
                         if (definitions.length == 0) {
-                            vscode.window.showErrorMessage("Please select a definitions file");
+                            vscode.window.showErrorMessage("Select a definitions file");
                             return;
                         }
                         if (projectName.length == 0) {
-                            vscode.window.showErrorMessage("Please enter a project name");
+                            vscode.window.showErrorMessage("Enter a project name");
                             return;
                         }
                         if (language.length == 0) {
-                            vscode.window.showErrorMessage("Please select a language");
+                            vscode.window.showErrorMessage("Select a language");
                             return;
                         }
                         if (style.length == 0) {
-                            vscode.window.showErrorMessage("Please select a style");
+                            vscode.window.showErrorMessage("Select a style");
                             return;
                         }
                         if (output.length == 0) {
-                            vscode.window.showErrorMessage("Please select an output folder");
+                            vscode.window.showErrorMessage("Select an output folder");
                             return;
                         }
 
@@ -146,10 +142,16 @@ export class CodeGeneratorWizardPanel {
                             openLabel: "Select definitions file",
                             defaultUri: vscode.Uri.file(path.dirname(message.definitions)),
                             filters: {
-                                "JSON": ["json"]
+                                "DISCO": ["disco", "yaml.disco"]
                             }
                         }).then((fileUri) => {
                             if (fileUri && fileUri.length > 0) {
+                                try {
+                                    child_process.execSync(`ceregistry validate --definitions "${fileUri[0].fsPath}"`);
+                                } catch (error: Error | any) {
+                                    vscode.window.showErrorMessage("Invalid or malformed definitions file");
+                                    return;
+                                }
                                 webview.postMessage({
                                     command: 'resultDialogForDefinition',
                                     definitionsFile: fileUri[0].fsPath
@@ -206,10 +208,13 @@ export class CodeGeneratorWizardPanel {
 
     private callCodeGenerator(output: any, projectName: any, style: any, language: any, definitions: any) {
         try {
-            child_process.execSync(`python3 ${this.scriptLocation} --output "${output}" --projectname "${projectName}" --style "${style}" --language "${language}" --definitions "${definitions}"`);
-            vscode.window.showInformationMessage("Code generation completed");
-            vscode.commands.executeCommand('vscode.openFolder', output);
-            this.dispose();
+            child_process.execSync(`ceregistry generate --output "${output}" --projectname "${projectName}" --style "${style}" --language "${language}" --definitions "${definitions}"`);
+            vscode.window.showInformationMessage("Code generation completed.", "Open Folder")
+                .then(selection => {
+                    if (selection === "Open Folder") {
+                        vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(output), {"forceNewWindow": true});
+                    }
+            });
         }
         catch (error: any) {
             vscode.window.showInformationMessage(error.toString());
@@ -242,8 +247,8 @@ export class CodeGeneratorWizardPanel {
             <span id="optionsData"><!-- ${JSON.stringify(options)} --></span>
                 <div class="control-container">
                     <div class="header">
-                        <h1>CloudEvents Discovery Code Generator</h1>
-                        <p>This wizard helps you creating code for producing or consuming CloudEvents with the CloudEvents SDK. The wizard wraps the "ceregistry" tool that uses CloudEvents Discovery registry endpoints or documents as input. The code generator always (re-)creates full projects (assemblies, modules, packages, depending on the nomenclature of the chosen language) that you can easily integrate into your own code-bases.</p>
+                        <h1>CloudEvents Discovery Tool</h1>
+                        <p>This wizard helps you validate specifications or creating code for producing or consuming CloudEvents with the CloudEvents SDK. The wizard wraps the "ceregistry" tool that uses CloudEvents Discovery registry endpoints or documents as input. The code generator always (re-)creates full projects (assemblies, modules, packages, depending on the nomenclature of the chosen language) that you can easily integrate into your own code-bases.</p>
                     </div>
                     <vscode-divider></vscode-divider>
                     <div class="content">

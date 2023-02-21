@@ -22,9 +22,9 @@ function main() {
     const projectName = document.getElementById('projectName') as TextField;
     projectName?.addEventListener('change', handleProjectNameChange);
     const pickDefinition = document.getElementById('pickDefinition') as Button;
-    pickDefinition?.addEventListener('change', handlePickDefinitionChange);
+    pickDefinition?.addEventListener('click', handlePickDefinitionChange);
     const pickOutput = document.getElementById('pickOutput') as Button;
-    pickOutput?.addEventListener('change', handlePickOutputChange);
+    pickOutput?.addEventListener('click', handlePickOutputChange);
     const language = document.getElementById('language') as Dropdown;
     language?.addEventListener('change', handleLanguageChange);
     const style = document.getElementById('style') as Dropdown;

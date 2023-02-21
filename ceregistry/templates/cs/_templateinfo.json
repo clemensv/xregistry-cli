@@ -1,3 +1,4 @@
 {
-    "description" : "C# / .NET 6.0+"
+    "description" : "C# / .NET 6.0+",
+    "priority" : 1
 }

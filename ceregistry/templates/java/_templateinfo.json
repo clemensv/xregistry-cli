@@ -1,3 +1,4 @@
 {
-    "description" : "Java 13+"
+    "description" : "Java 13+",
+    "priority" : 2
 }

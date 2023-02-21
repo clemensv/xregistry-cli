@@ -7,144 +7,77 @@ import internal from 'stream';
 
 export function activate(context: vscode.ExtensionContext) {
 
-    let pythonInstalled = true;
+    let toolInstalled = true;
+
+    let langsStyles: Array<{ name: string; description: string; priority: number; styles: Array<{ name: string; description: string; priority: number }> }> = new Array();
     try {
-        child_process.execSync('python --version');
+        // call the CLI tool with the list --format=json option and see if it works
+        // take the stdout and parse it as JSON
+        let output = child_process.execSync('ceregistry list --format=json', { encoding: 'utf8' });
+        langsStyles = JSON.parse(output);
     } catch (err) {
-        pythonInstalled = false;
+        toolInstalled = false;
     }
 
-    if (!pythonInstalled) {
-        vscode.window.showInformationMessage(`Python is not installed or it is not in the PATH. Do you want to install it now?`, 'Yes', 'No').then((answer) => {
-            if (answer === 'Yes') {
-                // Open the link to download python
-                vscode.commands.executeCommand('vscode.open', vscode.Uri.parse('https://www.python.org/downloads/'));
-            }
-        });
+    if (!toolInstalled) {
+        let callback = async () => {
+            vscode.window.showInformationMessage(`The "ceregistry CLI tool" is not installed. Please install it and then reload the window.`);
+        }
+        let disposable = vscode.commands.registerCommand('ceregistry.ui', callback);
+        context.subscriptions.push(disposable);
         return;
     }
 
-    let packageLocation = '';
-    let packageName = 'ceregistry';
-    let packageInstalled = false;
-    do {
-        try {
-            const output = child_process.execSync(`pip show ${packageName}`).toString();
-            const match = output.match(/^Location: (.+)$/m);
-            if (match) {
-                packageLocation = match[1];
-                packageInstalled = true;
-            } else {
-                packageInstalled = false;
-                return;
-            }
-        } catch (err) {
-            packageInstalled = false;
-            return;
-        }
-
-        if (!packageInstalled) {
-            vscode.window.showInformationMessage(`The package "${packageName}" is not installed. Do you want to install it now?`, 'Yes', 'No').then((answer) => {
-                if (answer === 'Yes') {
-                    child_process.execSync(`pip install ${packageName}`);
-                } else {
-                    return;
-                }
-            });
-        }
-    } while (!packageInstalled);
-
-    let scriptLocation = path.join(packageLocation, "ceregistry", "main.py");
-        
     let options: { [key: string]: { description: string, templates: { [key: string]: { description: string, priority: number, name: string } } } } = {};
-    const templateLocation = path.join(packageLocation, "ceregistry", "templates");
-    let languages = fs.readdirSync(templateLocation, { withFileTypes: true }).filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
-    for (let i = 0; i < languages.length; i++) {
-        let infoPath = path.join(templateLocation, languages[i], "_templateinfo.json");
-        let description = languages[i];
-        if (fs.existsSync(infoPath)) {
-            // read the JSON file and parse the "description" property
-            let info = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
-            if (info.hasOwnProperty("description")) {
-                description = info.description;
-            }
-        }
-        options[languages[i]] = { description: description, templates: {} };
 
-        let templates = fs.readdirSync(path.join(packageLocation, "ceregistry", "templates", languages[i]), { withFileTypes: true }).filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name );
-        // remove the _schemas folder from the list
-        templates = templates.filter((style) => {
-            return style !== "_schemas";
-        });
-        if (templates.length > 0) {
-            for (let j = 0; j < templates.length; j++) {
-                let description = templates[j];
-                let priority = 100;
-                let infoPath = path.join(templateLocation, languages[i], templates[j], "_templateinfo.json");
-                if (fs.existsSync(infoPath)) {
-                    // read the JSON file and parse the "description" property
-                    let info = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
-                    if (info.hasOwnProperty("description")) {
-                        description = info.description;
-                    }
-                    if (info.hasOwnProperty("priority")) {
-                        priority = info.priority;
-                    }
-                }
-                options[languages[i]].templates[templates[j]] = { description: description, priority: priority, name: templates[j] };
-            }
-        }
+    // map langStyles to options
+    for (let lang of langsStyles.sort((a, b) => a.priority - b.priority)) {
+        options[lang.name] = { description: lang.description, templates: {} };
+        for (let style of lang.styles.sort((a, b) => a.priority - b.priority)) {
+            options[lang.name].templates[style.name] = { description: style.description, priority: style.priority, name: style.name };
+        }        
     }
 
-    let disposable = vscode.commands.registerCommand('ceregistry.generate', async () => {
-        let definitionsFile = "";
-        let editor = vscode.window.activeTextEditor;
-        if (editor) {
-            let isCloudEventsDiscovery = false;
-            let document = editor.document;
-            if (document.languageId === "json" || document.languageId === "cedisco" || document.languageId === "plaintext") {
-                definitionsFile = document.fileName;
-                try {
-                    let jsonData = JSON.parse(document.getText());
-                    if (jsonData.hasOwnProperty("$schema") &&
-                        jsonData.hasOwnProperty("specversion")
-                        && (jsonData.hasOwnProperty("endpoints") || jsonData.hasOwnProperty("groups") || jsonData.hasOwnProperty("schemagroups"))) {
-                        isCloudEventsDiscovery = true;
-                    }
-                    else if (jsonData.hasOwnProperty("endpoint") || jsonData.hasOwnProperty("group") || jsonData.hasOwnProperty("schemagroup")) {
-                        isCloudEventsDiscovery = true;
-                    }
-                    else {
-                        for (let key in jsonData) {
-                            if (jsonData[key].hasOwnProperty("type") &&
-                                (jsonData[key]["type"] === "endpoint" || jsonData[key]["type"] === "group") || jsonData[key]["type"] === "schemagroup") {
-                                isCloudEventsDiscovery = true;
-                                break;
+    let disposable = vscode.commands.registerCommand('ceregistry.ui', async (filePath) => {
+        let definitionsFile = filePath ? filePath.fsPath : "";
+        if (!filePath) {
+            let editor = vscode.window.activeTextEditor;
+            if (editor) {
+                let isCloudEventsDiscovery = false;
+                let document = editor.document;
+                if (document.languageId === "json" || document.languageId === "cedisco" || document.languageId === "plaintext") {
+                    definitionsFile = document.fileName;
+                    try {
+                        let jsonData = JSON.parse(document.getText());
+                        if (jsonData.hasOwnProperty("$schema") &&
+                            jsonData.hasOwnProperty("specversion")
+                            && (jsonData.hasOwnProperty("endpoints") || jsonData.hasOwnProperty("groups") || jsonData.hasOwnProperty("schemagroups"))) {
+                            isCloudEventsDiscovery = true;
+                        }
+                        else if (jsonData.hasOwnProperty("endpoint") || jsonData.hasOwnProperty("group") || jsonData.hasOwnProperty("schemagroup")) {
+                            isCloudEventsDiscovery = true;
+                        }
+                        else {
+                            for (let key in jsonData) {
+                                if (jsonData[key].hasOwnProperty("type") &&
+                                    (jsonData[key]["type"] === "endpoint" || jsonData[key]["type"] === "group") || jsonData[key]["type"] === "schemagroup") {
+                                    isCloudEventsDiscovery = true;
+                                    break;
+                                }
                             }
                         }
+                    } catch (error) {
+                        isCloudEventsDiscovery = false;
                     }
-                } catch (error) {
-                    isCloudEventsDiscovery = false;
                 }
-            }
-            if (isCloudEventsDiscovery) {
-                definitionsFile = document.fileName;
+                if (isCloudEventsDiscovery) {
+                    definitionsFile = document.fileName;
+                }
             }
         }
 
-        CodeGeneratorWizardPanel.render(context.extensionUri, definitionsFile, options, scriptLocation);
+        CodeGeneratorWizardPanel.render(context.extensionUri, definitionsFile, options);
 
     });
     context.subscriptions.push(disposable);
-
-    disposable = vscode.commands.registerCommand('ceregistry.file-actions',
-        (filePath) => {
-            let definitionsFile = "";
-            if (filePath) {
-                definitionsFile = filePath.fsPath;
-            }
-            CodeGeneratorWizardPanel.render(context.extensionUri, definitionsFile, options, scriptLocation);
-        });
-    context.subscriptions.push(disposable);
-    
 }

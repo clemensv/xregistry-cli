@@ -30,7 +30,7 @@ and eventing objects. This project is a client for interacting with a CloudEvent
 can, as one feature, generate code from the discovery metadata held in the registry.
 
 A current, formal document schema for discovery documents (.disco) is embedded in this
-project at [ceregistry/schemas/ce_registry_doc.json](ceregistry/schemas/ce_registry_doc.json). 
+project at [ceregistry/schemas/ce_discovery_doc.json](ceregistry/schemas/ce_discovery_doc.json). 
 
 > The schema in this prototype reflects changes not yet merged into the formal 
 > spec docs in the CloudEvents project repo.
