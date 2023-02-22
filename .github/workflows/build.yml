@@ -27,8 +27,8 @@ jobs:
         echo "CEREGISTRY_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
     - name: Build Python package
       run: |
-        flit build
-        flit build --format wheel
+        python -m pip install --upgrade pip build wheel
+        python -m build --sdist --wheel --outdir dist
     # install Node dependencies including vsce and run vsce package in ceregistry_vscode, putting output in dist
     - name: Build VSCode extension
       run: |

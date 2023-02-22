@@ -1,2 +1,5 @@
-from ._version import __version__, __version_tuple__
 from .cli import main as cli
+from . import _version
+
+__version__ = _version.version
+VERSION = _version.version_tuple

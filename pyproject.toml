@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "flit_scm:buildapi"
-requires = ["flit_scm"]
+requires = ["flit_core>=3.2", "flit_scm", "wheel"]
 
 [project]
 name = "ceregistry"
