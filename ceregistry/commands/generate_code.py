@@ -313,7 +313,7 @@ def schema_type(schema_url: str):
             schema_files_collected.add(schema_url)
         match = re.search(r"/schemas/([\.\w]+)$", schema_url)
         if match:
-            return match.group(1)
+            return match.definitiongroup(1)
     return "object"
 
 def schema_object(root: dict, schema_url: str):
@@ -497,7 +497,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 #            namespace/package name plus {classname}
 # the {class*} patterns break the input information set up such that the
 # generator is fed just one CloudEvent definition but the information set
-# remains anchored at "groups"
+# remains anchored at "definitiongroups"
 def render_code_templates(project_name : str, style : str, output_dir : str, docroot : dict,
                           code_template_dirs : list, env : jinja2.Environment, post_process : bool, template_args : dict):
     class_name = None
@@ -512,7 +512,7 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                     continue
 
                 template_path = relpath + "/" + file  
-                # all codegen for CE is anchored on the included groups
+                # all codegen for CE is anchored on the included definitiongroups
                 scope = docroot
 
                 file_dir = file_dir_base = os.path.join(output_dir, os.path.join(*relpath.split("/")))
@@ -534,7 +534,7 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                                                         pascal(project_name))
                 file_name = file_name_base
                 if file_name.startswith("{class"):
-                    if "groups" in scope:
+                    if "definitiongroups" in scope:
                         if "endpoints" in docroot: endpoints = docroot["endpoints"]
                         else: endpoints = None
                         if "schemagroups" in docroot:
@@ -542,14 +542,14 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                         else:
                             schemagroups = None
 
-                        for id, group in scope["groups"].items():
-                            # create a snippet that only has the current group
+                        for id, definitiongroup in scope["definitiongroups"].items():
+                            # create a snippet that only has the current definitiongroup
                             subscope = {
                                 "endpoints": endpoints,
                                 "schemagroups": schemagroups,
-                                "groups": {}
+                                "definitiongroups": {}
                             }
-                            subscope["groups"][id] = group
+                            subscope["definitiongroups"][id] = definitiongroup
                             scope_parts = id.split(".")
                             package_name = id
                             if not package_name:

@@ -17,12 +17,13 @@ This project is a command line client for the *CloudEvents Registry*.
 
 ## Introduction
 
-CloudEvents Discovery is an API and a file format for describing messaging
-and eventing endpoints, groups of message definitions, and payload schemas. The
+CloudEvents Discovery is an API and a file format for describing messaging and
+eventing endpoints, groups of message definitions, and payload schemas. The
 formal specification for the foundational "CloudEvents Registry" is available at
 [https://github.com/cloudevents/spec/blob/main/registry/spec.md](https://github.com/cloudevents/spec/blob/main/registry/spec.md).
-The formal specification for the "CloudEvents Discovery" features layered onto the registry 
-resides at [https://github.com/cloudevents/spec/blob/main/discovery/spec.md](https://github.com/cloudevents/spec/blob/main/discovery/spec.md).
+The formal specification for the "CloudEvents Discovery" features layered onto
+the registry resides at
+[https://github.com/cloudevents/spec/blob/main/discovery/spec.md](https://github.com/cloudevents/spec/blob/main/discovery/spec.md).
 
 The "registry" is an API or document store (like a repo) where metadata is organized. 
 "Discovery" using that registry for finding out about concrete metadata for messaging 
@@ -93,26 +94,26 @@ for a specific perspective using different templates.
                     "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
                 ]
             },
-            "groups": [
-                "#/groups/Contoso.ERP.Events"
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.ERP.Events"
             ],
             "format" : "CloudEvents/1.0"
         }
     },
 ```
 
-The groups section describes groups of message definitions. The example shows a group of
-CloudEvents message definitions with just one entry. The message definition
-describes the CloudEvent message type `Contoso.ERP.Events.ReservationPlaced`,
-which is a CloudEvent with a `time` attribute, a `source` attribute, and a
-`data` attribute that refers to the `orderData` schema. The schema is defined in
-the `schemagroups` section below.
+The definitiongroups section describes groups of message definitions. The
+example shows a group of CloudEvents message definitions with just one entry.
+The message definition describes the CloudEvent message type
+`Contoso.ERP.Events.ReservationPlaced`, which is a CloudEvent with a `time`
+attribute, a `source` attribute, and a `data` attribute that refers to the
+`orderData` schema. The schema is defined in the `schemagroups` section below.
 
 ```json
 
-    "groups": {
+    "definitiongroups": {
         "Contoso.ERP.Events": {
-            "type": "group",
+            "type": "definitiongroup",
             "id": "Contoso.ERP.Events",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {

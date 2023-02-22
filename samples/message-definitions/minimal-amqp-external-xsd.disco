@@ -1,10 +1,10 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.3-wip",
-    "groups": {
+    "definitiongroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "type": "group",
+            "type": "definitiongroup",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
                     "type": "amqp",

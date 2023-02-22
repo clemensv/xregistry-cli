@@ -14,8 +14,8 @@
                 "endpoints": [],
                 "options": {}
             },
-            "groups": [
-                "#/groups/Eclipse.SparkplugB.EdgeNode"
+            "definitiongroups": [
+                "#/definitiongroups/Eclipse.SparkplugB.EdgeNode"
             ],
             "format": "MQTT/5.0"
         },
@@ -32,9 +32,9 @@
                     "topic": "spBv1.0/STATE/#,spBv1.0/{group_id}/NCMD/{edge_node_id},spBv1.0/{group_id}/DCMD/{edge_node_id}/#"
                 }
             },
-            "groups": [
-                "#/groups/Eclipse.SparkplugB.EdgeNodeCommands",
-                "#/groups/Eclipse.SparkplugB.HostApplicationState"
+            "definitiongroups": [
+                "#/definitiongroups/Eclipse.SparkplugB.EdgeNodeCommands",
+                "#/definitiongroups/Eclipse.SparkplugB.HostApplicationState"
             ],
             "format": "MQTT/5.0"
         },
@@ -49,8 +49,8 @@
                 "endpoints": [],
                 "options": {}
             },
-            "groups": [
-                "#/groups/Eclipse.SparkplugB.Device"
+            "definitiongroups": [
+                "#/definitiongroups/Eclipse.SparkplugB.Device"
             ],
             "format": "MQTT/5.0"
         },
@@ -67,8 +67,8 @@
                     "topic": "spBv1.0/{group_id}/DCMD/{edge_node_id}/{device_id}"
                 }
             },
-            "groups": [
-                "#/groups/Eclipse.SparkplugB.DeviceCommands"
+            "definitiongroups": [
+                "#/definitiongroups/Eclipse.SparkplugB.DeviceCommands"
             ],
             "format": "MQTT/5.0"
         },
@@ -83,18 +83,18 @@
                 "endpoints": [],
                 "options": {}
             },
-            "groups": [
-                "#/groups/Eclipse.SparkplugB.HostApplicationState",
-                "#/groups/Eclipse.SparkplugB.DeviceCommands",
-                "#/groups/Eclipse.SparkplugB.EdgeNodeCommands"
+            "definitiongroups": [
+                "#/definitiongroups/Eclipse.SparkplugB.HostApplicationState",
+                "#/definitiongroups/Eclipse.SparkplugB.DeviceCommands",
+                "#/definitiongroups/Eclipse.SparkplugB.EdgeNodeCommands"
             ],
             "format": "MQTT/5.0"
         }
     },
-    "groups": {
+    "definitiongroups": {
         "Eclipse.SparkplugB.EdgeNode": {
             "id": "Eclipse.SparkplugB",
-            "type": "group",
+            "type": "definitiongroup",
             "description": "Eclipse Sparkplug B is a lightweight messaging protocol for industrial IoT. This definition is for Sparkplug B v1.0 packets originating from an Edge Node.",
             "definitions": {
                 "NBIRTH": {
@@ -174,7 +174,7 @@
         },
         "Eclipse.SparkplugB.Device": {
             "id": "Eclipse.SparkplugB",
-            "type": "group",
+            "type": "definitiongroup",
             "description": "Eclipse Sparkplug B is a lightweight messaging protocol for industrial IoT. This definition is for Sparkplug B v1.0 packets originating from a Device.",
             "definitions": {
                 "DBIRTH": {
@@ -250,7 +250,7 @@
         },
         "Eclipse.SparkplugB.HostApplicationState": {
             "id": "Eclipse.SparkplugB.HostApplicationState",
-            "type": "group",
+            "type": "definitiongroup",
             "description": "Eclipse Sparkplug B is a lightweight messaging protocol for industrial IoT. This definition is for Sparkplug B v1.0 packets originating from a Host Application.",
             "definitions": {
                 "STATE.Death": {
@@ -309,7 +309,7 @@
         },
         "Eclipse.SparkplugB.EdgeNodeCommands": {
             "id": "Eclipse.SparkplugB.EdgeNodeCommands",
-            "type": "group",
+            "type": "definitiongroup",
             "description": "Eclipse Sparkplug B is a lightweight messaging protocol for industrial IoT. This definition is for Sparkplug B v1.0 packets originating from a Host Application.",
             "definitions": {
                 "NCMD": {
@@ -338,7 +338,7 @@
         },
         "Eclipse.SparkplugB.DeviceCommands": {
             "id": "Eclipse.SparkplugB.DeviceCommands",
-            "type": "group",
+            "type": "definitiongroup",
             "description": "Eclipse Sparkplug B is a lightweight messaging protocol for industrial IoT. This definition is for Sparkplug B v1.0 packets originating from a Host Application.",
             "definitions": {
                 "DCMD": {

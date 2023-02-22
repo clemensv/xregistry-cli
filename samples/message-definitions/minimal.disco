@@ -2,9 +2,9 @@
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.3-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "groups": {
+    "definitiongroups": {
         "com.example.grp1": {
-            "type": "group",
+            "type": "definitiongroup",
             "id": "com.example.grp1",
             "definitions": {
                 "com.example.grp1.ev1": {
@@ -33,7 +33,7 @@
             }
         },
         "com.example.grp2": {
-            "type": "group",
+            "type": "definitiongroup",
             "id": "com.example.grp2",
             "definitions": {
                 "com.example.grp2.ev1": {

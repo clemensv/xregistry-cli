@@ -16,8 +16,8 @@ CROSS APPLY
 
 -#}
 
-WITH {% for groupkey, group in root.groups.items() -%}
-{%- for definitionid, definition in group.definitions.items() %}
+WITH {% for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+{%- for definitionid, definition in definitiongroup.definitions.items() %}
 {%- if not loop.first -%},
 {% endif %}{{ definition.id | concat_namespace  | pascal }} AS (
     SELECT type, {% if definition.schemaurl -%}data AS {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}, {% endif -%} *
@@ -27,8 +27,8 @@ WITH {% for groupkey, group in root.groups.items() -%}
 {%- endfor -%}
 {%- endfor -%}
 
-{%- for groupkey, group in root.groups.items() -%}
-{%- for definitionid, definition in group.definitions.items() %}
+{%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+{%- for definitionid, definition in definitiongroup.definitions.items() %}
 {%- if definition.schemaurl %}
 SELECT {% for attrname, attribute in definition.metadata.attributes.items() %}
 {%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor -%}

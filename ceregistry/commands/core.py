@@ -29,7 +29,7 @@ def get_schemas_handled():
     return schemas_handled
 
 # Load the definition file, which may be a JSON Schema
-# or CloudEvents message group definition. Since URLs
+# or CloudEvents message definition group. Since URLs
 # found in documents may be redirected by their hosts,
 # the function returns the actual URL as the first return
 # value and the parsed object representing the document's
@@ -91,7 +91,7 @@ def load_definitions_core(definitions_file: str, headers: dict, ignore_handled: 
 
 def load_definitions(definitions_file: str, headers: dict, load_schema: bool = False, ignore_handled: bool = False):
     # for a CloudEvents message definition group, we
-    # normalize the document to be a groups doc
+    # normalize the document to be a definitiongroups doc
     definitions_file, docroot = load_definitions_core(definitions_file, 
                                                       headers, ignore_handled)
     
@@ -105,11 +105,11 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
         if docroot["$schema"] != "https://cloudevents.io/schemas/registry":
             print("unsupported schema:" + docroot["$schema"])
             return None, None
-    if "groupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["groupsUrl"], 
+    if "definitiongroupsUrl" in docroot:
+        _, subroot = load_definitions_core(docroot["definitiongroupsUrl"], 
                                            headers)
-        docroot["groups"] = subroot
-        docroot["groupsUrl"] = None
+        docroot["definitiongroups"] = subroot
+        docroot["definitiongroupsUrl"] = None
     if "schemagroupsUrl" in docroot:
         _, subroot = load_definitions_core(docroot["schemagroupsUrl"], 
                                            headers)
@@ -123,15 +123,15 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
 
     # make sure the document is always of the same form, even if
     # the URL was a deep link. We can drill to the level of an
-    # endpoint, a group, or a schemagroup
+    # endpoint, a definitiongroup, or a schemagroup
     newroot = {"$schema": "https://cloudevents.io/schemas/registry"}
 
     # the doc is an dict
     if isinstance(docroot, dict) and "type" in docroot[list(
             docroot.keys())[0]]:
         dictentry = docroot[list(docroot.keys())[0]]
-        if dictentry["type"] == "group":
-            newroot["groups"] = docroot
+        if dictentry["type"] == "definitiongroup":
+            newroot["definitiongroups"] = docroot
         elif dictentry["type"] == "schemagroup":
             newroot["schemagroups"] = docroot
         elif dictentry["type"] == "endpoint":
@@ -143,8 +143,8 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
 
     # the doc is an object
     elif "type" in docroot:
-        if docroot["type"] == "group":
-            newroot["groups"] = {docroot["id"]: docroot}
+        if docroot["type"] == "definitiongroup":
+            newroot["definitiongroups"] = {docroot["id"]: docroot}
         elif docroot["type"] == "schemagroup":
             newroot["schemagroups"] = {docroot["id"]: docroot}
         elif docroot["type"] == "endpoints":

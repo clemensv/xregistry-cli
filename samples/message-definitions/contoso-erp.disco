@@ -13,8 +13,8 @@
                     "https://erpsystem.com/events"
                 ]
             },
-            "groups": [
-                "#/groups/Contoso.ERP.Events"
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -29,8 +29,8 @@
                     "https://erpsystem.com/events/subscriptions"
                 ]
             },
-            "groups": [
-                "#/groups/Contoso.ERP.Events"
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -52,8 +52,8 @@
                     "distribution-mode": "copy"
                 }
             },
-            "groups": [
-                "#/groups/mygroup"
+            "definitiongroups": [
+                "#/definitiongroups/mygroup"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -69,16 +69,16 @@
                     "amqps://cediscoveryinterop.example.com/queue"
                 ]
             },
-            "groups": [
-                "#/groups/mygroup"
+            "definitiongroups": [
+                "#/definitiongroups/mygroup"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "groups": {
+    "definitiongroups": {
         "Contoso.ERP.Events": {
             "id": "Contoso.ERP.Events",
-            "type": "group",
+            "type": "definitiongroup",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "type": "cloudevent",

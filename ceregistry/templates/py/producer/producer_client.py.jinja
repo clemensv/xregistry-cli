@@ -5,10 +5,10 @@ import requests
 from cloudevents.conversion import to_binary, to_structured
 from cloudevents.http import CloudEvent
 
-{%- set groups = root.groups %}
-{% for group_key in groups.keys() -%}
-{%- set group = groups[group_key] -%}
-{%- set parts = group.id.split('.') -%}
+{%- set definitiongroups = root.definitiongroups %}
+{% for definitiongroup_key in definitiongroups.keys() -%}
+{%- set definitiongroup = definitiongroups[definitiongroup_key] -%}
+{%- set parts = definitiongroup.id.split('.') -%}
 {%- set groupName = parts | join('_') | lower %}
 
 class {{ groupName.split('.')[-1]}}_event_producer:
@@ -16,8 +16,8 @@ class {{ groupName.split('.')[-1]}}_event_producer:
         self.url = url
         self.content_mode = content_mode
 
-    {% for id in group.definitions -%}
-    {%- set definition = group.definitions[id] -%}
+    {% for id in definitiongroup.definitions -%}
+    {%- set definition = definitiongroup.definitions[id] -%}
     {%- set parts = definition.id.split('.') -%}
     {%- set definitionName = parts|join('_')|lower %}
     def send_{{definitionName.split('.')[-1]}}(self,

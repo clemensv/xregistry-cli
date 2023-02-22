@@ -57,8 +57,8 @@ paths:
                     application/json:
                       schema:
                         oneOf:
-                          {%- for groupkey, group in root.groups.items() -%}
-                              {%- for eventkey, event in group.definitions.items() %}
+                          {%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+                              {%- for eventkey, event in definitiongroup.definitions.items() %}
                             - $ref: "#/components/schemas/{{ event.id }}"
                               {%- endfor -%}
                           {%- endfor %}
@@ -76,8 +76,8 @@ components:
        $ref: https://raw.githubusercontent.com/cloudevents/spec/main/subscriptions/subscriptions-openapi.yaml#/components/schemas/SubscriptionRequest
     Subscription:   
       $ref: https://raw.githubusercontent.com/cloudevents/spec/main/subscriptions/subscriptions-openapi.yaml#/components/schemas/Subscription
-{%- for groupkey, group in root.groups.items() -%}
-  {%- for eventkey, event in group.definitions.items() %}
+{%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+  {%- for eventkey, event in definitiongroup.definitions.items() %}
     {{ event.id }}:
       type: "object"
       properties:

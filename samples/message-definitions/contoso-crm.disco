@@ -13,16 +13,16 @@
                     "https://erpsystem.com/events"
                 ]
             },
-            "groups": [
-                "#/groups/Contoso.CRM.Events"
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.CRM.Events"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "groups": {
+    "definitiongroups": {
         "Contoso.CRM.Events": {
             "id": "Contoso.CRM.Events",
-            "type": "group",
+            "type": "definitiongroup",
             "definitions": {
                 "Contoso.CRM.Events.CustomerCreated": {
                     "type": "cloudevent",
