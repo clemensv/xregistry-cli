@@ -4,19 +4,14 @@
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
-
     {
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}"
-      ],
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
       "name": "Launch Extension",
       "preLaunchTask": "tsc: build - ceregistry_vscode/tsconfig.json",
-      "outFiles": [
-        "${workspaceFolder}/out/**/*.js"
-      ],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "request": "launch",
       "type": "extensionHost"
-    },    
+    },
     {
       "name": "Python: Current File",
       "type": "python",
@@ -51,8 +46,7 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language cs --style azfunctionhttp --definitions .\\samples\\message-definitions\\contoso-erp.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testhttp"
-    }
-    ,
+    },
     {
       "name": "Python: Code Generator C# Consumer",
       "type": "python",
@@ -70,8 +64,7 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language openapi --style producer --definitions .\\samples\\protocols\\http-producer-endpoint.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testopenapi"
-    }
-    ,
+    },
     {
       "name": "Python: Code Generator openAPI Subscriber",
       "type": "python",
@@ -80,8 +73,7 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language openapi --style subscriber --definitions .\\samples\\message-definitions\\contoso-erp.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testopenapi2"
-    }
-    ,
+    },
     {
       "name": "Python: Code Generator Java producer",
       "type": "python",
@@ -109,7 +101,7 @@
       "justMyCode": true,
       "args": "generate --language java --style producer --definitions .\\samples\\message-definitions\\minimal-avro.disco --projectname Contoso.ERP.Events --output c:\\temp\\output\\testjavaavro"
     },
-    
+
     {
       "name": "Python: Code Generator Java consumer",
       "type": "python",
@@ -172,7 +164,16 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "validate --definitions .\\samples\\message-definitions\\contoso-erp.disco"
+    },
+    {
+      "name": "Debug test",
+      "type": "python",
+      "request": "attach",
+      "console": "externalTerminal",
+      "justMyCode": false,
+      "stopOnEntry": false,
+      "envFile": "${workspaceFolder}/.env.test",
+      "purpose": ["debug-test"]
     }
-
   ]
 }
