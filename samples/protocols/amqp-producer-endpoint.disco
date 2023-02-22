@@ -12,16 +12,16 @@
                     "amqps://cediscoveryinterop.example.com/topic"
                 ]
             },
-            "groups": [
-                "#/groups/Contoso.MyGroup"
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.MyGroup"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "groups": {
+    "definitiongroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "type": "group",
+            "type": "definitiongroup",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
                     "type": "amqp",

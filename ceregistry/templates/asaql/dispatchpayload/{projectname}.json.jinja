@@ -1,6 +1,6 @@
 {#- triggering generation of all schema-based elements with this loop #}
-{%- for groupkey, group in root.groups.items() -%}
-   {%- for definitionid, definition in group.definitions.items() %}
+{%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+   {%- for definitionid, definition in definitiongroup.definitions.items() %}
     {%- if definition.schemaurl -%}
         {% set x=definition.schemaurl | schema_type -%}
     {%-endif -%}

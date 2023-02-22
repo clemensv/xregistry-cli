@@ -2,9 +2,9 @@
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.3-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "groups": {
+    "definitiongroups": {
         "Contoso.ERP.Events": {
-            "type": "group",
+            "type": "definitiongroup",
             "id": "Contoso.ERP.Events",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {

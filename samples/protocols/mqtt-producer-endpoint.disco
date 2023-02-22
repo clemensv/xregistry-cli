@@ -17,16 +17,16 @@
                     "qos" : 1
                 }
             },
-            "groups": [
-                "#/groups/mygroup"
+            "definitiongroups": [
+                "#/definitiongroups/mygroup"
             ],
             "format" : "CloudEvents/1.0"
         }
     },
-    "groups": {
+    "definitiongroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "type": "group",
+            "type": "definitiongroup",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
                     "type": "mqtt",

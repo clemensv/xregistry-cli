@@ -1238,7 +1238,7 @@
   .codicon-feedback:before {
     content: "\eb96";
   }
-  .codicon-group-by-ref-type:before {
+  .codicon-definitiongroup-by-ref-type:before {
     content: "\eb97";
   }
   .codicon-ungroup-by-ref-type:before {
@@ -1343,7 +1343,7 @@
   .codicon-table:before {
     content: "\ebb7";
   }
-  .codicon-variable-group:before {
+  .codicon-variable-definitiongroup:before {
     content: "\ebb8";
   }
   .codicon-type-hierarchy:before {

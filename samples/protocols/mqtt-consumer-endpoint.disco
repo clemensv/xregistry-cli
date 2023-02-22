@@ -17,16 +17,16 @@
                     "qos" : 1
                 }
             },
-            "groups": [
-                "#/groups/Contoso.MyGroup"
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.MyGroup"
             ],
             "format" : "MQTT/5.0"
         }
     },
-    "groups": {
+    "definitiongroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "type": "group",
+            "type": "definitiongroup",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
                     "type": "mqtt",

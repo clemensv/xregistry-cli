@@ -32,8 +32,8 @@ paths:
           application/json:
             schema:
               oneOf:
-                {%- for groupkey, group in root.groups.items() -%}
-                    {%- for eventkey, event in group.definitions.items() %}
+                {%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+                    {%- for eventkey, event in definitiongroup.definitions.items() %}
                   - $ref: "#/components/schemas/{{ event.id }}"
                     {%- endfor -%}
                 {%- endfor %}
@@ -46,8 +46,8 @@ paths:
           description: "Unsupported Media Type"
 components:
   schemas:
-  {%- for groupkey, group in root.groups.items() -%}
-    {%- for eventkey, event in group.definitions.items() %}
+  {%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+    {%- for eventkey, event in definitiongroup.definitions.items() %}
     {{ event.id }}:
       type: "object"
       properties:

@@ -16,8 +16,8 @@
                     "topic": "events"
                 }   
             },
-            "groups": [
-                "#/groups/Contoso.ERP.Events"
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -35,15 +35,15 @@
                     "topic" : "events"
                 }
             },
-            "groups": [
-                "#/groups/Contoso.ERP.Events"
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "groups": {
+    "definitiongroups": {
         "Contoso.ERP.Events": {
-            "type": "group",
+            "type": "definitiongroup",
             "id": "Contoso.ERP.Events",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {

@@ -267,12 +267,12 @@ CloudEvents definitions with the help of the `schema_type` filter. The filter
 does not collect duplicates.
 
 ```jinja
-{%- for group_key, group in groups.items() if (group | exists("format", "cloudevents" )) -%}
-namespace {{ group.id | default(group_key) | namespace(project_name) | pascal }}
+{%- for definitiongroup_key, definitiongroup in definitiongroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
+namespace {{ definitiongroup.id | default(definitiongroup_key) | namespace(project_name) | pascal }}
 {
-    public interface I{{ group.id | default(group_key) | strip_namespace | pascal }}Dispatcher
+    public interface I{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | pascal }}Dispatcher
     {
-        {%- for id, definition in group.definitions.items() if (definition | exists( "format", "cloudevents" )) -%}
+        {%- for id, definition in definitiongroup.definitions.items() if (definition | exists( "format", "cloudevents" )) -%}
         {%- if definition.schemaurl -%}
         {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
         {%- else -%}
@@ -294,10 +294,10 @@ variable's structure reflects the respective input document.
 - For code generators for message payload schemas, the `root` variable is the
   root of the CloudEvents Discovery document, corresponding to the CloudEvent
   Discovery schema type `document`. Underneath `root` are three collections:
-  - `groups` - a dictionary of message definition groups, keyed by the group's
-    ID.
+  - `definitiongroups` - a dictionary of message definition groups, keyed by the
+    definitiongroup's ID.
   - `schemagroups` - a dictionary of schema definition groups, keyed by the
-    group's ID.
+    definitiongroup's ID.
   - `endpoints` - a dictionary of endpoints, keyed by the endpoint's ID.
 - For JSON schema, the `root` variable is the root of the JSON schema document.
 - For Proto schema, the `root` variable is a `string` (!) containing the
@@ -312,7 +312,7 @@ Otherwise, the template always gets the full input document.
 
 If the `--definitions` argument points to a URL or file name that
 returns/contains a fragment of a CloudEvents discovery document, such as a
-single `schemagroup` or `group` the generator will synthesize a full discovery
+single `schemagroup` or `definitiongroup` the generator will synthesize a full discovery
 document around the fragment and pass it to the template.
 
 ### Filters
@@ -470,12 +470,12 @@ called macro:
 
 ```jinja
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
-{%- set groups = root.groups -%}
-{%- if groups | exists("format", "amqp" ) %}
-{%- for group_key, group in groups.items() if (group | exists("format", "amqp" )) -%}
-{%- set pascalGroupName = group.id | default(group_key) | pascal -%}
+{%- set definitiongroups = root.definitiongroups -%}
+{%- if definitiongroups | exists("format", "amqp" ) %}
+{%- for definitiongroup_key, definitiongroup in definitiongroups.items() if (definitiongroup | exists("format", "amqp" )) -%}
+{%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
 {%- set interfaceName = "I"+(pascalGroupName | strip_namespace)+"AmqpDispatcher" -%}
-{{- DeclareDispatchInterface(project_name, group, pascalGroupName, interfaceName) | pushfile(interfaceName+".java") -}}
+{{- DeclareDispatchInterface(project_name, definitiongroup, pascalGroupName, interfaceName) | pushfile(interfaceName+".java") -}}
 {%- endfor -%}
 {%- endif -%}
 {%- endmacro -%}

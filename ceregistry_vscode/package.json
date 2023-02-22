@@ -60,7 +60,7 @@
         {
           "label": "CloudEvents Registry Tool",
           "command": "ceregistry.ui",
-          "group": "CloudEvents@1",
+          "definitiongroup": "CloudEvents@1",
           "when": "resourceExtname == .disco || resourceExtname == .yaml.disco"
         }
       ]

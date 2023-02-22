@@ -52,16 +52,16 @@ export function activate(context: vscode.ExtensionContext) {
                         let jsonData = JSON.parse(document.getText());
                         if (jsonData.hasOwnProperty("$schema") &&
                             jsonData.hasOwnProperty("specversion")
-                            && (jsonData.hasOwnProperty("endpoints") || jsonData.hasOwnProperty("groups") || jsonData.hasOwnProperty("schemagroups"))) {
+                            && (jsonData.hasOwnProperty("endpoints") || jsonData.hasOwnProperty("definitiongroups") || jsonData.hasOwnProperty("schemagroups"))) {
                             isCloudEventsDiscovery = true;
                         }
-                        else if (jsonData.hasOwnProperty("endpoint") || jsonData.hasOwnProperty("group") || jsonData.hasOwnProperty("schemagroup")) {
+                        else if (jsonData.hasOwnProperty("endpoint") || jsonData.hasOwnProperty("definitiongroup") || jsonData.hasOwnProperty("schemagroup")) {
                             isCloudEventsDiscovery = true;
                         }
                         else {
                             for (let key in jsonData) {
                                 if (jsonData[key].hasOwnProperty("type") &&
-                                    (jsonData[key]["type"] === "endpoint" || jsonData[key]["type"] === "group") || jsonData[key]["type"] === "schemagroup") {
+                                    (jsonData[key]["type"] === "endpoint" || jsonData[key]["type"] === "definitiongroup") || jsonData[key]["type"] === "schemagroup") {
                                     isCloudEventsDiscovery = true;
                                     break;
                                 }

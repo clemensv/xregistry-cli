@@ -25,10 +25,10 @@
             "type": "string",
             "format": "uri-reference"
           },
-          "groups": {
-            "$ref": "#/components/schemas/groups"
+          "definitiongroups": {
+            "$ref": "#/components/schemas/definitiongroups"
           },
-          "groupsUrl": {
+          "definitiongroupsUrl": {
             "type": "string",
             "format": "uri-reference"
           },
@@ -53,12 +53,12 @@
           },
           {
             "required": [
-              "groups"
+              "definitiongroups"
             ]
           },
           {
             "required": [
-              "groupsUrl"
+              "definitiongroupsUrl"
             ]
           },
           {
@@ -104,7 +104,7 @@
           "format": "uri-reference"
         }
       },
-      "group": {
+      "definitiongroup": {
         "type": "object",
         "properties": {
           "format": {
@@ -118,10 +118,10 @@
             "type": "string",
             "format": "uri-reference"
           },
-          "groups": {
-            "$ref": "#/components/schemas/groups"
+          "definitiongroups": {
+            "$ref": "#/components/schemas/definitiongroups"
           },
-          "groupsUrl": {
+          "definitiongroupsUrl": {
             "type": "string",
             "format": "uri-reference"
           }
@@ -274,13 +274,13 @@
               "creation-time": {
                 "$ref": "#/components/schemas/metadataPropertyDateTime"
               },
-              "group-id": {
+              "definitiongroup-id": {
                 "$ref": "#/components/schemas/metadataPropertyString"
               },
-              "group-sequence": {
+              "definitiongroup-sequence": {
                 "$ref": "#/components/schemas/metadataPropertyInteger"
               },
-              "reply-to-group-id": {
+              "reply-to-definitiongroup-id": {
                 "$ref": "#/components/schemas/metadataPropertyString"
               }
             }
@@ -611,11 +611,11 @@
           "$ref": "#/components/schemas/definition"
         }
       },
-      "groups": {
+      "definitiongroups": {
         "type": "object",
         "description": "A set of Definition Groups.",
         "additionalProperties": {
-          "$ref": "#/components/schemas/group"
+          "$ref": "#/components/schemas/definitiongroup"
         }
       },
       "resource": {
@@ -623,7 +623,7 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "group": "#/components/schemas/group",
+            "definitiongroup": "#/components/schemas/definitiongroup",
             "definition": "#/components/schemas/definition",
             "amqp": "#/components/schemas/amqpDefinition",
             "mqtt": "#/components/schemas/mqttDefinition",
@@ -649,7 +649,7 @@
           },
           "groupId": {
             "type": "string",
-            "description": "Optional reference to a group that this resource is subordinate to",
+            "description": "Optional reference to a definitiongroup that this resource is subordinate to",
             "format": "uri-reference"
           },
           "version": {
@@ -785,7 +785,7 @@
           "definitions": {
             "$ref": "#/components/schemas/definitions"
           },
-          "groups": {
+          "definitiongroups": {
             "$ref": "#/components/schemas/groupUriReferences"
           }
         },
@@ -957,7 +957,7 @@
         "properties": {
           "format": {
             "type": "string",
-            "description": "Specifies the format of all schemas in this group",
+            "description": "Specifies the format of all schemas in this definitiongroup",
             "example": [
               "json",
               "avro",

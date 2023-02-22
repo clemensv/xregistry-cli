@@ -64,8 +64,8 @@ channels:
         {%- endif %}
         payload:
           oneOf:
-          {%- for group in endpoint.groups -%}
-            {%- set groupObject = schema_object(root, group) %}
+          {%- for definitiongroup in endpoint.definitiongroups -%}
+            {%- set groupObject = schema_object(root, definitiongroup) %}
             {%- if groupObject is mapping %}
             {%- for eventkey, event in groupObject.definitions.items() %}
             - $ref: "#/components/schemas/{{ event.id }}"
@@ -76,8 +76,8 @@ channels:
   {#- binary mode #}
       message:
         oneOf:  
-        {%- for group in endpoint.groups -%}
-          {%- set groupObject = schema_object(root, group) %}
+        {%- for definitiongroup in endpoint.definitiongroups -%}
+          {%- set groupObject = schema_object(root, definitiongroup) %}
           {%- if groupObject is mapping %}
           {%- for eventkey, event in groupObject.definitions.items() -%}         
            {%- set x = (protocol+":"+groupObject.id+":"+event.id) | push("messages") %}
@@ -95,8 +95,8 @@ components:
     {%- set protocol = message.split(':')[0] -%}
     {%- set groupid = message.split(':')[1] -%}
     {%- set eventid = message.split(':')[2] -%}
-    {%- for groupkey, group in root.groups.items() if groupkey == groupid -%}
-    {%- for eventkey, event in group.definitions.items() if eventkey == eventid %}
+    {%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() if definitiongroup_key == groupid -%}
+    {%- for eventkey, event in definitiongroup.definitions.items() if eventkey == eventid %}
     {{protocol | pascal}}{{ event.id | concat_namespace | pascal }}:
       messageId: "{{protocol | pascal}}{{ event.id | concat_namespace | pascal }}"
       title: "{{ event.id }}"
@@ -194,8 +194,8 @@ components:
   {%- endif %}  
   schemas:
   {%- if ce_content_mode == "structured" -%}
-  {%- for groupkey, group in root.groups.items() -%}
-    {%- for eventkey, event in group.definitions.items() %}
+  {%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+    {%- for eventkey, event in definitiongroup.definitions.items() %}
     {{ event.id }}:
       type: "object"
       properties:
