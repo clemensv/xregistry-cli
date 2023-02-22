@@ -41,6 +41,7 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.11.1
+    # we need to build the package for generating the _version.py file that isn't checked in
     - name: Install dependencies and build package
       run: |
         python -m pip install --upgrade pip build wheel
