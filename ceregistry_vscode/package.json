@@ -1,8 +1,8 @@
 {
-  "name": "ceregistry",
+  "name": "ceregistry-vscode",
   "version": "0.0.2",
-  "displayName": "CeRegistry",
-  "description": "CloudEvents Registry Extension",
+  "displayName": "CloudEvents Registry Tool",
+  "description": "A GUI wrapper for the CloudEvents Registry CLI",
   "publisher": "cedisco",
   "license": "SEE LICENSE IN LICENSE.txt",
   "icon": "cloudevents-icon-color.png",
@@ -67,10 +67,11 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run package",
-    "compile": "node ./esbuild.js",
-    "package": "node ./esbuild.js",
-    "watch": "node ./esbuild.js --watch"
+    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
+    "test-compile": "tsc -p ./"
   },
   "dependencies": {
     "@vscode/webview-ui-toolkit": "^1.2.1",
@@ -78,7 +79,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.14.0",
-    "@types/vscode": "^1.75.1",
+    "@types/vscode": "^1.74.0",
     "@types/vscode-webview": "^1.57.1",
     "esbuild": "^0.17.10",
     "esbuild-plugin-copy": "^2.0.2"

@@ -25,13 +25,24 @@ jobs:
     - name: Set version environment variable
       run: |
         echo "CEREGISTRY_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
-    - name: Build package
+    - name: Build Python package
       run: |
         flit build
         flit build --format wheel
+    # install Node dependencies including vsce and run vsce package in ceregistry_vscode, putting output in dist
+    - name: Build VSCode extension
+      run: |
+        npm install -g @vscode/vsce
+        cd ceregistry_vscode      
+        npm --no-git-tag-version version ${{steps.get_version.outputs.version-without-v}}  
+        npm install
+        vsce package
+        mv *.vsix ../dist
+        cd ..
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
           dist/*.tar.gz
           dist/*.whl
+    
