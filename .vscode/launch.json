@@ -163,7 +163,7 @@
       "program": "-m ceregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": "validate --definitions .\\samples\\message-definitions\\contoso-erp.cereg"
+      "args": "validate --definitions E:\\Code\\cedisco-codegen\\test\\cs\\http_end_to_end_proto\\http_end_to_end_proto.cereg"
     },
     {
       "name": "Debug test",

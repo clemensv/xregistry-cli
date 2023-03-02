@@ -48,6 +48,7 @@ def validate(definitions_uri, headers, verbose=False):
     if errors:
         print("{} Validation errors:".format(definitions_file))
         for i, error in enumerate(errors):
+            print("at {}: {}".format(error.json_path, error.message))
             for suberror in sorted(error.context, key=lambda e: e.schema_path):
                 print("at {}: {}".format(suberror.json_path, suberror.message))
         return 1

@@ -41,7 +41,7 @@
             "type": "string",
             "format": "uri-reference"
           }
-        }        
+        }
       },
       "reference": {
         "type": "object",
@@ -116,18 +116,18 @@
         "discriminator": {
           "propertyName": "format",
           "mapping": {
-            "AMQP/1.0": "#/components/schemas/amqpDefinition",
+            "AMQP/1.0": "#/components/schemas/amqpDefinition10",
             "AMQP": "#/components/schemas/amqpDefinition",
-            "MQTT/3.1.1": "#/components/schemas/mqttDefinition",
-            "MQTT/5.0": "#/components/schemas/mqttDefinition",
+            "MQTT/3.1.1": "#/components/schemas/mqttDefinition311",
+            "MQTT/5.0": "#/components/schemas/mqttDefinition50",
             "MQTT": "#/components/schemas/mqttDefinition",
-            "HTTP/1.1": "#/components/schemas/httpDefinition",
+            "HTTP/1.1": "#/components/schemas/httpDefinition11",
             "HTTP": "#/components/schemas/httpDefinition",
-            "HTTP/2": "#/components/schemas/httpDefinition",
-            "HTTP/3": "#/components/schemas/httpDefinition",
-            "KAFKA/0.11": "#/components/schemas/kafkaDefinition",
+            "HTTP/2": "#/components/schemas/httpDefinition2",
+            "HTTP/3": "#/components/schemas/httpDefinition3",
+            "KAFKA/0.11": "#/components/schemas/kafkaDefinition011",
             "KAFKA": "#/components/schemas/kafkaDefinition",
-            "CloudEvents/1.0": "#/components/schemas/cloudEventDefinition",
+            "CloudEvents/1.0": "#/components/schemas/cloudEventDefinition10",
             "CloudEvents": "#/components/schemas/cloudEventDefinition",
             "Generic": "#/components/schemas/genericDefinition"
           }
@@ -140,8 +140,20 @@
             "format": "uri-reference"
           },
           "schema": {
-            "type": "object",
-            "description": "An in-line definition of the schema of the message's data."
+            "oneOf": [
+              {
+                "type": "object",
+                "description": "An in-line definition of the schema of the message's data."
+              },
+              {
+                "type": "string",
+                "description": "An in-line definition of the schema of the message's data."
+              }
+            ]
+          },
+          "schemaformat": {
+            "type": "string",
+            "description": "Declares the schema format"
           },
           "format": {
             "type": "string",
@@ -157,16 +169,17 @@
           "format"
         ]
       },
+      "cloudEventDefinition10": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/cloudEventDefinition"
+          }
+        ]
+      },
       "cloudEventDefinition": {
         "type": "object",
         "properties": {
-          "format": {
-            "type": "string",
-            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
-            "enum": [
-              "CloudEvents/1.0"
-            ]
-          },
           "metadata": {
             "$ref": "#/components/schemas/cloudEventMetadata"
           }
@@ -177,16 +190,17 @@
           }
         ]
       },
+      "amqpDefinition10": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/amqpDefinition"
+          }
+        ]
+      },
       "amqpDefinition": {
         "type": "object",
         "properties": {
-          "format": {
-            "type": "string",
-            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
-            "enum": [
-              "AMQP/1.0"
-            ]
-          },
           "metadata": {
             "$ref": "#/components/schemas/amqpMetadata"
           }
@@ -197,17 +211,25 @@
           }
         ]
       },
+      "mqttDefinition50": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/mqttDefinition"
+          }
+        ]
+      },
+      "mqttDefinition311": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/mqttDefinition"
+          }
+        ]
+      },
       "mqttDefinition": {
         "type": "object",
         "properties": {
-          "format": {
-            "type": "string",
-            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
-            "enum": [
-              "MQTT/5.0",
-              "MQTT/3.1.1"
-            ]
-          },
           "metadata": {
             "$ref": "#/components/schemas/mqttMetadata"
           }
@@ -218,18 +240,33 @@
           }
         ]
       },
+      "httpDefinition11": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/httpDefinition"
+          }
+        ]
+      },
+      "httpDefinition2": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/httpDefinition"
+          }
+        ]
+      },
+      "httpDefinition3": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/httpDefinition"
+          }
+        ]
+      },
       "httpDefinition": {
         "type": "object",
         "properties": {
-          "format": {
-            "type": "string",
-            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
-            "enum": [
-              "HTTP/1.1",
-              "HTTP/2",
-              "HTTP/3"
-            ]
-          },
           "metadata": {
             "$ref": "#/components/schemas/httpMetadata"
           }
@@ -240,17 +277,17 @@
           }
         ]
       },
+      "kafkaDefinition011": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/kafkaDefinition"
+          }
+        ]
+      },
       "kafkaDefinition": {
         "type": "object",
         "properties": {
-          "format": {
-            "type": "string",
-            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
-            "enum": [
-              "KAFKA/0.11",
-              "KAFKA"
-            ]
-          },
           "metadata": {
             "$ref": "#/components/schemas/kafkaMetadata"
           }
@@ -264,10 +301,6 @@
       "genericDefinition": {
         "type": "object",
         "properties": {
-          "format": {
-            "type": "string",
-            "description": "Specifies the `format` value of the Definitions associated with this Endpoint."
-          },
           "metadata": {
             "type": "object"
           }
@@ -402,16 +435,19 @@
             "type": "array",
             "description": "User Property is allowed to appear multiple times to represent multiple name, value pairs. The same name is allowed to appear more than once.",
             "items": {
-              "type": "object",
-              "description" : "MQTT user property",
-              "properties": {
-                "name": {
-                  "type": "string"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/metadataProperty"
                 },
-                "value": {
-                    "$ref": "#/components/schemas/metadataProperty"
-                }              
-              }
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
             }
           }
         }
@@ -432,16 +468,19 @@
             "type": "array",
             "description": "HTTP Header is allowed to appear multiple times to represent multiple name, value pairs. The same name is allowed to appear more than once.",
             "items": {
-              "type": "object",
-              "description" : "HTTP Header",
-              "properties": {
-                "name": {
-                  "type": "string"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/metadataProperty"
                 },
-                "value": {
-                    "$ref": "#/components/schemas/metadataProperty"
-                }              
-              }
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
             }
           },
           "query": {
@@ -465,7 +504,7 @@
           "key": {
             "$ref": "#/components/schemas/metadataPropertyBinary"
           },
-          "timestamp": {
+          "tiomestamp": {
             "$ref": "#/components/schemas/metadataPropertyInteger"
           },
           "headers": {
@@ -988,14 +1027,14 @@
         "discriminator": {
           "propertyName": "protocol",
           "mapping": {
-            "MQTT/3.1.1": "#/components/schemas/endpointOptionsMqtt",
-            "MQTT/5.0": "#/components/schemas/endpointOptionsMqtt",
+            "MQTT/3.1.1": "#/components/schemas/endpointOptionsMqtt311",
+            "MQTT/5.0": "#/components/schemas/endpointOptionsMqtt50",
             "MQTT": "#/components/schemas/endpointOptionsMqtt",
-            "AMQP/1.0": "#/components/schemas/endpointOptionsAmqp",
+            "AMQP/1.0": "#/components/schemas/endpointOptionsAmqp10",
             "AMQP": "#/components/schemas/endpointOptionsAmqp",
-            "HTTP/1.1": "#/components/schemas/endpointOptionsHttp",
-            "HTTP/2": "#/components/schemas/endpointOptionsHttp",
-            "HTTP/3": "#/components/schemas/endpointOptionsHttp",
+            "HTTP/1.1": "#/components/schemas/endpointOptionsHttp11",
+            "HTTP/2": "#/components/schemas/endpointOptionsHttp2",
+            "HTTP/3": "#/components/schemas/endpointOptionsHttp3",
             "HTTP": "#/components/schemas/endpointOptionsHttp",
             "KAFKA": "#/components/schemas/endpointOptionsKafka",
             "NATS": "#/components/schemas/endpointOptionsNats"
@@ -1006,6 +1045,22 @@
             "type": "string"
           }
         }
+      },
+      "endpointOptionsMqtt311": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptionsMqtt"
+          }
+        ]
+      },
+      "endpointOptionsMqtt50": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptionsMqtt"
+          }
+        ]
       },
       "endpointOptionsMqtt": {
         "type": "object",
@@ -1034,14 +1089,23 @@
               },
               "will-topic": {
                 "type": "string",
+                "format": "uritemplate",
                 "description": "The topic to use for the will message for this endpoint"
               },
               "will-message": {
                 "type": "string",
-                "format" : "urireference",
+                "format": "urireference",
                 "description": "The will message to use (message definition reference)"
               }
             }
+          }
+        ]
+      },
+      "endpointOptionsAmqp10": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptionsAmqp"
           }
         ]
       },
@@ -1089,6 +1153,30 @@
                 }
               }
             }
+          }
+        ]
+      },
+      "endpointOptionsHttp11": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptionsHttp"
+          }
+        ]
+      },
+      "endpointOptionsHttp2": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptionsHttp"
+          }
+        ]
+      },
+      "endpointOptionsHttp3": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptionsHttp"
           }
         ]
       },
@@ -1223,9 +1311,9 @@
         "properties": {
           "format": {
             "type": "string",
-            "description": "Specifies the format of all schemas in this definitiongroup",
+            "description": "Specifies the format of all schemas in this definitiongroup in the format {schema-type}/{version}",
             "example": [
-              "json",
+              "jsonschema/draft-07",
               "avro",
               "xsd",
               "protobuf"
@@ -1270,6 +1358,10 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/schemaVersion"
             }
+          },
+          "format": {
+            "type": "string",
+            "description": "The format of the schema in the format {schema-type}/{version}"
           }
         },
         "allOf": [
@@ -1287,9 +1379,17 @@
             "description": "A URL to the schema document.",
             "format": "uri"
           },
-          "schemaobject": {
-            "type": "object",
-            "description": "An in-line definition of the schema document (JSON)."
+          "schema": {
+            "oneOf": [
+              {
+                "type": "object",
+                "description": "An in-line definition of the schema of the message's data."
+              },
+              {
+                "type": "string",
+                "description": "An in-line definition of the schema of the message's data."
+              }
+            ]
           }
         },
         "allOf": [
