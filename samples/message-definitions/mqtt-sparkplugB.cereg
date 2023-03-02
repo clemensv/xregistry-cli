@@ -12,7 +12,11 @@
                 "protocol": "MQTT",
                 "strict": false,
                 "endpoints": [],
-                "options": {}
+                "options": {
+                    "topic": "spBv1.0/{group_id}/{message_type}/{edge_node_id}",
+                    "will-message" : "#/definitiongroups/Eclipse.SparkplugB.EdgeNode/definitions/NDEATH",
+                    "will-topic" : "spBv1.0/{group_id}/NDEATH/{edge_node_id}"
+                }
             },
             "definitiongroups": [
                 "#/definitiongroups/Eclipse.SparkplugB.EdgeNode"
@@ -81,7 +85,11 @@
                 "protocol": "MQTT",
                 "strict": false,
                 "endpoints": [],
-                "options": {}
+                "options": {
+                    "topic": "spBv1.0/STATE/{sparkplug_host_id}",
+                    "will-message" : "#/definitiongroups/Eclipse.SparkplugB.HostApplication/definitions/STATE.Death",
+                    "will-topic" : "spBv1.0/STATE/{sparkplug_host_id}"
+                }
             },
             "definitiongroups": [
                 "#/definitiongroups/Eclipse.SparkplugB.HostApplicationState",
@@ -161,10 +169,6 @@
                             "retain": {
                                 "type": "boolean",
                                 "value": false
-                            },
-                            "will_message": {
-                                "type": "boolean",
-                                "value": true
                             }
                         }
                     },
@@ -270,14 +274,6 @@
                             "retain": {
                                 "type": "boolean",
                                 "value": true
-                            },
-                            "will_message": {
-                                "type": "boolean",
-                                "value": "true"
-                            },
-                            "will_topic": {
-                                "type": "string",
-                                "value": "spBv1.0/STATE/{sparkplug_host_id}"
                             }
                         }
                     },
