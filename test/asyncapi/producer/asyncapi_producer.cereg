@@ -1,7 +1,25 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
+    "id": "urn:contoso:erp:events",
+    "description": "Contoso ERP Events",
     "endpoints": {
+        "Contoso.ERP.Eventing.HttpProducer": {
+            "type": "endpoint",
+            "id": "Contoso.ERP.Eventing.HttpProducer",
+            "usage": "producer",
+            "config": {
+                "protocol": "HTTP",
+                "strict": false,
+                "endpoints": [
+                    "http://localhost:11001/events"
+                ]
+            },
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.ERP.Events"
+            ],
+            "format": "CloudEvents/1.0"
+        },
         "Contoso.ERP.Eventing.AmqpProducer": {
             "type": "endpoint",
             "id": "Contoso.ERP.Eventing.AmqpProducer",
@@ -10,41 +28,39 @@
                 "protocol": "AMQP",
                 "strict": false,
                 "endpoints": [
-                    "amqp://127.11.0.2:5672/"
-                ],
-                "options" : {
-                    "node" : "queue"
-                }  
+                    "amqps://cediscoveryinterop.example.com/topic"
+                ]
             },
             "definitiongroups": [
                 "#/definitiongroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         },
-        "Contoso.ERP.Eventing.AmqpConsumer": {
+        "Contoso.ERP.Eventing.MqttProducer" : {
             "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.AmqpConsumer",
-            "usage": "consumer",
+            "id" : "Contoso.ERP.Eventing.MqttProducer",
+            "usage": "producer",
             "config": {
-                "protocol": "AMQP",
+                "protocol": "MQTT",
                 "strict": false,
                 "endpoints": [
-                    "amqp://127.11.0.2:5672/"
+                    "mqtt://mybroker.example.com"
                 ],
                 "options" : {
-                    "node" : "queue"
-                }  
+                    "topic" : "events",
+                    "qos" : 1
+                }
             },
             "definitiongroups": [
                 "#/definitiongroups/Contoso.ERP.Events"
             ],
-            "format": "CloudEvents/1.0"
+            "format" : "CloudEvents/1.0"
         }
     },
     "definitiongroups": {
         "Contoso.ERP.Events": {
-            "type": "definitiongroup",
             "id": "Contoso.ERP.Events",
+            "type": "definitiongroup",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "type": "cloudevent",
@@ -70,10 +86,15 @@
                                 "type": "uritemplate",
                                 "value": "/erp/orders",
                                 "required": true
+                            },
+                            "datacontenttype": {
+                                "type": "string",
+                                "value": "avro/binary",
+                                "required": true
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 },
                 "Contoso.ERP.Events.PaymentsReceived": {
                     "type": "cloudevent",
@@ -532,7 +553,8 @@
                                 "required": true
                             }
                         }
-                    }
+                    },
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderDeletionData"
                 }
             }
         }
@@ -544,47 +566,36 @@
             "schemas": {
                 "orderData": {
                     "type": "schema",
+                    "format":"Avro/1.8.2",
                     "id": "orderData",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
+                            "format":"Avro/1.8.2",
                             "id": "1",
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "orderId": {
-                                        "type": "string",
-                                        "minLength": 1
-                                    },
-                                    "customerId": {
-                                        "type": "string",
-                                        "minLength": 1
-                                    },
-                                    "total": {
-                                        "type": "number",
-                                        "minimum": 0
-                                    },
-                                    "items": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "productId": {
-                                                    "type": "string",
-                                                    "minLength": 1
-                                                },
-                                                "quantity": {
-                                                    "type": "number",
-                                                    "minimum": 0
-                                                },
-                                                "price": {
-                                                    "type": "number",
-                                                    "minimum": 0
-                                                }
+                                "type": "record",
+                                "name": "OrderData",
+                                "fields": [
+                                    { "name": "orderId", "type": "string" },
+                                    { "name": "customerId", "type": "string" },
+                                    { "name": "total", "type": "double" },
+                                    {
+                                        "name": "items",
+                                        "type": {
+                                            "type": "array",
+                                            "items": {
+                                                "name": "Item",
+                                                "type": "record",
+                                                "fields": [
+                                                    { "name": "productId", "type": "string" },
+                                                    { "name": "quantity", "type": "double" },
+                                                    { "name": "price", "type": "double" }
+                                                ]
                                             }
                                         }
                                     }
-                                }
+                                ]
                             }
                         }
                     }

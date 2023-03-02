@@ -1,9 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
-  "$id": "https://cloudevents.io/2022-12/discovery",
-  "title": "JSON Schema for CloudEvents Discovery Docs",
+  "$id": "https://cloudevents.io/schemas/registry",
+  "title": "JSON Schema for CloudEvents Registry Documents",
   "allOf": [
-    { "$ref": "#/components/schemas/document" }
+    {
+      "$ref": "#/components/schemas/document"
+    }
   ],
   "components": {
     "schemas": {
@@ -12,11 +14,11 @@
         "properties": {
           "$schema": {
             "type": "string",
-            "default": "https://cloudevents.io/2022-12/discovery"
+            "default": "https://cloudevents.io/schemas/registry"
           },
           "specversion": {
             "type": "string",
-            "default": "0.3-wip"
+            "default": "0.4-wip"
           },
           "endpoints": {
             "$ref": "#/components/schemas/endpoints"
@@ -39,39 +41,7 @@
             "type": "string",
             "format": "uri-reference"
           }
-        },
-        "anyOf": [
-          {
-            "required": [
-              "endpoints"
-            ]
-          },
-          {
-            "required": [
-              "endpointsUrl"
-            ]
-          },
-          {
-            "required": [
-              "definitiongroups"
-            ]
-          },
-          {
-            "required": [
-              "definitiongroupsUrl"
-            ]
-          },
-          {
-            "required": [
-              "schemagroups"
-            ]
-          },
-          {
-            "required": [
-              "schemagroupsUrl"
-            ]
-          }
-        ]
+        }        
       },
       "reference": {
         "type": "object",
@@ -88,16 +58,16 @@
           }
         }
       },
-      "groupReference": {
+      "definitiongroupReference": {
         "$ref": "#/components/schemas/reference"
       },
-      "groupReferences": {
+      "definitiongroupReferences": {
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/groupReference"
+          "$ref": "#/components/schemas/definitiongroupReference"
         }
       },
-      "groupUriReferences": {
+      "definitiongroupUriReferences": {
         "type": "array",
         "items": {
           "type": "string",
@@ -143,6 +113,25 @@
       },
       "definition": {
         "type": "object",
+        "discriminator": {
+          "propertyName": "format",
+          "mapping": {
+            "AMQP/1.0": "#/components/schemas/amqpDefinition",
+            "AMQP": "#/components/schemas/amqpDefinition",
+            "MQTT/3.1.1": "#/components/schemas/mqttDefinition",
+            "MQTT/5.0": "#/components/schemas/mqttDefinition",
+            "MQTT": "#/components/schemas/mqttDefinition",
+            "HTTP/1.1": "#/components/schemas/httpDefinition",
+            "HTTP": "#/components/schemas/httpDefinition",
+            "HTTP/2": "#/components/schemas/httpDefinition",
+            "HTTP/3": "#/components/schemas/httpDefinition",
+            "KAFKA/0.11": "#/components/schemas/kafkaDefinition",
+            "KAFKA": "#/components/schemas/kafkaDefinition",
+            "CloudEvents/1.0": "#/components/schemas/cloudEventDefinition",
+            "CloudEvents": "#/components/schemas/cloudEventDefinition",
+            "Generic": "#/components/schemas/genericDefinition"
+          }
+        },
         "description": "a message definition",
         "properties": {
           "schemaurl": {
@@ -153,12 +142,19 @@
           "schema": {
             "type": "object",
             "description": "An in-line definition of the schema of the message's data."
+          },
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` of this definition."
           }
         },
         "allOf": [
           {
             "$ref": "#/components/schemas/resource"
           }
+        ],
+        "required": [
+          "format"
         ]
       },
       "cloudEventDefinition": {
@@ -167,7 +163,9 @@
           "format": {
             "type": "string",
             "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
-            "default": "CloudEvents/1.0"
+            "enum": [
+              "CloudEvents/1.0"
+            ]
           },
           "metadata": {
             "$ref": "#/components/schemas/cloudEventMetadata"
@@ -185,7 +183,9 @@
           "format": {
             "type": "string",
             "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
-            "default": "AMQP/1.0"
+            "enum": [
+              "AMQP/1.0"
+            ]
           },
           "metadata": {
             "$ref": "#/components/schemas/amqpMetadata"
@@ -203,10 +203,56 @@
           "format": {
             "type": "string",
             "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
-            "default": "MQTT/5.0"
+            "enum": [
+              "MQTT/5.0",
+              "MQTT/3.1.1"
+            ]
           },
           "metadata": {
             "$ref": "#/components/schemas/mqttMetadata"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/definition"
+          }
+        ]
+      },
+      "httpDefinition": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
+            "enum": [
+              "HTTP/1.1",
+              "HTTP/2",
+              "HTTP/3"
+            ]
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/httpMetadata"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/definition"
+          }
+        ]
+      },
+      "kafkaDefinition": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Specifies the `format` value of the Definitions associated with this Endpoint.",
+            "enum": [
+              "KAFKA/0.11",
+              "KAFKA"
+            ]
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/kafkaMetadata"
           }
         },
         "allOf": [
@@ -269,19 +315,19 @@
                 "$ref": "#/components/schemas/metadataPropertySymbol"
               },
               "absolute-expiry-time": {
-                "$ref": "#/components/schemas/metadataPropertyDateTime"
+                "$ref": "#/components/schemas/metadataPropertyTimeStamp"
               },
               "creation-time": {
-                "$ref": "#/components/schemas/metadataPropertyDateTime"
+                "$ref": "#/components/schemas/metadataPropertyTimeStamp"
               },
-              "definitiongroup-id": {
+              "group-id": {
                 "$ref": "#/components/schemas/metadataPropertyString"
               },
-              "definitiongroup-sequence": {
+              "group-sequence": {
                 "$ref": "#/components/schemas/metadataPropertyInteger"
               },
-              "reply-to-definitiongroup-id": {
-                "$ref": "#/components/schemas/metadataPropertyString"
+              "reply-to-group-id": {
+                "$ref": "#/components/schemas/metadataPropertyUriTemplate"
               }
             }
           },
@@ -356,15 +402,77 @@
             "type": "array",
             "description": "User Property is allowed to appear multiple times to represent multiple name, value pairs. The same name is allowed to appear more than once.",
             "items": {
-              "allOf" : {
-                "$ref": "#/components/schemas/metadataProperty",
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  }
-                }
+              "type": "object",
+              "description" : "MQTT user property",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                    "$ref": "#/components/schemas/metadataProperty"
+                }              
               }
+            }
+          }
+        }
+      },
+      "httpMetadata": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/metadataPropertyString"
+          },
+          "status": {
+            "$ref": "#/components/schemas/metadataPropertyString"
+          },
+          "path": {
+            "$ref": "#/components/schemas/metadataPropertyUriTemplate"
+          },
+          "headers": {
+            "type": "array",
+            "description": "HTTP Header is allowed to appear multiple times to represent multiple name, value pairs. The same name is allowed to appear more than once.",
+            "items": {
+              "type": "object",
+              "description" : "HTTP Header",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                    "$ref": "#/components/schemas/metadataProperty"
+                }              
+              }
+            }
+          },
+          "query": {
+            "type": "object",
+            "description": "HTTP Query Parameters are key value pairs",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/metadataProperty"
+            }
+          }
+        }
+      },
+      "kafkaMetadata": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "$ref": "#/components/schemas/metadataPropertyString"
+          },
+          "partition": {
+            "$ref": "#/components/schemas/metadataPropertyInteger"
+          },
+          "key": {
+            "$ref": "#/components/schemas/metadataPropertyBinary"
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/metadataPropertyInteger"
+          },
+          "headers": {
+            "type": "object",
+            "description": "Apache Kafka headers are key value pairs",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/metadataProperty"
             }
           }
         }
@@ -382,7 +490,7 @@
                 "$ref": "#/components/schemas/metadataPropertyString"
               },
               "time": {
-                "$ref": "#/components/schemas/metadataPropertyDateTime"
+                "$ref": "#/components/schemas/metadataPropertyTimeStamp"
               },
               "source": {
                 "$ref": "#/components/schemas/metadataPropertyUriTemplate"
@@ -405,6 +513,7 @@
       },
       "metadataPropertyBase": {
         "type": "object",
+        "description": "Base class for all metadata properties. The discriminator is used to determine the actual type of the property and is only relevant for the OpenAPI definition of the Registry API.",
         "discriminator": {
           "propertyName": "type",
           "mapping": {
@@ -413,7 +522,7 @@
             "string": "#/components/schemas/metadataPropertyString",
             "symbol": "#/components/schemas/metadataPropertySymbol",
             "binary": "#/components/schemas/metadataPropertyBinary",
-            "datetime": "#/components/schemas/metadataPropertyDateTime",
+            "timestamp": "#/components/schemas/metadataPropertyTimeStamp",
             "duration": "#/components/schemas/metadataPropertyDuration",
             "uritemplate": "#/components/schemas/metadataPropertyUriTemplate",
             "uri": "#/components/schemas/metadataPropertyUri",
@@ -508,7 +617,7 @@
           }
         ]
       },
-      "metadataPropertyDateTime": {
+      "metadataPropertyTimeStamp": {
         "description": "This is a date-time property, holding RFC3339 string expressions.",
         "type": "object",
         "properties": {
@@ -625,9 +734,6 @@
           "mapping": {
             "definitiongroup": "#/components/schemas/definitiongroup",
             "definition": "#/components/schemas/definition",
-            "amqp": "#/components/schemas/amqpDefinition",
-            "mqtt": "#/components/schemas/mqttDefinition",
-            "cloudevent": "#/components/schemas/cloudEventDefinition",
             "schemagroup": "#/components/schemas/schemaGroup",
             "endpoint": "#/components/schemas/endpoint",
             "schema": "#/components/schemas/schema",
@@ -786,7 +892,7 @@
             "$ref": "#/components/schemas/definitions"
           },
           "definitiongroups": {
-            "$ref": "#/components/schemas/groupUriReferences"
+            "$ref": "#/components/schemas/definitiongroupUriReferences"
           }
         },
         "allOf": [
@@ -882,9 +988,17 @@
         "discriminator": {
           "propertyName": "protocol",
           "mapping": {
-            "mqtt": "#/components/schemas/endpointOptionsMqtt",
-            "amqp": "#/components/schemas/endpointOptionsAmqp",
-            "http": "#/components/schemas/endpointOptionsHttp"
+            "MQTT/3.1.1": "#/components/schemas/endpointOptionsMqtt",
+            "MQTT/5.0": "#/components/schemas/endpointOptionsMqtt",
+            "MQTT": "#/components/schemas/endpointOptionsMqtt",
+            "AMQP/1.0": "#/components/schemas/endpointOptionsAmqp",
+            "AMQP": "#/components/schemas/endpointOptionsAmqp",
+            "HTTP/1.1": "#/components/schemas/endpointOptionsHttp",
+            "HTTP/2": "#/components/schemas/endpointOptionsHttp",
+            "HTTP/3": "#/components/schemas/endpointOptionsHttp",
+            "HTTP": "#/components/schemas/endpointOptionsHttp",
+            "KAFKA": "#/components/schemas/endpointOptionsKafka",
+            "NATS": "#/components/schemas/endpointOptionsNats"
           }
         },
         "properties": {
@@ -898,6 +1012,36 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/endpointOptions"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "topic": {
+                "type": "string",
+                "description": "The topic to use for this endpoint"
+              },
+              "qos": {
+                "type": "integer",
+                "description": "The quality of service level to use for this endpoint"
+              },
+              "retain": {
+                "type": "boolean",
+                "description": "Whether to retain messages for this endpoint"
+              },
+              "clean-session": {
+                "type": "boolean",
+                "description": "Whether to use a clean session for this endpoint"
+              },
+              "will-topic": {
+                "type": "string",
+                "description": "The topic to use for the will message for this endpoint"
+              },
+              "will-message": {
+                "type": "string",
+                "format" : "urireference",
+                "description": "The will message to use (message definition reference)"
+              }
+            }
           }
         ]
       },
@@ -906,6 +1050,45 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/endpointOptions"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "node": {
+                "type": "string",
+                "description": "The quality of service level to use for this endpoint"
+              },
+              "durable": {
+                "type": "boolean",
+                "description": "Whether to retain messages for this endpoint"
+              },
+              "ttl": {
+                "type": "integer",
+                "description": "The time in milliseconds after which messages are discarded for this endpoint"
+              },
+              "distribution-mode": {
+                "type": "string",
+                "description": "The distribution mode to use for this endpoint",
+                "enum": [
+                  "move",
+                  "copy"
+                ]
+              },
+              "link-properties": {
+                "type": "object",
+                "description": "The link properties to set",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "connection-properties": {
+                "type": "object",
+                "description": "The connection prooperties to set",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
           }
         ]
       },
@@ -914,6 +1097,89 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/endpointOptions"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "description": "The HTTP method to use for this endpoint"
+              },
+              "headers": {
+                "type": "array",
+                "description": "The HTTP headers to use for this endpoint",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The HTTP header name"
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "The HTTP header value"
+                    }
+                  }
+                }
+              },
+              "query": {
+                "type": "object",
+                "description": "The HTTP query parameters to use for this endpoint",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "endpointOptionsKafka": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptions"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "topic": {
+                "type": "string",
+                "description": "The NATS topic to use for this endpoint"
+              },
+              "acks": {
+                "type": "integer",
+                "description": "The Kafka acks to use for this endpoint"
+              },
+              "key": {
+                "type": "string",
+                "description": "The Kafka key to use for this endpoint"
+              },
+              "partition": {
+                "type": "integer",
+                "description": "The Kafka partition to use for this endpoint"
+              },
+              "consumer-group": {
+                "type": "string",
+                "description": "The Kafka consumer group to use for this endpoint"
+              }
+            }
+          }
+        ]
+      },
+      "endpointOptionsNats": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/endpointOptions"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "topic": {
+                "type": "string",
+                "description": "The NATS topic to use for this endpoint"
+              }
+            }
           }
         ]
       },

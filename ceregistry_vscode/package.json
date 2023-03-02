@@ -27,9 +27,9 @@
   "json.schemas": [
     {
       "fileMatch": [
-        "*.disco"
+        "*.cereg"
       ],
-      "url": "./schemas/ce_discovery_doc.json"
+      "url": "./schemas/ce_registry_doc.json"
     }
   ],
   "contributes": {
@@ -46,8 +46,8 @@
           "CloudEvents Discovery"
         ],
         "extensions": [
-          ".disco",
-          ".yaml.disco"
+          ".cereg",
+          ".yaml.cereg"
         ],
         "icon": {
           "light": "./themes/icons/cloudevents-icon-color.svg",
@@ -61,7 +61,7 @@
           "label": "CloudEvents Registry Tool",
           "command": "ceregistry.ui",
           "definitiongroup": "CloudEvents@1",
-          "when": "resourceExtname == .disco || resourceExtname == .yaml.disco"
+          "when": "resourceExtname == .cereg || resourceExtname == .yaml.cereg"
         }
       ]
     }

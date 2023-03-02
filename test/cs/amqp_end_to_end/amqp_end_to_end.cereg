@@ -1,33 +1,39 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "endpoints": {
-        "Contoso.ERP.Eventing.HttpProducer": {
+        "Contoso.ERP.Eventing.AmqpProducer": {
             "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.HttpProducer",
+            "id": "Contoso.ERP.Eventing.AmqpProducer",
             "usage": "producer",
             "config": {
-                "protocol": "HTTP",
+                "protocol": "AMQP",
                 "strict": false,
                 "endpoints": [
-                    "http://localhost:11001/events/"
-                ]
+                    "amqp://127.11.0.2:5672/"
+                ],
+                "options" : {
+                    "node" : "queue"
+                }  
             },
             "definitiongroups": [
                 "#/definitiongroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         },
-        "Contoso.ERP.Eventing.HttpConsumer": {
+        "Contoso.ERP.Eventing.AmqpConsumer": {
             "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.HttpConsumer",
+            "id": "Contoso.ERP.Eventing.AmqpConsumer",
             "usage": "consumer",
             "config": {
-                "protocol": "HTTP",
+                "protocol": "AMQP",
                 "strict": false,
                 "endpoints": [
-                    "http://localhost:11001/events/"
-                ]
+                    "amqp://127.11.0.2:5672/"
+                ],
+                "options" : {
+                    "node" : "queue"
+                }  
             },
             "definitiongroups": [
                 "#/definitiongroups/Contoso.ERP.Events"

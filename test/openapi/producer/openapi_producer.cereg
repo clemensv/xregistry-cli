@@ -1,39 +1,33 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "endpoints": {
-        "Contoso.ERP.Eventing.MqttProducer": {
+        "Contoso.ERP.Eventing.HttpProducer": {
             "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.MqttProducer",
+            "id": "Contoso.ERP.Eventing.HttpProducer",
             "usage": "producer",
             "config": {
-                "protocol": "MQTT",
+                "protocol": "HTTP",
                 "strict": false,
                 "endpoints": [
-                    "mqtt://127.11.0.1:1883"
-                ],
-                "options" : {
-                    "topic": "events"
-                }   
+                    "http://localhost:11001/events/"
+                ]
             },
             "definitiongroups": [
                 "#/definitiongroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         },
-        "Contoso.ERP.Eventing.MqttConsumer": {
+        "Contoso.ERP.Eventing.HttpConsumer": {
             "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.MqttConsumer",
+            "id": "Contoso.ERP.Eventing.HttpConsumer",
             "usage": "consumer",
             "config": {
-                "protocol": "MQTT",
+                "protocol": "HTTP",
                 "strict": false,
                 "endpoints": [
-                    "mqtt://127.11.0.1:1883"
-                ],
-                "options" : {
-                    "topic" : "events"
-                }
+                    "http://localhost:11001/events/"
+                ]
             },
             "definitiongroups": [
                 "#/definitiongroups/Contoso.ERP.Events"

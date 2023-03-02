@@ -29,7 +29,7 @@ def run_test():
     sys.argv = ['ceregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'java',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.cereg'),
                 '--output', os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/producer/'.replace('/', os.path.sep)),
                 '--projectname', 'Contoso.ERP.Producer']
     ceregistry.cli()
@@ -38,7 +38,7 @@ def run_test():
     sys.argv = [ 'ceregistry', 'generate', 
                 '--style', 'consumer', 
                 '--language', 'java',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.cereg'),
                 '--output', os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
     ceregistry.cli()

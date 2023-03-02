@@ -332,8 +332,20 @@ def latest_dict_entry(dict: dict):
     return dict[sorted([k.ljust(m) for k in dict.keys()])[-1].strip()] 
 
 # the core generator function that drives the Jinja templates
+# Arguments:
+#   project_name: the name of the project
+#   language: the language to generate code for
+#   style: the style of code to generate
+#   output_dir: the directory to write the generated code to
+#   definitions_file_arg: the path to the definitions file
+#   headers: a dictionary of headers to use when resolving references
+#   template_dirs: a list of directories to search for templates
+#   template_args: a dictionary of arguments to pass to the templates
+#   suppress_code_output: if True, do not output generated code. This will still run through all templates and collect schema references
+#   suppress_schema_output: if True, do not output generated schemas
 def generate(project_name: str, language: str, style: str, output_dir: str,
-             definitions_file_arg: str, headers: dict, template_dirs: list, template_args: dict):
+             definitions_file_arg: str, headers: dict, template_dirs: list, template_args: dict, 
+             suppress_code_output: bool, suppress_schema_output: bool):
     global schema_references_collected
     
     # Load definitions
@@ -364,9 +376,9 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     code_env = setup_jinja_env(code_template_and_include_dirs)
     schema_env = setup_jinja_env(schema_template_dirs)
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dirs, code_env, False, template_args)
+                          code_template_dirs, code_env, False, template_args, suppress_code_output)
     render_code_templates(project_name, style, output_dir, docroot,
-                          schema_template_dirs, schema_env, False, template_args)
+                          schema_template_dirs, schema_env, False, template_args, suppress_schema_output)
     
     # now we need to handle any local schema references we found in the document
  
@@ -457,7 +469,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                                     schema_format_short = "avro"
                             
                             render_schema_templates(schema_format_short, project_name, class_name, language,
-                                                    output_dir, definitions_file, schema_root, schema_template_dirs, schema_env, template_args)
+                                                    output_dir, definitions_file, schema_root, schema_template_dirs, schema_env, template_args, suppress_schema_output)
                             continue
                         else:
                             print("Warning: unable to find schema reference " + schema_reference)
@@ -472,12 +484,12 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         schema_format_short = "json"
                                                
                     render_schema_templates(schema_format_short, project_name, class_name, language,
-                                            output_dir, definitions_file, schema_root, schema_template_dirs, schema_env, template_args)
+                                            output_dir, definitions_file, schema_root, schema_template_dirs, schema_env, template_args, suppress_schema_output)
                 else:
                     print("Warning: unable to find schema reference " + schema_reference)
             
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dirs, code_env, True, template_args)
+                          code_template_dirs, code_env, True, template_args, suppress_code_output)
     
     
     # reset the references collected in this file 
@@ -485,7 +497,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 
     if style == "schema":
         render_schema_templates(None, project_name, None, language,
-                                output_dir, definitions_file, docroot, schema_template_dirs, schema_env)
+                                output_dir, definitions_file, docroot, schema_template_dirs, schema_env, suppress_schema_output)
 
 
 # for templates, except in _schemas, the filename may lead (!) with the
@@ -499,7 +511,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 # generator is fed just one CloudEvent definition but the information set
 # remains anchored at "definitiongroups"
 def render_code_templates(project_name : str, style : str, output_dir : str, docroot : dict,
-                          code_template_dirs : list, env : jinja2.Environment, post_process : bool, template_args : dict):
+                          code_template_dirs : list, env : jinja2.Environment, post_process : bool, template_args : dict, suppress_output : bool = False):
     class_name = None
     for template_dir in code_template_dirs:
         for root, dirs, files in os.walk(template_dir):
@@ -564,7 +576,7 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                                     "{classfull}", id).replace("{classname}",
                                                             pascal(class_name))
                             render_template(project_name, class_name, subscope, file_dir,
-                                            file_name, template, template_args)
+                                            file_name, template, template_args, suppress_output)
                     continue  # skip back to the outer loop
 
                 if file_name.startswith("{projectdir}"):
@@ -572,12 +584,12 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                     file_name = file_name_base.replace("{projectdir}", "")
 
                 
-                render_template(project_name, class_name, scope, file_dir, file_name, template, template_args)
+                render_template(project_name, class_name, scope, file_dir, file_name, template, template_args, suppress_output)
 
 
 def render_schema_templates(schema_type : str, project_name : str, class_name : str, language : str,
                             output_dir : str, definitions_file : str, docroot : dict, schema_template_dirs : list, env : jinja2.Environment,
-                            template_args : dict):
+                            template_args : dict, suppress_output : bool = False):
     global uses_protobuf
     global uses_avro
     
@@ -639,10 +651,10 @@ def render_schema_templates(schema_type : str, project_name : str, class_name : 
             
             
             # generate the file
-            render_template(project_name, class_name, scope, file_dir, file_name, template, template_args)
+            render_template(project_name, class_name, scope, file_dir, file_name, template, template_args, suppress_output)
 
 
-def render_template(project_name : str, class_name : str, scope : dict, file_dir : str, file_name : str, template : str, template_args : dict):
+def render_template(project_name : str, class_name : str, scope : dict, file_dir : str, file_name : str, template : str, template_args : dict, suppress_output : bool = False):
 
     global uses_protobuf
     global uses_avro
@@ -651,7 +663,7 @@ def render_template(project_name : str, class_name : str, scope : dict, file_dir
     try:
         output_path = os.path.join(os.getcwd(), file_dir, file_name)
 
-        if not os.path.exists(os.path.dirname(output_path)):
+        if not suppress_output and not os.path.exists(os.path.dirname(output_path)):
             os.makedirs(os.path.dirname(output_path))
 
         try:
@@ -663,12 +675,13 @@ def render_template(project_name : str, class_name : str, scope : dict, file_dir
             args["uses_avro"]=uses_avro
             args["uses_protobuf"]=uses_protobuf
             rendered = template.render(args)
-            with open(output_path, "w") as f:
-                f.write(rendered)
+            if not suppress_output:
+                with open(output_path, "w") as f:
+                    f.write(rendered)
         except TypeError as err:
             # this is the result of the exit tag in the template
             if err.args[0].find("Undefined found") > -1:
-                if ( os.path.exists(output_path) ):
+                if not suppress_output and os.path.exists(output_path):
                     os.remove(output_path)
             else:
                 print("{file}: {msg}".format(file=template.name, msg=err))
@@ -714,6 +727,9 @@ def setup_jinja_env(template_dirs : list[str]):
 
 
 def generate_code(args) -> int:
+    suppress_schema_output = args.no_schema
+    suppress_code_output = args.no_code
+
     if args.headers:
         # ok to have = in base64 values
         headers = {
@@ -753,12 +769,12 @@ def generate_code(args) -> int:
                 return 1
             
             generate(args.project_name, args.language, args.style, args.output_dir,
-                    args.definitions_file, headers, args.template_dirs, template_args)
+                    args.definitions_file, headers, args.template_dirs, template_args, suppress_code_output, suppress_schema_output)
 
             # generate external schemas
             for schema in schema_files_collected:
                 generate(args.project_name, args.language, "schema", args.output_dir,
-                        schema, headers, args.template_dirs, template_args)
+                        schema, headers, args.template_dirs, template_args, )
             
             if stack("files"):
                 for file, content in stack("files"):

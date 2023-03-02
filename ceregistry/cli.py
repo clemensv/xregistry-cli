@@ -35,6 +35,9 @@ def main():
     
     # Specify the arguments for the generate command
     generate.add_argument("--projectname", dest="project_name", required=True, help="The project name (namespace name) for the output")
+    generate.add_argument("--schemaprojectname", dest="schema_project_name", required=False, help="The project name (namespace name) for schema classes (optional, defaults to projectname)")
+    generate.add_argument("--noschema", dest="no_schema", action="store_true", required=False, help="Do not generate schema classes (optional, defaults to false)")
+    generate.add_argument("--nocode", dest="no_code", action="store_true", required=False, help="Do not generate non-schema code like consumers or producers (optional, defaults to false)")
     generate.add_argument("--language", dest="language", required=True, help="The language to use for the generated code")
     generate.add_argument("--style", dest="style", required=True, help="The style of the generated code")
     generate.add_argument("--output", dest="output_dir", required=True, help="The directory where the generated code should be saved")

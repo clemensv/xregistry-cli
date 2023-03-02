@@ -1,21 +1,28 @@
 {
-    "specversion": "0.3-wip",
-    "endpoints": {
-        "Contoso.MyAmqpProducer": {
+    "$schema": "https://cloudevents.io/schemas/registry",
+    "specversion": "0.4-wip",
+    "endpoints" : {
+        "MyEventQueue" : {
             "type": "endpoint",
-            "id": "Contoso.MyAmqpProducer",
-            "usage": "producer",
+            "id" : "MyEventQueue",
+            "usage": "consumer",
             "config": {
                 "protocol": "AMQP",
                 "strict": false,
                 "endpoints": [
-                    "amqps://cediscoveryinterop.example.com/topic"
-                ]
+                    "amqps://cediscoveryinterop.example.com/queue"
+                ],
+                "options" : {
+                    "link-properties" : {
+                        "myprop" : "prop"
+                    },
+                    "distribution-mode" : "copy"
+                }
             },
             "definitiongroups": [
                 "#/definitiongroups/Contoso.MyGroup"
             ],
-            "format": "CloudEvents/1.0"
+            "format" : "AMQP/1.0"
         }
     },
     "definitiongroups": {

@@ -1,11 +1,11 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "endpoints" : {
-        "Contoso.MqttProducer" : {
+        "MyMqttConsumer" : {
             "type": "endpoint",
-            "id" : "Contoso.MqttProducer",
-            "usage": "producer",
+            "id" : "MyMqttConsumer",
+            "usage": "consumer",
             "config": {
                 "protocol": "MQTT",
                 "strict": false,
@@ -18,9 +18,9 @@
                 }
             },
             "definitiongroups": [
-                "#/definitiongroups/mygroup"
+                "#/definitiongroups/Contoso.MyGroup"
             ],
-            "format" : "CloudEvents/1.0"
+            "format" : "MQTT/5.0"
         }
     },
     "definitiongroups": {

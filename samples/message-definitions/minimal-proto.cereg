@@ -1,6 +1,6 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "definitiongroups": {
         "com.example.grp1": {
@@ -10,6 +10,7 @@
                 "com.example.grp1.ev1": {
                     "type": "cloudevent",
                     "id": "com.example.grp1.ev1",
+                    "description": "",
                     "format": "CloudEvents/1.0",
                     "metadata": {
                         "attributes": {
@@ -24,11 +25,12 @@
                             },
                             "source": {
                                 "type": "uritemplate",
+                                "value": "",
                                 "required": true
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1"
+                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1:x1"
                 }
             }
         },
@@ -57,7 +59,7 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1"
+                    "schemaurl": "#/schemagroups/com.example.grp2/schemas/s2:q1"
                 },
                 "com.example.grp2.ev2": {
                     "type": "cloudevent",
@@ -80,7 +82,7 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1"
+                    "schemaurl": "#/schemagroups/com.example.grp2/schemas/s1:q2"
                 }
             }
         }
@@ -93,21 +95,13 @@
                 "s1": {
                     "type": "schema",
                     "id": "s1",
-                    "format": "JsonSchema/draft-07",
+                    "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
                             "id": "1",
-                            "format": "JsonSchema/draft-07",
-                            "schema": {
-                                "$schema": "http://json-schema.org/draft-07/schema",
-                                "type": "object",
-                                "properties": {
-                                    "a": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
+                            "format": "Protobuf/3.0",
+                            "schema": "syntax = \"proto3\"; message x1 { string a = 1; } }"
                         }
                     }
                 }
@@ -120,21 +114,26 @@
                 "s1": {
                     "type": "schema",
                     "id": "s1",
-                    "format": "JsonSchema/draft-07",
+                    "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
                             "type": "schemaversion",
                             "id": "1",
-                            "format": "JsonSchema/draft-07",
-                            "schema": {
-                                "$schema": "http://json-schema.org/draft-07/schema",
-                                "type": "object",
-                                "properties": {
-                                    "a": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
+                            "format": "Protobuf/3.0",
+                            "schema": "syntax = \"proto3\"; message q1 { string a = 1; } }"
+                        }
+                    }
+                },
+                "s2": {
+                    "type": "schema",
+                    "id": "s2",
+                    "format": "Protobuf/3.0",
+                    "versions": {
+                        "1": {
+                            "type": "schemaversion",
+                            "id": "1",
+                            "format": "Protobuf/3.0",
+                            "schema": "syntax = \"proto3\"; message q2 { string a = 1; } }"
                         }
                     }
                 }

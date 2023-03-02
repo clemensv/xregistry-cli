@@ -30,8 +30,8 @@ The "registry" is an API or document store (like a repo) where metadata is organ
 and eventing objects. This project is a client for interacting with a CloudEvents registry that 
 can, as one feature, generate code from the discovery metadata held in the registry.
 
-A current, formal document schema for discovery documents (.disco) is embedded in this
-project at [ceregistry/schemas/ce_discovery_doc.json](ceregistry/schemas/ce_discovery_doc.json). 
+A current, formal document schema for discovery documents (.cereg) is embedded in this
+project at [ceregistry/schemas/ce_registry_doc.json](ceregistry/schemas/ce_registry_doc.json). 
 
 > The schema in this prototype reflects changes not yet merged into the formal 
 > spec docs in the CloudEvents project repo.
@@ -43,24 +43,24 @@ asynchronous messaging or eventing endpoint, including such that do not use
 CloudEvents at all. This repository even contains a few examples of such
 definitions for AMQP and MQTT based flows.
 
-The file format has the extension `.disco` (from "discovery") and is a JSON
+The file format has the extension `.cereg` (from "discovery") and is a JSON
 file. The tooling can also handle YAML files with an equivalent structure with a
-`.disco.yaml` extension. This CLI tool can be used to generate code from a
-`.disco` file, or to validate a `.disco` file against the formal specification.
+`.cereg.yaml` extension. This CLI tool can be used to generate code from a
+`.cereg` file, or to validate a `.cereg` file against the formal specification.
 
-### A .disco file
+### A .cereg file
 
-A `.disco` file is a JSON or YAML file that describes a set of messaging
-constructs. We will briefly describe the structure of a `.disco` file here for
+A `.cereg` file is a JSON or YAML file that describes a set of messaging
+constructs. We will briefly describe the structure of a `.cereg` file here for
 context, but the formal specification is the authoritative source for the
 structure.
 
-The top-level of a `.disco` file declares the schema and version of the specification:
+The top-level of a `.cereg` file declares the schema and version of the specification:
 
 ```json
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
 ```
 
 The endpoints section describes *producer*, *consumer*, and/or *subscriber*
@@ -206,20 +206,20 @@ used to test the tool and which also illustrate the format further.
 
 For instance, the following files are available:
 
-- [contoso-crm.disco](samples/message-definitions/contoso-crm.disco) is a set of fictional event definitions for a fictional CRM system.
-- [contoso-erp.disco](samples/message-definitions/contoso-erp.disco) is a set of fictional event definitions for a fictional ERP system.
-- [Microsoft.Storage.disco](samples/message-definitions/Microsoft.Storage.disco) is a set of event definitions for Azure Storage Blobs.
-- [minimal-avro.disco](samples/message-definitions/minimal-avro.disco) uses an embedded Apache Avro schema for its payloads.
-- [minimal-proto.disco](samples/message-definitions/minimal-proto.disco) uses an embedded Google Protocol Buffers schema for its payloads.
-- [mqtt-producer-endpoint.disco](samples/protocols/mqtt-producer-endpoint.disco) shows how to define an MQTT producer endpoint with the MQTT packet format (not CloudEvents)
-- [amqp-producer-endpoint.disco](samples/protocols/amqp-producer-endpoint.disco) shows how to define an AMQP producer endpoint with the AMQP message format (not CloudEvents)
+- [contoso-crm.cereg](samples/message-definitions/contoso-crm.cereg) is a set of fictional event definitions for a fictional CRM system.
+- [contoso-erp.cereg](samples/message-definitions/contoso-erp.cereg) is a set of fictional event definitions for a fictional ERP system.
+- [Microsoft.Storage.cereg](samples/message-definitions/Microsoft.Storage.cereg) is a set of event definitions for Azure Storage Blobs.
+- [minimal-avro.cereg](samples/message-definitions/minimal-avro.cereg) uses an embedded Apache Avro schema for its payloads.
+- [minimal-proto.cereg](samples/message-definitions/minimal-proto.cereg) uses an embedded Google Protocol Buffers schema for its payloads.
+- [mqtt-producer-endpoint.cereg](samples/protocols/mqtt-producer-endpoint.cereg) shows how to define an MQTT producer endpoint with the MQTT packet format (not CloudEvents)
+- [amqp-producer-endpoint.cereg](samples/protocols/amqp-producer-endpoint.cereg) shows how to define an AMQP producer endpoint with the AMQP message format (not CloudEvents)
 
 There are several other examples in the [samples](samples) directory.
 
 An extreme example that demonstrates the versatility of the format is a full
 declaration of the Eclipse Sparkplug B industrial protocol for MQTT, including
 schemas and message definitions, in a single file:
-[sparkplugb.disco](samples/message-definitions/mqtt-sparkplugB.disco).
+[sparkplugb.cereg](samples/message-definitions/mqtt-sparkplugB.cereg).
 
 Mind that not all of these samples are compatible with all code generator
 templates and not all templates yet refuse to render for incompatible files and
@@ -296,7 +296,7 @@ Especially noteworthy might be the support for both AsyncAPI and OpenAPI.
 
 The tool can generate AsyncAPI definitions for producer endpoints with: 
 ```shell
-ceregistry generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.disco --output=MyProjectProducer
+ceregistry generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer
 ``` 
 
 This will yield a `MyProjectProducer/MyProjectProducer.yml' file that can be used to generate a
@@ -305,7 +305,7 @@ producer client for the given endpoint.
 Similarly, the tool can generate OpenAPI definitions for subscriber endpoints with: 
 
 ```shell
-ceregistry generate --language=openapi --style=subscriber --projectname=MyProjectSubscriber --definitions=definitions.disco --output=MyProjectSubscriber
+ceregistry generate --language=openapi --style=subscriber --projectname=MyProjectSubscriber --definitions=definitions.cereg --output=MyProjectSubscriber
 ```
 
 This will yield a `MyProjectSubscriber/MyProjectSubcriber.yml' file that can be
@@ -317,7 +317,7 @@ with the CloudEvents Subscription API.
 The tool can generate AsyncAPI definitions with: 
 
 ```shell
-ceregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.disco --output=MyProjectProducer
+ceregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer
 ```
 
 For AsyncAPI, the tool support an extension parameter ce_content_mode that can be used to control the CloudEvents content mode of the generated AsyncAPI definition. The default is "structured" and the other supported value is "binary". The AsyncAPI template supports HTTP, MQTT, and AMQP 1.0 endpoints and injects the appropriate headers for the selected content mode for each protocol.
@@ -325,7 +325,7 @@ For AsyncAPI, the tool support an extension parameter ce_content_mode that can b
 Use it like this:
 
 ```shell
-ceregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.disco --output=MyProjectProducer --template-args ce_content_mode=binary
+ceregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer --template-args ce_content_mode=binary
 ```
 
 #### Custom Templates

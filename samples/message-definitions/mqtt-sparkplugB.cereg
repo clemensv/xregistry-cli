@@ -1,6 +1,6 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "description": "This is the Eclipse Sparkplug B v1.0 CloudEvents Discovery Declaration (which isn't using CloudEvents itself, at all)",
     "endpoints": {
         "Eclipse.SparkplugBv10EdgeNodeProducer": {

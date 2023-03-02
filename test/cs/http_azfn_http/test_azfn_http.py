@@ -33,7 +33,7 @@ def test_azfn_http():
     sys.argv = ['ceregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'cs',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.cereg'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
     ceregistry.cli()
@@ -41,7 +41,7 @@ def test_azfn_http():
     sys.argv = [ 'ceregistry', 'generate',  
                 '--style', 'azfunctionhttp', 
                 '--language', 'cs',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.cereg'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/azfn/'),
                 '--projectname', 'Contoso.ERP.AzureFunction']
     ceregistry.cli()

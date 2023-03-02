@@ -20,7 +20,7 @@ def test_asyncapi_producer():
     sys.argv = ['ceregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'asyncapi',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'asyncapi_producer.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'asyncapi_producer.cereg'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducerBinary',
                 '--template-args', 'ce_content_mode=binary']
@@ -34,7 +34,7 @@ def test_asyncapi_producer():
     sys.argv = ['ceregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'asyncapi',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'asyncapi_producer.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'asyncapi_producer.cereg'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducerStructured',
                 '--template-args', 'ce_content_mode=structured']

@@ -20,7 +20,7 @@ def test_openapi_subscriber():
     sys.argv = ['ceregistry', 'generate',  
                 '--style', 'subscriber', 
                 '--language', 'openapi',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_subscriber.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_subscriber.cereg'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpSubscriber']
     ceregistry.cli()

@@ -12,14 +12,14 @@ import ceregistry
 def test_validate():
     # clean the output directory
     input_dir = os.path.join(project_root, 'samples'.replace('/', os.path.sep))
-    disco_files = glob.glob("**/*.disco", root_dir=input_dir, recursive=True)
+    disco_files = glob.glob("**/*.cereg", root_dir=input_dir, recursive=True)
     for disco_file in disco_files:
         # generate the producer
         sys.argv = ['ceregistry', 'validate',  
                     '--definitions', os.path.join(input_dir, disco_file)]
         if ceregistry.cli() != 0:
             raise Exception("validation failed")
-    disco_files = glob.glob("**/*.disco.yaml", root_dir=input_dir, recursive=True)
+    disco_files = glob.glob("**/*.cereg.yaml", root_dir=input_dir, recursive=True)
     for disco_file in disco_files:
         # generate the producer
         sys.argv = ['ceregistry', 'validate',  

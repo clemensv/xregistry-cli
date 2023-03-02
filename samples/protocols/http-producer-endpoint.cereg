@@ -1,82 +1,82 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "endpoints" : {
-        "MyEventQueue" : {
+        "myendpoint" : {
             "type": "endpoint",
-            "id" : "MyEventQueue",
-            "usage": "consumer",
+            "id" : "myendpoint",
+            "usage": "producer",
             "config": {
-                "protocol": "AMQP",
+                "protocol": "HTTP",
                 "strict": false,
                 "endpoints": [
-                    "amqps://cediscoveryinterop.example.com/queue"
+                    "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
                 ],
                 "options" : {
-                    "link-properties" : {
-                        "myprop" : "prop"
-                    },
-                    "distribution-mode" : "copy"
+                    "headers" : [
+                        {
+                            "name" : "Authorization",
+                            "value" : "Bearer {token}"
+                        }
+                    ]
                 }
             },
             "definitiongroups": [
-                "#/definitiongroups/Contoso.MyGroup"
+                "#/definitiongroups/Contoso.ERP.Events"
             ],
-            "format" : "AMQP/1.0"
+            "format" : "CloudEvents/1.0"
         }
     },
     "definitiongroups": {
-        "Contoso.MyGroup": {
-            "id": "Contoso.MyGroup",
+        "Contoso.ERP.Events": {
             "type": "definitiongroup",
+            "id": "Contoso.ERP.Events",
             "definitions": {
-                "Contoso.MyGroup.MyEvent": {
-                    "type": "amqp",
-                    "id": "Contoso.MyGroup.MyEvent",
-                    "format": "AMQP/1.0",
+                "Contoso.ERP.Events.ReservationPlaced": {
+                    "type": "cloudevent",
+                    "id": "Contoso.ERP.Events.ReservationPlaced",
+                    "description": "A reservation has been placed",
+                    "format": "CloudEvents/1.0",
                     "metadata": {
-                        "header": {
-                            "ttl": {
-                                "type": "integer",
-                                "value": 1000
-                            }
-                        },
-                        "properties": {
-                            "subject": {
+                        "attributes": {
+                            "id": {
                                 "type": "string",
-                                "value": "myvalue"
-                            }
-                        },
-                        "application-properties": {
-                            "myProperty1": {
-                                "type": "string"
+                                "required": true
                             },
-                            "myProperty2": {
-                                "type": "string"
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.ERP.Events.ReservationPlaced",
+                                "required": true
                             },
-                            "myProperty3": {
-                                "type": "string"
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/orders",
+                                "required": true
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData",
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 }
             }
         }
     },
     "schemagroups": {
-        "Contoso.MyEvents": {
+        "Contoso.ERP.Events": {
             "type": "schemagroup",
-            "id": "Contoso.MyEvents",
+            "id": "Contoso.ERP.Events",
             "schemas": {
-                "MyEventData": {
-                    "id": "MyEventData",
+                "orderData": {
                     "type": "schema",
+                    "id": "orderData",
                     "format": "JsonSchema/draft-07",
                     "versions": {
-                        "1.0": {
-                            "id": "1.0",
+                        "1": {
                             "type": "schemaversion",
+                            "id": "1",
                             "format": "JsonSchema/draft-07",
                             "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",

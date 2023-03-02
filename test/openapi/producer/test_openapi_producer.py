@@ -20,7 +20,7 @@ def test_openapi_producer():
     sys.argv = ['ceregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'openapi',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_producer.disco'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_producer.cereg'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducer']
     ceregistry.cli()

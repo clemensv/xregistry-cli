@@ -1,11 +1,27 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "endpoints": {
-        "Contoso.ERP.Eventing.HttpSubscriber": {
+        "Contoso.ERP.Eventing.HttpProducer": {
             "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.HttpSubscriber",
-            "usage": "subscriber",
+            "id": "Contoso.ERP.Eventing.HttpProducer",
+            "usage": "producer",
+            "config": {
+                "protocol": "HTTP",
+                "strict": false,
+                "endpoints": [
+                    "http://localhost:11001/events/"
+                ]
+            },
+            "definitiongroups": [
+                "#/definitiongroups/Contoso.ERP.Events"
+            ],
+            "format": "CloudEvents/1.0"
+        },
+        "Contoso.ERP.Eventing.HttpConsumer": {
+            "type": "endpoint",
+            "id": "Contoso.ERP.Eventing.HttpConsumer",
+            "usage": "consumer",
             "config": {
                 "protocol": "HTTP",
                 "strict": false,

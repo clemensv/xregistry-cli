@@ -1,39 +1,17 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "endpoints": {
-        "Contoso.ERP.Eventing.MqttProducer": {
+        "Contoso.ERP.Eventing.HttpProducer": {
             "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.MqttProducer",
+            "id": "Contoso.ERP.Eventing.HttpProducer",
             "usage": "producer",
             "config": {
-                "protocol": "MQTT",
+                "protocol": "HTTP",
                 "strict": false,
                 "endpoints": [
-                    "mqtt://127.11.0.1:1883/"
-                ],
-                "options" : {
-                    "topic": "events"
-                }   
-            },
-            "definitiongroups": [
-                "#/definitiongroups/Contoso.ERP.Events"
-            ],
-            "format": "CloudEvents/1.0"
-        },
-        "Contoso.ERP.Eventing.MqttConsumer": {
-            "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.MqttConsumer",
-            "usage": "consumer",
-            "config": {
-                "protocol": "MQTT",
-                "strict": false,
-                "endpoints": [
-                    "mqtt://127.11.0.1:1883/"
-                ],
-                "options" : {
-                    "topic" : "events"
-                }
+                    "http://localhost:11000/api/ContosoERPAzureFunction"
+                ]
             },
             "definitiongroups": [
                 "#/definitiongroups/Contoso.ERP.Events"

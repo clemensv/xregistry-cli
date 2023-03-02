@@ -27,12 +27,12 @@ def validate(definitions_uri, headers, verbose=False):
         print("Error: could not load definitions file {}".format(definitions_uri))
         return 2
 
-    # validate the definitions file using the JSON schema in schemas/ce_discovery_doc.json
+    # validate the definitions file using the JSON schema in schemas/ce_registry_doc.json
 
     # load the schema
     try:
         basepath = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
-        schema_file = os.path.join(basepath, "schemas", "ce_discovery_doc.json")
+        schema_file = os.path.join(basepath, "schemas", "ce_registry_doc.json")
         with open(schema_file, "r") as f:
             schema = json.load(f)
     except IOError as e:

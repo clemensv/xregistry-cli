@@ -1,16 +1,16 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.3-wip",
+    "specversion": "0.4-wip",
     "endpoints": {
-        "Contoso.ERP.Eventing.HttpProducer": {
+        "Contoso.ERP.Eventing.HttpSubscriber": {
             "type": "endpoint",
-            "id": "Contoso.ERP.Eventing.HttpProducer",
-            "usage": "producer",
+            "id": "Contoso.ERP.Eventing.HttpSubscriber",
+            "usage": "subscriber",
             "config": {
                 "protocol": "HTTP",
                 "strict": false,
                 "endpoints": [
-                    "http://localhost:11000/api/ContosoERPAzureFunction"
+                    "http://localhost:11001/events/"
                 ]
             },
             "definitiongroups": [
