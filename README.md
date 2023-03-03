@@ -232,7 +232,7 @@ contains an MQTT producer endpoint.
 The tool requires Python 3.10 or later. Until the tool is published in an official package source (*this is a prototype, remember?*), you can install the tool with pip directly from the repo:
 
 ```
-pip install git+https://github.com/clemensv/cedisco-codegen.git
+pip install git+https://github.com/clemensv/cloudevents-registry-cli.git
 ```
 
 If you want to develop locally and/or run the included tests follow the instructions in [Development Environment](docs/development_environment.md).
