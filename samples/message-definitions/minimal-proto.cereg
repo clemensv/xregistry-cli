@@ -1,14 +1,13 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.4-wip",
+    "specversion": "0.5-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "definitiongroups": {
+    "definitionGroups": {
         "com.example.grp1": {
-            "type": "definitiongroup",
-            "id": "com.example.grp1",
+                       "id": "com.example.grp1",
+            "format" : "CloudEvents/1.0",
             "definitions": {
                 "com.example.grp1.ev1": {
-                    "type": "cloudevent",
                     "id": "com.example.grp1.ev1",
                     "description": "",
                     "format": "CloudEvents/1.0",
@@ -30,16 +29,15 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1:x1"
+                    "schemaUrl": "#/schemaGroups/com.example.grp1/schemas/s1:x1"
                 }
             }
         },
         "com.example.grp2": {
-            "type": "definitiongroup",
-            "id": "com.example.grp2",
+                       "id": "com.example.grp2",
+            "format": "CloudEvents/1.0",
             "definitions": {
                 "com.example.grp2.ev1": {
-                    "type": "cloudevent",
                     "id": "com.example.grp2.ev1",
                     "format": "CloudEvents/1.0",
                     "metadata": {
@@ -59,10 +57,9 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/com.example.grp2/schemas/s2:q1"
+                    "schemaUrl": "#/schemaGroups/com.example.grp2/schemas/s2:q1"
                 },
                 "com.example.grp2.ev2": {
-                    "type": "cloudevent",
                     "id": "com.example.grp2.ev2",
                     "format": "CloudEvents/1.0",
                     "metadata": {
@@ -82,25 +79,22 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/com.example.grp2/schemas/s1:q2"
+                    "schemaUrl": "#/schemaGroups/com.example.grp2/schemas/s1:q2"
                 }
             }
         }
     },
-    "schemagroups": {
+    "schemaGroups": {
         "com.example.grp1": {
-            "type": "schemagroup",
             "id": "com.example.grp1",
+            "format": "Protobuf/3.0",
             "schemas": {
                 "s1": {
-                    "type": "schema",
                     "id": "s1",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
                             "id": "1",
-                            "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message x1 { string a = 1; } }"
                         }
                     }
@@ -108,16 +102,13 @@
             }
         },
         "com.example.grp2": {
-            "type": "schemagroup",
             "id": "com.example.grp2",
             "schemas": {
                 "s1": {
-                    "type": "schema",
                     "id": "s1",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
                             "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message q1 { string a = 1; } }"
@@ -125,12 +116,10 @@
                     }
                 },
                 "s2": {
-                    "type": "schema",
                     "id": "s2",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
                             "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message q2 { string a = 1; } }"

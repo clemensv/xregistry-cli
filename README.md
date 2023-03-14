@@ -31,7 +31,7 @@ and eventing objects. This project is a client for interacting with a CloudEvent
 can, as one feature, generate code from the discovery metadata held in the registry.
 
 A current, formal document schema for discovery documents (.cereg) is embedded in this
-project at [ceregistry/schemas/ce_registry_doc.json](ceregistry/schemas/ce_registry_doc.json). 
+project at [ceregistry/schemas/xregistry_messaging_catalog.json](ceregistry/schemas/xregistry_messaging_catalog.json). 
 
 > The schema in this prototype reflects changes not yet merged into the formal 
 > spec docs in the CloudEvents project repo.
@@ -60,7 +60,7 @@ The top-level of a `.cereg` file declares the schema and version of the specific
 ```json
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.4-wip",
+    "specversion": "0.5-wip",
 ```
 
 The endpoints section describes *producer*, *consumer*, and/or *subscriber*
@@ -84,7 +84,6 @@ for a specific perspective using different templates.
 ```json
     "endpoints" : {
         "myendpoint" : {
-            "type": "endpoint",
             "id" : "myendpoint",
             "usage": "producer",
             "config": {
@@ -94,30 +93,28 @@ for a specific perspective using different templates.
                     "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
                 ]
             },
-            "definitiongroups": [
-                "#/definitiongroups/Contoso.ERP.Events"
+            "definitionGroups": [
+                "#/definitionGroups/Contoso.ERP.Events"
             ],
             "format" : "CloudEvents/1.0"
         }
     },
 ```
 
-The definitiongroups section describes groups of message definitions. The
+The definitionGroups section describes groups of message definitions. The
 example shows a group of CloudEvents message definitions with just one entry.
 The message definition describes the CloudEvent message type
 `Contoso.ERP.Events.ReservationPlaced`, which is a CloudEvent with a `time`
 attribute, a `source` attribute, and a `data` attribute that refers to the
-`orderData` schema. The schema is defined in the `schemagroups` section below.
+`orderData` schema. The schema is defined in the `schemaGroups` section below.
 
 ```json
 
-    "definitiongroups": {
+    "definitionGroups": {
         "Contoso.ERP.Events": {
-            "type": "definitiongroup",
             "id": "Contoso.ERP.Events",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {
-                    "type": "cloudevent",
                     "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
@@ -143,32 +140,29 @@ attribute, a `source` attribute, and a `data` attribute that refers to the
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
+                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/orderData"
                 }
             }
         }
     },
 ```
 
-The *schemagroups* section describes groups of schemas. The example shows a
+The *schemaGroups* section describes groups of schemas. The example shows a
 group of JSON schemas with just one entry having a single version. The schema is
 used by the message definition above. Note that the schema is defined in the
 same file in this example, but it could also be defined in a separate file and
-referenced by URL, with a "schemaurl" property replacing the "schema" property.
+referenced by URL, with a "schemaUrl" property replacing the "schema" property.
 
 ```json
-    "schemagroups": {
+    "schemaGroups": {
         "Contoso.ERP.Events": {
-            "type": "schemagroup",
             "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
-                    "type": "schema",
-                    "id": "orderData",
+                                        "id": "orderData",
                     "format": "JsonSchema/draft-07",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
                             "id": "1",
                             "format": "JsonSchema/draft-07",
                             "schema": {

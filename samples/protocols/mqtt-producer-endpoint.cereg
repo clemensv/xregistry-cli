@@ -1,10 +1,9 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.4-wip",
-    "endpoints" : {
-        "Contoso.MqttProducer" : {
-            "type": "endpoint",
-            "id" : "Contoso.MqttProducer",
+    "specversion": "0.5-wip",
+    "endpoints": {
+        "Contoso.MqttProducer": {
+            "id": "Contoso.MqttProducer",
             "usage": "producer",
             "config": {
                 "protocol": "MQTT",
@@ -12,24 +11,23 @@
                 "endpoints": [
                     "mqtt://mybroker.example.com"
                 ],
-                "options" : {
-                    "topic" : "events",
-                    "qos" : 1
+                "options": {
+                    "topic": "events",
+                    "qos": 1
                 }
             },
-            "definitiongroups": [
-                "#/definitiongroups/mygroup"
+            "definitionGroups": [
+                "#/definitionGroups/mygroup"
             ],
-            "format" : "CloudEvents/1.0"
+            "format": "CloudEvents/1.0"
         }
     },
-    "definitiongroups": {
+    "definitionGroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "type": "definitiongroup",
+            "format": "MQTT/5.0",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
-                    "type": "mqtt",
                     "id": "Contoso.MyGroup.MyEvent",
                     "format": "MQTT/5.0",
                     "metadata": {
@@ -46,37 +44,34 @@
                                 "type": "boolean",
                                 "value": false
                             },
-                            "user-properties" : [
-                                    {
-                                        "name" : "property1",
-                                        "type" : "string"
-                                    },
-                                    {
-                                        "name" : "property2",
-                                        "type" : "integer"
-                                    }
-                                ]
-                            
+                            "user-properties": [
+                                {
+                                    "name": "property1",
+                                    "type": "string"
+                                },
+                                {
+                                    "name": "property2",
+                                    "type": "integer"
+                                }
+                            ]
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData",
+                    "schemaFormat": "JsonSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
     },
-    "schemagroups": {
+    "schemaGroups": {
         "Contoso.MyEvents": {
-            "type": "schemagroup",
             "id": "Contoso.MyEvents",
             "schemas": {
                 "MyEventData": {
                     "id": "MyEventData",
-                    "type": "schema",
                     "format": "JsonSchema/draft-07",
                     "versions": {
                         "1.0": {
                             "id": "1.0",
-                            "type": "schemaversion",
                             "format": "JsonSchema/draft-07",
                             "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",

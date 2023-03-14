@@ -1,9 +1,9 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.4-wip",
+    "specversion": "0.5-wip",
+    "id": "https://contoso.com/schemas/contoso.crm.events.json",
     "endpoints": {
         "Contoso.CRM.Eventing.Http": {
-            "type": "endpoint",
             "id": "Contoso.CRM.Eventing.Http",
             "usage": "producer",
             "config": {
@@ -13,19 +13,18 @@
                     "https://erpsystem.com/events"
                 ]
             },
-            "definitiongroups": [
-                "#/definitiongroups/Contoso.CRM.Events"
+            "definitionGroups": [
+                "#/definitionGroups/Contoso.CRM.Events"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitiongroups": {
+    "definitionGroups": {
         "Contoso.CRM.Events": {
             "id": "Contoso.CRM.Events",
-            "type": "definitiongroup",
+            "format": "CloudEvents/1.0",
             "definitions": {
                 "Contoso.CRM.Events.CustomerCreated": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerCreated",
                     "description": "An order has been placed",
                     "format": "CloudEvents/1.0",
@@ -51,10 +50,10 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerCreatedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerCreatedEventData"
                 },
                 "Contoso.CRM.Events.CustomerUpdated": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerUpdated",
                     "description": "An order has been placed",
                     "format": "CloudEvents/1.0",
@@ -80,10 +79,10 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerUpdatedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerUpdatedEventData"
                 },
                 "Contoso.CRM.Events.CustomerDeleted": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerDeleted",
                     "description": "A customer has been deleted",
                     "format": "CloudEvents/1.0",
@@ -109,10 +108,10 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerDeletedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerDeletedEventData"
                 },
                 "Contoso.CRM.Events.CustomerStatusUpdated": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerStatusUpdated",
                     "description": "A customer's status has been updated",
                     "format": "CloudEvents/1.0",
@@ -138,10 +137,10 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerStatusUpdatedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerStatusUpdatedEventData"
                 },
                 "Contoso.CRM.Events.CustomerAddressUpdated": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerAddressUpdated",
                     "description": "A customer's address has been updated",
                     "format": "CloudEvents/1.0",
@@ -167,10 +166,11 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerAddressUpdatedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerAddressUpdatedEventData"
                 },
                 "Contoso.CRM.Events.CustomerContactUpdated": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerContactUpdated",
                     "description": "A customer's contact information has been updated",
                     "format": "CloudEvents/1.0",
@@ -196,10 +196,10 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerContactUpdatedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerContactUpdatedEventData"
                 },
                 "Contoso.CRM.Events.CustomerNoteAdded": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerNoteAdded",
                     "description": "A note has been added to a customer",
                     "format": "CloudEvents/1.0",
@@ -225,10 +225,10 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteAddedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteAddedEventData"
                 },
                 "Contoso.CRM.Events.CustomerNoteDeleted": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerNoteDeleted",
                     "description": "A note has been deleted from a customer",
                     "format": "CloudEvents/1.0",
@@ -254,10 +254,10 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteDeletedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteDeletedEventData"
                 },
                 "Contoso.CRM.Events.CustomerNoteUpdated": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerNoteUpdated",
                     "description": "A note has been updated on a customer",
                     "format": "CloudEvents/1.0",
@@ -283,10 +283,10 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteUpdatedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteUpdatedEventData"
                 },
                 "Contoso.CRM.Events.CustomerContactAdded": {
-                    "type": "cloudevent",
                     "id": "Contoso.CRM.Events.CustomerContactAdded",
                     "description": "A contact has been added to a customer",
                     "format": "CloudEvents/1.0",
@@ -321,23 +321,23 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.CRM.Events/schemas/customerContactAddedEventData"
+                    "schemaFormat": "JSONSchema/draft-07",
+                    "schemaUrl": "#/schemaGroups/Contoso.CRM.Events/schemas/customerContactAddedEventData"
                 }
             }
         }
     },
-    "schemagroups": {
+    "schemaGroups": {
         "Contoso.CRM.Events": {
-            "type": "schemagroup",
             "id": "Contoso.CRM.Events",
             "schemas": {
                 "customerAddressUpdatedEventData": {
-                    "type": "schema",
                     "id": "customerAddressUpdatedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
+                            "format": "JSONSchema/draft-07",
                             "schema": {
                                 "type": "object",
                                 "properties": {
@@ -383,11 +383,10 @@
                     }
                 },
                 "customerNoteAddedEventData": {
-                    "type": "schema",
                     "id": "customerNoteAddedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -416,11 +415,10 @@
                     }
                 },
                 "customerNoteDeletedEventData": {
-                    "type": "schema",
                     "id": "customerNoteDeletedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -439,11 +437,10 @@
                     }
                 },
                 "customerNoteUpdatedEventData": {
-                    "type": "schema",
                     "id": "customerNoteUpdatedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -472,11 +469,10 @@
                     }
                 },
                 "customerContactAddedEventData": {
-                    "type": "schema",
-                    "id" : "customerContactAddedEventData",
+                    "id": "customerContactAddedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -505,11 +501,10 @@
                     }
                 },
                 "customerContactDeletedEventData": {
-                    "type": "schema",
-                    "id" : "customerContactDeletedEventData",
+                    "id": "customerContactDeletedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -528,11 +523,10 @@
                     }
                 },
                 "customerContactUpdatedEventData": {
-                    "type": "schema",
-                    "id" : "customerContactUpdatedEventData",
+                    "id": "customerContactUpdatedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -561,11 +555,10 @@
                     }
                 },
                 "customerCreatedEventData": {
-                    "type": "schema",
-                    "id" : "customerCreatedEventData",
+                    "id": "customerCreatedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -584,11 +577,10 @@
                     }
                 },
                 "customerStatusUpdatedEventData": {
-                    "type": "schema",
-                    "id" : "customerStatusUpdatedEventData",
+                    "id": "customerStatusUpdatedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -607,11 +599,10 @@
                     }
                 },
                 "customerDeletedEventData": {
-                    "type": "schema",
-                    "id" : "customerDeletedEventData",
+                    "id": "customerDeletedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",
@@ -630,11 +621,10 @@
                     }
                 },
                 "customerUpdatedEventData": {
-                    "type": "schema",
-                    "id" : "customerUpdatedEventData",
+                    "id": "customerUpdatedEventData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "type": "schemaversion",
                             "id": "1.0",
                             "schema": {
                                 "type": "object",

@@ -1,7 +1,7 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "amqp.jinja.include" as amqp -%}
 {%- import "mqtt.jinja.include" as mqtt -%}
-{%- set definitiongroups = root.definitiongroups %}
+{%- set definitionGroups = root.definitionGroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
@@ -27,7 +27,7 @@ using CloudNative.CloudEvents.SystemTextJson;
 {%- endif %}
 using Microsoft.Extensions.Logging;
  
-{% for definitiongroup_key, definitiongroup in definitiongroups.items() -%}
+{% for definitiongroup_key, definitiongroup in definitionGroups.items() -%}
  {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
 namespace {{ project_name | pascal }}
 {
@@ -35,16 +35,16 @@ namespace {{ project_name | pascal }}
     public class {{ class_name }} : IDisposable
     {
         {%- if uses_cloudevents_message %}
-        {{ cloudEvents.DeclareDispatchObjectsFields( definitiongroups ) | indent(8) }}
-        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, definitiongroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsFields( definitionGroups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, definitionGroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
         {%- endif %}
         {%- if uses_amqp_message %}
-        {{ amqp.DeclareDispatchObjectsFields( definitiongroups ) | indent(8) }}
-        {{ amqp.DeclareDispatchObjectsConstructor( project_name, class_name, definitiongroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchMessageAsync += DispatchMessageAsync;") | indent(8) }}
+        {{ amqp.DeclareDispatchObjectsFields( definitionGroups ) | indent(8) }}
+        {{ amqp.DeclareDispatchObjectsConstructor( project_name, class_name, definitionGroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchMessageAsync += DispatchMessageAsync;") | indent(8) }}
         {%- endif %}
         {%- if uses_mqtt_message %}
-        {{ mqtt.DeclareDispatchObjectsFields( definitiongroups ) | indent(8) }}
-        {{ mqtt.DeclareDispatchObjectsConstructor( project_name, class_name, definitiongroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchApplicationMessageAsync += DispatchApplicationMessageAsync;") | indent(8) }}
+        {{ mqtt.DeclareDispatchObjectsFields( definitionGroups ) | indent(8) }}
+        {{ mqtt.DeclareDispatchObjectsConstructor( project_name, class_name, definitionGroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchApplicationMessageAsync += DispatchApplicationMessageAsync;") | indent(8) }}
         {%- endif %}
 
         private ConsumerEndpoint endpoint;
@@ -65,7 +65,7 @@ namespace {{ project_name | pascal }}
         {
             try 
             {
-                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", definitiongroups ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", definitionGroups ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -81,7 +81,7 @@ namespace {{ project_name | pascal }}
         {
             try 
             {
-                {{ amqp.DispatchToDispatchObjects( "amqpMessage", definitiongroups ) | indent(16) }}
+                {{ amqp.DispatchToDispatchObjects( "amqpMessage", definitionGroups ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -97,7 +97,7 @@ namespace {{ project_name | pascal }}
         {
             try 
             {
-               {{ mqtt.DispatchToDispatchObjects( "mqttMessage", definitiongroups ) | indent(16) }}
+               {{ mqtt.DispatchToDispatchObjects( "mqttMessage", definitionGroups ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -123,7 +123,7 @@ namespace {{ project_name | pascal }}
            {%- set isAmqp = not isCloudEvent and endpoint.format.lower().startswith("amqp") %}
            {%- set isMqtt = not isCloudEvent and endpoint.format.lower().startswith("mqtt") %}
                 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( definitiongroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( definitiongroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( definitiongroups, true ) }}) 
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( definitionGroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( definitionGroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( definitionGroups, true ) }}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -140,7 +140,7 @@ namespace {{ project_name | pascal }}
             {%- endfor %}
             };
             var endpoint = ConsumerEndpoint.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints);
-            var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( definitiongroups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( definitiongroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( definitiongroups, false ) -}});
+            var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( definitionGroups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( definitionGroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( definitionGroups, false ) -}});
             return consumer;
         }
         {%- endif -%}

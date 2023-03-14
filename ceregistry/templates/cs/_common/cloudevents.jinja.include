@@ -64,31 +64,31 @@ cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ a
 {%- endfor -%}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchObjectsArgs(definitiongroups, withType) -%}
-{%- for definitiongroup_key, definitiongroup in definitiongroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
+{%- macro DeclareDispatchObjectsArgs(definitionGroups, withType) -%}
+{%- for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
 {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
 {%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsFields(definitiongroups) -%}
-{%- for definitiongroup_key, definitiongroup in definitiongroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
+{%- macro DeclareDispatchObjectsFields(definitionGroups) -%}
+{%- for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
 {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
 I{{ pascalGroupName | strip_namespace }}Dispatcher _{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher;
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, definitiongroups, args, body) -%}
-{%- if definitiongroups | exists("format", "cloudevents" ) %}
+{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, definitionGroups, args, body) -%}
+{%- if definitionGroups | exists("format", "cloudevents" ) %}
 public {{ class_name }}( {{ args }}{%- if args %}, {%- endif -%}
-    {%- for definitiongroup_key, definitiongroup in definitiongroups.items() -%}
+    {%- for definitiongroup_key, definitiongroup in definitionGroups.items() -%}
     {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%} 
     I{{ pascalGroupName | strip_namespace }}Dispatcher {{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%}
 )
 {
-    {%- for definitiongroup_key, definitiongroup in definitiongroups.items() -%}
+    {%- for definitiongroup_key, definitiongroup in definitionGroups.items() -%}
     {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
     this._{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher = {{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher;
     {%- endfor %}
@@ -97,20 +97,20 @@ public {{ class_name }}( {{ args }}{%- if args %}, {%- endif -%}
 {% endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(cloudEvent, definitiongroups) -%}
-{%- if definitiongroups | exists("format", "cloudevents" ) -%}
+{%- macro DispatchToDispatchObjects(cloudEvent, definitionGroups) -%}
+{%- if definitionGroups | exists("format", "cloudevents" ) -%}
 var cloudEventType = {{ cloudEvent }}.Type;
 switch (cloudEventType)
 {
-    {% for definitiongroup_key, definitiongroup in definitiongroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
+    {% for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
     {% for id, definition in definitiongroup.definitions.items() -%}
     {% set pascalDefinitionName = definition.id | pascal %}
     case "{{ definition.id }}":
         if ( this._{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher != null )
         {
             await this._{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher.On{{ pascalDefinitionName | strip_namespace }}Async({{ cloudEvent }},
-                {%- if definition.schemaurl -%}
-            {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ cloudEvent }}.Data)
+                {%- if definition.schemaUrl -%}
+            {{ definition.schemaUrl | schema_type | strip_namespace  | pascal }}.FromData({{ cloudEvent }}.Data)
             {%- else -%}
             {{ cloudEvent }}.Data
             {%- endif %});
@@ -127,13 +127,13 @@ switch (cloudEventType)
 {%- endmacro -%}
 
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
-{%- set definitiongroups = root.definitiongroups -%}
-{%- if definitiongroups | exists("format", "cloudevents" ) %}
+{%- set definitionGroups = root.definitionGroups -%}
+{%- if definitionGroups | exists("format", "cloudevents" ) %}
 {%- set function_name = project_name | pascal -%}
 using System.Threading.Tasks;
 using CloudNative.CloudEvents;
 
-{%- for definitiongroup_key, definitiongroup in definitiongroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
+{%- for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
 {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
 namespace {{ pascalGroupName | namespace(project_name) | pascal }}
 {
@@ -141,8 +141,8 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
     {
         {%- for id, definition in definitiongroup.definitions.items() if (definition | exists( "format", "cloudevents" )) -%}
         {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}
-        {%- if definition.schemaurl -%}
-        {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
+        {%- if definition.schemaUrl -%}
+        {%- set dataType = definition.schemaUrl | schema_type | strip_namespace  | pascal -%}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   

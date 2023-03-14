@@ -91,7 +91,7 @@ def load_definitions_core(definitions_file: str, headers: dict, ignore_handled: 
 
 def load_definitions(definitions_file: str, headers: dict, load_schema: bool = False, ignore_handled: bool = False):
     # for a CloudEvents message definition group, we
-    # normalize the document to be a definitiongroups doc
+    # normalize the document to be a definitionGroups doc
     definitions_file, docroot = load_definitions_core(definitions_file, 
                                                       headers, ignore_handled)
     
@@ -105,16 +105,16 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
         if docroot["$schema"] != "https://cloudevents.io/schemas/registry":
             print("unsupported schema:" + docroot["$schema"])
             return None, None
-    if "definitiongroupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["definitiongroupsUrl"], 
+    if "definitionGroupsUrl" in docroot:
+        _, subroot = load_definitions_core(docroot["definitionGroupsUrl"], 
                                            headers)
-        docroot["definitiongroups"] = subroot
-        docroot["definitiongroupsUrl"] = None
-    if "schemagroupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["schemagroupsUrl"], 
+        docroot["definitionGroups"] = subroot
+        docroot["definitionGroupsUrl"] = None
+    if "schemaGroupsUrl" in docroot:
+        _, subroot = load_definitions_core(docroot["schemaGroupsUrl"], 
                                            headers)
-        docroot["schemagroups"] = subroot
-        docroot["schemagroupsUrl"] = None
+        docroot["schemaGroups"] = subroot
+        docroot["schemaGroupsUrl"] = None
     if "endpointsUrl" in docroot:
         _, subroot = load_definitions_core(docroot["endpointsUrl"], 
                                            headers)
@@ -131,9 +131,9 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
             docroot.keys())[0]]:
         dictentry = docroot[list(docroot.keys())[0]]
         if dictentry["type"] == "definitiongroup":
-            newroot["definitiongroups"] = docroot
+            newroot["definitionGroups"] = docroot
         elif dictentry["type"] == "schemagroup":
-            newroot["schemagroups"] = docroot
+            newroot["schemaGroups"] = docroot
         elif dictentry["type"] == "endpoint":
             newroot["endpoints"] = docroot
         else:
@@ -144,9 +144,9 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
     # the doc is an object
     elif "type" in docroot:
         if docroot["type"] == "definitiongroup":
-            newroot["definitiongroups"] = {docroot["id"]: docroot}
+            newroot["definitionGroups"] = {docroot["id"]: docroot}
         elif docroot["type"] == "schemagroup":
-            newroot["schemagroups"] = {docroot["id"]: docroot}
+            newroot["schemaGroups"] = {docroot["id"]: docroot}
         elif docroot["type"] == "endpoints":
             newroot["endpoints"] = {docroot["id"]: docroot}
         else:

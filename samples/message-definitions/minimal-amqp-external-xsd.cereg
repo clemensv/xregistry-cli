@@ -1,13 +1,12 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.4-wip",
-    "definitiongroups": {
+    "specversion": "0.5-wip",
+    "definitionGroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "type": "definitiongroup",
+                       "format" : "AMQP/1.0",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
-                    "type": "amqp",
                     "id": "Contoso.MyGroup.MyEvent",
                     "format": "AMQP/1.0",
                     "metadata": {
@@ -18,26 +17,23 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
     },
-    "schemagroups": {
+    "schemaGroups": {
         "Contoso.MyEvents": {
-            "type": "schemagroup",
             "id": "Contoso.MyEvents",
             "schemas": {
                 "MyEventData": {
                     "id": "MyEventData",
-                    "type": "schema",
                     "format": "XSD/1.0",
                     "versions": {
                         "1.0": {
                             "id": "1.0",
-                            "type": "schemaversion",
                             "format": "XSD/1.0",
-                            "schemaurl": "  https://contoso.com/schemas/myeventdata/1.0.xsd"
+                            "schemaUrl": "  https://contoso.com/schemas/myeventdata/1.0.xsd"
                         }
                     }
                 }

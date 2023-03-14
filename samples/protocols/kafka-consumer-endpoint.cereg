@@ -1,36 +1,34 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.4-wip",
+    "specversion": "0.5-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "endpoints": {
         "Fabrikam.RedmondUsWa.Building42.Environment.Temperature": {
-            "type": "endpoint",
             "id": "Fabrikam.RedmondUsWa.Building42.Environment.Temperature",
             "usage": "consumer",
             "config": {
-                "protocol": "KAFKA/3.0",
+                "protocol": "Kafka",
                 "strict": false,
                 "endpoints": [
                     "SSL://myserver.example.com"
                 ],
                 "options": {
                     "topic": "temperature",
-                    "consumer-group" : "specificgroup"
+                    "consumer-group": "specificgroup"
                 }
             },
-            "definitiongroups": [
-                "#/definitiongroups/Contoso.MyGroup"
+            "definitionGroups": [
+                "#/definitionGroups/Contoso.MyGroup"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitiongroups": {
+    "definitionGroups": {
         "Contoso.Sensors.Temperature": {
-            "type": "definitiongroup",
             "id": "Contoso.ERP.Events",
+            "format": "CloudEvents/1.0",
             "definitions": {
                 "Contoso.Sensors.Temperature.Metrics": {
-                    "type": "cloudevent",
                     "id": "Contoso.Sensors.Temperature.Metrics",
                     "description": "A set of metrics emitted by a temperature sensor",
                     "format": "CloudEvents/1.0",
@@ -48,24 +46,22 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
+                    "schemaFormat": "Avro/1.11.0",
+                    "schemaUrl": "#/schemaGroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
             }
         }
     },
-    "schemagroups": {
+    "schemaGroups": {
         "Contoso.Sensors.Temperature": {
-            "type": "schemagroup",
             "id": "Contoso.Sensors.Temperature",
             "schemas": {
                 "temperatureData": {
-                    "type": "schema",
-                    "format":"Avro/1.11.0",
+                    "format": "Avro/1.11.0",
                     "id": "temperatureData",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
-                            "format":"Avro/1.11.0",
+                            "format": "Avro/1.11.0",
                             "id": "1",
                             "schema": {
                                 "type": "record",
@@ -79,8 +75,14 @@
                                                 "name": "Metric",
                                                 "type": "record",
                                                 "fields": [
-                                                    { "name": "timestamp", "type": "long" },
-                                                    { "name": "value", "type": "double" }
+                                                    {
+                                                        "name": "timestamp",
+                                                        "type": "long"
+                                                    },
+                                                    {
+                                                        "name": "value",
+                                                        "type": "double"
+                                                    }
                                                 ]
                                             }
                                         }
@@ -92,6 +94,5 @@
                 }
             }
         }
-        
     }
 }

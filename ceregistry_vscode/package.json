@@ -29,7 +29,7 @@
       "fileMatch": [
         "*.cereg"
       ],
-      "url": "./schemas/ce_registry_doc.json"
+      "url": "./schemas/*.json"
     }
   ],
   "contributes": {

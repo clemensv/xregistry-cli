@@ -1,5 +1,5 @@
 $schema: https://cloudevents.io/schemas/registry
-specversion: 0.4-wip
+specversion: 0.5-wip
 endpoints:
   Contoso.CRM.Eventing.Http:
     type: endpoint
@@ -10,13 +10,14 @@ endpoints:
       strict: false
       endpoints:
         - https://erpsystem.com/events
-    definitiongroups:
-      - "#/definitiongroups/Contoso.CRM.Events"
+    definitionGroups:
+      - "#/definitionGroups/Contoso.CRM.Events"
     format: CloudEvents/1.0
-definitiongroups:
+definitionGroups:
   Contoso.CRM.Events:
     id: Contoso.CRM.Events
     type: definitiongroup
+    format: CloudEvents/1.0
     definitions:
       Contoso.CRM.Events.CustomerCreated:
         type: cloudevent
@@ -39,7 +40,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerCreatedEventData"
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerCreatedEventData"
       Contoso.CRM.Events.CustomerUpdated:
         type: cloudevent
         id: Contoso.CRM.Events.CustomerUpdated
@@ -61,7 +62,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerUpdatedEventData"
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerUpdatedEventData"
       Contoso.CRM.Events.CustomerDeleted:
         type: cloudevent
         id: Contoso.CRM.Events.CustomerDeleted
@@ -83,7 +84,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerDeletedEventData"
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerDeletedEventData"
       Contoso.CRM.Events.CustomerStatusUpdated:
         type: cloudevent
         id: Contoso.CRM.Events.CustomerStatusUpdated
@@ -105,7 +106,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerStatusUpdatedEven\
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerStatusUpdatedEven\
           tData"
       Contoso.CRM.Events.CustomerAddressUpdated:
         type: cloudevent
@@ -128,7 +129,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerAddressUpdatedEve\
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerAddressUpdatedEve\
           ntData"
       Contoso.CRM.Events.CustomerContactUpdated:
         type: cloudevent
@@ -151,7 +152,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerContactUpdatedEve\
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerContactUpdatedEve\
           ntData"
       Contoso.CRM.Events.CustomerNoteAdded:
         type: cloudevent
@@ -174,7 +175,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteAddedEventData"
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteAddedEventData"
       Contoso.CRM.Events.CustomerNoteDeleted:
         type: cloudevent
         id: Contoso.CRM.Events.CustomerNoteDeleted
@@ -196,7 +197,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteDeletedEventD\
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteDeletedEventD\
           ata"
       Contoso.CRM.Events.CustomerNoteUpdated:
         type: cloudevent
@@ -219,7 +220,7 @@ definitiongroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteUpdatedEventD\
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteUpdatedEventD\
           ata"
       Contoso.CRM.Events.CustomerContactAdded:
         type: cloudevent
@@ -250,9 +251,9 @@ definitiongroups:
               type: string
               required: false
               description: The subject of the event
-        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerContactAddedEvent\
+        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerContactAddedEvent\
           Data"
-schemagroups:
+schemaGroups:
   Contoso.CRM.Events:
     type: schemagroup
     id: Contoso.CRM.Events
@@ -260,6 +261,7 @@ schemagroups:
       customerAddressUpdatedEventData:
         type: schema
         id: customerAddressUpdatedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -297,6 +299,7 @@ schemagroups:
       customerNoteAddedEventData:
         type: schema
         id: customerNoteAddedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -320,6 +323,7 @@ schemagroups:
       customerNoteDeletedEventData:
         type: schema
         id: customerNoteDeletedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -336,6 +340,7 @@ schemagroups:
       customerNoteUpdatedEventData:
         type: schema
         id: customerNoteUpdatedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -359,6 +364,7 @@ schemagroups:
       customerContactAddedEventData:
         type: schema
         id: customerContactAddedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -382,6 +388,7 @@ schemagroups:
       customerContactDeletedEventData:
         type: schema
         id: customerContactDeletedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -398,6 +405,7 @@ schemagroups:
       customerContactUpdatedEventData:
         type: schema
         id: customerContactUpdatedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -421,6 +429,7 @@ schemagroups:
       customerCreatedEventData:
         type: schema
         id: customerCreatedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -437,6 +446,7 @@ schemagroups:
       customerStatusUpdatedEventData:
         type: schema
         id: customerStatusUpdatedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -453,6 +463,7 @@ schemagroups:
       customerDeletedEventData:
         type: schema
         id: customerDeletedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
@@ -469,6 +480,7 @@ schemagroups:
       customerUpdatedEventData:
         type: schema
         id: customerUpdatedEventData
+        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion

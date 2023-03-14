@@ -1,14 +1,13 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.4-wip",
+    "specversion": "0.5-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "definitiongroups": {
+    "definitionGroups": {
         "Contoso.ERP.Events": {
-            "type": "definitiongroup",
-            "id": "Contoso.ERP.Events",
+                       "id": "Contoso.ERP.Events",
+            "format": "CloudEvents/1.0",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {
-                    "type": "cloudevent",
                     "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
@@ -34,32 +33,38 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
+                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 }
             }
         }
     },
-    "schemagroups": {
+    "schemaGroups": {
         "Contoso.ERP.Events": {
-            "type": "schemagroup",
             "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
-                    "type": "schema",
-                    "format":"Avro/1.8.2",
+                    "format": "Avro/1.8.2",
                     "id": "orderData",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
-                            "format":"Avro/1.8.2",
+                            "format": "Avro/1.8.2",
                             "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "OrderData",
                                 "fields": [
-                                    { "name": "orderId", "type": "string" },
-                                    { "name": "customerId", "type": "string" },
-                                    { "name": "total", "type": "double" },
+                                    {
+                                        "name": "orderId",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "name": "customerId",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "name": "total",
+                                        "type": "double"
+                                    },
                                     {
                                         "name": "items",
                                         "type": {
@@ -68,9 +73,18 @@
                                                 "name": "Item",
                                                 "type": "record",
                                                 "fields": [
-                                                    { "name": "productId", "type": "string" },
-                                                    { "name": "quantity", "type": "double" },
-                                                    { "name": "price", "type": "double" }
+                                                    {
+                                                        "name": "productId",
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "name": "quantity",
+                                                        "type": "double"
+                                                    },
+                                                    {
+                                                        "name": "price",
+                                                        "type": "double"
+                                                    }
                                                 ]
                                             }
                                         }

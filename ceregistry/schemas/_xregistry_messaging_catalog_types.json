@@ -1,0 +1,81 @@
+﻿{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "properties": {
+    "refs": {
+      "$ref": "#/definitions/refs"
+    }
+  },
+  "definitions": {
+    "refs": {
+      "type": "object",
+      "title": "foo",
+      "properties": {
+        "endpoint": {
+          "$ref": "xregistry_endpoint_registry.json#/definitions/endpoint"
+        },
+        "endpointConfig": {
+          "$ref": "xregistry_endpoint_registry.json#/definitions/endpointConfig"
+        },
+        "endpointConfigSubscriber": {
+          "$ref": "xregistry_endpoint_registry.json#/definitions/endpointConfigSubscriber"
+        },
+        "endpointConfigProducer": {
+          "$ref": "xregistry_endpoint_registry.json#/definitions/endpointConfigProducer"
+        },
+        "endpointConfigConsumer": {
+          "$ref": "xregistry_endpoint_registry.json#/definitions/endpointConfigConsumer"
+        },
+        "endpointOptionsMqtt": {
+          "$ref": "xregistry_endpoint_registry_mqtt.json#/definitions/endpointOptionsMqtt"
+        },
+        "endpointOptionsAmqp": {
+          "$ref": "xregistry_endpoint_registry_amqp.json#/definitions/endpointOptionsAmqp"
+        },
+        "endpointOptionsHttp": {
+          "$ref": "xregistry_endpoint_registry_http.json#/definitions/endpointOptionsHttp"
+        },
+        "endpointOptionsKafka": {
+          "$ref": "xregistry_endpoint_registry_kafka.json#/definitions/endpointOptionsKafka"
+        },
+        "endpointOptionsNats": {
+          "$ref": "xregistry_endpoint_registry_nats.json#/definitions/endpointOptionsNats"
+        },
+        "mqttMetadata": {
+          "$ref": "xregistry_messagedefinition_registry_mqtt.json#/definitions/mqttMetadata"
+        },
+        "amqpMetadata": {
+          "$ref": "xregistry_messagedefinition_registry_amqp.json#/definitions/amqpMetadata"
+        },
+        "httpMetadata": {
+          "$ref": "xregistry_messagedefinition_registry_http.json#/definitions/httpMetadata"
+        },
+        "kafkaMetadata": {
+          "$ref": "xregistry_messagedefinition_registry_kafka.json#/definitions/kafkaMetadata"
+        },
+        "cloudEventMetadata": {
+          "$ref": "xregistry_messagedefinition_registry_cloudevents.json#/definitions/cloudEventMetadata"
+        },
+        "mqttDefinition": {
+          "$ref": "xregistry_messagedefinition_registry_mqtt.json#/definitions/mqttDefinition"
+        },
+        "amqpDefinition": {
+          "$ref": "xregistry_messagedefinition_registry_amqp.json#/definitions/amqpDefinition"
+        },
+        "httpDefinition": {
+          "$ref": "xregistry_messagedefinition_registry_http.json#/definitions/httpDefinition"
+        },
+        "kafkaDefinition": {
+          "$ref": "xregistry_messagedefinition_registry_kafka.json#/definitions/kafkaDefinition"
+        },
+        "cloudEventDefinition": {
+          "$ref": "xregistry_messagedefinition_registry_cloudevents.json#/definitions/cloudEventDefinition"
+        }
+      },
+      "required": [
+        "endpointConfigSubscriber",
+        "endpointConfigProducer",
+        "endpointConfigConsumer"
+      ]
+    }
+  }
+}

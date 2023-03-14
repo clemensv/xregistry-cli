@@ -262,19 +262,19 @@ templates use the [`schema_type`](#schema_type) filter to determine the correct
 type name for a given referenced schema type for a payload.
 
 For example, the C# code generator for CloudEvents uses the following template,
-which infers required schema type names from the schemaurl property of
+which infers required schema type names from the schemaUrl property of
 CloudEvents definitions with the help of the `schema_type` filter. The filter
 does not collect duplicates.
 
 ```jinja
-{%- for definitiongroup_key, definitiongroup in definitiongroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
+{%- for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
 namespace {{ definitiongroup.id | default(definitiongroup_key) | namespace(project_name) | pascal }}
 {
     public interface I{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | pascal }}Dispatcher
     {
         {%- for id, definition in definitiongroup.definitions.items() if (definition | exists( "format", "cloudevents" )) -%}
-        {%- if definition.schemaurl -%}
-        {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
+        {%- if definition.schemaUrl -%}
+        {%- set dataType = definition.schemaUrl | schema_type | strip_namespace  | pascal -%}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}
@@ -294,9 +294,9 @@ variable's structure reflects the respective input document.
 - For code generators for message payload schemas, the `root` variable is the
   root of the CloudEvents Discovery document, corresponding to the CloudEvent
   Discovery schema type `document`. Underneath `root` are three collections:
-  - `definitiongroups` - a dictionary of message definition groups, keyed by the
+  - `definitionGroups` - a dictionary of message definition groups, keyed by the
     definitiongroup's ID.
-  - `schemagroups` - a dictionary of schema definition groups, keyed by the
+  - `schemaGroups` - a dictionary of schema definition groups, keyed by the
     definitiongroup's ID.
   - `endpoints` - a dictionary of endpoints, keyed by the endpoint's ID.
 - For JSON schema, the `root` variable is the root of the JSON schema document.
@@ -470,9 +470,9 @@ called macro:
 
 ```jinja
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
-{%- set definitiongroups = root.definitiongroups -%}
-{%- if definitiongroups | exists("format", "amqp" ) %}
-{%- for definitiongroup_key, definitiongroup in definitiongroups.items() if (definitiongroup | exists("format", "amqp" )) -%}
+{%- set definitionGroups = root.definitionGroups -%}
+{%- if definitionGroups | exists("format", "amqp" ) %}
+{%- for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "amqp" )) -%}
 {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
 {%- set interfaceName = "I"+(pascalGroupName | strip_namespace)+"AmqpDispatcher" -%}
 {{- DeclareDispatchInterface(project_name, definitiongroup, pascalGroupName, interfaceName) | pushfile(interfaceName+".java") -}}
@@ -586,12 +586,12 @@ with the highest version number.
 Example:
 
 ```jinja
-{%- set schemaObj = schema_object(root, event.schemaurl ) -%}
-    {%- if schemaObj.type == "schema" -%}
+{%- set schemaObj = schema_object(root, event.schemaUrl ) -%}
+    {%- if schemaObj.format is defined -%}
        {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
 ```
 
-#### `schema_object(root, schemaurl)`
+#### `schema_object(root, schemaUrl)`
 
 Gets an object resolving a given relative URL. This is useful for getting the
 schema object for a given event or command.
@@ -599,8 +599,8 @@ schema object for a given event or command.
 Example:
 
 ```jinja
-{%- set schemaObj = schema_object(root, event.schemaurl ) -%}
-    {%- if schemaObj.type == "schema" -%}
+{%- set schemaObj = schema_object(root, event.schemaUrl ) -%}
+    {%- if schemaObj.format is defined -%}
 ```
 
 ### Tags

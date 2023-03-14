@@ -1,9 +1,8 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.4-wip",
+    "specversion": "0.5-wip",
     "endpoints": {
         "Contoso.ERP.Eventing.HttpProducer": {
-            "type": "endpoint",
             "id": "Contoso.ERP.Eventing.HttpProducer",
             "usage": "producer",
             "config": {
@@ -13,13 +12,12 @@
                     "http://localhost:11002/events/"
                 ]
             },
-            "definitiongroups": [
-                "#/definitiongroups/Contoso.ERP.Events"
+            "definitionGroups": [
+                "#/definitionGroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         },
         "Contoso.ERP.Eventing.HttpConsumer": {
-            "type": "endpoint",
             "id": "Contoso.ERP.Eventing.HttpConsumer",
             "usage": "consumer",
             "config": {
@@ -29,19 +27,18 @@
                     "http://localhost:11002/events/"
                 ]
             },
-            "definitiongroups": [
-                "#/definitiongroups/Contoso.ERP.Events"
+            "definitionGroups": [
+                "#/definitionGroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitiongroups": {
+    "definitionGroups": {
         "Contoso.ERP.Events": {
-            "type": "definitiongroup",
             "id": "Contoso.ERP.Events",
+            "format": "CloudEvents/1.0",
             "definitions": {
                 "Contoso.ERP.Events.ReservationPlaced": {
-                    "type": "cloudevent",
                     "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
@@ -67,11 +64,10 @@
                             }
                         }
                     },
-                    "schemaformat": "Protobuf/3.0",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
+                    "schemaFormat": "Protobuf/3.0",
+                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 },
                 "Contoso.ERP.Events.PaymentsReceived": {
-                    "type": "cloudevent",
                     "id": "Contoso.ERP.Events.PaymentsReceived",
                     "format": "CloudEvents/1.0",
                     "description": "A payment has been received",
@@ -97,11 +93,10 @@
                             }
                         }
                     },
-                    "schemaformat": "Protobuf/3.0",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/paymentData:PaymentData"
+                    "schemaFormat": "Protobuf/3.0",
+                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/paymentData:PaymentData"
                 },
                 "Contoso.ERP.Events.ShipmentAccepted": {
-                    "type": "cloudevent",
                     "id": "Contoso.ERP.Events.ShipmentAccepted",
                     "description": "A shipment has been accepted",
                     "format": "CloudEvents/1.0",
@@ -127,11 +122,10 @@
                             }
                         }
                     },
-                    "schemaformat": "Protobuf/3.0",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData:ShipmentData"
+                    "schemaFormat": "Protobuf/3.0",
+                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/shipmentData:ShipmentData"
                 },
                 "Contoso.ERP.Events.ShipmentRejected": {
-                    "type": "cloudevent",
                     "id": "Contoso.ERP.Events.ShipmentRejected",
                     "description": "A shipment has been rejected",
                     "format": "CloudEvents/1.0",
@@ -157,11 +151,10 @@
                             }
                         }
                     },
-                    "schemaformat": "Protobuf/3.0",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData:ShipmentData"
+                    "schemaFormat": "Protobuf/3.0",
+                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/shipmentData:ShipmentData"
                 },
                 "Contoso.ERP.Events.ReservationCancelled": {
-                    "type": "cloudevent",
                     "id": "Contoso.ERP.Events.ReservationCancelled",
                     "description": "A reservation has been cancelled",
                     "format": "CloudEvents/1.0",
@@ -187,24 +180,21 @@
                             }
                         }
                     },
-                    "schemaformat": "Protobuf/3.0",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData:CancellationData"
+                    "schemaFormat": "Protobuf/3.0",
+                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/cancellationData:CancellationData"
                 }
             }
         }
     },
-    "schemagroups": {
+    "schemaGroups": {
         "Contoso.ERP.Events": {
-            "type": "schemagroup",
             "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
-                    "type": "schema",
                     "id": "orderData",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
                             "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message OrderData { string orderId = 1; string customerId = 2; double total = 3; repeated Item items = 4; } message Item { string productId = 1; double quantity = 2; double price = 3; }"
@@ -212,12 +202,10 @@
                     }
                 },
                 "paymentData": {
-                    "type": "schema",
                     "id": "paymentData",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
                             "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message PaymentData { string transactionId = 1; string orderId = 2; double amount = 3; string status = 4; string paymentMethod = 5; }"
@@ -225,12 +213,10 @@
                     }
                 },
                 "shipmentData": {
-                    "type": "schema",
                     "id": "shipmentData",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
                             "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message ShipmentData { string trackingNumber = 1; string orderId = 2; string status = 3; string courierName = 4; }"
@@ -238,12 +224,10 @@
                     }
                 },
                 "cancellationData": {
-                    "type": "schema",
                     "id": "cancellationData",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "type": "schemaversion",
                             "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message CancellationData { string orderId = 1; string reason = 2; string status = 3; }"

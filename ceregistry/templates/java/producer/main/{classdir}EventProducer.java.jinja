@@ -1,7 +1,7 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "amqp.jinja.include" as amqp -%}
 {%- import "mqtt.jinja.include" as mqtt -%}
-{%- set definitiongroups = root.definitiongroups %}
+{%- set definitionGroups = root.definitionGroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_http_endpoint = (root | exists( "protocol", "http" )) %}
 {%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
@@ -39,7 +39,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.ArrayList;
 
 
-{% for definitiongroup_key, definitiongroup in definitiongroups.items() -%}
+{% for definitiongroup_key, definitiongroup in definitionGroups.items() -%}
 {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
 {%- set className = (pascalGroupName | strip_namespace)+"EventProducer" %}
 public class {{ className }}
@@ -106,9 +106,9 @@ public class {{ className }}
     {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}
     {%- set isMqtt = not isCloudEvent and definition.format.lower().startswith("mqtt") %}
     public CompletableFuture<Void> send{{ pascalDefinitionName | strip_namespace }}Async(
-    {%- if definition.schemaurl -%}
+    {%- if definition.schemaUrl -%}
     {%- set toBytes="data.toByteArray()" -%}
-    {{ definition.schemaurl | schema_type | strip_namespace | pascal }} data
+    {{ definition.schemaUrl | schema_type | strip_namespace | pascal }} data
     {%- else -%}
     {% set toBytes="data.toBytes()" %}
     CloudEventData data

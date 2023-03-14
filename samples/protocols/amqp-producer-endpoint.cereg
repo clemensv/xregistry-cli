@@ -1,8 +1,7 @@
 {
-    "specversion": "0.4-wip",
+    "specversion": "0.5-wip",
     "endpoints": {
         "Contoso.MyAmqpProducer": {
-            "type": "endpoint",
             "id": "Contoso.MyAmqpProducer",
             "usage": "producer",
             "config": {
@@ -12,19 +11,18 @@
                     "amqps://cediscoveryinterop.example.com/topic"
                 ]
             },
-            "definitiongroups": [
-                "#/definitiongroups/Contoso.MyGroup"
+            "definitionGroups": [
+                "#/definitionGroups/Contoso.MyGroup"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitiongroups": {
+    "definitionGroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "type": "definitiongroup",
+            "format": "AMQP/1.0",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
-                    "type": "amqp",
                     "id": "Contoso.MyGroup.MyEvent",
                     "format": "AMQP/1.0",
                     "metadata": {
@@ -52,24 +50,21 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData",
+                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData",
                 }
             }
         }
     },
-    "schemagroups": {
+    "schemaGroups": {
         "Contoso.MyEvents": {
-            "type": "schemagroup",
             "id": "Contoso.MyEvents",
             "schemas": {
                 "MyEventData": {
                     "id": "MyEventData",
-                    "type": "schema",
                     "format": "JsonSchema/draft-07",
                     "versions": {
                         "1.0": {
                             "id": "1.0",
-                            "type": "schemaversion",
                             "format": "JsonSchema/draft-07",
                             "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",

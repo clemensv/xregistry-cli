@@ -428,7 +428,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     #    the local reference 
 
                     schema_version = None
-                    if "type" in schema_root and schema_root["type"] == "schema" and "versions" in schema_root:
+                    if "format" in schema_root and "versions" in schema_root:
                         # the reference pointed to a schema definition. Now we need to find the
                         # most recent version in the versions dictionary by sorting the keys
                         # and picking the last one. To sort the keys, we need to make them the same length 
@@ -437,13 +437,13 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         max_key_length = max([len(key) for key in versions.keys()])
                         sorted_keys = sorted(versions.keys(), key=lambda key: key.rjust(max_key_length))
                         schema_version = versions[sorted_keys[-1]]
-                    elif "type" in schema_root and schema_root["type"] == "schemaversion":
+                    elif "schema" in schema_root or "schemaUrl" in schema_root:
                         # the reference pointed to a schema version definition
                         schema_version = schema_root
 
                     if schema_version and isinstance(schema_version,dict):
-                        if "schemaformat" in schema_version:
-                            schema_format = schema_version["schemaformat"]
+                        if "schemaFormat" in schema_version:
+                            schema_format = schema_version["schemaFormat"]
 
                         # case c): if the schema version contains a schemaUrl attribute, then we need to
                         # add the schemaUrl to the list of schemas to be processed and continue
@@ -463,7 +463,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                                 format_string = schema_version["format"].lower()
                                 if format_string.startswith("proto"):
                                     schema_format_short = "proto"
-                                elif format_string.startswith("json"):
+                                elif format_string.startswith("jsonschema"):
                                     schema_format_short = "json"
                                 elif format_string.startswith("avro"):
                                     schema_format_short = "avro"
@@ -509,7 +509,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 #            namespace/package name plus {classname}
 # the {class*} patterns break the input information set up such that the
 # generator is fed just one CloudEvent definition but the information set
-# remains anchored at "definitiongroups"
+# remains anchored at "definitionGroups"
 def render_code_templates(project_name : str, style : str, output_dir : str, docroot : dict,
                           code_template_dirs : list, env : jinja2.Environment, post_process : bool, template_args : dict, suppress_output : bool = False):
     class_name = None
@@ -524,7 +524,7 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                     continue
 
                 template_path = relpath + "/" + file  
-                # all codegen for CE is anchored on the included definitiongroups
+                # all codegen for CE is anchored on the included definitionGroups
                 scope = docroot
 
                 file_dir = file_dir_base = os.path.join(output_dir, os.path.join(*relpath.split("/")))
@@ -546,22 +546,22 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                                                         pascal(project_name))
                 file_name = file_name_base
                 if file_name.startswith("{class"):
-                    if "definitiongroups" in scope:
+                    if "definitionGroups" in scope:
                         if "endpoints" in docroot: endpoints = docroot["endpoints"]
                         else: endpoints = None
-                        if "schemagroups" in docroot:
-                            schemagroups = docroot["schemagroups"]
+                        if "schemaGroups" in docroot:
+                            schemaGroups = docroot["schemaGroups"]
                         else:
-                            schemagroups = None
+                            schemaGroups = None
 
-                        for id, definitiongroup in scope["definitiongroups"].items():
+                        for id, definitiongroup in scope["definitionGroups"].items():
                             # create a snippet that only has the current definitiongroup
                             subscope = {
                                 "endpoints": endpoints,
-                                "schemagroups": schemagroups,
-                                "definitiongroups": {}
+                                "schemaGroups": schemaGroups,
+                                "definitionGroups": {}
                             }
-                            subscope["definitiongroups"][id] = definitiongroup
+                            subscope["definitionGroups"][id] = definitiongroup
                             scope_parts = id.split(".")
                             package_name = id
                             if not package_name:

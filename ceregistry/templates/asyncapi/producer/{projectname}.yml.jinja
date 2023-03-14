@@ -64,7 +64,7 @@ channels:
         {%- endif %}
         payload:
           oneOf:
-          {%- for definitiongroup in endpoint.definitiongroups -%}
+          {%- for definitiongroup in endpoint.definitionGroups -%}
             {%- set groupObject = schema_object(root, definitiongroup) %}
             {%- if groupObject is mapping %}
             {%- for eventkey, event in groupObject.definitions.items() %}
@@ -76,7 +76,7 @@ channels:
   {#- binary mode #}
       message:
         oneOf:  
-        {%- for definitiongroup in endpoint.definitiongroups -%}
+        {%- for definitiongroup in endpoint.definitionGroups -%}
           {%- set groupObject = schema_object(root, definitiongroup) %}
           {%- if groupObject is mapping %}
           {%- for eventkey, event in groupObject.definitions.items() -%}         
@@ -95,7 +95,7 @@ components:
     {%- set protocol = message.split(':')[0] -%}
     {%- set groupid = message.split(':')[1] -%}
     {%- set eventid = message.split(':')[2] -%}
-    {%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() if definitiongroup_key == groupid -%}
+    {%- for definitiongroup_key, definitiongroup in root.definitionGroups.items() if definitiongroup_key == groupid -%}
     {%- for eventkey, event in definitiongroup.definitions.items() if eventkey == eventid %}
     {{protocol | pascal}}{{ event.id | concat_namespace | pascal }}:
       messageId: "{{protocol | pascal}}{{ event.id | concat_namespace | pascal }}"
@@ -157,16 +157,16 @@ components:
                    {%- endif %}
             bindingVersion: '0.1.0'
         {%- endif %}
-        {%- if event.schemaurl %}
-            {%- if event.schemaurl.startswith('#') %}
-              {%- set schemaObj = schema_object(root, event.schemaurl ) -%}
-                {%- if schemaObj.type == "schema" -%}
+        {%- if event.schemaUrl %}
+            {%- if event.schemaUrl.startswith('#') %}
+              {%- set schemaObj = schema_object(root, event.schemaUrl ) -%}
+                {%- if schemaObj.format is defined -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
                   {%- if schemaVersion.schema is defined -%}
                   {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
       schemaFormat: "application/schema+json;version=draft-07"
       payload:
-          $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+          $ref: "#/components/schemas/{{ event.schemaUrl[1:].split('/')[-3] | pascal }}.{{ event.schemaUrl[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
                   {%- set fileName = (schemaObj.id | lower | snake) +".proto" -%}
                   {%- set x = schemaVersion.schema | pushfile(fileName) %}
@@ -183,7 +183,7 @@ components:
                 {%- endif -%}
               {%- endif -%}
             {%- else %}
-            $ref: "{{ event.schemaurl }}"
+            $ref: "{{ event.schemaUrl }}"
             {%- endif %}
         {%- else %}
             type: "object"
@@ -194,7 +194,7 @@ components:
   {%- endif %}  
   schemas:
   {%- if ce_content_mode == "structured" -%}
-  {%- for definitiongroup_key, definitiongroup in root.definitiongroups.items() -%}
+  {%- for definitiongroup_key, definitiongroup in root.definitionGroups.items() -%}
     {%- for eventkey, event in definitiongroup.definitions.items() %}
     {{ event.id }}:
       type: "object"
@@ -230,14 +230,14 @@ components:
           {%- endif %}
         {%- endfor %}
         data:
-        {%- if event.schemaurl %}
-             {%- if event.schemaurl.startswith('#') %}
-              {%- set schemaObj = schema_object(root, event.schemaurl ) -%}
-                {%- if schemaObj.type == "schema" -%}
+        {%- if event.schemaUrl %}
+             {%- if event.schemaUrl.startswith('#') %}
+              {%- set schemaObj = schema_object(root, event.schemaUrl ) -%}
+                {%- if schemaObj.format is defined -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
                   {%- if schemaVersion.schema is defined -%}
                   {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
-                  $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+                  $ref: "#/components/schemas/{{ event.schemaUrl[1:].split('/')[-3] | pascal }}.{{ event.schemaUrl[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
                   {%- set x = schemaVersion.schema | pushfile(schemaObj.id+".proto") %}
                   type: string
@@ -250,7 +250,7 @@ components:
                 {%- endif -%}
               {%- endif -%}
             {%- else %}
-            $ref: "{{ event.schemaurl }}"
+            $ref: "{{ event.schemaUrl }}"
             {%- endif %}
         {%- else %}
             type: "object"
@@ -264,17 +264,17 @@ components:
     {%- endfor -%}
   {%- endfor -%}
   {%- endif %}
-  {%- if root.schemagroups is defined -%}
-    {%- for schemagroupkey in root.schemagroups.keys() if schemagroupkey != "type" -%}
-      {%- set schemagroup = root.schemagroups[schemagroupkey] -%}
-       {%- for schemakey, schema in schemagroup.schemas.items() if schemakey != "type" and not schema.format is defined or schema.format.lower().startswith("json") -%}
+  {%- if root.schemaGroups is defined -%}
+    {%- for schemagroupkey in root.schemaGroups.keys() -%}
+      {%- set schemagroup = root.schemaGroups[schemagroupkey] -%}
+       {%- for schemakey, schema in schemagroup.schemas.items() if schema.format.lower().startswith("json") -%}
           {%- set newest_schemaversion = latest_dict_entry(schema.versions) %} 
     {{ schemagroupkey | pascal }}.{{ schemakey | pascal }}:
-            {%- if newest_schemaversion.schemaurl is defined -%}
-            {%- if ns.newest_schemaversion.schemaurl.startswith('#') %}
-      $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaurl.split('#/schemagroups/')[1] }}"
+            {%- if newest_schemaversion.schemaUrl is defined -%}
+            {%- if ns.newest_schemaversion.schemaUrl.startswith('#') %}
+      $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaUrl.split('#/schemaGroups/')[1] }}"
             {%- else %}
-            $ref: "{{ newest_schemaversion.schemaurl }}"
+            $ref: "{{ newest_schemaversion.schemaUrl }}"
             {%- endif -%}
             {%- else %} 
       {{ newest_schemaversion.schema | toyaml(3) | indent(6) }}
