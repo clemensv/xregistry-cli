@@ -13,7 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
     try {
         // call the CLI tool with the list --format=json option and see if it works
         // take the stdout and parse it as JSON
-        let output = child_process.execSync('ceregistry list --format=json', { encoding: 'utf8' });
+        let output = child_process.execSync('xregistry list --format=json', { encoding: 'utf8' });
         langsStyles = JSON.parse(output);
     } catch (err) {
         toolInstalled = false;
@@ -21,9 +21,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     if (!toolInstalled) {
         let callback = async () => {
-            vscode.window.showInformationMessage(`The "ceregistry CLI tool" is not installed. Please install it and then reload the window.`);
+            vscode.window.showInformationMessage(`The "xregistry CLI tool" is not installed. Please install it and then reload the window.`);
         }
-        let disposable = vscode.commands.registerCommand('ceregistry.ui', callback);
+        let disposable = vscode.commands.registerCommand('xregistry.ui', callback);
         context.subscriptions.push(disposable);
         return;
     }
@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
         }        
     }
 
-    let disposable = vscode.commands.registerCommand('ceregistry.ui', async (filePath) => {
+    let disposable = vscode.commands.registerCommand('xregistry.ui', async (filePath) => {
         let definitionsFile = filePath ? filePath.fsPath : "";
         
         if (!filePath) {

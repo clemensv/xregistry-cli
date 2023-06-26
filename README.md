@@ -31,7 +31,7 @@ and eventing objects. This project is a client for interacting with a CloudEvent
 can, as one feature, generate code from the discovery metadata held in the registry.
 
 A current, formal document schema for discovery documents (.cereg) is embedded in this
-project at [ceregistry/schemas/xregistry_messaging_catalog.json](ceregistry/schemas/xregistry_messaging_catalog.json). 
+project at [xregistry/schemas/xregistry_messaging_catalog.json](xregistry/schemas/xregistry_messaging_catalog.json). 
 
 > The schema in this prototype reflects changes not yet merged into the formal 
 > spec docs in the CloudEvents project repo.
@@ -233,10 +233,10 @@ If you want to develop locally and/or run the included tests follow the instruct
 
 ## Usage
 
-The tool is invoked as `ceregistry` and supports the following subcommands:
-- `ceregistry generate`:  Generate code
-- `ceregistry validate`:  Validate a definition
-- `ceregistry list`: List available templates
+The tool is invoked as `xregistry` and supports the following subcommands:
+- `xregistry generate`:  Generate code
+- `xregistry validate`:  Validate a definition
+- `xregistry list`: List available templates
 
 ### Generate
 
@@ -290,7 +290,7 @@ Especially noteworthy might be the support for both AsyncAPI and OpenAPI.
 
 The tool can generate AsyncAPI definitions for producer endpoints with: 
 ```shell
-ceregistry generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer
+xregistry generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer
 ``` 
 
 This will yield a `MyProjectProducer/MyProjectProducer.yml' file that can be used to generate a
@@ -299,7 +299,7 @@ producer client for the given endpoint.
 Similarly, the tool can generate OpenAPI definitions for subscriber endpoints with: 
 
 ```shell
-ceregistry generate --language=openapi --style=subscriber --projectname=MyProjectSubscriber --definitions=definitions.cereg --output=MyProjectSubscriber
+xregistry generate --language=openapi --style=subscriber --projectname=MyProjectSubscriber --definitions=definitions.cereg --output=MyProjectSubscriber
 ```
 
 This will yield a `MyProjectSubscriber/MyProjectSubcriber.yml' file that can be
@@ -311,7 +311,7 @@ with the CloudEvents Subscription API.
 The tool can generate AsyncAPI definitions with: 
 
 ```shell
-ceregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer
+xregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer
 ```
 
 For AsyncAPI, the tool support an extension parameter ce_content_mode that can be used to control the CloudEvents content mode of the generated AsyncAPI definition. The default is "structured" and the other supported value is "binary". The AsyncAPI template supports HTTP, MQTT, and AMQP 1.0 endpoints and injects the appropriate headers for the selected content mode for each protocol.
@@ -319,7 +319,7 @@ For AsyncAPI, the tool support an extension parameter ce_content_mode that can b
 Use it like this:
 
 ```shell
-ceregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer --template-args ce_content_mode=binary
+xregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.cereg --output=MyProjectProducer --template-args ce_content_mode=binary
 ```
 
 #### Custom Templates

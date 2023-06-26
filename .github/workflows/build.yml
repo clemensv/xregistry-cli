@@ -24,16 +24,16 @@ jobs:
       uses: battila7/get-version-action@v2
     - name: Set version environment variable
       run: |
-        echo "CEREGISTRY_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
+        echo "xregistry_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
     - name: Build Python package
       run: |
         python -m pip install --upgrade pip build wheel
         python -m build --sdist --wheel --outdir dist
-    # install Node dependencies including vsce and run vsce package in ceregistry_vscode, putting output in dist
+    # install Node dependencies including vsce and run vsce package in xregistry_vscode, putting output in dist
     - name: Build VSCode extension
       run: |
         npm install -g @vscode/vsce
-        cd ceregistry_vscode      
+        cd xregistry_vscode      
         npm --no-git-tag-version version ${{steps.get_version.outputs.version-without-v}}  
         npm install
         vsce package

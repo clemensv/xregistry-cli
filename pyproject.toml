@@ -3,7 +3,7 @@ build-backend = "flit_scm:buildapi"
 requires = ["flit_core>=3.2", "flit_scm", "wheel"]
 
 [project]
-name = "ceregistry"
+name = "xregistry"
 dynamic = ["version"]
 authors = [
     { name = "Clemens Vasters", email = "clemensv@microsoft.com"}
@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ceregistry = "ceregistry.cli:main"
+xregistry = "xregistry.cli:main"
 
 [tool.setuptools_scm]
-write_to = "ceregistry/_version.py"
+write_to = "xregistry/_version.py"

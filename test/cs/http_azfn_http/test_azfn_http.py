@@ -10,7 +10,7 @@ import time
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root))
 
-import ceregistry
+import xregistry
 
 # call ps to find out the process id of the process with the given name and then kill it
 def terminate_process(process_name):
@@ -30,21 +30,21 @@ def test_azfn_http():
     if os.path.exists(output):
         shutil.rmtree(output)
     # generate the producer
-    sys.argv = ['ceregistry', 'generate',  
+    sys.argv = ['xregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.cereg'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
-    ceregistry.cli()
+    xregistry.cli()
     # generate the consumer
-    sys.argv = [ 'ceregistry', 'generate',  
+    sys.argv = [ 'xregistry', 'generate',  
                 '--style', 'azfunctionhttp', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.cereg'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/azfn/'),
                 '--projectname', 'Contoso.ERP.AzureFunction']
-    ceregistry.cli()
+    xregistry.cli()
     
     sentFileName = os.path.join(os.path.dirname(__file__),  "client", "sent.txt")
     receivedFileName = os.path.join(os.path.dirname(__file__), "function","bin","output","received.txt")

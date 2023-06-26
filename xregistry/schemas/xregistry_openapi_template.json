@@ -14,7 +14,7 @@
   "paths": {
     "/": {
       "get": {
-        "operationId": "getAll",
+        "operationId": "getRootDocument",
         "description": "Gets the root document",
         "parameters": [
           {
@@ -22,8 +22,22 @@
             "name": "inline",
             "description": "Set if references shall be inlined",
             "required": false,
+            "allowEmptyValue": true,
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "description": "Filter criterion(s)",
+            "explode": true,
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         ],
@@ -41,7 +55,7 @@
         }
       },
       "post": {
-        "operationId": "uploadDoc",
+        "operationId": "upsertDocument",
         "description": "Uploads a registry document and upserts its contents into the registry",
         "requestBody": {
           "description": "A request to create or update the discovery endpoint's collection of endpoints with the given endpoints",
@@ -68,24 +82,42 @@
       }
     },
     "/{%-groupNamePlural-%}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/groupType"
+        }
+      ],
       "get": {
         "operationId": "getResourceGroupAll",
         "description": "Gets all entries of the resource group",
         "parameters": [
           {
             "in": "query",
-            "name": "name",
-            "description": "The name of the schema group to be returned",
+            "name": "inline",
+            "description": "Set if references shall be inlined",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "description": "Filter criterion(s)",
+            "explode": true,
             "required": false,
             "schema": {
-              "type": "string",
-              "description": "Filter expression"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Resource groups that match the query or all available resource groups if no query was specified",
             "content": {
               "application/json": {
                 "schema": {
@@ -101,58 +133,22 @@
             "description": "No groups found"
           }
         }
-      },
-      "post": {
-        "operationId": "postGroup",
-        "requestBody": {
-          "description": "Create a new group",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "{%-groupTypeReference-%}"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "The resulting resource",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "{%-groupTypeReference-%}"
-                }
-              }
-            },
-            "headers": {
-              "Location": {
-                "description": "The location of the created resource",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request - constraint failure"
-          },
-          "409": {
-            "description": "Conflict - epoch not greater"
-          }
-        }
       }
     },
-    "/{%-groupNamePlural-%}/{groupid}": {
+    "/{groupType}/{groupId}": {
       "parameters": [
         {
-          "$ref": "#/components/parameters/groupid"
+          "$ref": "#/components/parameters/groupType"
+        },
+        {
+          "$ref": "#/components/parameters/groupId"
         }
       ],
       "get": {
         "operationId": "getResourceGroup",
         "responses": {
           "200": {
-            "description": "The schema group",
+            "description": "The resource group",
             "content": {
               "application/json": {
                 "schema": {
@@ -170,6 +166,19 @@
         }
       },
       "put": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "epoch",
+            "description": "The epoch of the resource group to be updated",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "A number representing the version number of the resource.",
+              "format": "int64"
+            }
+          }
+        ],
         "operationId": "putResourceGroup",
         "description": "creates or updates the resource group",
         "requestBody": {
@@ -210,8 +219,8 @@
           {
             "in": "query",
             "name": "epoch",
-            "description": "The epoch of the schema group to be deleted",
-            "required": false,
+            "description": "The epoch of the resource group to be deleted",
+            "required": true,
             "schema": {
               "type": "integer",
               "description": "A number representing the version number of the resource.",
@@ -220,15 +229,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "A list of the Endpoints that were deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "{%-groupTypeReference-%}"
-                }
-              }
-            }
+          "204": {
+            "description": "Ok"
           },
           "400": {
             "description": "Bad Request - constraint failure"
@@ -239,10 +241,16 @@
         }
       }
     },
-    "/{%-groupNamePlural-%}/{groupid}/{%-resourceNamePlural-%}": {
+    "/{%-groupNamePlural-%}/{groupId}/{%-resourceNamePlural-%}": {
       "parameters": [
         {
-          "$ref": "#/components/parameters/groupid"
+          "$ref": "#/components/parameters/groupType"
+        },
+        {
+          "$ref": "#/components/parameters/groupId"
+        },
+        {
+          "$ref": "#/components/parameters/resourceType"
         }
       ],
       "get": {
@@ -251,56 +259,59 @@
         "parameters": [
           {
             "in": "query",
-            "name": "name",
-            "description": "The name of the schema to be returned",
+            "name": "inline",
+            "description": "Set if references shall be inlined",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skip",
+            "description": "The number of resources to skip",
             "required": false,
             "schema": {
-              "type": "string",
-              "description": "Filter expression"
+              "type": "integer"
             }
-          }
+          },
+          {
+            "in": "query",
+            "name": "top",
+            "description": "The number of resources to show",
+            "required": false,
+                "schema": {
+              "type": "integer"
+        }
+      },
+          {
+            "in": "query",
+            "name": "filter",
+            "description": "Filter criterion(s)",
+            "explode": true,
+            "required": false,
+              "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+                }
+              }
+            }
         ],
         "responses": {
           "200": {
-            "description": "A list of resources (optionally matching the query parameter)",
+            "description": "Updated list of resources",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "additionalProperties": {
-                    "$ref": "{%-resourceTypeReference-%}"
+                     "$ref": "{%-resourceTypeReference-%}"
                   }
                 }
               }
             }
-          }
-        }
-      },
-      "put": {
-        "operationId": "putResources",
-        "requestBody": {
-          "description": "A request to create or update the discovery group's collection of groups with the given group",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "{%-resourceTypeReference-%}"
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "A Endpoint Reference referencing the updated Endpoint",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "{%-resourceTypeReference-%}"
-                }
-              }
-            }
           },
           "400": {
             "description": "Bad Request - constraint failure"
@@ -309,33 +320,34 @@
             "description": "Conflict - epoch not greater"
           }
         }
-      },
-      "delete": {
-        "operationId": "deleteResources",
-        "responses": {
-          "200": {
-            "description": "Delete succeeded"
-          },
-          "400": {
-            "description": "Bad Request - constraint failure"
-          },
-          "409": {
-            "description": "Conflict - epoch not greater"
-          }
-        }
-      }
+      }      
     },
-    "/{%-groupNamePlural-%}/{groupid}/{%-resourceNamePlural-%}/{resourceid}": {
+    "/{%-groupNamePlural-%}/{groupId}/{%-resourceNamePlural-%}/{resourceId}": {
       "parameters": [
         {
-          "$ref": "#/components/parameters/groupid"
+          "$ref": "#/components/parameters/groupType"
         },
         {
-          "$ref": "#/components/parameters/resourceid"
+          "$ref": "#/components/parameters/groupId"
+        },
+        {
+          "$ref": "#/components/parameters/resourceType"
+        },
+        {
+          "$ref": "#/components/parameters/resourceId"
+        },
+        {
+          "in": "query",
+          "name": "meta",
+          "description": "Interact with the metadata",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
         }
       ],
       "get": {
-        "operationId": "getLatestResource",
+        "operationId": "getResource",
         "responses": {
           "200": {
             "description": "The corresponding resource",
@@ -390,6 +402,11 @@
                   "type": "string",
                   "format": "binary"
                 }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "xregistry_resources.json#/definitions/resource"
+                }
               }
             }
           },
@@ -401,10 +418,75 @@
           }
         }
       },
+      "put": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "epoch",
+            "description": "The epoch of the resource group to be upserted",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "A number representing the version number of the resource.",
+              "format": "int64"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/resource-description"
+          },
+          {
+            "$ref": "#/components/parameters/resource-docs"
+          },
+          {
+            "$ref": "#/components/parameters/resource-origin"
+          },
+          {
+            "$ref": "#/components/parameters/resource-tags"
+          }
+        ],
+        "summary": "Create or update a resource",
+        "description": "Create a resource. ",
+        "operationId": "putResource",
+        "requestBody": {
+          "description": "The resource to be created/updated",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "xregistry_resources.json#/definitions/resource"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "xregistry_resources.json#/definitions/resource"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - constraint failure"
+          },
+          "409": {
+            "description": "Conflict - epoch not greater"
+          }
+        }
+      },
       "post": {
         "summary": "Post new resource version",
-        "description": "Register schema version If schema of specified name does not exist in specified group, schema and schema version is created at version 1. If schema of specified name exists already in specified group, schema is created at latest version + 1. If schema with identical content already exists, existing schema's ID is returned. \n",
-        "operationId": "postResourceDocument",
+        "description": "Register resource version If resource of specified name does not exist in specified group, resource and resource version is created at version 1. If resource of specified name exists already in specified group, resource is created at latest version + 1. If resource with identical content already exists, existing resource's ID is returned. \n",
+        "operationId": "postResource",
         "parameters": [
           {
             "$ref": "#/components/parameters/resource-description"
@@ -428,19 +510,24 @@
           }
         ],
         "requestBody": {
-          "description": "A request to add a new schema document to the schema's document collection",
+          "description": "A request to add a new resource to the version collection",
           "content": {
             "application/octet-stream": {
               "schema": {
                 "type": "string",
                 "format": "binary"
               }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "xregistry_resources.json#/definitions/resource"
+              }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "A request to add a new schema document to the schema's document collection",
+            "description": "The created resource",
             "headers": {
               "resource-id": {
                 "$ref": "#/components/headers/resource-id"
@@ -485,6 +572,11 @@
                   "type": "string",
                   "format": "binary"
                 }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "xregistry_resources.json#/definitions/resource"
+                }
               }
             }
           },
@@ -498,80 +590,151 @@
             "description": "Conflict - epoch not greater"
           }
         }
+      },
+      "delete": {
+        "summary": "Delete resource",
+        "description": "Delete resource",
+        "operationId": "deleteResource",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "epoch",
+            "description": "The epoch of the resource to be deleted",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "A number representing the version number of the resource.",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request - constraint failure"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
       }
     },
-    "/{%-groupNamePlural-%}/{groupid}/{%-resourceNamePlural-%}/{resourceid}/meta": {
+    "/{%-groupNamePlural-%}/{groupId}/{%-resourceNamePlural-%}/{resourceId}/versions/{versionId}": {
       "parameters": [
         {
-          "$ref": "#/components/parameters/groupid"
+          "$ref": "#/components/parameters/groupType"
         },
         {
-          "$ref": "#/components/parameters/resourceid"
+          "$ref": "#/components/parameters/groupId"
+        },
+        {
+          "$ref": "#/components/parameters/resourceType"
+        },
+        {
+          "$ref": "#/components/parameters/resourceId"
+        },
+        {
+          "in": "query",
+          "name": "meta",
+          "description": "Interact with the metadata",
+          "required": false,
+          "allowEmptyValue": true,
+          "schema": {
+            "type": "boolean"
+          }
         }
       ],
       "get": {
-        "operationId": "getLatestResourceMetadata",
+        "operationId": "getResourceVersionsAll",
+        "description": "Get an optionally filtered collection of resources",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "inline",
+            "description": "Set if references shall be inlined",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skip",
+            "description": "The number of resources to skip",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "top",
+            "description": "The number of resources to show",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "description": "Filter criterion(s)",
+            "explode": true,
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "The corresponding schema",
+            "description": "A list of resource versions",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "{%-resourceTypeReference-%}"
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "xregistry_resources.json#/definitions/resource"
+                  }
                 }
               }
             }
-          },
-          "400": {
-            "description": "Bad Request - constraint failure"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      },
-      "put": {
-        "operationId": "updateLatestResourceVersionMetadata",
-        "description": "Updates metadata of the document stored for the schema version",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "{%-resourceTypeReference-%}"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The metadata of the schema version document",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "{%-resourceTypeReference-%}"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request - constraint failure"
-          },
-          "404": {
-            "description": "Not Found"
           }
         }
       }
     },
-    "/{%-groupNamePlural-%}/{groupid}/{%-resourceNamePlural-%}/{resourceid}/versions/{versionid}": {
+    "/{groupType}/{groupId}/{resourceType}/{resourceId}/versions/{versionId}": {
       "parameters": [
         {
-          "$ref": "#/components/parameters/groupid"
+          "$ref": "#/components/parameters/groupType"
         },
         {
-          "$ref": "#/components/parameters/resourceid"
+          "$ref": "#/components/parameters/groupId"
         },
         {
-          "$ref": "#/components/parameters/versionid"
+          "$ref": "#/components/parameters/resourceType"
+        },
+        {
+          "$ref": "#/components/parameters/resourceId"
+        },
+        {
+          "$ref": "#/components/parameters/versionId"
+        },
+        {
+          "in": "query",
+          "name": "meta",
+          "description": "Interact with the metadata",
+          "required": false,
+          "allowEmptyValue": true,
+          "schema": {
+            "type": "boolean"
+          }
         }
       ],
       "get": {
@@ -635,90 +798,78 @@
           }
         }
       },
-      "delete": {
-        "operationId": "deleteResourceVersion",
+      "put": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "epoch",
+            "description": "The epoch of the resource group to be updated",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "A number representing the version number of the resource.",
+              "format": "int64"
+            }
+          }
+        ],
+        "operationId": "updateResourceVersion",
+        "description": "Updates the metadata for the schema version",
+        "requestBody": {
+          "description": "The schema version document",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "xregistry_resources.json#/definitions/resource"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "A list of the Endpoints that were deleted",
+            "description": "The schema version metadata",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "{%-resourceVersionTypeReference-%}"
+                  "$ref": "xregistry_resources.json#/definitions/resource"
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request - constraint failure"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      },
+      "delete": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "epoch",
+            "description": "The epoch of the resource group to be deleted",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "A number representing the version number of the resource.",
+              "format": "int64"
+            }
+          }
+        ],
+        "operationId": "deleteResourceVersion",
+        "responses": {
+          "204": {
+            "description": "Ok"
           },
           "400": {
             "description": "Bad Request - constraint failure"
           },
           "409": {
             "description": "Conflict - epoch not greater"
-          }
-        }
-      }
-    },
-    "/{%-groupNamePlural-%}/{groupid}/{%-resourceNamePlural-%}/{resourceid}/versions/{versionid}/meta": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/groupid"
-        },
-        {
-          "$ref": "#/components/parameters/resourceid"
-        },
-        {
-          "$ref": "#/components/parameters/versionid"
-        }
-      ],
-      "get": {
-        "operationId": "getResourceVersionMetadata",
-        "description": "Gets metadata of the document stored for the schema version",
-        "responses": {
-          "200": {
-            "description": "The metadata of the schema version document",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "{%-resourceVersionTypeReference-%}"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request - constraint failure"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      },
-      "put": {
-        "operationId": "updateResourceVersionMetadata",
-        "description": "Updates metadata of the document stored for the schema version",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "{%-resourceVersionTypeReference-%}"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The metadata of the schema version document",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "{%-resourceVersionTypeReference-%}"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request - constraint failure"
-          },
-          "404": {
-            "description": "Not Found"
           }
         }
       }
@@ -733,6 +884,24 @@
       }
     },
     "parameters": {
+      "groupType": {
+        "in": "path",
+        "name": "groupType",
+        "description": "The groupType (plural)",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "resourceType": {
+        "in": "path",
+        "name": "id",
+        "description": "The resourceType (plural)",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
       "id": {
         "in": "path",
         "name": "id",
@@ -744,9 +913,9 @@
           "format": "uri-reference"
         }
       },
-      "groupid": {
+      "groupId": {
         "in": "path",
-        "name": "groupid",
+        "name": "groupId",
         "description": "The id of the group",
         "required": true,
         "schema": {
@@ -755,20 +924,9 @@
           "format": "uri-reference"
         }
       },
-      "defid": {
+      "resourceId": {
         "in": "path",
-        "name": "defid",
-        "description": "The id of the definition",
-        "required": true,
-        "schema": {
-          "type": "string",
-          "description": "A unique identifier",
-          "format": "uri-reference"
-        }
-      },
-      "resourceid": {
-        "in": "path",
-        "name": "resourceid",
+        "name": "resourceId",
         "description": "The id of the schema",
         "required": true,
         "schema": {
@@ -777,9 +935,9 @@
           "format": "uri-reference"
         }
       },
-      "versionid": {
+      "versionId": {
         "in": "path",
-        "name": "versionid",
+        "name": "versionId",
         "description": "The id of the schema",
         "required": true,
         "schema": {
@@ -800,7 +958,7 @@
         "in": "header",
         "name": "resource-id",
         "required": false,
-        "description": "A unique identifier for this Endpoint. This value MUST be globally unique",
+        "description": "A unique identifier for this resource. This value MUST be globally unique",
         "schema": {
           "type": "string",
           "format": "uri-reference"
@@ -820,7 +978,7 @@
         "in": "header",
         "name": "resource-self",
         "required": false,
-        "description": "A unique URI for the resource. The URI MUST be a combination of the  base URI of the list of this resource type for the current Discovery  Service appended with the `id` of this resource.\n",
+        "description": "A unique URI for the resource.",
         "schema": {
           "type": "string",
           "format": "uri"

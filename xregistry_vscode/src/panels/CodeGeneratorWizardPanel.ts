@@ -151,7 +151,7 @@ export class CodeGeneratorWizardPanel {
                         }).then((fileUri) => {
                             if (fileUri && fileUri.length > 0) {
                                 try {
-                                    child_process.execSync(`ceregistry validate --definitions "${fileUri[0].fsPath}"`);
+                                    child_process.execSync(`xregistry validate --definitions "${fileUri[0].fsPath}"`);
                                 } catch (error: Error | any) {
                                     vscode.window.showErrorMessage("Invalid or malformed definitions file");
                                     return;
@@ -212,7 +212,7 @@ export class CodeGeneratorWizardPanel {
 
     private callCodeGenerator(output: any, projectName: any, style: any, language: any, definitions: any) {
         try {
-            child_process.execSync(`ceregistry generate --output "${output}" --projectname "${projectName}" --style "${style}" --language "${language}" --definitions "${definitions}"`);
+            child_process.execSync(`xregistry generate --output "${output}" --projectname "${projectName}" --style "${style}" --language "${language}" --definitions "${definitions}"`);
             vscode.window.showInformationMessage("Code generation completed.", "Open Folder")
                 .then(selection => {
                     if (selection === "Open Folder") {
@@ -254,7 +254,7 @@ export class CodeGeneratorWizardPanel {
                 <div class="control-container">
                     <div class="header">
                         <h1>CloudEvents Discovery Tool</h1>
-                        <p>This wizard helps you validate specifications or creating code for producing or consuming CloudEvents with the CloudEvents SDK. The wizard wraps the "ceregistry" tool that uses CloudEvents Discovery registry endpoints or documents as input. The code generator always (re-)creates full projects (assemblies, modules, packages, depending on the nomenclature of the chosen language) that you can easily integrate into your own code-bases.</p>
+                        <p>This wizard helps you validate specifications or creating code for producing or consuming CloudEvents with the CloudEvents SDK. The wizard wraps the "xregistry" tool that uses CloudEvents Discovery registry endpoints or documents as input. The code generator always (re-)creates full projects (assemblies, modules, packages, depending on the nomenclature of the chosen language) that you can easily integrate into your own code-bases.</p>
                     </div>
                     <vscode-divider></vscode-divider>
                     <div class="content">

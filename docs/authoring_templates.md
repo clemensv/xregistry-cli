@@ -91,7 +91,7 @@ generate serializer code, you don't need to provide any templates in the
 `_schemas`. If you don't need to share macros across styles, you don't need to
 provide any templates in the `_common` directory.
 
-The full set of templates for the C# language is [here](../ceregistry/templates/cs).
+The full set of templates for the C# language is [here](../xregistry/templates/cs).
 
 ## Template Info
 
