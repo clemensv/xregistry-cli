@@ -7,7 +7,7 @@
             "id": "Fabrikam.RedmondUsWa.Building42.Environment.Temperature",
             "usage": "consumer",
             "config": {
-                "protocol": "NATS/1.0.0",
+                "protocol": "NATS",
                 "strict": false,
                 "endpoints": [
                     "nats://myserver.example.com:4222"
@@ -62,7 +62,7 @@
                         "1": {
                             "format": "Avro/1.11.0",
                             "id": "1",
-                            "schema": {
+                            "schemaobject": {
                                 "type": "record",
                                 "name": "TemperatureData",
                                 "fields": [

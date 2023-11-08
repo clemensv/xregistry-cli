@@ -23,7 +23,7 @@
             "id": "Contoso.ERP.Eventing.AmqpProducer",
             "usage": "producer",
             "config": {
-                "protocol": "AMQP",
+                "protocol": "AMQP/1.0",
                 "strict": false,
                 "endpoints": [
                     "amqps://cediscoveryinterop.example.com/topic"
@@ -38,7 +38,7 @@
             "id": "Contoso.ERP.Eventing.MqttProducer",
             "usage": "producer",
             "config": {
-                "protocol": "MQTT",
+                "protocol": "MQTT/5.0",
                 "strict": false,
                 "endpoints": [
                     "mqtt://mybroker.example.com"
@@ -567,7 +567,7 @@
                         "1": {
                             "format": "Avro/1.8.2",
                             "id": "1",
-                            "schema": {
+                            "schemaobject": {
                                 "type": "record",
                                 "name": "OrderData",
                                 "fields": [
@@ -618,7 +618,8 @@
                     "versions": {
                         "1": {
                             "id": "1",
-                            "schema": {
+                            "format": "JSONSchema/draft-07",
+                            "schemaobject": {
                                 "type": "object",
                                 "properties": {
                                     "transactionId": {
@@ -648,7 +649,8 @@
                     "versions": {
                         "1": {
                             "id": "1",
-                            "schema": {
+                            "format": "JSONSchema/draft-07",
+                            "schemaobject": {
                                 "type": "object",
                                 "properties": {
                                     "trackingnumber": {

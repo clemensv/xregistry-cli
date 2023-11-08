@@ -441,6 +441,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133177391754886858": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
                             "id": "133177391754886858",
                             "version": 133177391754886860,
@@ -462,6 +463,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133177391754886951": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
                             "id": "133177391754886951",
                             "version": 133177391754886940,
@@ -483,6 +485,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133177391754886997": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
                             "id": "133177391754886997",
                             "version": 133177391754886990,
@@ -504,6 +507,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133177391754887023": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
                             "id": "133177391754887023",
                             "version": 133177391754887020,
@@ -525,6 +529,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133177391754887055": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
                             "id": "133177391754887055",
                             "version": 133177391754887060,
@@ -546,6 +551,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133179208137780104": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageBlobCreatedEventData",
                             "id": "133179208137780104",
                             "version": 133179208137780100,
@@ -567,6 +573,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133179208137780104": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageBlobDeletedEventData",
                             "id": "133179208137780104",
                             "version": 133179208137780100,
@@ -588,6 +595,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133179208137780104": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageBlobInventoryPolicyCompletedEventData",
                             "id": "133179208137780104",
                             "version": 133179208137780100,
@@ -609,6 +617,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133179208137780104": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageAsyncOperationInitiatedEventData",
                             "id": "133179208137780104",
                             "version": 133179208137780100,
@@ -630,6 +639,7 @@
                     "format": "JSONSchema/draft-07",
                     "versions": {
                         "133179208137780104": {
+                            "format": "JSONSchema/draft-07",
                             "schemaUrl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageLifecyclePolicyCompletedEventData",
                             "id": "133179208137780104",
                             "version": 133179208137780100,

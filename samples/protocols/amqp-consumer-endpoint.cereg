@@ -6,7 +6,7 @@
             "id": "MyEventQueue",
             "usage": "consumer",
             "config": {
-                "protocol": "AMQP",
+                "protocol": "AMQP/1.0",
                 "strict": false,
                 "endpoints": [
                     "amqps://cediscoveryinterop.example.com/queue"
@@ -27,7 +27,7 @@
     "definitionGroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-                       "format": "AMQP/1.0",
+            "format": "AMQP/1.0",
             "definitions": {
                 "Contoso.MyGroup.MyEvent": {
                     "id": "Contoso.MyGroup.MyEvent",
@@ -36,7 +36,7 @@
                         "header": {
                             "ttl": {
                                 "type": "integer",
-                                "value": 1000
+                                "value": "1000"
                             }
                         },
                         "properties": {
@@ -57,7 +57,7 @@
                             }
                         }
                     },
-                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData",
+                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
@@ -73,7 +73,7 @@
                         "1.0": {
                             "id": "1.0",
                             "format": "JsonSchema/draft-07",
-                            "schema": {
+                            "schemaobject": {
                                 "$schema": "http://json-schema.org/draft-07/schema",
                                 "type": "object",
                                 "properties": {

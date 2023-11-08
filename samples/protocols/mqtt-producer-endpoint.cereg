@@ -6,7 +6,7 @@
             "id": "Contoso.MqttProducer",
             "usage": "producer",
             "config": {
-                "protocol": "MQTT",
+                "protocol": "MQTT/5.0",
                 "strict": false,
                 "endpoints": [
                     "mqtt://mybroker.example.com"
@@ -73,7 +73,7 @@
                         "1.0": {
                             "id": "1.0",
                             "format": "JsonSchema/draft-07",
-                            "schema": {
+                            "schemaobject": {
                                 "$schema": "http://json-schema.org/draft-07/schema",
                                 "type": "object",
                                 "properties": {

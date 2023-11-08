@@ -95,6 +95,7 @@
                     "versions": {
                         "1": {
                             "id": "1",
+                            "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message x1 { string a = 1; } }"
                         }
                     }

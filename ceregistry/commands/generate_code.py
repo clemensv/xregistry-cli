@@ -437,7 +437,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         max_key_length = max([len(key) for key in versions.keys()])
                         sorted_keys = sorted(versions.keys(), key=lambda key: key.rjust(max_key_length))
                         schema_version = versions[sorted_keys[-1]]
-                    elif "schema" in schema_root or "schemaUrl" in schema_root:
+                    elif "schema" in schema_root or "schemaUrl" in schema_root or "schemaobject" in schema_root:
                         # the reference pointed to a schema version definition
                         schema_version = schema_root
 
@@ -452,10 +452,14 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                             if schema_url not in schema_files_collected:
                                 schema_files_collected.add(schema_url)
                             continue
-                        elif "schema" in schema_version:
+                        elif "schema" in schema_version or "schemaobject" in schema_version:
                             # case b): the schema version does not contain a schemaUrl attribute, so we
                             # assume that the schema is inline and we can proceed to render it
-                            schema_root = schema_version["schema"]
+                            if "schemaobject" in schema_version:
+                                schema_root = schema_version["schemaobject"]
+                            else:
+                                schema_root = schema_version["schema"]
+
                             set_current_url (schema_reference)
                             schema_format_short = None
 
@@ -588,7 +592,7 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
 
 
 def render_schema_templates(schema_type : str, project_name : str, class_name : str, language : str,
-                            output_dir : str, definitions_file : str, docroot : dict, schema_template_dirs : list, env : jinja2.Environment,
+                            output_dir : str, definitions_file : str, docroot : dict|str, schema_template_dirs : list, env : jinja2.Environment,
                             template_args : dict, suppress_output : bool = False):
     global uses_protobuf
     global uses_avro

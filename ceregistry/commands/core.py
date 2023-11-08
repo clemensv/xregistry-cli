@@ -101,10 +101,10 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
     if load_schema:
         return definitions_file, docroot
 
-    if "$schema" in docroot:
-        if docroot["$schema"] != "https://cloudevents.io/schemas/registry":
-            print("unsupported schema:" + docroot["$schema"])
-            return None, None
+    # if "$schema" in docroot:
+    #     if docroot["$schema"] != "https://cloudevents.io/schemas/registry":
+    #         print("unsupported schema:" + docroot["$schema"])
+    #         return None, None
     if "definitionGroupsUrl" in docroot:
         _, subroot = load_definitions_core(docroot["definitionGroupsUrl"], 
                                            headers)

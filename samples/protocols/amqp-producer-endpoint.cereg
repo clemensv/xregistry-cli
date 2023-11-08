@@ -1,11 +1,12 @@
 {
+    "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.5-wip",
     "endpoints": {
         "Contoso.MyAmqpProducer": {
             "id": "Contoso.MyAmqpProducer",
             "usage": "producer",
             "config": {
-                "protocol": "AMQP",
+                "protocol": "AMQP/1.0",
                 "strict": false,
                 "endpoints": [
                     "amqps://cediscoveryinterop.example.com/topic"
@@ -29,7 +30,7 @@
                         "header": {
                             "ttl": {
                                 "type": "integer",
-                                "value": 1000
+                                "value": "1000"
                             }
                         },
                         "properties": {
@@ -50,7 +51,7 @@
                             }
                         }
                     },
-                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData",
+                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
@@ -66,7 +67,7 @@
                         "1.0": {
                             "id": "1.0",
                             "format": "JsonSchema/draft-07",
-                            "schema": {
+                            "schemaobject": {
                                 "$schema": "http://json-schema.org/draft-07/schema",
                                 "type": "object",
                                 "properties": {

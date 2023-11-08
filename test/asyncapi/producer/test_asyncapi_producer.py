@@ -24,7 +24,7 @@ def test_asyncapi_producer():
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducerBinary',
                 '--template-args', 'ce_content_mode=binary']
-    if ceregistry.cli() != 0:
+6    if ceregistry.cli() != 0:
         raise Exception("ceregistry failed")
     # run dotnet build on the csproj here that references the generated files already
     cmd = 'asyncapi validate ' + os.path.join(output_dir, "ContosoErpProducerBinary.yml")

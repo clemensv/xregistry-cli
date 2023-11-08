@@ -7,14 +7,14 @@
             "id": "Fabrikam.RedmondUsWa.Building42.Environment.Temperature",
             "usage": "producer",
             "config": {
-                "protocol": "Kafka",
+                "protocol": "KAFKA",
                 "strict": false,
                 "endpoints": [
                     "SSL://myserver.example.com"
                 ],
                 "options": {
                     "topic": "temperature",
-                    "acks": "1"
+                    "acks": 1
                 }
             },
             "definitionGroups": [
@@ -63,7 +63,7 @@
                         "1": {
                             "format": "Avro/1.11.0",
                             "id": "1",
-                            "schema": {
+                            "schemaobject": {
                                 "type": "record",
                                 "name": "TemperatureData",
                                 "fields": [

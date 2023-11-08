@@ -261,12 +261,12 @@ schemaGroups:
       customerAddressUpdatedEventData:
         type: schema
         id: customerAddressUpdatedEventData
-        format: JSONSchema/draft-07
         versions:
           "1.0":
             type: schemaversion
             id: "1.0"
-            schema:
+            format: JSONSchema/draft-07
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -304,7 +304,8 @@ schemaGroups:
           "1.0":
             type: schemaversion
             id: "1.0"
-            schema:
+            format: JSONSchema/draft-07
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -328,7 +329,8 @@ schemaGroups:
           "1.0":
             type: schemaversion
             id: "1.0"
-            schema:
+            format: JSONSchema/draft-07
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -345,7 +347,8 @@ schemaGroups:
           "1.0":
             type: schemaversion
             id: "1.0"
-            schema:
+            format: JSONSchema/draft-07
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -368,8 +371,9 @@ schemaGroups:
         versions:
           "1.0":
             type: schemaversion
+            format: JSONSchema/draft-07
             id: "1.0"
-            schema:
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -392,8 +396,9 @@ schemaGroups:
         versions:
           "1.0":
             type: schemaversion
+            format: JSONSchema/draft-07
             id: "1.0"
-            schema:
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -410,7 +415,8 @@ schemaGroups:
           "1.0":
             type: schemaversion
             id: "1.0"
-            schema:
+            format: JSONSchema/draft-07
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -434,7 +440,8 @@ schemaGroups:
           "1.0":
             type: schemaversion
             id: "1.0"
-            schema:
+            format: JSONSchema/draft-07
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -451,7 +458,8 @@ schemaGroups:
           "1.0":
             type: schemaversion
             id: "1.0"
-            schema:
+            format: JSONSchema/draft-07
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -467,8 +475,9 @@ schemaGroups:
         versions:
           "1.0":
             type: schemaversion
+            format: JSONSchema/draft-07
             id: "1.0"
-            schema:
+            schemaobject:
               type: object
               properties:
                 customerId:
@@ -485,7 +494,8 @@ schemaGroups:
           "1.0":
             type: schemaversion
             id: "1.0"
-            schema:
+            format: JSONSchema/draft-07
+            schemaobject:
               type: object
               properties:
                 customerId:

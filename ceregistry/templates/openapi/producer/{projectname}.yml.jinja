@@ -118,7 +118,7 @@ components:
             $ref: "{{ ns.newest_schemaversion.schemaUrl }}"
             {%- endif -%}
             {%- else %} 
-      {{ ns.newest_schemaversion.schema | toyaml(3) | indent(6) }}
+      {{ ns.newest_schemaversion.schemaobject | toyaml(3) | indent(6) }}
             {%- endif %} 
             {%- endif -%}
        {%- endfor -%} 

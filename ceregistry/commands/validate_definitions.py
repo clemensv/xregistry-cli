@@ -3,29 +3,6 @@ import json
 import jsonschema   
 
 from .core import load_definitions
-
-class DirectoryRefResolver(jsonschema.RefResolver):
-    """
-    A refresolver for jsonschema that loads schemas from a directory.
-    """
-    def __init__(self, directory):
-        super().__init__("", None)
-        self.directory = directory
-        self.cache_remote = True        
-
-    ## implement resolve()
-    def resolve(self, uri):
-        return super().resolve(uri)
-    
-    def resolve_remote(self, uri):
-        if uri.startswith("http:") or uri.startswith("https:"):
-            return super().resolve_remote(uri)
-            
-        uri = uri.replace("/", os.path.sep)
-        filename = os.path.join(self.directory, uri)
-        with open(filename, "r") as f:
-            schema = json.loads(f.read())
-            return schema
     
 def validate_definition(args) -> int:
     if args.definitions_file:
@@ -54,7 +31,7 @@ def validate(definitions_uri, headers, verbose=False):
     # load the schema
     try:
         basepath = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
-        schema_file = os.path.join(basepath, "schemas", "xregistry_messaging_catalog.json")
+        schema_file = os.path.join(basepath, "schemas", "document-schema.json")
         with open(schema_file, "r") as f:
             schema = json.load(f)
     except IOError as e:
@@ -66,8 +43,7 @@ def validate(definitions_uri, headers, verbose=False):
     
 
     # validate the definitions file
-    resolver = DirectoryRefResolver(os.path.join(basepath, "schemas"))	
-    errors = list(jsonschema.Draft7Validator(schema, resolver=resolver).iter_errors(docroot))
+    errors = list(jsonschema.Draft7Validator(schema).iter_errors(docroot))
     if errors:
         print("{} Validation errors:".format(definitions_file))
         for i, error in enumerate(errors):
