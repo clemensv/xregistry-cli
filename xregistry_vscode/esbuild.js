@@ -22,7 +22,7 @@ const extensionConfig = {
         copy({
             resolveFrom: "cwd",
             assets: {
-              from: ["../ceregistry/schemas/*.json"],
+              from: ["../xregistry/schemas/*.json"],
               to: ["./schemas"],
             },
         })

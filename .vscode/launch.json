@@ -7,7 +7,7 @@
     {
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
       "name": "Launch Extension",
-      "preLaunchTask": "tsc: build - ceregistry_vscode/tsconfig.json",
+      "preLaunchTask": "tsc: build - xregistry_vscode/tsconfig.json",
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "request": "launch",
       "type": "extensionHost"
@@ -24,7 +24,7 @@
       "name": "Python: Code Generator EventHubs",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language cs --style azfunctioneventhubs --definitions .\\samples\\message-definitions\\contoso-erp.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testeh"
@@ -33,7 +33,7 @@
       "name": "Python: Code Generator C# SB",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language cs --style azfunctionservicebus --definitions .\\samples\\message-definitions\\contoso-erp.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testsb"
@@ -42,7 +42,7 @@
       "name": "Python: Code Generator C# HTTP",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language cs --style azfunctionhttp --definitions .\\samples\\message-definitions\\contoso-erp.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testhttp"
@@ -51,7 +51,7 @@
       "name": "Python: Code Generator C# Consumer",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language cs --style consumer --definitions .\\samples\\protocols\\http-consumer-endpoint.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testconsumer"
@@ -60,7 +60,7 @@
       "name": "Python: Code Generator openAPI Producer",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language openapi --style producer --definitions .\\samples\\protocols\\http-producer-endpoint.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testopenapi"
@@ -69,7 +69,7 @@
       "name": "Python: Code Generator openAPI Subscriber",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language openapi --style subscriber --definitions .\\samples\\message-definitions\\contoso-erp.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testopenapi2"
@@ -78,7 +78,7 @@
       "name": "Python: Code Generator Java producer",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language java --style producer --definitions .\\samples\\message-definitions\\contoso-erp.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testjavap"
@@ -87,7 +87,7 @@
       "name": "Python: Code Generator Java producer Proto",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language java --style producer --definitions .\\samples\\message-definitions\\minimal-proto.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testjavaproto"
@@ -96,7 +96,7 @@
       "name": "Python: Code Generator Java producer Avro",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language java --style producer --definitions .\\samples\\message-definitions\\minimal-avro.cereg --projectname Contoso.ERP.Events --output c:\\temp\\output\\testjavaavro"
@@ -106,7 +106,7 @@
       "name": "Python: Code Generator Java consumer",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": false,
       "args": "generate --language java --style consumer --definitions .\\samples\\message-definitions\\contoso-erp.cereg --projectname Contoso.ERP.Events --output tmp/testjavac"
@@ -115,7 +115,7 @@
       "name": "Python: Code Generator Java consumer Proto",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language java --style consumer --definitions .\\samples\\message-definitions\\minimal-proto.cereg --projectname Contoso.ERP.Events --output tmp/testjavacproto"
@@ -124,7 +124,7 @@
       "name": "Python: Code Generator Java consumer Avro",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --language java --style consumer --definitions .\\samples\\message-definitions\\minimal-avro.cereg --projectname Contoso.ERP.Events --output tmp/testjavacavro"
@@ -133,7 +133,7 @@
       "name": "Python: Code Generator Fropp",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate --definitions c:\\git\\cedisco-sb\\namespace-clemensv-erp.cereg --output c:\\git\\cedisco-sb\\tmp --language fropp --style producer --templates c:\\git\\cedisco-sb\\ --projectname foo"
@@ -142,7 +142,7 @@
       "name": "Python: Code Generator Help",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "generate -h"
@@ -151,7 +151,7 @@
       "name": "Python: List JSON",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "list --format json"
@@ -160,7 +160,7 @@
       "name": "Python: Validate",
       "type": "python",
       "request": "launch",
-      "program": "-m ceregistry",
+      "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "validate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\Microsoft.Storage.cereg"

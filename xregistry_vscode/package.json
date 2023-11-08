@@ -1,5 +1,5 @@
 {
-  "name": "ceregistry-vscode",
+  "name": "xregistry-vscode",
   "version": "0.0.2",
   "displayName": "CloudEvents Registry Tool",
   "description": "A GUI wrapper for the CloudEvents Registry CLI",
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/clemensv/cedisco-codegen/ceregistry_vscode"
+    "url": "https://github.com/clemensv/cedisco-codegen/xregistry_vscode"
   },
   "engines": {
     "vscode": "^1.74.0"
@@ -21,7 +21,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:ceregistry.generate"
+    "onCommand:xregistry.generate"
   ],
   "main": "./out/extension.js",
   "json.schemas": [
@@ -35,7 +35,7 @@
   "contributes": {
     "commands": [
       {
-        "command": "ceregistry.ui",
+        "command": "xregistry.ui",
         "title": "CloudEvents Registry Tool"
       }
     ],
@@ -59,7 +59,7 @@
       "explorer/context": [
         {
           "label": "CloudEvents Registry Tool",
-          "command": "ceregistry.ui",
+          "command": "xregistry.ui",
           "definitiongroup": "CloudEvents@1",
           "when": "resourceExtname == .cereg || resourceExtname == .yaml.cereg"
         }
