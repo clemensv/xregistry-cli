@@ -277,7 +277,7 @@ components:
             $ref: "{{ newest_schemaversion.schemaUrl }}"
             {%- endif -%}
             {%- else %} 
-      {{ newest_schemaversion.schema | toyaml(3) | indent(6) }}
+      {{ newest_schemaversion.schemaobject | toyaml(3) | indent(6) }}
             {%- endif %} 
        {%- endfor -%} 
   {%- endfor -%}
