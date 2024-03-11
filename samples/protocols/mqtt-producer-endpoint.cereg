@@ -16,21 +16,20 @@
                     "qos": 1
                 }
             },
-            "definitionGroups": [
-                "#/definitionGroups/mygroup"
+            "messagegroups": [
+                "#/messagegroups/mygroup"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitionGroups": {
+    "messagegroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "format": "MQTT/5.0",
-            "definitions": {
+            "messages": {
                 "Contoso.MyGroup.MyEvent": {
                     "id": "Contoso.MyGroup.MyEvent",
-                    "format": "MQTT/5.0",
-                    "metadata": {
+                    "binding": "MQTT/5.0",
+                    "message": {
                         "properties": {
                             "topic": {
                                 "type": "uritemplate",
@@ -57,12 +56,12 @@
                         }
                     },
                     "schemaFormat": "JsonSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData"
+                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
     },
-    "schemaGroups": {
+    "schemagroups": {
         "Contoso.MyEvents": {
             "id": "Contoso.MyEvents",
             "schemas": {

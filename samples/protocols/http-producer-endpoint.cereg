@@ -21,17 +21,17 @@
                     ]
                 }
             },
-            "definitionGroups": [
-                "#/definitionGroups/Contoso.ERP.Events"
+            "messagegroups": [
+                "#/messagegroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitionGroups": {
+    "messagegroups": {
         "Contoso.ERP.Events": {
                        "id": "Contoso.ERP.Events",
             "format": "CloudEvents/1.0",
-            "definitions": {
+            "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
@@ -59,12 +59,12 @@
                         }
                     },
                     "schemaFormat" : "JsonSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/orderData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 }
             }
         }
     },
-    "schemaGroups": {
+    "schemagroups": {
         "Contoso.ERP.Events": {
             "id": "Contoso.ERP.Events",
             "schemas": {

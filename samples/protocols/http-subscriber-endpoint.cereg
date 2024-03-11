@@ -12,17 +12,17 @@
                     "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
                 ]
             },
-            "definitionGroups": [
-                "#/definitionGroups/mygroup"
+            "messagegroups": [
+                "#/messagegroups/mygroup"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitionGroups": {
+    "messagegroups": {
         "mygroup": {
             "id": "mygroup",
             "format": "CloudEvents/1.0",
-            "definitions": {
+            "messages": {
                 "myevent": {
                     "id": "myevent",
                     "format": "CloudEvents/1.0",

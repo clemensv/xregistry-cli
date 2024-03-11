@@ -12,21 +12,21 @@
                     "amqps://cediscoveryinterop.example.com/topic"
                 ]
             },
-            "definitionGroups": [
-                "#/definitionGroups/Contoso.MyGroup"
+            "messagegroups": [
+                "#/messagegroups/Contoso.MyGroup"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitionGroups": {
+    "messagegroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "format": "AMQP/1.0",
-            "definitions": {
+            "binding": "AMQP/1.0",
+            "messages": {
                 "Contoso.MyGroup.MyEvent": {
                     "id": "Contoso.MyGroup.MyEvent",
-                    "format": "AMQP/1.0",
-                    "metadata": {
+                    "binding": "AMQP/1.0",
+                    "message": {
                         "header": {
                             "ttl": {
                                 "type": "integer",
@@ -51,12 +51,12 @@
                             }
                         }
                     },
-                    "schemaUrl": "#/schemaGroups/Contoso.MyEvents/schemas/MyEventData"
+                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
     },
-    "schemaGroups": {
+    "schemagroups": {
         "Contoso.MyEvents": {
             "id": "Contoso.MyEvents",
             "schemas": {

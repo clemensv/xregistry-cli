@@ -32,7 +32,7 @@ paths:
           application/json:
             schema:
               oneOf:
-                {%- for definitiongroup_key, definitiongroup in root.definitionGroups.items() -%}
+                {%- for definitiongroup_key, definitiongroup in root.messagegroups.items() -%}
                     {%- for eventkey, event in definitiongroup.definitions.items() %}
                   - $ref: "#/components/schemas/{{ event.id }}"
                     {%- endfor -%}
@@ -46,7 +46,7 @@ paths:
           description: "Unsupported Media Type"
 components:
   schemas:
-  {%- for definitiongroup_key, definitiongroup in root.definitionGroups.items() -%}
+  {%- for definitiongroup_key, definitiongroup in root.messagegroups.items() -%}
     {%- for eventkey, event in definitiongroup.definitions.items() %}
     {{ event.id }}:
       type: "object"
@@ -82,11 +82,11 @@ components:
           {%- endif %}
         {%- endfor %}
         data:
-        {%- if event.schemaUrl %}
-            {%- if event.schemaUrl.startswith('#') %}
-            $ref: "#/components/schemas/{{ event.schemaUrl[1:].split('/')[-3] | pascal }}.{{ event.schemaUrl[1:].split('/')[-1] | pascal }}"
+        {%- if event.schemaurl %}
+            {%- if event.schemaurl.startswith('#') %}
+            $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
             {%- else %}
-            $ref: "{{ event.schemaUrl }}"
+            $ref: "{{ event.schemaurl }}"
             {%- endif %}
         {%- else %}
             type: "object"
@@ -99,9 +99,9 @@ components:
         {%- endfor %}
     {%- endfor -%}
   {%- endfor -%}
-  {%- if root.schemaGroups is defined -%}
-    {%- for schemagroupkey in root.schemaGroups.keys() -%}
-      {%- set schemagroup = root.schemaGroups[schemagroupkey] -%}
+  {%- if root.schemagroups is defined -%}
+    {%- for schemagroupkey in root.schemagroups.keys() -%}
+      {%- set schemagroup = root.schemagroups[schemagroupkey] -%}
        {%- for schemakey, schema in schemagroup.schemas.items() -%}
           {%- set ns = namespace(newest_schemaversion=null) -%}
           {%- for schemaversionid, schemaversion in schema.versions.items() -%}
@@ -111,11 +111,11 @@ components:
           {%- endfor -%}
           {%- if ns.newest_schemaversion is defined %} 
     {{ schemagroupkey | pascal }}.{{ schemakey | pascal }}:
-            {%- if ns.newest_schemaversion.schemaUrl -%}
-            {%- if ns.newest_schemaversion.schemaUrl.startswith('#') %}
-            $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaUrl.split('#/schemaGroups/')[1] }}"
+            {%- if ns.newest_schemaversion.schemaurl -%}
+            {%- if ns.newest_schemaversion.schemaurl.startswith('#') %}
+            $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaurl.split('#/schemagroups/')[1] }}"
             {%- else %}
-            $ref: "{{ ns.newest_schemaversion.schemaUrl }}"
+            $ref: "{{ ns.newest_schemaversion.schemaurl }}"
             {%- endif -%}
             {%- else %} 
       {{ ns.newest_schemaversion.schemaobject | toyaml(3) | indent(6) }}

@@ -2,11 +2,11 @@
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.5-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "definitionGroups": {
+    "messagegroups": {
         "Contoso.ERP.Events": {
                        "id": "Contoso.ERP.Events",
             "format": "CloudEvents/1.0",
-            "definitions": {
+            "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
@@ -33,12 +33,12 @@
                             }
                         }
                     },
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/orderData:OrderData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 }
             }
         }
     },
-    "schemaGroups": {
+    "schemagroups": {
         "Contoso.ERP.Events": {
             "id": "Contoso.ERP.Events",
             "schemas": {

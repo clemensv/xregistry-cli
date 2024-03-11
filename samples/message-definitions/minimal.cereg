@@ -2,11 +2,11 @@
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.5-wip",
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "definitionGroups": {
+    "messagegroups": {
         "com.example.grp1": {
                        "id": "com.example.grp1",
             "format": "CloudEvents/1.0",
-            "definitions": {
+            "messages": {
                 "com.example.grp1.ev1": {
                     "id": "com.example.grp1.ev1",
                     "format": "CloudEvents/1.0",
@@ -27,14 +27,14 @@
                             }
                         }
                     },
-                    "schemaUrl": "#/schemaGroups/com.example.grp1/schemas/s1"
+                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1"
                 }
             }
         },
         "com.example.grp2": {
                        "id": "com.example.grp2",
             "format": "CloudEvents/1.0",
-            "definitions": {
+            "messages": {
                 "com.example.grp2.ev1": {
                     "id": "com.example.grp2.ev1",
                     "format": "CloudEvents/1.0",
@@ -55,7 +55,7 @@
                             }
                         }
                     },
-                    "schemaUrl": "#/schemaGroups/com.example.grp1/schemas/s1"
+                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1"
                 },
                 "com.example.grp2.ev2": {
                     "id": "com.example.grp2.ev2",
@@ -77,12 +77,12 @@
                             }
                         }
                     },
-                    "schemaUrl": "#/schemaGroups/com.example.grp1/schemas/s1"
+                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1"
                 }
             }
         }
     },
-    "schemaGroups": {
+    "schemagroups": {
         "com.example.grp1": {
             "id": "com.example.grp1",
             "schemas": {

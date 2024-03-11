@@ -1,4 +1,4 @@
-{%- set definitionGroups = root.definitionGroups -%}
+{%- set messagegroups = root.messagegroups -%}
 {%- set function_name = project_name | pascal -%}
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 
@@ -24,7 +24,7 @@ namespace {{ project_name | pascal }}
     {%- set class_name = (project_name | pascal | strip_namespace)+"Functions" %}
     public class {{ class_name }}
     {
-        {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, definitionGroups) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, messagegroups) | indent(8) }}
 
         [FunctionName("{{ project_name | pascal | concat_namespace }}")]
         public async Task Run(
@@ -53,7 +53,7 @@ namespace {{ project_name | pascal }}
                 {
                     return;
                 }
-                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", definitionGroups ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups ) | indent(16) }}
             }
         }
     }

@@ -10,10 +10,10 @@ endpoints:
       strict: false
       endpoints:
         - https://erpsystem.com/events
-    definitionGroups:
-      - "#/definitionGroups/Contoso.CRM.Events"
+    messagegroups:
+      - "#/messagegroups/Contoso.CRM.Events"
     format: CloudEvents/1.0
-definitionGroups:
+messagegroups:
   Contoso.CRM.Events:
     id: Contoso.CRM.Events
     type: definitiongroup
@@ -40,7 +40,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerCreatedEventData"
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerCreatedEventData"
       Contoso.CRM.Events.CustomerUpdated:
         type: cloudevent
         id: Contoso.CRM.Events.CustomerUpdated
@@ -62,7 +62,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerUpdatedEventData"
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerUpdatedEventData"
       Contoso.CRM.Events.CustomerDeleted:
         type: cloudevent
         id: Contoso.CRM.Events.CustomerDeleted
@@ -84,7 +84,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerDeletedEventData"
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerDeletedEventData"
       Contoso.CRM.Events.CustomerStatusUpdated:
         type: cloudevent
         id: Contoso.CRM.Events.CustomerStatusUpdated
@@ -106,7 +106,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerStatusUpdatedEven\
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerStatusUpdatedEven\
           tData"
       Contoso.CRM.Events.CustomerAddressUpdated:
         type: cloudevent
@@ -129,7 +129,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerAddressUpdatedEve\
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerAddressUpdatedEve\
           ntData"
       Contoso.CRM.Events.CustomerContactUpdated:
         type: cloudevent
@@ -152,7 +152,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerContactUpdatedEve\
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerContactUpdatedEve\
           ntData"
       Contoso.CRM.Events.CustomerNoteAdded:
         type: cloudevent
@@ -175,7 +175,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteAddedEventData"
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteAddedEventData"
       Contoso.CRM.Events.CustomerNoteDeleted:
         type: cloudevent
         id: Contoso.CRM.Events.CustomerNoteDeleted
@@ -197,7 +197,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteDeletedEventD\
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteDeletedEventD\
           ata"
       Contoso.CRM.Events.CustomerNoteUpdated:
         type: cloudevent
@@ -220,7 +220,7 @@ definitionGroups:
               type: uritemplate
               value: /crm/customers
               required: true
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerNoteUpdatedEventD\
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteUpdatedEventD\
           ata"
       Contoso.CRM.Events.CustomerContactAdded:
         type: cloudevent
@@ -251,9 +251,9 @@ definitionGroups:
               type: string
               required: false
               description: The subject of the event
-        schemaUrl: "#/schemaGroups/Contoso.CRM.Events/schemas/customerContactAddedEvent\
+        schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerContactAddedEvent\
           Data"
-schemaGroups:
+schemagroups:
   Contoso.CRM.Events:
     type: schemagroup
     id: Contoso.CRM.Events

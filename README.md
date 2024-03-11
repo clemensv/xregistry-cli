@@ -93,27 +93,27 @@ for a specific perspective using different templates.
                     "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
                 ]
             },
-            "definitionGroups": [
-                "#/definitionGroups/Contoso.ERP.Events"
+            "messagegroups": [
+                "#/messagegroups/Contoso.ERP.Events"
             ],
             "format" : "CloudEvents/1.0"
         }
     },
 ```
 
-The definitionGroups section describes groups of message definitions. The
+The messagegroups section describes groups of message definitions. The
 example shows a group of CloudEvents message definitions with just one entry.
 The message definition describes the CloudEvent message type
 `Contoso.ERP.Events.ReservationPlaced`, which is a CloudEvent with a `time`
 attribute, a `source` attribute, and a `data` attribute that refers to the
-`orderData` schema. The schema is defined in the `schemaGroups` section below.
+`orderData` schema. The schema is defined in the `schemagroups` section below.
 
 ```json
 
-    "definitionGroups": {
+    "messagegroups": {
         "Contoso.ERP.Events": {
             "id": "Contoso.ERP.Events",
-            "definitions": {
+            "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
@@ -140,21 +140,21 @@ attribute, a `source` attribute, and a `data` attribute that refers to the
                             }
                         }
                     },
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/orderData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 }
             }
         }
     },
 ```
 
-The *schemaGroups* section describes groups of schemas. The example shows a
+The *schemagroups* section describes groups of schemas. The example shows a
 group of JSON schemas with just one entry having a single version. The schema is
 used by the message definition above. Note that the schema is defined in the
 same file in this example, but it could also be defined in a separate file and
-referenced by URL, with a "schemaUrl" property replacing the "schema" property.
+referenced by URL, with a "schemaurl" property replacing the "schema" property.
 
 ```json
-    "schemaGroups": {
+    "schemagroups": {
         "Contoso.ERP.Events": {
             "id": "Contoso.ERP.Events",
             "schemas": {

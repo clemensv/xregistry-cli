@@ -17,17 +17,17 @@
                     "acks": 1
                 }
             },
-            "definitionGroups": [
-                "#/definitionGroups/Contoso.Sensors.Temperature"
+            "messagegroups": [
+                "#/messagegroups/Contoso.Sensors.Temperature"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitionGroups": {
+    "messagegroups": {
         "Contoso.Sensors.Temperature": {
             "id": "Contoso.ERP.Events",
             "format": "CloudEvents/1.0",
-            "definitions": {
+            "messages": {
                 "Contoso.Sensors.Temperature.Metrics": {
                     "id": "Contoso.Sensors.Temperature.Metrics",
                     "description": "A set of metrics emitted by a temperature sensor",
@@ -47,12 +47,12 @@
                         }
                     },
                     "schemaFormat": "Avro/1.11.0",
-                    "schemaUrl": "#/schemaGroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
+                    "schemaurl": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
             }
         }
     },
-    "schemaGroups": {
+    "schemagroups": {
         "Contoso.Sensors.Temperature": {
             "id": "Contoso.Sensors.Temperature",
             "schemas": {

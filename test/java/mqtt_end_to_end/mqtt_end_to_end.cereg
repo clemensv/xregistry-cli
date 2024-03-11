@@ -15,8 +15,8 @@
                     "topic": "events"
                 }
             },
-            "definitionGroups": [
-                "#/definitionGroups/Contoso.ERP.Events"
+            "messagegroups": [
+                "#/messagegroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -33,17 +33,17 @@
                     "topic": "events"
                 }
             },
-            "definitionGroups": [
-                "#/definitionGroups/Contoso.ERP.Events"
+            "messagegroups": [
+                "#/messagegroups/Contoso.ERP.Events"
             ],
             "format": "CloudEvents/1.0"
         }
     },
-    "definitionGroups": {
+    "messagegroups": {
         "Contoso.ERP.Events": {
             "id": "Contoso.ERP.Events",
             "format": "CloudEvents/1.0",
-            "definitions": {
+            "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
@@ -71,7 +71,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/orderData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 },
                 "Contoso.ERP.Events.PaymentsReceived": {
                     "id": "Contoso.ERP.Events.PaymentsReceived",
@@ -100,7 +100,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/paymentData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/paymentData"
                 },
                 "Contoso.ERP.Events.ShipmentAccepted": {
                     "id": "Contoso.ERP.Events.ShipmentAccepted",
@@ -129,7 +129,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/shipmentData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
                 },
                 "Contoso.ERP.Events.ShipmentRejected": {
                     "id": "Contoso.ERP.Events.ShipmentRejected",
@@ -158,7 +158,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/shipmentData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
                 },
                 "Contoso.ERP.Events.ReturnRequested": {
                     "id": "Contoso.ERP.Events.ReturnRequested",
@@ -187,7 +187,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/returnData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/returnData"
                 },
                 "Contoso.ERP.Events.ReservationCancelled": {
                     "id": "Contoso.ERP.Events.ReservationCancelled",
@@ -216,7 +216,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/cancellationData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData"
                 },
                 "Contoso.ERP.Events.ReservationRefunded": {
                     "id": "Contoso.ERP.Events.ReservationRefunded",
@@ -245,7 +245,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/refundData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/refundData"
                 },
                 "Contoso.ERP.Events.InventoryUpdated": {
                     "id": "Contoso.ERP.Events.InventoryUpdated",
@@ -276,7 +276,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/inventoryData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/inventoryData"
                 },
                 "Contoso.ERP.Events.ProductAdded": {
                     "id": "Contoso.ERP.Events.ProductAdded",
@@ -305,7 +305,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/productData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/productData"
                 },
                 "Contoso.ERP.Events.ProductDeleted": {
                     "id": "Contoso.ERP.Events.ProductDeleted",
@@ -334,7 +334,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/productDeletionData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/productDeletionData"
                 },
                 "Contoso.ERP.Events.ProductUpdated": {
                     "id": "Contoso.ERP.Events.ProductUpdated",
@@ -363,7 +363,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/productUpdatedData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/productUpdatedData"
                 },
                 "Contoso.ERP.Events.EmployeeAdded": {
                     "id": "Contoso.ERP.Events.EmployeeAdded",
@@ -391,7 +391,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/employeeData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/employeeData"
                 },
                 "Contoso.ERP.Events.EmployeeDeleted": {
                     "id": "Contoso.ERP.Events.EmployeeDeleted",
@@ -419,7 +419,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/employeeDeletionData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/employeeDeletionData"
                 },
                 "Contoso.ERP.Events.EmployeeUpdated": {
                     "id": "Contoso.ERP.Events.EmployeeUpdated",
@@ -447,7 +447,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/employeeUpdatedData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/employeeUpdatedData"
                 },
                 "Contoso.ERP.Events.PurchaseOrderCreated": {
                     "id": "Contoso.ERP.Events.PurchaseOrderCreated",
@@ -475,7 +475,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/purchaseOrderData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderData"
                 },
                 "Contoso.ERP.Events.PurchaseOrderUpdated": {
                     "id": "Contoso.ERP.Events.PurchaseOrderUpdated",
@@ -503,7 +503,7 @@
                         }
                     },
                     "schemaFormat": "JSONSchema/draft-07",
-                    "schemaUrl": "#/schemaGroups/Contoso.ERP.Events/schemas/purchaseOrderUpdatedData"
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderUpdatedData"
                 },
                 "Contoso.ERP.Events.PurchaseOrderDeleted": {
                     "id": "Contoso.ERP.Events.PurchaseOrderDeleted",
@@ -534,7 +534,7 @@
             }
         }
     },
-        "schemaGroups": {
+        "schemagroups": {
         "Contoso.ERP.Events": {
                        "id": "Contoso.ERP.Events",
             "schemas": {

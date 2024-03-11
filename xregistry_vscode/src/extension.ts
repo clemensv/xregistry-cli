@@ -52,7 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
                         let jsonData = JSON.parse(document.getText());
                         if (jsonData.hasOwnProperty("$schema") &&
                             jsonData.hasOwnProperty("specversion")
-                            && (jsonData.hasOwnProperty("endpoints") || jsonData.hasOwnProperty("definitionGroups") || jsonData.hasOwnProperty("schemaGroups"))) {
+                            && (jsonData.hasOwnProperty("endpoints") || jsonData.hasOwnProperty("messagegroups") || jsonData.hasOwnProperty("schemagroups"))) {
                             isCloudEventsDiscovery = true;
                         }
                         else if (jsonData.hasOwnProperty("endpoint") || jsonData.hasOwnProperty("definitiongroup") || jsonData.hasOwnProperty("schemagroup")) {

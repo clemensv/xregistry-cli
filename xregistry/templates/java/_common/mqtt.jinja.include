@@ -103,25 +103,25 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endmacro -%}
 
 
-{%- macro DeclareDispatchObjectsArgs(definitionGroups, withType) -%}
-{%- for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "mqtt" )) -%}
+{%- macro DeclareDispatchObjectsArgs(messagegroups, withType) -%}
+{%- for definitiongroup_key, definitiongroup in messagegroups.items() if (definitiongroup | exists("format", "mqtt" )) -%}
 {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
 {%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsFields(definitionGroups) -%}
-{%- for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "mqtt" )) -%}
+{%- macro DeclareDispatchObjectsFields(messagegroups) -%}
+{%- for definitiongroup_key, definitiongroup in messagegroups.items() if (definitiongroup | exists("format", "mqtt" )) -%}
 {%- set handlerName=(definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
 {%- set handlerType="I"+(definitiongroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
 {{ handlerType }} _{{ handlerName }};
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, definitionGroups, args, body) -%}
-{%- if definitionGroups | exists("format", "mqtt" ) %}
+{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
+{%- if messagegroups | exists("format", "mqtt" ) %}
 {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
-    {%- for definitiongroup_key, definitiongroup in definitionGroups.items() -%}
+    {%- for definitiongroup_key, definitiongroup in messagegroups.items() -%}
     {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%} 
     {%- set handlerName=(definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
     {%- set handlerType="I"+(definitiongroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
@@ -129,7 +129,7 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
 {
-    {% for definitiongroup_key, definitiongroup in definitionGroups.items() -%}
+    {% for definitiongroup_key, definitiongroup in messagegroups.items() -%}
     {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
     {%- set handlerName=(definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
    {%- set handlerType="I"+(definitiongroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
@@ -140,13 +140,13 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(message, definitionGroups) -%}
-{%- if definitionGroups | exists("format", "mqtt" ) %}
+{%- macro DispatchToDispatchObjects(message, messagegroups) -%}
+{%- if messagegroups | exists("format", "mqtt" ) %}
 try {
    Regex regex; 
    Match match; 
    var messageTopic = {{ message }}.Topic;
-   {% for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "mqtt" )) -%}
+   {% for definitiongroup_key, definitiongroup in messagegroups.items() if (definitiongroup | exists("format", "mqtt" )) -%}
    {%- set handlerName=(definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
    {% for id, definition in definitiongroup.definitions.items() if (definition | exists("format", "mqtt" )) -%}
    {% set pascalDefinitionName = definition.id | pascal %}
@@ -155,8 +155,8 @@ try {
    if (match.Success)
    {
       return this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
-      {%- if definition.schemaUrl -%}
-      {{ definition.schemaUrl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Payload)
+      {%- if definition.schemaurl -%}
+      {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Payload)
       {%- else -%}
       {{ message }}.Data
       {%- endif %}, match.Groups.Values.Where(g => g.Name != "0").ToDictionary(g => g.Name, g => g.Value));
@@ -182,8 +182,8 @@ public interface {{ interfaceName }}
 {
     {%- for id, definition in definitiongroup.definitions.items() if (definition | exists( "format", "mqtt" )) -%}
     {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}
-    {%- if definition.schemaUrl -%}
-    {%- set dataType = definition.schemaUrl | schema_type | strip_namespace  | pascal -%}
+    {%- if definition.schemaurl -%}
+    {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
     {%- else -%}
     {%- set dataType = "Object" -%}
     {%- endif %}   
@@ -193,9 +193,9 @@ public interface {{ interfaceName }}
 {%- endmacro -%}
 
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
-{%- set definitionGroups = root.definitionGroups -%}
-{%- if definitionGroups | exists("format", "mqtt" ) %}
-{%- for definitiongroup_key, definitiongroup in definitionGroups.items() if (definitiongroup | exists("format", "mqtt" )) -%}
+{%- set messagegroups = root.messagegroups -%}
+{%- if messagegroups | exists("format", "mqtt" ) %}
+{%- for definitiongroup_key, definitiongroup in messagegroups.items() if (definitiongroup | exists("format", "mqtt" )) -%}
 {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
 {%- set interfaceName = "I"+(pascalGroupName | strip_namespace)+"MqttDispatcher" -%}
 {{- DeclareDispatchInterfaceV5(project_name, definitiongroup, pascalGroupName, interfaceName) | pushfile(interfaceName+".java") -}}

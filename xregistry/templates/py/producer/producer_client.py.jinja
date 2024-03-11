@@ -5,9 +5,9 @@ import requests
 from cloudevents.conversion import to_binary, to_structured
 from cloudevents.http import CloudEvent
 
-{%- set definitionGroups = root.definitionGroups %}
-{% for definitiongroup_key in definitionGroups.keys() -%}
-{%- set definitiongroup = definitionGroups[definitiongroup_key] -%}
+{%- set messagegroups = root.messagegroups %}
+{% for definitiongroup_key in messagegroups.keys() -%}
+{%- set definitiongroup = messagegroups[definitiongroup_key] -%}
 {%- set parts = definitiongroup.id.split('.') -%}
 {%- set groupName = parts | join('_') | lower %}
 
@@ -31,8 +31,8 @@ class {{ groupName.split('.')[-1]}}_event_producer:
             {{ attrname }}: str {%- if not attribute.required -%} = default {% endif %},
         {%- endif -%}
     {%- endfor -%} 
-    data: {%- if definition.schemaUrl -%}
-    {{ definition.schemaUrl | schema_type | strip_namespace | snake }}
+    data: {%- if definition.schemaurl -%}
+    {{ definition.schemaurl | schema_type | strip_namespace | snake }}
     {%- else -%}
     object
     {%- endif -%}) -> None:

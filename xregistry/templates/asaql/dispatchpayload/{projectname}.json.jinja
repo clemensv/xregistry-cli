@@ -1,8 +1,8 @@
 {#- triggering generation of all schema-based elements with this loop #}
-{%- for definitiongroup_key, definitiongroup in root.definitionGroups.items() -%}
+{%- for definitiongroup_key, definitiongroup in root.messagegroups.items() -%}
    {%- for definitionid, definition in definitiongroup.definitions.items() %}
-    {%- if definition.schemaUrl -%}
-        {% set x=definition.schemaUrl | schema_type -%}
+    {%- if definition.schemaurl -%}
+        {% set x=definition.schemaurl | schema_type -%}
     {%-endif -%}
     {%- endfor -%}
 {%- endfor %}
