@@ -6,9 +6,9 @@ from cloudevents.conversion import to_binary, to_structured
 from cloudevents.http import CloudEvent
 
 {%- set messagegroups = root.messagegroups %}
-{% for definitiongroup_key in messagegroups.keys() -%}
-{%- set definitiongroup = messagegroups[definitiongroup_key] -%}
-{%- set parts = definitiongroup.id.split('.') -%}
+{% for messagegroup_key in messagegroups.keys() -%}
+{%- set messagegroup = messagegroups[messagegroup_key] -%}
+{%- set parts = messagegroup.id.split('.') -%}
 {%- set groupName = parts | join('_') | lower %}
 
 class {{ groupName.split('.')[-1]}}_event_producer:
@@ -16,8 +16,8 @@ class {{ groupName.split('.')[-1]}}_event_producer:
         self.url = url
         self.content_mode = content_mode
 
-    {% for id in definitiongroup.definitions -%}
-    {%- set definition = definitiongroup.definitions[id] -%}
+    {% for id in messagegroup.messages -%}
+    {%- set definition = messagegroup.messages[id] -%}
     {%- set parts = definition.id.split('.') -%}
     {%- set definitionName = parts|join('_')|lower %}
     def send_{{definitionName.split('.')[-1]}}(self,

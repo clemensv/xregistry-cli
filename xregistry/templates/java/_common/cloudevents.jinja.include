@@ -1,9 +1,9 @@
 {#- CloudEvents macros -#}
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
-{%- macro DeclareUriTemplateArguments(definition) -%}
-{%- for attrname in definition.metadata.attributes -%}
-{%- set attribute = definition.metadata.attributes[attrname] -%}
+{%- macro DeclareUriTemplateArguments(message) -%}
+{%- for attrname in message.metadata.attributes -%}
+{%- set attribute = message.metadata.attributes[attrname] -%}
     {%- if attribute.type == "uritemplate" -%}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
         , String {{ placeholder }}
@@ -15,11 +15,11 @@
 {%- endfor -%} 
 {%- endmacro -%}
 
-{#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as definition -#}
-{%- macro DeclareCloudNativeCloudEvent(variable, data, definition) -%}
+{#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as message -#}
+{%- macro DeclareCloudNativeCloudEvent(variable, data, message) -%}
 CloudEvent {{ variable }} = new CloudEventBuilder()
-{%- for attrname in definition.metadata.attributes -%}
-{%- set attribute = definition.metadata.attributes[attrname] -%}
+{%- for attrname in message.metadata.attributes -%}
+{%- set attribute = message.metadata.attributes[attrname] -%}
 {%- if attrname in ["subject", "type", "datacontenttype"] -%}
     {%- set attrProp = attrname | pascal | replace("Datacontenttype", "DataContentType") %}
     .with{{ attrProp }}({% if attribute.value -%}"{{ attribute.value }}"
@@ -58,38 +58,38 @@ CloudEvent {{ variable }} = new CloudEventBuilder()
     {%- else -%}{{ attrname }}{%- endif -%})
 {%- endif -%}
 {%- endfor %}
-    .withData({%- if definition.metadata.datacontenttype -%}"{{ definition.metadata.datacontenttype.value }}", {% endif -%}
-              {%- if definition.metadata.dataschema -%}"{{ definition.metadata.dataschema }}", {% endif -%} {{ data }} )
+    .withData({%- if message.metadata.datacontenttype -%}"{{ message.metadata.datacontenttype.value }}", {% endif -%}
+              {%- if message.metadata.dataschema -%}"{{ message.metadata.dataschema }}", {% endif -%} {{ data }} )
     .build();
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsArgs(messagegroups, withType) -%}
-{%- for definitiongroup_key, definitiongroup in messagegroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
-{%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
-{%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher{%- if not loop.last %}, {%- endif -%}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+{%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal %}
+{%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsFields(messagegroups) -%}
-{%- for definitiongroup_key, definitiongroup in messagegroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
-{%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
-I{{ pascalGroupName | strip_namespace }}Dispatcher _{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher;
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+{%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal %}
+I{{ pascalGroupName | strip_namespace }}Dispatcher _{{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher;
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
 {%- if messagegroups | exists("format", "cloudevents" ) %}
 {{ class_name }}( {{ args }}{%- if args %}, {%- endif -%}
-    {%- for definitiongroup_key, definitiongroup in messagegroups.items() -%}
-    {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%} 
-    I{{ pascalGroupName | strip_namespace }}Dispatcher {{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher
+    {%- for definitiongroup_key, messagegroup in messagegroups.items() -%}
+    {%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal -%} 
+    I{{ pascalGroupName | strip_namespace }}Dispatcher {{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%}
 )
 {
-    {%- for definitiongroup_key, definitiongroup in messagegroups.items() -%}
-    {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal %}
-    this._{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher = {{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher;
+    {%- for definitiongroup_key, messagegroup in messagegroups.items() -%}
+    {%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal %}
+    this._{{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher = {{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher;
     {%- endfor %}
     {{ body | indent(4) }}
 }
@@ -102,15 +102,15 @@ try {
     var cloudEventType = {{ cloudEvent }}.getType();
     switch (cloudEventType)
     {
-        {%- for definitiongroup_key, definitiongroup in messagegroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
-        {%- for id, definition in definitiongroup.definitions.items() -%}
-        {%- set pascalDefinitionName = definition.id | pascal %}
-        case "{{ definition.id }}":
-            if ( this._{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher != null )
+        {%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+        {%- for id, message in messagegroup.messages.items() -%}
+        {%- set pascalDefinitionName = message.id | pascal %}
+        case "{{ message.id }}":
+            if ( this._{{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher != null )
             {
-                return this._{{ definitiongroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher.on{{ pascalDefinitionName | strip_namespace }}Async({{ cloudEvent }},
-                    {%- if definition.schemaurl -%}
-                {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}.fromData({{ cloudEvent }}.getData())
+                return this._{{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher.on{{ pascalDefinitionName | strip_namespace }}Async({{ cloudEvent }},
+                    {%- if message.schemaurl -%}
+                {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.fromData({{ cloudEvent }}.getData())
                 {%- else -%}
                 {{ cloudEvent }}.getData()
                 {%- endif %});
@@ -129,7 +129,7 @@ return CompletableFuture.completedFuture(null);
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterface(project_name, definitiongroup, pascalGroupName) -%}
+{%- macro DeclareDispatchInterface(project_name, messagegroup, pascalGroupName) -%}
 package {{ pascalGroupName | namespace(project_name) | lower() }};
 
 import io.cloudevents.CloudEvent;
@@ -137,10 +137,10 @@ import java.util.concurrent.CompletableFuture;
 
 public interface I{{ pascalGroupName | strip_namespace }}Dispatcher
 {
-    {%- for id, definition in definitiongroup.definitions.items() if (definition | exists( "format", "cloudevents" )) -%}
-    {%- set pascalDefinitionName = definition.id | strip_namespace | pascal -%}
-    {%- if definition.schemaurl -%}
-    {%- set dataType = definition.schemaurl | schema_type | strip_namespace  | pascal -%}
+    {%- for id, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) -%}
+    {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
+    {%- if message.schemaurl -%}
+    {%- set dataType = message.schemaurl | schema_type | strip_namespace  | pascal -%}
     {%- else -%}
     {%- set dataType = "Object" -%}
     {%- endif %}   
@@ -152,10 +152,10 @@ public interface I{{ pascalGroupName | strip_namespace }}Dispatcher
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("format", "cloudevents" ) %}
-{%- for definitiongroup_key, definitiongroup in messagegroups.items() if (definitiongroup | exists("format", "cloudevents" )) -%}
-{%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+{%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal -%}
 {%- set interfaceName = "I"+(pascalGroupName | strip_namespace)+"Dispatcher" -%}
-{{- DeclareDispatchInterface(project_name, definitiongroup, pascalGroupName) | pushfile(interfaceName+".java") -}}
+{{- DeclareDispatchInterface(project_name, messagegroup, pascalGroupName) | pushfile(interfaceName+".java") -}}
 {%- endfor -%}
 {%- endif -%}
 {%- endmacro -%}

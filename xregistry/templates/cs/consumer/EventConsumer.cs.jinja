@@ -27,8 +27,8 @@ using CloudNative.CloudEvents.SystemTextJson;
 {%- endif %}
 using Microsoft.Extensions.Logging;
  
-{% for definitiongroup_key, definitiongroup in messagegroups.items() -%}
- {%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
+{% for messagegroup_key, messagegroup in messagegroups.items() -%}
+ {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
 namespace {{ project_name | pascal }}
 {
      {%- set class_name = ( pascalGroupName | strip_namespace )+"EventConsumer" %}

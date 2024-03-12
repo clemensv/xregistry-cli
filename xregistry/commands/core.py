@@ -105,21 +105,21 @@ def load_definitions(definitions_file: str, headers: dict, load_schema: bool = F
     #     if docroot["$schema"] != "https://cloudevents.io/schemas/registry":
     #         print("unsupported schema:" + docroot["$schema"])
     #         return None, None
-    if "messagegroupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["messagegroupsUrl"], 
+    if "messagegroupsurl" in docroot:
+        _, subroot = load_definitions_core(docroot["messagegroupsurl"], 
                                            headers)
         docroot["messagegroups"] = subroot
-        docroot["messagegroupsUrl"] = None
+        docroot["messagegroupsurl"] = None
     if "schemagroupsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["schemagroupsUrl"], 
+        _, subroot = load_definitions_core(docroot["schemagroupsurl"], 
                                            headers)
         docroot["schemagroups"] = subroot
-        docroot["schemagroupsUrl"] = None
+        docroot["schemagroupsurl"] = None
     if "endpointsUrl" in docroot:
-        _, subroot = load_definitions_core(docroot["endpointsUrl"], 
+        _, subroot = load_definitions_core(docroot["endpointsurl"], 
                                            headers)
         docroot["endpoints"] = subroot
-        docroot["endpointsUrl"] = None
+        docroot["endpointsurl"] = None
 
     # make sure the document is always of the same form, even if
     # the URL was a deep link. We can drill to the level of an

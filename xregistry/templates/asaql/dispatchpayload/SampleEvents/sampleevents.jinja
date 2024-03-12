@@ -23,8 +23,8 @@
     }
 }
 {% endmacro %}
-{%- for definitiongroup_key, definitiongroup in root.messagegroups.items() -%}
-{%- for eventkey, event in definitiongroup.definitions.items() %}
+{%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
+{%- for eventkey, event in messagegroup.messages.items() %}
 {{ generate(event.metadata.attributes) | pushfile("event_" + (event.id | strip_namespace | snake) + ".json") }}
 {%- endfor %}
 {%- endfor %}

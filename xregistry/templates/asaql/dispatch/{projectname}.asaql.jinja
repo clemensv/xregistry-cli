@@ -1,5 +1,5 @@
-{%- for definitiongroup_key, definitiongroup in root.messagegroups.items() -%}
-   {%- for eventkey, event in definitiongroup.definitions.items() %}
+{%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
+   {%- for eventkey, event in messagegroup.messages.items() %}
 SELECT type, *
 INTO [output{{event.id | strip_namespace | pascal }}] 
 FROM [input]

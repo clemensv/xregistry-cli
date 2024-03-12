@@ -20,8 +20,8 @@ using CloudNative.CloudEvents.SystemTextJson;
 {%- endif %}
 using Microsoft.Extensions.Logging;
  
-{% for definitiongroup_key, definitiongroup in messagegroups.items() -%}
-{%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
+{% for messagegroup_key, messagegroup in messagegroups.items() -%}
+{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
 namespace {{ project_name | pascal }}
 {
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventProducer" %}
@@ -81,8 +81,8 @@ namespace {{ project_name | pascal }}
         {%- endfor -%}
         {% endif %}
 
-        {% for id in definitiongroup.definitions -%}
-        {%- set definition = definitiongroup.definitions[id] -%}
+        {% for id in messagegroup.messages -%}
+        {%- set definition = messagegroup.messages[id] -%}
         {%- set pascalDefinitionName = definition.id | pascal %}
         {%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
         {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}

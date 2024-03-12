@@ -442,8 +442,8 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         schema_version = schema_root
 
                     if schema_version and isinstance(schema_version,dict):
-                        if "schemaFormat" in schema_version:
-                            schema_format = schema_version["schemaFormat"]
+                        if "schemaformat" in schema_version:
+                            schema_format = schema_version["schemaformat"]
 
                         # case c): if the schema version contains a schemaurl attribute, then we need to
                         # add the schemaurl to the list of schemas to be processed and continue

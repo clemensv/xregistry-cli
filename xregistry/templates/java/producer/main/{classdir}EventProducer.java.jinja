@@ -39,8 +39,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.ArrayList;
 
 
-{% for definitiongroup_key, definitiongroup in messagegroups.items() -%}
-{%- set pascalGroupName = definitiongroup.id | default(definitiongroup_key) | pascal -%}
+{% for messagegroup_key, messagegroup in messagegroups.items() -%}
+{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
 {%- set className = (pascalGroupName | strip_namespace)+"EventProducer" %}
 public class {{ className }}
 {
@@ -99,8 +99,8 @@ public class {{ className }}
     {%- endfor -%}
     {% endif %}
 
-    {% for id in definitiongroup.definitions -%}
-    {%- set definition = definitiongroup.definitions[id] -%}
+    {% for id in messagegroup.messages -%}
+    {%- set definition = messagegroup.messages[id] -%}
     {%- set pascalDefinitionName = definition.id | pascal %}
     {%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
     {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}

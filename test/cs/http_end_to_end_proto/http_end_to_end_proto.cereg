@@ -64,7 +64,7 @@
                             }
                         }
                     },
-                    "schemaFormat": "Protobuf/3.0",
+                    "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 },
                 "Contoso.ERP.Events.PaymentsReceived": {
@@ -93,7 +93,7 @@
                             }
                         }
                     },
-                    "schemaFormat": "Protobuf/3.0",
+                    "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/paymentData:PaymentData"
                 },
                 "Contoso.ERP.Events.ShipmentAccepted": {
@@ -122,7 +122,7 @@
                             }
                         }
                     },
-                    "schemaFormat": "Protobuf/3.0",
+                    "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData:ShipmentData"
                 },
                 "Contoso.ERP.Events.ShipmentRejected": {
@@ -151,7 +151,7 @@
                             }
                         }
                     },
-                    "schemaFormat": "Protobuf/3.0",
+                    "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData:ShipmentData"
                 },
                 "Contoso.ERP.Events.ReservationCancelled": {
@@ -180,7 +180,7 @@
                             }
                         }
                     },
-                    "schemaFormat": "Protobuf/3.0",
+                    "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData:CancellationData"
                 }
             }

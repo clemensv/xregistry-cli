@@ -55,7 +55,7 @@
                             ]
                         }
                     },
-                    "schemaFormat": "JsonSchema/draft-07",
+                    "schemaformat": "JsonSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }

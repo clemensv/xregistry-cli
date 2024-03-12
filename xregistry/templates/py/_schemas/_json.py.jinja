@@ -75,7 +75,7 @@
 75            {%- endif %}
 76   {%- endmacro -%}
 
-77   {%- for name, type in schema.definitions.items() -%}
+77   {%- for name, type in schema.messages.items() -%}
 78       {{ emitclass(type, name) }}
 79   {%- endfor -%}
 80   {%- for name, type in schema.properties.items() -%}

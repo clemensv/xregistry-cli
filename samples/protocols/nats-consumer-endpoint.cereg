@@ -45,7 +45,7 @@
                             }
                         }
                     },
-                    "schemaFormatr": "Avro/1.11.0",
+                    "schemaformatr": "Avro/1.11.0",
                     "schemaurl": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
             }

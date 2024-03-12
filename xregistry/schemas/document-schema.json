@@ -11,7 +11,7 @@
     "messagegroups": {
       "type": "object",
       "additionalProperties": {
-        "$ref": "#/definitions/definitiongroup"
+        "$ref": "#/definitions/messagegroup"
       }
     },
     "schemagroups": {
@@ -21,8 +21,8 @@
       }
     }
   },
-  "messages": {
-    "definition": {
+  "definitions": {
+    "message": {
       "type": "object",
       "properties": {
         "id": {
@@ -48,17 +48,17 @@
         "labels": {
           "type": "object"
         },
-        "createdBy": {
+        "createdby": {
           "type": "string"
         },
-        "createdOn": {
+        "createdon": {
           "type": "string",
           "format": "date-time"
         },
         "modifiedBy": {
           "type": "string"
         },
-        "modifiedOn": {
+        "modifiedon": {
           "type": "string",
           "format": "date-time"
         },
@@ -797,17 +797,17 @@
           "type": "string",
           "description": "Endpoint metadata format identifier. If set, all definitions MUST use this format value."
         },
-        "createdBy": {
+        "createdby": {
           "type": "string"
         },
-        "createdOn": {
+        "createdon": {
           "type": "string",
           "format": "date-time"
         },
         "modifiedBy": {
           "type": "string"
         },
-        "modifiedOn": {
+        "modifiedon": {
           "type": "string",
           "format": "date-time"
         },
@@ -1170,7 +1170,7 @@
         "messages": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/definition"
+            "$ref": "#/definitions/message"
           }
         }
       },
@@ -1178,7 +1178,7 @@
         "id"
       ]
     },
-    "definitiongroup": {
+    "messagegroup": {
       "type": "object",
       "properties": {
         "id": {
@@ -1208,17 +1208,17 @@
           "type": "string",
           "description": "Format identifier that defines the common metadata information for the message. All definitions in this group share this format. Mixed-format groups are not permitted."
         },
-        "createdBy": {
+        "createdby": {
           "type": "string"
         },
-        "createdOn": {
+        "createdon": {
           "type": "string",
           "format": "date-time"
         },
         "modifiedBy": {
           "type": "string"
         },
-        "modifiedOn": {
+        "modifiedon": {
           "type": "string",
           "format": "date-time"
         },
@@ -1229,7 +1229,7 @@
         "messages": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/definition"
+            "$ref": "#/definitions/message"
           }
         }
       },
@@ -1237,7 +1237,7 @@
         "id"
       ]
     },
-    "schemaVersion": {
+    "schemaversion": {
       "type": "object",
       "properties": {
         "id": {
@@ -1267,17 +1267,17 @@
           "type": "string",
           "description": "Schema format identifier for this schema version."
         },
-        "createdBy": {
+        "createdby": {
           "type": "string"
         },
-        "createdOn": {
+        "createdon": {
           "type": "string",
           "format": "date-time"
         },
         "modifiedBy": {
           "type": "string"
         },
-        "modifiedOn": {
+        "modifiedon": {
           "type": "string",
           "format": "date-time"
         },
@@ -1329,30 +1329,30 @@
         "format": {
           "type": "string"
         },
-        "createdBy": {
+        "createdby": {
           "type": "string"
         },
-        "createdOn": {
+        "createdon": {
           "type": "string",
           "format": "date-time"
         },
         "modifiedBy": {
           "type": "string"
         },
-        "modifiedOn": {
+        "modifiedon": {
           "type": "string",
           "format": "date-time"
         },
-        "versionsUrl": {
+        "versionsurl": {
           "type": "string"
         },
-        "versionsCount": {
+        "versionscount": {
           "type": "integer"
         },
         "versions": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/schemaVersion"
+            "$ref": "#/definitions/schemaversion"
           }
         }
       },
@@ -1367,8 +1367,8 @@
         },
         {
           "required": [
-            "versionsUrl",
-            "versionsCount"
+            "versionsurl",
+            "versionscount"
           ]
         }
       ]
@@ -1402,17 +1402,17 @@
         "format": {
           "type": "string"
         },
-        "createdBy": {
+        "createdby": {
           "type": "string"
         },
-        "createdOn": {
+        "createdon": {
           "type": "string",
           "format": "date-time"
         },
         "modifiedBy": {
           "type": "string"
         },
-        "modifiedOn": {
+        "modifiedon": {
           "type": "string",
           "format": "date-time"
         },
