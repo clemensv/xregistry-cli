@@ -313,7 +313,7 @@
                                 "required": true
                             }
                         }
-                    }
+                    },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/inventoryData"
                 },

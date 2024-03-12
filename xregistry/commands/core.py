@@ -70,12 +70,12 @@ def load_definitions_core(definitions_file: str, headers: dict, ignore_handled: 
                 textDoc = f.read()
                 try:
                     docroot = json.loads(textDoc)
-                except json.decoder.JSONDecodeError as e:
+                except json.decoder.JSONDecodeError as e1:
                     try:
                         # if the JSON is invalid, try to parse it as YAML
                         docroot = yaml.safe_load(textDoc)
-                    except yaml.YAMLError as e:
-                        docroot = textDoc
+                    except yaml.YAMLError as e2:
+                        raise e1
     except urllib.error.URLError as e:
         print("An error occurred while trying to open the URL: ", e)
         return None, None
