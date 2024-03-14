@@ -120,7 +120,7 @@ class TimeExtension(Extension):
 # anywhere in the doc with the value prefixed with the given string (case-insensitive)
 def exists(obj, prop, value):
     df = pd.json_normalize(obj)
-    result = df[df.filter(like=prop).applymap(lambda x: x.lower()).apply(lambda x: x.str.startswith(value))].any().any()
+    result = df[df.filter(like=prop).map(lambda x: x.lower()).apply(lambda x: x.str.startswith(value))].any().any()
     return result
 
 
@@ -144,7 +144,7 @@ def regex_replace(string, pattern, replacement):
 # in C# identifiers with an underscore
 def strip_invalid_identifier_characters(string):
     if string:
-        return re.sub("[^A-Za-z0-9_\.]", "_", string)
+        return re.sub(r'[^A-Za-z0-9_\.]', '_', string)
     return string
 
 
