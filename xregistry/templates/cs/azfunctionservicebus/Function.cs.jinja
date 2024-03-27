@@ -52,7 +52,7 @@ namespace {{ project_name | pascal }}
             {
                 return;
             }
-            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(12) }}
         }
     }
 }

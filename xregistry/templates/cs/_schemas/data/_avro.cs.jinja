@@ -8,13 +8,25 @@ using System;
     {%- if type.type == 'record' or not type.type %}
     public partial class {{ type_name | pascal }}
     {
-        public static {{ type_name | pascal }} FromData(object data)
+        public static {{ type_name | pascal }} FromData(object? data, string? contentType)
         {
-            // generated from a JSON schema and therefore only supporting JSON
             if ( data is {{ type_name | pascal }})
             {
                 return ({{ type_name | pascal }})data;
             }
+            contentType = contentType?.Split(';')[0].Trim().ToLowerInvariant();
+            var isJson = contentType != null && (contentType == "application/json" || contentType.EndsWith("+json"));
+            if (isJson)
+            {
+                if (data is JsonElement) 
+                {
+                    return JsonSerializer.Deserialize<{{ type_name | pascal }}>((JsonElement)data);
+                }
+                else if (data is string)
+                {
+                    return JsonSerializer.Deserialize<{{ type_name | pascal }}>((string)data);
+                }
+            } 
             var stream = data as Stream;
             if (stream == null)
             {
@@ -31,9 +43,9 @@ using System;
                     throw new NotSupportedException("Data is not of a supported type for conversion to {{ type_name | pascal }}");  
                 }
             }
-            var decoder = new Avro.IO.BinaryDecoder(stream);
-            var writer = new Avro.Specific.SpecificDatumReader<{{ type_name | pascal }}>({{ type_name | pascal }}._SCHEMA, {{ type_name | pascal }}._SCHEMA);
-            return writer.Read(default({{ type_name | pascal }}), decoder);
+            var decoder = isJson ? new Avro.IO.JsonDecoder(stream) : new Avro.IO.BinaryDecoder(stream);
+            var reader = new Avro.Specific.SpecificDatumReader<{{ type_name | pascal }}>({{ type_name | pascal }}._SCHEMA, {{ type_name | pascal }}._SCHEMA);
+            return reader.Read(default({{ type_name | pascal }}), decoder);
         }
 
         public byte[] ToByteArray() 

@@ -3,15 +3,13 @@
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set function_name = project_name | pascal -%}
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Threading;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using CloudNative.CloudEvents;
@@ -20,55 +18,90 @@ using CloudNative.CloudEvents.Avro;
 using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
 using CloudNative.CloudEvents.SystemTextJson;
 using CloudNative.CloudEvents.AspNetCore;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 
 namespace {{ project_name | pascal }}
 {
     {%- set class_name = (project_name | pascal | strip_namespace)+"Functions" %}
     public class {{ class_name }}
     {
+        private static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
+        private static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
+        private static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
+
        {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
         {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "", "") | indent(8) }}
 
-        [FunctionName("{{ project_name | pascal | concat_namespace }}")]
-        public async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "post", "options", Route = null)] HttpRequest req,
-            ILogger log,
+        [Function("{{ project_name | pascal | concat_namespace }}")]
+        public async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post", "options", Route = null)] HttpRequestData req,
+            FunctionContext executionContext,
             CancellationToken cancellationToken)
         {
-            if(req.Method == "OPTIONS")
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            if (req.Method == "OPTIONS")
             {
-                var origin = req.Headers["WebHook-Request-Origin"];
-                if (!string.IsNullOrEmpty(origin) && allowedOrigins.Contains(origin))
+                if (req.Headers.TryGetValues("WebHook-Request-Origin", out var origin))
                 {
-                    return new OkResult();
+                    // if all origins are allowed, return the response
+                    if (origin.All(o => allowedOrigins.Contains(o)))
+                    {
+                        return response;
+                    }
                 }
-                return new UnauthorizedResult();
+                response.StatusCode = HttpStatusCode.Unauthorized;
+                return response;
             }
             
-            CloudEventFormatter formatter = null;
-            var contentType = req.ContentType.Split(";")[0];
-            if (contentType.EndsWith("+proto"))
+            ILogger logger = executionContext.GetLogger<{{ class_name }}>();
+
+            CloudEvent? cloudEvent = null;
+            var contentType = req.Headers.GetValues("Content-Type").First().Split(";")[0];
+            if ( contentType != null && contentType.StartsWith("application/cloudevents") )
             {
-            formatter = new ProtobufEventFormatter();
-            }
-            else if (contentType.EndsWith("+avro"))
-            {
-                formatter = new AvroEventFormatter();
+                var formatter = contentType.EndsWith("+proto") ? protoFormatter: contentType.EndsWith("+avro") ? avroFormatter : jsonFormatter;
+                cloudEvent = formatter.DecodeStructuredModeMessage(req.Body, new System.Net.Mime.ContentType(contentType), null);
             }
             else 
             {
-                formatter = new JsonEventFormatter();
-            }
+                // do we have a header "CE-SpecVersion"?
+                if (req.Headers.TryGetValues("CE-SpecVersion", out var specVersion))
+                {
+                    var version = specVersion.First();
+                    if ( version == "1.0")
+                    {
+                        var id = req.Headers.GetValues("CE-Id").First();
+                        var source = req.Headers.GetValues("CE-Source").First();
+                        var subject = req.Headers.GetValues("CE-Subject").First();
+                        var type = req.Headers.GetValues("CE-Type").First();
+                        var time = req.Headers.GetValues("CE-Time").First();
+                        var dataschema = req.Headers.GetValues("CE-DataSchema").First();
 
-            var cloudEvent = await req.ToCloudEventAsync(formatter);
-            if(cloudEvent == null)
+                        cloudEvent = new CloudEvent()
+                        {
+                            Id = id,
+                            Source = source != null ? new Uri(source, UriKind.RelativeOrAbsolute) : null,
+                            Type = type,
+                            Subject = subject,
+                            DataContentType = contentType,
+                            Data = req.Body,                            
+                            Time = DateTimeOffset.Parse(time),
+                            DataSchema = dataschema != null ? new Uri(dataschema, UriKind.RelativeOrAbsolute) : null
+                        };
+                    }
+                }
+            }
+            if ( cloudEvent == null )
             {
-                return new NoContentResult();
+                response.StatusCode = HttpStatusCode.BadRequest;
+                return response;
             }
+            
+            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "logger" ) | indent(12) }}
 
-            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups ) | indent(12) }}
-
-            return new NoContentResult();
+            response.StatusCode = HttpStatusCode.NoContent;
+            return response;
         }
 
         private static readonly HashSet<string> allowedOrigins = new();

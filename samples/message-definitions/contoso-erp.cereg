@@ -13,7 +13,7 @@
                 ]
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.ERP.Events"
+                "#/messagegroups/Contoso.ERP.ChangeEvents"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -28,7 +28,7 @@
                 ]
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.ERP.Events"
+                "#/messagegroups/Contoso.ERP.ChangeEvents"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -80,9 +80,9 @@
         }
     },
     "messagegroups": {
-        "Contoso.ERP.Events": {
-            "id": "Contoso.ERP.Events",
-                       "format": "CloudEvents/1.0",
+        "Contoso.ERP.ChangeEvents": {
+            "id": "Contoso.ERP.ChangeEvents",
+            "format": "CloudEvents/1.0",
             "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
                     "id": "Contoso.ERP.Events.ReservationPlaced",
@@ -575,15 +575,15 @@
     },
     "schemagroups": {
         "Contoso.ERP.Events": {
-                       "id": "Contoso.ERP.Events",
+            "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
                     "id": "orderData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -626,11 +626,11 @@
                 },
                 "paymentData": {
                     "id": "paymentData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -657,11 +657,11 @@
                 },
                 "shipmentData": {
                     "id": "shipmentData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -684,11 +684,11 @@
                 },
                 "cancellationData": {
                     "id": "cancellationData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -708,11 +708,11 @@
                 },
                 "refundData": {
                     "id": "refundData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -735,11 +735,11 @@
                 },
                 "inventoryData": {
                     "id": "inventoryData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -759,11 +759,11 @@
                 },
                 "productData": {
                     "id": "productData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -789,11 +789,11 @@
                 },
                 "productDeletionData": {
                     "id": "productDeletionData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -812,11 +812,11 @@
                 },
                 "productUpdatedData": {
                     "id": "productUpdatedData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -847,11 +847,11 @@
                 },
                 "employeeData": {
                     "id": "employeeData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -878,11 +878,11 @@
                 },
                 "employeeDeletionData": {
                     "id": "employeeDeletionData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -899,11 +899,11 @@
                 },
                 "employeeUpdatedData": {
                     "id": "employeeUpdatedData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -930,11 +930,11 @@
                 },
                 "purchaseOrderData": {
                     "id": "purchaseOrderData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -974,11 +974,11 @@
                 },
                 "purchaseOrderUpdatedData": {
                     "id": "purchaseOrderUpdatedData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -995,11 +995,11 @@
                 },
                 "purchaseOrderDeletionData": {
                     "id": "purchaseOrderDeletionData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {
@@ -1016,11 +1016,11 @@
                 },
                 "returnData": {
                     "id": "returnData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
+                            "format": "JSONSchema/draft-07",
                             "schemaobject": {
                                 "type": "object",
                                 "properties": {

@@ -7,7 +7,7 @@ using System;
 {%- macro emitclass(type, type_name) %}
     public partial class {{ type_name | pascal }}
     {
-        public static {{ type_name | pascal }} FromData(object data)
+        public static {{ type_name | pascal }} FromData(object? data, string? contentType)
         {
             // generated from a JSON schema and therefore only supporting JSON
             if ( data is {{ type_name | pascal }})

@@ -25,7 +25,7 @@
         /// <param name="data">The data to use to create the new instance. 
         /// This may be a string or JsonElement or an instance of this class.</param>
         /// <returns>{{ type_name | pascal }}</returns>
-        public static {{ type_name | pascal }} FromData(object data)
+        public static {{ type_name | pascal }}? FromData(object? data, string? contentType)
         {
             // generated from a JSON schema and therefore only supporting JSON
             if ( data is {{ type_name | pascal }})
@@ -39,6 +39,10 @@
             else if ( data is string)
             {
                 return JsonSerializer.Deserialize<{{ type_name | pascal }}>((string)data);
+            }
+            else if (data is BinaryData)
+            {
+                return ((BinaryData)data).ToObjectFromJson<{{ type_name | pascal }}>();
             }
             throw new NotSupportedException("Data is not of a supported type for conversion to {{ type_name | pascal }}");
         }
@@ -175,7 +179,7 @@
                 {%- set csharpType = list_type+"<object>" -%}
             {%- endif -%}
         {%- else -%}
-           {%- set csharpType = "object" -%}
+            {%- set csharpType = "object" -%}
         {%- endif -%}
         {%- if (not property.type) or property.type == "object"  -%}
             {%- if property['$ref'] -%}
@@ -200,7 +204,7 @@
         /// <summary>
         /// {{ propertyName | pascal }}
         /// </summary>
-        private {{ propertyName | pascal }}Enum _{{ propertyName }} = {{ propertyName | pascal }}Enum.{{ property.enum[0] | pascal }};
+        private {{ propertyName | pascal }}Enum {{ propertyName }} = {{ propertyName | pascal }}Enum.{{ property.enum[0] | pascal }};
         /// <summary>
         /// {{ propertyName | pascal }}
         /// </summary>
@@ -212,7 +216,7 @@
         {
             get
             {
-                return _{{ propertyName }};
+                return {{ propertyName }};
             }
             set
             {
@@ -220,11 +224,14 @@
                 {
                     throw new ArgumentOutOfRangeException("{{ propertyName | pascal }}", ExceptionMessages.ValueIsInvalid);
                 }
-                _{{ propertyName }} = value;
+                {{ propertyName }} = value;
             }
         }
-        {%- else %}
-        private {{ csharpType }} _{{ propertyName }} { get; set; }
+        {%- else -%}
+        {%- if not (type.required and pn in type.required) -%}
+        {%- set csharpType = csharpType + "?" -%}
+        {%- endif %}
+        private {{ csharpType }} {{ propertyName }};
         /// <summary>
         /// {{ propertyName | pascal }}
         /// </summary>
@@ -236,7 +243,7 @@
         {
             get
             {
-                return _{{ propertyName }};
+                return {{ propertyName }};
             }
             set
             {
@@ -288,7 +295,7 @@
                     throw new System.ArgumentException(ExceptionMessages.ValueIsNotAnEmail, "{{ propertyName | pascal }}");
                 }
                 {%- endif %}
-                _{{ propertyName }} = value;
+                {{ propertyName }} = value;
             }
         }    
         {% endif -%}

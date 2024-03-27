@@ -2,8 +2,9 @@
 {%- set uses_avro = uses_avro | default(true) -%}
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   {%- if uses_protobuf %}
   <ItemGroup>
@@ -19,7 +20,7 @@
      <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.ServiceBus" Version="5.8.1" />
      <PackageReference Include="Azure.Core.Amqp" Version="1.2.0" />
      <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.11.1" />
-    <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="4.1.3" />
+    <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="4.3.0" />
      <PackageReference Include="CloudNative.CloudEvents" Version="2.5.1" />
      <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.5.1" />
@@ -30,9 +31,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     {%- endif %}
-    {%- if uses_avro or uses_protobuf %}
-    <PackageReference Include="System.Memory.Data" Version="6.0.0"></PackageReference>
-    {%- endif %}
+    <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
     {%- if uses_avro %}
     <PackageReference Include="Apache.Avro" Version="1.11.1" />
     {%- endif %}

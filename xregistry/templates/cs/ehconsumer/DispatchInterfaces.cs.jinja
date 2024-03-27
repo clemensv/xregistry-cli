@@ -1,0 +1,4 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "eventhubs.jinja.include" as eventhubs -%}
+{{ cloudEvents.DeclareDispatchInterfaces( project_name, root) }}
+{{ eventhubs.DeclareDispatchInterfaces( project_name, root) }}

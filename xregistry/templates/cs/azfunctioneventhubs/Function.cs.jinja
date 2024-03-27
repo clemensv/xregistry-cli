@@ -27,9 +27,7 @@ namespace {{ project_name | pascal }}
         {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, messagegroups) | indent(8) }}
 
         [FunctionName("{{ project_name | pascal | concat_namespace }}")]
-        public async Task Run(
-              [EventHubTrigger("myeventhub", Connection = "EventHubConnection")] EventData [] messages,
-              ILogger log)
+        public async Task Run([EventHubTrigger("myeventhub", Connection = "EventHubConnection")] EventData [] messages, ILogger log)
         {
             foreach(var message in messages)
             {
@@ -53,7 +51,7 @@ namespace {{ project_name | pascal }}
                 {
                     return;
                 }
-                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(16) }}
             }
         }
     }

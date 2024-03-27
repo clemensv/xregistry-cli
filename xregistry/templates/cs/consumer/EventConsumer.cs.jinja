@@ -59,13 +59,11 @@ namespace {{ project_name | pascal }}
         
         {%- if uses_cloudevents_message %}
         
-        public async Task DispatchCloudEventAsync(
-               CloudEvent cloudEvent,
-               ILogger log)
+        public async Task DispatchCloudEventAsync( CloudEvent cloudEvent, ILogger log)
         {
             try 
             {
-                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -75,13 +73,11 @@ namespace {{ project_name | pascal }}
         {%- endif %}
 
         {%- if uses_amqp_message %}
-        public async Task DispatchMessageAsync(
-               Amqp.Message amqpMessage,
-               ILogger log)
+        public async Task DispatchMessageAsync( Amqp.Message amqpMessage, ILogger log)
         {
             try 
             {
-                {{ amqp.DispatchToDispatchObjects( "amqpMessage", messagegroups ) | indent(16) }}
+                {{ amqp.DispatchToDispatchObjects( "amqpMessage", messagegroups, "log" ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -91,13 +87,11 @@ namespace {{ project_name | pascal }}
         {%- endif %}
 
         {%- if uses_mqtt_message %}
-        public async Task DispatchApplicationMessageAsync(
-               MqttApplicationMessage mqttMessage,
-               ILogger log)
+        public async Task DispatchApplicationMessageAsync( MqttApplicationMessage mqttMessage, ILogger log)
         {
             try 
             {
-               {{ mqtt.DispatchToDispatchObjects( "mqttMessage", messagegroups ) | indent(16) }}
+               {{ mqtt.DispatchToDispatchObjects( "mqttMessage", messagegroups, "log" ) | indent(16) }}
             }
             catch (Exception ex)
             {

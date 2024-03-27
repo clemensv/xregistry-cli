@@ -115,7 +115,7 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
 {%- set handlerName=(messagegroup.id | default(messagegroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
 {%- set handlerType="I"+(messagegroup.id | default(messagegroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
-{{ handlerType }} _{{ handlerName }};
+{{ handlerType }} {{ handlerName }};
 {%- endfor %}
 {%- endmacro-%}
 
@@ -134,14 +134,14 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal %}
     {%- set handlerName=(messagegroup.id | default(messagegroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
    {%- set handlerType="I"+(messagegroup.id | default(messagegroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
-    this._{{ handlerName }} = {{ handlerName }};
+    this.{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
     {{ body | indent(4) }}
 }
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(message, messagegroups) -%}
+{%- macro DispatchToDispatchObjects(message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "mqtt" ) %}
 Regex regex; 
 Match match; 
@@ -154,9 +154,9 @@ regex = new Regex("^" + "{{ message.message.properties.topic.value}}".Replace("{
 match = regex.Match(messageTopic);
 if (match.Success)
 {
-   await this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
+   await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
    {%- if message.schemaurl -%}
-   {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Payload)
+   {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
    {%- else -%}
    {{ message }}.Data
    {%- endif %}, match.Groups.Values.Where(g => g.Name != "0").ToDictionary(g => g.Name, g => g.Value));
@@ -188,7 +188,7 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   
-        Task On{{ pascalDefinitionName | strip_namespace }}Async(MqttApplicationMessage mqttMessage, {{ dataType }} data, IDictionary<string, string> parameters);
+        Task On{{ pascalDefinitionName | strip_namespace }}Async(MqttApplicationMessage mqttMessage, {{ dataType }}? data, IDictionary<string, string> parameters);
         {%- endfor %}
     }
 }

@@ -105,7 +105,7 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
 {%- set handlerName=(messagegroup.id | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
 {%- set handlerType="I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
-{{ handlerType }} _{{ handlerName }};
+{{ handlerType }} {{ handlerName }};
 {%- endfor %}
 {%- endmacro -%}
 
@@ -115,7 +115,7 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal %}
 {%- set handlerName=(messagegroup.id | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
 {%- set handlerType="I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
-{{ handlerType }} _{{ handlerName }};
+{{ handlerType }} {{ handlerName }};
 {%- endfor %}
 
 {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
@@ -131,14 +131,14 @@ Amqp.Message {{ variable }} = new Amqp.Message()
     {%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal %}
     {%- set handlerName=(messagegroup.id | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
     {%- set handlerType="I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
-    this._{{ handlerName }} = {{ handlerName }};
+    this.{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
     {{ body | indent(4) }}
 }
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(message, messagegroups) -%}
+{%- macro DispatchToDispatchObjects(message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
 try {
    var messageSubject = {{ message }}.Properties.Subject;
@@ -149,11 +149,11 @@ try {
       {% for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
       {% set pascalDefinitionName = message.id | pascal %}
       case "{{ message.id }}":
-         if ( this._{{ handlerName }} != null )
+         if ( this.{{ handlerName }} != null )
          {
-               return this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
+               return this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
                   {%- if message.schemaurl -%}
-               {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Body)
+               {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
                {%- else -%}
                {{ message }}.Data
                {%- endif %});
@@ -162,7 +162,7 @@ try {
       {% endfor %}
       {% endfor %}
       default:
-         _logger.error(String.format("Unsupported message subject %s", messageSubject));
+         {{ logger }}.error(String.format("Unsupported message subject %s", messageSubject));
          break;
    }
 } catch ( Exception exception ) {

@@ -22,11 +22,9 @@ namespace {{ project_name | pascal }}
         {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, messagegroups) | indent(8) }}
         
         [FunctionName("{{ project_name | pascal | concat_namespace }}")]
-        public async Task Run(
-                [EventGridTrigger] CloudEvent cloudEvent,
-                ILogger log)
+        public async Task Run([EventGridTrigger] CloudEvent cloudEvent, ILogger log)
         {
-            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(12) }}
         }
     }
 }

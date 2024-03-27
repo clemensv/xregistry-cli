@@ -96,7 +96,7 @@ I{{ pascalGroupName | strip_namespace }}Dispatcher _{{ messagegroup.id | default
 {% endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(cloudEvent, messagegroups) -%}
+{%- macro DispatchToDispatchObjects(cloudEvent, messagegroups, logger) -%}
 {%- if messagegroups | exists("format", "cloudevents" ) -%}
 try {
     var cloudEventType = {{ cloudEvent }}.getType();
@@ -119,7 +119,7 @@ try {
         {% endfor %}
         {% endfor %}
         default:
-            _logger.warn("Unsupported CloudEvent type", cloudEventType);
+            {{ logger }}.warn("Unsupported CloudEvent type", cloudEventType);
             break;
     }
 } catch ( Exception exception ) {

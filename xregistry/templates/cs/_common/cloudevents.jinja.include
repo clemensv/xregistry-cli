@@ -74,7 +74,7 @@ cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ a
 {%- macro DeclareDispatchObjectsFields(messagegroups) -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
 {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal %}
-I{{ pascalGroupName | strip_namespace }}Dispatcher _{{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher;
+I{{ pascalGroupName | strip_namespace }}Dispatcher {{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher;
 {%- endfor %}
 {%- endmacro-%}
 
@@ -90,14 +90,14 @@ public {{ class_name }}( {{ args }}{%- if args %}, {%- endif -%}
 {
     {%- for messagegroup_key, messagegroup in messagegroups.items() -%}
     {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal %}
-    this._{{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher = {{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher;
+    this.{{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher = {{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher;
     {%- endfor %}
     {{ body | indent(4) }}
 }
 {% endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(cloudEvent, messagegroups) -%}
+{%- macro DispatchToDispatchObjects(cloudEvent, messagegroups, logger) -%}
 {%- if messagegroups | exists("format", "cloudevents" ) -%}
 var cloudEventType = {{ cloudEvent }}.Type;
 switch (cloudEventType)
@@ -106,11 +106,11 @@ switch (cloudEventType)
     {% for id, message in messagegroup.messages.items() -%}
     {% set pascalDefinitionName = message.id | pascal %}
     case "{{ message.id }}":
-        if ( this._{{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher != null )
+        if ( this.{{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher != null )
         {
-            await this._{{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher.On{{ pascalDefinitionName | strip_namespace }}Async({{ cloudEvent }},
+            await this.{{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}Dispatcher.On{{ pascalDefinitionName | strip_namespace }}Async({{ cloudEvent }},
                 {%- if message.schemaurl -%}
-            {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ cloudEvent }}.Data)
+            {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ cloudEvent }}.Data, {{cloudEvent}}.DataContentType)
             {%- else -%}
             {{ cloudEvent }}.Data
             {%- endif %});
@@ -120,7 +120,7 @@ switch (cloudEventType)
     {% endfor %}
     {% endfor %}
     default:
-        log.LogError("Unsupported CloudEvent type {eventType}", cloudEventType);
+        {{ logger }}.LogError("Unsupported CloudEvent type {eventType}", cloudEventType);
         break;
 }
 {%- endif -%}
@@ -135,7 +135,7 @@ using CloudNative.CloudEvents;
 
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
 {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal %}
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ project_name | pascal }}
 {
     public interface I{{ pascalGroupName | strip_namespace }}Dispatcher
     {
@@ -146,7 +146,7 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   
-        Task On{{ pascalDefinitionName | strip_namespace }}Async(CloudEvent cloudEvent, {{ dataType }} data);
+        Task On{{ pascalDefinitionName | strip_namespace }}Async(CloudEvent cloudEvent, {{ dataType }}? data);
         {%- endfor %}
     }
 }

@@ -7,11 +7,11 @@
 
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <LangVersion>10.0</LangVersion>
     <ProjectName>{{project_name | pascal }}</ProjectName>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   {%- if uses_protobuf %}
   <ItemGroup>
@@ -27,6 +27,7 @@
     <PackageReference Include="CloudNative.CloudEvents" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints" Version="1.2.1" />    
     <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.5.1" />
+    <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
     {%- if uses_amqp_message or uses_amqp_endpoint %}
     <PackageReference Include="AMQPNetLite" Version="2.4.5" />
     {%- endif %}
@@ -46,9 +47,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    {%- endif %}
-    {%- if uses_avro or uses_protobuf %}
-    <PackageReference Include="System.Memory.Data" Version="6.0.0"></PackageReference>
     {%- endif %}
     {%- if uses_avro %}
     <PackageReference Include="Apache.Avro" Version="1.11.1" />
