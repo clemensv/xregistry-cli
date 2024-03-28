@@ -58,13 +58,13 @@ def test_azfn_http():
     
     func_process = None
     func_cmd = "func host start --port 11000"
-    func_process = subprocess.Popen(func_cmd.split(" ") if platform.system() == "Windows" else func_cmd, env=my_env, stderr=sys.stderr, stdout=sys.stdout, shell=True, cwd=os.path.join(project_root, 'tmp/test/cs/azfn_http/azfn/'))
+    func_process = subprocess.Popen(func_cmd.split(" ") if platform.system() == "Windows" else func_cmd, env=my_env, stderr=sys.stderr, stdout=sys.stdout, shell=True, cwd=os.path.join(os.path.dirname(__file__), "function"))
     try:
         time.sleep(30);
         # Run the client
         print("Starting the client")
         client_cmd = "dotnet run"
-        client_process = subprocess.Popen(client_cmd.split(" ") if platform.system() == "Windows" else client_cmd, env=my_env, cwd=os.path.join(project_root, 'tmp/test/cs/azfn_http/producer/'), stderr=sys.stderr, stdout=sys.stdout, shell=True) 
+        client_process = subprocess.Popen(client_cmd.split(" ") if platform.system() == "Windows" else client_cmd, env=my_env, cwd=os.path.join(os.path.dirname(__file__), "client"), stderr=sys.stderr, stdout=sys.stdout, shell=True) 
         client_process.wait()
     finally:    
         if platform.system() == "Windows":

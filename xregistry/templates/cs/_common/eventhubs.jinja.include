@@ -185,3 +185,79 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
 {%- endfor -%}
 {%- endif -%}
 {%- endmacro -%}
+
+{%- macro CloudEventsUsings() -%}
+using CloudNative.CloudEvents;
+using CloudEvent = CloudNative.CloudEvents.CloudEvent;
+using CloudNative.CloudEvents.Core;
+using CloudNative.CloudEvents.SystemTextJson;
+using CloudNative.CloudEvents.Protobuf;
+using CloudNative.CloudEvents.Avro;
+using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
+{%- endmacro -%}
+
+{%- macro CloudEventsMethods() -%}
+private const string amqpCloudEventPrefix1 = "cloudEvents_";
+private const string amqpCloudEventPrefix2 = "cloudEvents:";
+private static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
+private static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
+private static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
+
+private string? GetCloudEventAttribute(EventData eventData, string key)
+{
+   if (eventData.Properties.TryGetValue(amqpCloudEventPrefix1+key, out var value) ||
+      eventData.Properties.TryGetValue(amqpCloudEventPrefix2+key, out value))
+   {
+      return value as string;
+   }
+   return null;
+} 
+
+public static bool IsCloudEvent(EventData eventData) =>
+      MimeUtilities.IsCloudEventsContentType(eventData.ContentType) ||
+      eventData.Properties.ContainsKey(amqpCloudEventPrefix1) ||
+      eventData.Properties.ContainsKey(amqpCloudEventPrefix2);
+
+private CloudEvent CloudEventFromEventData(EventData eventData) 
+{
+   CloudEventFormatter? formatter = null;
+   var contentType = eventData.ContentType?.Split(';')[0];
+   if ( contentType != null && contentType.StartsWith("application/cloudevents") )
+   {
+      formatter = contentType.EndsWith("+proto") ? protoFormatter: contentType.EndsWith("+avro") ? avroFormatter : jsonFormatter;
+      return formatter.DecodeStructuredModeMessage(eventData.EventBody.ToStream(), new System.Net.Mime.ContentType(contentType), null);
+   }
+   else
+   {
+      // binary mode
+      var cloudEvent = new CloudEvent()
+      {
+         Data = eventData.EventBody,
+         DataContentType = contentType,
+      };
+      string? specVersion = GetCloudEventAttribute(eventData, "specversion");
+      if (specVersion != "1.0") throw new Exception("Unsupported CloudEvent specversion: " + specVersion);
+      string? dataSchema = GetCloudEventAttribute(eventData, "dataschema");
+      string? time = GetCloudEventAttribute(eventData, "time");
+      string? source = GetCloudEventAttribute(eventData, "source");
+      string? subject = GetCloudEventAttribute(eventData, "subject");
+      string? type = GetCloudEventAttribute(eventData, "type");
+      string? id = GetCloudEventAttribute(eventData, "id");
+      if (dataSchema != null) cloudEvent.DataSchema = new Uri(dataSchema);
+      if (time != null) cloudEvent.Time = DateTime.Parse(time);
+      if (source != null) cloudEvent.Source = new Uri(source);
+      if (subject != null) cloudEvent.Subject = subject;
+      if (type != null) cloudEvent.Type = type;
+      if (id != null) cloudEvent.Id = id;
+      foreach (var key in eventData.Properties.Keys)
+      {
+         if (key.StartsWith(amqpCloudEventPrefix1) || key.StartsWith(amqpCloudEventPrefix2))
+         {
+            var attributeName = key.Substring(amqpCloudEventPrefix1.Length);
+            cloudEvent[attributeName] = eventData.Properties[key] as string;
+         }
+      }
+      return cloudEvent;
+   }         
+}
+{%- endmacro -%}

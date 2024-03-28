@@ -16,13 +16,12 @@ using Microsoft.Extensions.Configuration;
 
 namespace {{ project_name | pascal }}
 {
-    {%- set class_name = (project_name | pascal | concat_namespace)+"Functions" %}
+    {%- set class_name = (project_name | pascal | concat_namespace)+"Base" %}
     public class {{ class_name }}
     {
         {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, messagegroups) | indent(8) }}
         
-        [FunctionName("{{ project_name | pascal | concat_namespace }}")]
-        public async Task Run([EventGridTrigger] CloudEvent cloudEvent, ILogger log)
+        public async Task Run(CloudEvent cloudEvent, ILogger log)
         {
             {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(12) }}
         }

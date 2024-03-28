@@ -1,56 +1,29 @@
 {%- set messagegroups = root.messagegroups -%}
 {%- set function_name = project_name | pascal -%}
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "eventhubs.jinja.include" as eventhubs -%}
 
-using CloudNative.CloudEvents;
-using CloudEvent = CloudNative.CloudEvents.CloudEvent;
-using CloudNative.CloudEvents.Core;
-using CloudNative.CloudEvents.SystemTextJson;
-using CloudNative.CloudEvents.Protobuf;
-using CloudNative.CloudEvents.Avro;
-using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
-using Azure.Messaging;
 using Azure.Messaging.EventHubs;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
+using System;
 using System.Threading.Tasks;
-using System.Threading;
-using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
+
+{{ eventhubs.CloudEventsUsings() }}
 
 namespace {{ project_name | pascal }}
 {
-    {%- set class_name = (project_name | pascal | strip_namespace)+"Functions" %}
+    {%- set class_name = (project_name | pascal | strip_namespace)+"Base" %}
     public class {{ class_name }}
     {
-        {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, messagegroups) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "", "") | indent(8) }}
+        {{ eventhubs.CloudEventsMethods() | indent(8) }}
 
-        [FunctionName("{{ project_name | pascal | concat_namespace }}")]
-        public async Task Run([EventHubTrigger("myeventhub", Connection = "EventHubConnection")] EventData [] messages, ILogger log)
+        public virtual async Task Run(EventData [] events, ILogger log)
         {
-            foreach(var message in messages)
+            foreach(var ev in events)
             {
-                CloudEventFormatter formatter = null;
-                var contentType = message.ContentType.Split(";")[0];
-                if (contentType.EndsWith("+proto"))
-                {
-                formatter = new ProtobufEventFormatter();
-                }
-                else if (contentType.EndsWith("+avro"))
-                {
-                    formatter = new AvroEventFormatter();
-                }
-                else 
-                {
-                    formatter = new JsonEventFormatter();
-                }
-
-                var cloudEvent = message.ToCloudEvent(formatter);
-                if(cloudEvent == null)
-                {
-                    return;
-                }
+                var cloudEvent = CloudEventFromEventData(ev);
                 {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(16) }}
             }
         }

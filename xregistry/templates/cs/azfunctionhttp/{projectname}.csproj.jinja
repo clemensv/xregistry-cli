@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
-    <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
   </PropertyGroup>
  {%- if uses_protobuf %}
@@ -16,14 +15,13 @@
     </ItemGroup>
   {% endif %}
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.21.0" />
-    <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.17.2" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.1.0" />
     <PackageReference Include="CloudNative.CloudEvents" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.AspNetCore" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.5.1" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.6.0" />
     {%- if uses_protobuf %}
     <PackageReference Include="Grpc.Tools" Version="2.50.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -48,14 +46,4 @@
     <Error Condition="'$(AvroGenExitCode)' != '0'" Text="AvroGen invocation failed with exit code $(AvroGenExitCode). if the tool is not installed, install it with 'dotnet tool install --global Apache.Avro.Tools --version 1.11.1'" />
   </Target>
   {% endif %}
-  <ItemGroup>
-    <None Update="host.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="local.settings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>

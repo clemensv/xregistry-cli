@@ -1,11 +1,15 @@
 {
   "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
-    "FUNCTIONS_WORKER_RUNTIME_VERSION": "~4",
-    "FUNCTIONS_EXTENSION_VERSION": "~4",
-    "ALLOWED_ORIGINS": "http://localhost:11000"
-  }
+    "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+        "FUNCTIONS_WORKER_RUNTIME_VERSION": "~4",
+        "FUNCTIONS_EXTENSION_VERSION": "~4",
+        "ALLOWED_ORIGINS": "http://localhost:11000"
+    },
+    "Host": {
+        "LocalHttpPort": 11000,
+        "CORS": "http://localhost:11000"
+    }
 }
   

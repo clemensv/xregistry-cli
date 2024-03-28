@@ -1,23 +1,16 @@
 {%- set messagegroups = root.messagegroups -%}
 {%- set function_name = project_name | pascal -%}
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "servicebus.jinja.include" as servicebus -%}
 
-using CloudNative.CloudEvents;
-using CloudEvent = CloudNative.CloudEvents.CloudEvent;
-using CloudNative.CloudEvents.Core;
-using CloudNative.CloudEvents.SystemTextJson;
-using CloudNative.CloudEvents.Protobuf;
-using CloudNative.CloudEvents.Avro;
-using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
 using Azure.Messaging;
 using Azure.Messaging.ServiceBus;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
+using System;
 using System.Threading.Tasks;
-using System.Threading;
-using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
+
+{{ servicebus.CloudEventsUsings() }}
 
 namespace {{ project_name | pascal }}
 {
@@ -25,33 +18,14 @@ namespace {{ project_name | pascal }}
     {%- set class_name = (project_name | pascal | strip_namespace)+"Functions" %}
     public class {{ class_name }}
     {
-        {{ cloudEvents.DeclareDispatchObjects( project_name, class_name, messagegroups) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "", "") | indent(8) }} 
 
-        [FunctionName("{{ project_name | pascal | concat_namespace }}")]
-         public async Task Run(
-              [ServiceBusTrigger("myqueue", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message,
-              ILogger log)
+        {{ servicebus.CloudEventsMethods()  | indent(8) }}
+
+        public async virtual Task Run(ServiceBusReceivedMessage message, ILogger log)
         {
-            CloudEventFormatter formatter = null;
-            var contentType = message.ContentType.Split(";")[0];
-            if (contentType.EndsWith("+proto"))
-            {
-            formatter = new ProtobufEventFormatter();
-            }
-            else if (contentType.EndsWith("+avro"))
-            {
-                formatter = new AvroEventFormatter();
-            }
-            else 
-            {
-                formatter = new JsonEventFormatter();
-            }
-
-            var cloudEvent = message.ToCloudEvent(formatter);
-            if(cloudEvent == null)
-            {
-                return;
-            }
+            var cloudEvent = CloudEventFromServiceBusMessage(message);
             {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(12) }}
         }
     }

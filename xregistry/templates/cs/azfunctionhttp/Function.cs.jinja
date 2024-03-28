@@ -17,13 +17,12 @@ using CloudNative.CloudEvents.Protobuf;
 using CloudNative.CloudEvents.Avro;
 using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
 using CloudNative.CloudEvents.SystemTextJson;
-using CloudNative.CloudEvents.AspNetCore;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 
 namespace {{ project_name | pascal }}
 {
-    {%- set class_name = (project_name | pascal | strip_namespace)+"Functions" %}
+    {%- set class_name = (project_name | pascal | strip_namespace)+"Base" %}
     public class {{ class_name }}
     {
         private static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
@@ -31,10 +30,9 @@ namespace {{ project_name | pascal }}
         private static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
 
        {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
-        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "", "") | indent(8) }}
+       {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "", "") | indent(8) }}
 
-        [Function("{{ project_name | pascal | concat_namespace }}")]
-        public async Task<HttpResponseData> Run(
+        public virtual async Task<HttpResponseData> Run(
             [HttpTrigger(AuthorizationLevel.Function, "post", "options", Route = null)] HttpRequestData req,
             FunctionContext executionContext,
             CancellationToken cancellationToken)
