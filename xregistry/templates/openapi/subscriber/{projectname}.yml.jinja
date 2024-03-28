@@ -13,8 +13,8 @@ servers:
 {%- if endpoint.usage == "subscriber" and protocol == "http" -%}
 {%- set options = endpoint.config.options -%}
 {%- set endpoints = endpoint.config.endpoints -%}
-{%- for endpointUrl in endpoints %}
-- url: {{ endpointUrl }}
+{%- for endpointObject in endpoints %}
+- url: {{ endpointObject.uri }}
 {%- if endpoint.description %}
   description: {{ endpoint.description }}
 {%- endif -%}
@@ -81,7 +81,7 @@ components:
     {{ event.id }}:
       type: "object"
       properties:
-        {%- for attributeKey, attribute in event.metadata.attributes.items() %}
+        {%- for attributeKey, attribute in event.metadata.items() %}
         "{{ attributeKey }}":
           {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
           type: "string"
@@ -122,7 +122,7 @@ components:
           type: "object"
       {%- endif %}
       required:
-      {%- for attributeKey, attribute in event.metadata.attributes.items() %}
+      {%- for attributeKey, attribute in event.metadata.items() %}
       {%- if attribute.required %}
         - "{{ attributeKey }}"
       {%- endif %}
@@ -150,7 +150,7 @@ components:
           $ref: "{{ ns.newest_schemaversion.schemaurl }}"
           {%- endif -%}
           {%- else %} 
-      {{ ns.newest_schemaversion.schemaobject | toyaml(3) | indent(6) }}
+      {{ ns.newest_schemaversion.schema | toyaml(3) | indent(6) }}
           {%- endif %} 
           {%- endif -%}
       {%- endif -%}

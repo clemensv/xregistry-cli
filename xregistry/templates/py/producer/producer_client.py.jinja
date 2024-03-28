@@ -21,8 +21,8 @@ class {{ groupName.split('.')[-1]}}_event_producer:
     {%- set parts = definition.id.split('.') -%}
     {%- set definitionName = parts|join('_')|lower %}
     def send_{{definitionName.split('.')[-1]}}(self,
-    {%- for attrname in definition.metadata.attributes -%}
-    {%- set attribute = definition.metadata.attributes[attrname] -%}
+    {%- for attrname in definition.metadata -%}
+    {%- set attribute = definition.metadata[attrname] -%}
         {%- if attribute.type == "uritemplate" -%}
             {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
                 {{ placeholder | snake }} : str,
@@ -37,8 +37,8 @@ class {{ groupName.split('.')[-1]}}_event_producer:
     object
     {%- endif -%}) -> None:
         attributes = {
-        {%- for attrname in definition.metadata.attributes -%}
-        {%- set attribute = definition.metadata.attributes[attrname] %}
+        {%- for attrname in definition.metadata -%}
+        {%- set attribute = definition.metadata[attrname] %}
             "{{ attrname }}": 
             {%- if attribute.value -%}
             "{{ attribute.value }}"

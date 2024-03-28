@@ -7,10 +7,8 @@
             "usage": "subscriber",
             "config": {
                 "protocol": "HTTP",
-                "strict": false,
-                "endpoints": [
-                    "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
-                ]
+                "deployed": false,
+                "endpoints": [{ "uri": "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions" }]
             },
             "messagegroups": [
                 "#/messagegroups/mygroup"
@@ -27,7 +25,6 @@
                     "id": "myevent",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -52,4 +49,3 @@
             }
         }
     }
-}

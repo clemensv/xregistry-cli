@@ -30,7 +30,7 @@ WITH {% for messagegroup_key, messagegroup in root.messagegroups.items() -%}
 {%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
 {%- for definitionid, definition in messagegroup.messages.items() %}
 {%- if definition.schemaurl %}
-SELECT {% for attrname, attribute in definition.metadata.attributes.items() %}
+SELECT {% for attrname, attribute in definition.metadata.items() %}
 {%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor -%}
 {%- set schemalist = get("select:"+(definition.schemaurl | schema_type)).split(",") -%}
 {%- for item in schemalist if item.strip() -%}
@@ -48,7 +48,7 @@ CROSS APPLY
     {{ apply }}
 {% endif -%}
 {%- else %}
-SELECT {% for attrname, attribute in definition.metadata.attributes.items() %}
+SELECT {% for attrname, attribute in definition.metadata.items() %}
 {%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor %}
 INTO [output{{ definition.id | strip_namespace | pascal }}]
 FROM {{ definition.id | concat_namespace  | pascal }} as event

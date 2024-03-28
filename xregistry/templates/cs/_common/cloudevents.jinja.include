@@ -2,8 +2,8 @@
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- for attrname in message.metadata.attributes -%}
-{%- set attribute = message.metadata.attributes[attrname] -%}
+{%- for attrname in message.metadata -%}
+{%- set attribute = message.metadata[attrname] -%}
     {%- if attribute.type == "uritemplate" -%}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
         , string {{ placeholder }}
@@ -19,8 +19,8 @@
 {%- macro DeclareCloudNativeCloudEvent(variable, message) -%}
 CloudEvent {{ variable }} = new CloudEvent()
 {
-{%- for attrname in message.metadata.attributes -%}
-{%- set attribute = message.metadata.attributes[attrname] -%}
+{%- for attrname in message.metadata -%}
+{%- set attribute = message.metadata[attrname] -%}
 {%- if attrname in ["subject", "type", "datacontenttype"] -%}
     {%- set attrProp = attrname | pascal | replace("Datacontenttype", "DataContentType") %}
     {{ attrProp }} = {% if attribute.value -%}$"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%},
@@ -45,8 +45,8 @@ CloudEvent {{ variable }} = new CloudEvent()
 {%- endif -%}
 {%- endfor %}
 };
-{% for attrname in message.metadata.attributes -%}
-{%- set attribute = message.metadata.attributes[attrname] -%}
+{% for attrname in message.metadata -%}
+{%- set attribute = message.metadata[attrname] -%}
 {%- if attrname not in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
 cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
 {%- endif -%}
@@ -56,8 +56,8 @@ cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ a
 {#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as message -#}
 {%- macro DeclareCloudNativeCloudEventFromJson(variable, json, message) -%}
 };
-{% for attrname in message.metadata.attributes -%}
-{%- set attribute = message.metadata.attributes[attrname] -%}
+{% for attrname in message.metadata -%}
+{%- set attribute = message.metadata[attrname] -%}
 {%- if attrname not in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
 cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
 {%- endif -%}

@@ -21,7 +21,7 @@ def run_test():
     sys.argv = ['xregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'cs',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.cereg'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/mqtt_end_to_end/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
     xregistry.cli()
@@ -29,7 +29,7 @@ def run_test():
     sys.argv = [ 'xregistry', 'generate', 
                 '--style', 'consumer', 
                 '--language', 'cs',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.cereg'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/mqtt_end_to_end/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
     xregistry.cli()

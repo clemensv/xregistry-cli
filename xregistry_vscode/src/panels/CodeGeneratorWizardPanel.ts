@@ -146,7 +146,7 @@ export class CodeGeneratorWizardPanel {
                             openLabel: "Select definitions file",
                             defaultUri: vscode.Uri.file(path.dirname(message.definitions)),
                             filters: {
-                                "DISCO": ["disco", "yaml.cereg"]
+                                "DISCO": ["disco", "yaml.json"]
                             }
                         }).then((fileUri) => {
                             if (fileUri && fileUri.length > 0) {

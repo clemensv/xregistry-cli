@@ -7,10 +7,8 @@
             "usage": "producer",
             "config": {
                 "protocol": "HTTP",
-                "strict": false,
-                "endpoints": [
-                    "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
-                ],
+                "deployed": false,
+                "endpoints": [{ "uri": "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions" }],
                 "options": {
                     "method": "post",
                     "headers": [
@@ -37,7 +35,6 @@
                     "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -56,8 +53,7 @@
                                 "value": "/erp/orders",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat" : "JsonSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 }
@@ -75,7 +71,7 @@
                         "1": {
                             "id": "1",
                             "format": "JsonSchema/draft-07",
-                            "schemaobject": {
+                            "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",
                                 "type": "object",
                                 "properties": {

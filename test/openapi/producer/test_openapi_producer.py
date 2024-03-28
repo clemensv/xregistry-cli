@@ -20,7 +20,7 @@ def test_openapi_producer():
     sys.argv = ['xregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'openapi',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_producer.cereg'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_producer.xreg.json'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducer']
     xregistry.cli()

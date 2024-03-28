@@ -2,8 +2,8 @@
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- for attrname in message.metadata.attributes -%}
-{%- set attribute = message.metadata.attributes[attrname] -%}
+{%- for attrname in message.metadata -%}
+{%- set attribute = message.metadata[attrname] -%}
     {%- if attribute.type == "uritemplate" -%}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
         , String {{ placeholder }}
@@ -18,8 +18,8 @@
 {#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as message -#}
 {%- macro DeclareCloudNativeCloudEvent(variable, data, message) -%}
 CloudEvent {{ variable }} = new CloudEventBuilder()
-{%- for attrname in message.metadata.attributes -%}
-{%- set attribute = message.metadata.attributes[attrname] -%}
+{%- for attrname in message.metadata -%}
+{%- set attribute = message.metadata[attrname] -%}
 {%- if attrname in ["subject", "type", "datacontenttype"] -%}
     {%- set attrProp = attrname | pascal | replace("Datacontenttype", "DataContentType") %}
     .with{{ attrProp }}({% if attribute.value -%}"{{ attribute.value }}"

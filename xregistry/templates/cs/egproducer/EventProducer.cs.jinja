@@ -55,7 +55,7 @@ namespace {{ project_name | pascal }}
             if ( endpointUrl == null )
             {
                 {%- if endpoints %}
-                endpointUrl = new Uri("{{ endpoints[0] }}");
+                endpointUrl = new Uri("{{ endpoints[0].uri }}");
                 {%- else %}
                 throw new ArgumentNullException(nameof(endpointUrl));
                 {%- endif %}

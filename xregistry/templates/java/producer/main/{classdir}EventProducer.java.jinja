@@ -90,8 +90,8 @@ public class {{ className }}
         {%- endfor %}
         {%- endif %}
         var endpoints = new ArrayList<java.net.URI>();
-        {%- for uri in endpoints %}
-        endpoints.add(java.net.URI.create("{{ uri }}"));
+        {%- for epo in endpoints %}
+        endpoints.add(java.net.URI.create("{{ epo.uri }}"));
         {%- endfor %}
         return new {{ className }}(ProducerEndpoint.create(credential, {{ protocol | pascal }}Protocol.NAME, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, encoding, eventFormat{%- endif %});
     }

@@ -138,7 +138,7 @@ namespace {{ project_name | pascal }}
             if ( fullyQualifiedNamespace == null )
             {
                 {%- if endpoints %}
-                fullyQualifiedNamespace = "{{ endpoints[0] }}";
+                fullyQualifiedNamespace = "{{ endpoints[0].uri }}";
                 {%- else %}
                 throw new ArgumentNullException(nameof(fullyQualifiedNamespace));
                 {%- endif %}

@@ -7,17 +7,16 @@
             "id": "Fabrikam.RedmondUsWa.Building42.Environment.Temperature",
             "usage": "consumer",
             "config": {
-                "protocol": "NATS",
-                "strict": false,
-                "endpoints": [
-                    "nats://myserver.example.com:4222"
-                ],
+                "protocol": "KAFKA",
+                "deployed": false,
+                "endpoints": [{ "uri": "SSL://myserver.example.com" }],
                 "options": {
-                    "subject": "temperature",
+                    "topic": "temperature",
+                    "consumer-group": "specificgroup"
                 }
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.Sensors.Temperature"
+                "#/messagegroups/Contoso.MyGroup"
             ],
             "format": "CloudEvents/1.0"
         }
@@ -32,7 +31,6 @@
                     "description": "A set of metrics emitted by a temperature sensor",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "type": {
                                 "type": "string",
                                 "value": "Contoso.Sensors.Temperature.Metrics",
@@ -43,9 +41,8 @@
                                 "value": "/contoso/{site}/sensors/{sensorid}",
                                 "required": true
                             }
-                        }
-                    },
-                    "schemaformatr": "Avro/1.11.0",
+                        },
+                    "schemaformat": "Avro/1.11.0",
                     "schemaurl": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
             }
@@ -62,7 +59,7 @@
                         "1": {
                             "format": "Avro/1.11.0",
                             "id": "1",
-                            "schemaobject": {
+                            "schema": {
                                 "type": "record",
                                 "name": "TemperatureData",
                                 "fields": [

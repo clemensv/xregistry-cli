@@ -437,7 +437,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         max_key_length = max([len(key) for key in versions.keys()])
                         sorted_keys = sorted(versions.keys(), key=lambda key: key.rjust(max_key_length))
                         schema_version = versions[sorted_keys[-1]]
-                    elif "schema" in schema_root or "schemaurl" in schema_root or "schemaobject" in schema_root:
+                    elif "schema" in schema_root or "schemaurl" in schema_root or "schema" in schema_root:
                         # the reference pointed to a schema version definition
                         schema_version = schema_root
 
@@ -452,11 +452,11 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                             if schema_url not in schema_files_collected:
                                 schema_files_collected.add(schema_url)
                             continue
-                        elif "schema" in schema_version or "schemaobject" in schema_version:
+                        elif "schema" in schema_version or "schema" in schema_version:
                             # case b): the schema version does not contain a schemaurl attribute, so we
                             # assume that the schema is inline and we can proceed to render it
-                            if "schemaobject" in schema_version:
-                                schema_root = schema_version["schemaobject"]
+                            if "schema" in schema_version:
+                                schema_root = schema_version["schema"]
                             else:
                                 schema_root = schema_version["schema"]
 

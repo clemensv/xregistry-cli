@@ -4,7 +4,7 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "Contoso.ERP.Events": {
-                       "id": "Contoso.ERP.Events",
+            "id": "Contoso.ERP.Events",
             "format": "CloudEvents/1.0",
             "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
@@ -12,25 +12,23 @@
                     "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.ERP.Events.ReservationPlaced",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/erp/orders/{orderid}",
-                                "required": true
-                            }
+                        "id": {
+                            "type": "string",
+                            "required": true
+                        },
+                        "type": {
+                            "type": "string",
+                            "value": "Contoso.ERP.Events.ReservationPlaced",
+                            "required": true
+                        },
+                        "time": {
+                            "type": "datetime",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "value": "/erp/orders/{orderid}",
+                            "required": true
                         }
                     },
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
@@ -49,7 +47,7 @@
                         "1": {
                             "format": "Avro/1.8.2",
                             "id": "1",
-                            "schemaobject": {
+                            "schema": {
                                 "type": "record",
                                 "name": "OrderData",
                                 "fields": [

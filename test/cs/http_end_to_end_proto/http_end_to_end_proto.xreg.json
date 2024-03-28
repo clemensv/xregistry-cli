@@ -7,10 +7,8 @@
             "usage": "producer",
             "config": {
                 "protocol": "HTTP",
-                "strict": false,
-                "endpoints": [
-                    "http://localhost:11002/events/"
-                ]
+                "deployed": false,
+                "endpoints": [{ "uri": "http://localhost:11002/events/" }]
             },
             "messagegroups": [
                 "#/messagegroups/Contoso.ERP.Events"
@@ -22,10 +20,8 @@
             "usage": "consumer",
             "config": {
                 "protocol": "HTTP",
-                "strict": false,
-                "endpoints": [
-                    "http://localhost:11002/events/"
-                ]
+                "deployed": false,
+                "endpoints": [{ "uri": "http://localhost:11002/events/" }]
             },
             "messagegroups": [
                 "#/messagegroups/Contoso.ERP.Events"
@@ -43,7 +39,6 @@
                     "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -62,8 +57,7 @@
                                 "value": "/erp/orders",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 },
@@ -72,7 +66,6 @@
                     "format": "CloudEvents/1.0",
                     "description": "A payment has been received",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -91,8 +84,7 @@
                                 "value": "/erp/payments",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/paymentData:PaymentData"
                 },
@@ -101,7 +93,6 @@
                     "description": "A shipment has been accepted",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -120,8 +111,7 @@
                                 "value": "/erp/shipments",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData:ShipmentData"
                 },
@@ -130,7 +120,6 @@
                     "description": "A shipment has been rejected",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -149,8 +138,7 @@
                                 "value": "/erp/shipments",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData:ShipmentData"
                 },
@@ -159,7 +147,6 @@
                     "description": "A reservation has been cancelled",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -178,8 +165,7 @@
                                 "value": "/erp/orders",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "Protobuf/3.0",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData:CancellationData"
                 }

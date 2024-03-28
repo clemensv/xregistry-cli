@@ -33,15 +33,15 @@ def test_azfn_http():
     sys.argv = ['xregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'cs',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.cereg'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
     xregistry.cli()
     # generate the consumer
     sys.argv = [ 'xregistry', 'generate',  
-                '--style', 'azfunctionhttp', 
+                '--style', 'httpazfn', 
                 '--language', 'cs',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.cereg'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/azfn/'),
                 '--projectname', 'Contoso.ERP.AzureFunction']
     xregistry.cli()

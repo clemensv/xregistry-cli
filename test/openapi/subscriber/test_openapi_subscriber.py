@@ -20,7 +20,7 @@ def test_openapi_subscriber():
     sys.argv = ['xregistry', 'generate',  
                 '--style', 'subscriber', 
                 '--language', 'openapi',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_subscriber.cereg'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_subscriber.xreg.json'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpSubscriber']
     xregistry.cli()

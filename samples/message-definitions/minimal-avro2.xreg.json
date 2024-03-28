@@ -12,7 +12,6 @@
                     "description": "A toll record event has been received",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "type": {
                                 "value": "Microsoft.Samples.TollRecordEvents.TollRecordReceived",
                                 "description": "Type of the event"
@@ -29,8 +28,7 @@
                                 "value": "{sensorid}",
                                 "description": "Id of the sensor that scanned the vehicle"
                             }
-                        }
-                    },
+                        },
                     "schemaurl": "#/schemagroups/Microsoft.Samples.TollRecordEvents/schemas/TollRecordEventData"
                 }
             }
@@ -47,7 +45,7 @@
                         "1": {
                             "format": "Avro/1.11.1",
                             "id": "1",
-                            "schemaobject": {
+                            "schema": {
                                 "type": "record",
                                 "name": "TollRecordEventData",
                                 "namespace": "Microsoft.Samples.TollRecordEvents",

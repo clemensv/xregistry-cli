@@ -133,8 +133,8 @@ public class {{ className }}
         {%- endfor %}
         {%- endif %}
         var endpoints = new ArrayList<java.net.URI>();
-        {%- for uri in endpoints %}
-        endpoints.add(java.net.URI.create("{{ uri }}"));
+        {%- for epo in endpoints %}
+        endpoints.add(java.net.URI.create("{{ epo.uri }}"));
         {%- endfor %}
         var endpoint = ConsumerEndpoint.create(credential, {{ protocol | pascal }}Protocol.NAME, {% if options %}options, {% else %}null, {% endif %}endpoints);
         var consumer = new {{ className }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, false ) -}});

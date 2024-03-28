@@ -5,13 +5,11 @@
     "endpoints": {
         "Fabrikam.RedmondUsWa.Building42.Environment.Temperature": {
             "id": "Fabrikam.RedmondUsWa.Building42.Environment.Temperature",
-            "usage": "producer",
+            "usage": "consumer",
             "config": {
                 "protocol": "NATS",
-                "strict": false,
-                "endpoints": [
-                    "nats://myserver.example.com:4222"
-                ],
+                "deployed": false,
+                "endpoints": [{ "uri": "nats://myserver.example.com:4222" }],
                 "options": {
                     "subject": "temperature",
                 }
@@ -32,7 +30,6 @@
                     "description": "A set of metrics emitted by a temperature sensor",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "type": {
                                 "type": "string",
                                 "value": "Contoso.Sensors.Temperature.Metrics",
@@ -43,9 +40,8 @@
                                 "value": "/contoso/{site}/sensors/{sensorid}",
                                 "required": true
                             }
-                        }
-                    },
-                    "schemaformat" : "Avro/1.11.0",
+                        },
+                    "schemaformatr": "Avro/1.11.0",
                     "schemaurl": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
             }
@@ -62,7 +58,7 @@
                         "1": {
                             "format": "Avro/1.11.0",
                             "id": "1",
-                            "schemaobject": {
+                            "schema": {
                                 "type": "record",
                                 "name": "TemperatureData",
                                 "fields": [

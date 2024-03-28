@@ -18,7 +18,7 @@ def test_http_end_to_end_proto():
     sys.argv = ['xregistry', 'generate',  
                 '--style', 'producer', 
                 '--language', 'cs',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end_proto.cereg'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end_proto.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/http_end_to_end_proto/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
     xregistry.cli()
@@ -26,7 +26,7 @@ def test_http_end_to_end_proto():
     sys.argv = [ 'xregistry', 'generate', 
                 '--style', 'consumer', 
                 '--language', 'cs',
-                '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end_proto.cereg'),
+                '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end_proto.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/http_end_to_end_proto/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
     xregistry.cli()

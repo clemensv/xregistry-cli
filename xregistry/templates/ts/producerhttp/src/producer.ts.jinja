@@ -44,8 +44,8 @@ export class {{ pascalGroupName | concat_namespace }}EventProducer
        var options = {};
        {%- endif %}
        var endpoints = [
-       {%- for uri in endpoints %}
-           "{{ uri }}"
+       {%- for epo in endpoints %}
+           "{{ epo.uri }}"
            {%- if not loop.last -%},{%- endif %}
        {%- endfor %}
        ];

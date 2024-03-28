@@ -2,29 +2,27 @@
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.5-wip",
     "endpoints": {
-        "Contoso.MqttProducer": {
-            "id": "Contoso.MqttProducer",
-            "usage": "producer",
+        "MyMqttConsumer": {
+            "id": "MyMqttConsumer",
+            "usage": "consumer",
             "config": {
                 "protocol": "MQTT/5.0",
-                "strict": false,
-                "endpoints": [
-                    "mqtt://mybroker.example.com"
-                ],
+                "deployed": false,
+                "endpoints": [{ "uri": "mqtt://mybroker.example.com" }],
                 "options": {
                     "topic": "events",
                     "qos": 1
                 }
             },
             "messagegroups": [
-                "#/messagegroups/mygroup"
-            ],
-            "format": "CloudEvents/1.0"
+                "#/messagegroups/Contoso.MyGroup"
+            ]
         }
     },
     "messagegroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
+            "binding": "MQTT/5.0",
             "messages": {
                 "Contoso.MyGroup.MyEvent": {
                     "id": "Contoso.MyGroup.MyEvent",
@@ -72,7 +70,7 @@
                         "1.0": {
                             "id": "1.0",
                             "format": "JsonSchema/draft-07",
-                            "schemaobject": {
+                            "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",
                                 "type": "object",
                                 "properties": {

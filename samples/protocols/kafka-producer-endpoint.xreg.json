@@ -8,10 +8,8 @@
             "usage": "producer",
             "config": {
                 "protocol": "KAFKA",
-                "strict": false,
-                "endpoints": [
-                    "SSL://myserver.example.com"
-                ],
+                "deployed": false,
+                "endpoints": [{ "uri": "SSL://myserver.example.com" }],
                 "options": {
                     "topic": "temperature",
                     "acks": 1
@@ -33,7 +31,6 @@
                     "description": "A set of metrics emitted by a temperature sensor",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "type": {
                                 "type": "string",
                                 "value": "Contoso.Sensors.Temperature.Metrics",
@@ -44,8 +41,7 @@
                                 "value": "/contoso/{site}/sensors/{sensorid}",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "Avro/1.11.0",
                     "schemaurl": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
@@ -63,7 +59,7 @@
                         "1": {
                             "format": "Avro/1.11.0",
                             "id": "1",
-                            "schemaobject": {
+                            "schema": {
                                 "type": "record",
                                 "name": "TemperatureData",
                                 "fields": [

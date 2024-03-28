@@ -9,7 +9,7 @@
             "usage": "producer",
             "config": {
                 "protocol": "MQTT/3.1.1",
-                "strict": false,
+                "deployed": false,
                 "endpoints": [],
                 "options": {
                     "topic": "spBv1.0/{group_id}/{message_type}/{edge_node_id}",
@@ -27,7 +27,7 @@
             "usage": "consumer",
             "config": {
                 "protocol": "MQTT/3.1.1",
-                "strict": false,
+                "deployed": false,
                 "endpoints": [],
                 "options": {
                     "topic": "spBv1.0/STATE/#,spBv1.0/{group_id}/NCMD/{edge_node_id},spBv1.0/{group_id}/DCMD/{edge_node_id}/#"
@@ -44,7 +44,7 @@
             "usage": "producer",
             "config": {
                 "protocol": "MQTT/3.1.1",
-                "strict": false,
+                "deployed": false,
                 "endpoints": [],
                 "options": {}
             },
@@ -58,7 +58,7 @@
             "usage": "consumer",
             "config": {
                 "protocol": "MQTT/3.1.1",
-                "strict": false,
+                "deployed": false,
                 "endpoints": [],
                 "options": {
                     "topic": "spBv1.0/{group_id}/DCMD/{edge_node_id}/{device_id}"
@@ -74,7 +74,7 @@
             "usage": "producer",
             "config": {
                 "protocol": "MQTT/3.1.1",
-                "strict": false,
+                "deployed": false,
                 "endpoints": [],
                 "options": {
                     "topic": "spBv1.0/STATE/{sparkplug_host_id}",
@@ -356,7 +356,7 @@
                             "id": "v1.0",
                             "description": "Eclipse Sparkplug B JSON Messages Version 1.0",
                             "format": "JsonSchema/draft-07",
-                            "schemaobject": {
+                            "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema#",
                                 "$id": "https://raw.githubusercontent.com/Cirrus-Link/Sparkplug/master/sparkplug_b/sparkplug_b.json",
                                 "title": "Sparkplug B JSON Messages",

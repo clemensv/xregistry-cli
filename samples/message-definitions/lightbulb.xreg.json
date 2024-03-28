@@ -1,0 +1,249 @@
+{
+    "$schema": "https://cloudevents.io/schemas/registry",
+    "specversion": "0.5-wip",
+    "id": "urn:uuid:a-specific-uuid",
+    "messagegroups": {
+        "Fabrikam.Lumen.StateChange": {
+            "id": "Fabrikam.Lumen.StateChange",
+            "format": "CloudEvents/1.0",
+            "description": "State change events for a Fabrikam smart lightbulb",
+            "messages": {
+                "Fabrikam.Lumen.StateChange.TurnedOn": {
+                    "id": "Fabrikam.Lumen.StateChange.TurnedOn",
+                    "description": "Event for when the bulb is turned on",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                            "id": {
+                                "required": true
+                            },
+                            "type": {
+                                "value": "Fabrikam.Lumen.StateChange.TurnedOn",
+                                "description": "Event when the bulb is turned on"
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "description": "source of the event",
+                                "value": "{tenantid}/{deviceid}"
+                            },
+                            "subject": {
+                                "type": "string",
+                                "description": "subject of the event"
+                            },
+                            "time": {
+                                "required": true
+                            }
+                        },
+                    "schemaformat": "Avro/1.11.1",
+                    "schemaurl": "#/schemagroups/Fabrikam.Lumen.StateChange/schemas/turnedOnData"
+                },
+                "Fabrikam.Lumen.StateChange.TurnedOff": {
+                    "id": "Fabrikam.Lumen.StateChange.TurnedOff",
+                    "description": "Event for when the bulb is turned off",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                            "id": {
+                                "required": true
+                            },
+                            "type": {
+                                "value": "Fabrikam.Lumen.StateChange.TurnedOff",
+                                "description": "Event when the bulb is turned off"
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "description": "source of the event",
+                                "value": "{tenantid}/{deviceid}"
+                            },
+                            "subject": {
+                                "type": "string",
+                                "description": "subject of the event"
+                            },
+                            "time": {
+                                "required": true
+                            }
+                        },
+                    "schemaformat": "Avro/1.11.1",
+                    "schemaurl": "#/schemagroups/Fabrikam.Lumen.StateChange/schemas/turnedOffData"
+                },
+                "Fabrikam.Lumen.StateChange.BrightnessChanged": {
+                    "id": "Fabrikam.Lumen.StateChange.BrightnessChanged",
+                    "description": "Event for when the bulb's brightness changes",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "required": true
+                            },
+                            "type": {
+                                "value": "Fabrikam.Lumen.StateChange.BrightnessChanged",
+                                "description": "Event when the bulb's brightness changes"
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "description": "source of the event",
+                                "value": "{tenantid}/{deviceid}"
+                            },
+                            "subject": {
+                                "type": "string",
+                                "description": "subject of the event"
+                            },
+                            "time": {
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaformat": "Avro/1.11.1",
+                    "schemaurl": "#/schemagroups/Fabrikam.Lumen.StateChange/schemas/brightnessChangedData"
+                },
+                "Fabrikam.Lumen.StateChange.ColorChanged": {
+                    "id": "Fabrikam.Lumen.StateChange.ColorChanged",
+                    "description": "Event for when the bulb's color changes",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "attributes": {
+                            "id": {
+                                "required": true
+                            },
+                            "type": {
+                                "value": "Fabrikam.Lumen.StateChange.ColorChanged",
+                                "description": "Event when the bulb's color changes"
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "description": "source of the event",
+                                "value": "{tenantid}/{deviceid}"
+                            },
+                            "subject": {
+                                "type": "string",
+                                "description": "subject of the event"
+                            },
+                            "time": {
+                                "required": true
+                            }
+                        }
+                    },
+                    "schemaformat": "Avro/1.11.1",
+                    "schemaurl": "#/schemagroups/Fabrikam.Lumen.StateChange/schemas/colorChangedData"
+                }
+            }
+        }
+    },
+    "schemagroups": {
+        "Fabrikam.Lumen.StateChange": {
+            "id": "Fabrikam.Lumen.StateChange",
+            "schemas": {
+                "turnedOnData": {
+                    "format": "Avro/1.11.1",
+                    "id": "turnedOnData",
+                    "versions": {
+                        "1": {
+                            "format": "Avro/1.11.1",
+                            "id": "1",
+                            "schema": {
+                                "type": "record",
+                                "name": "TurnedOnData",
+                                "namespace": "Fabrikam.Lumen.StateChange",
+                                "doc": "Data schema for bulb turned on event",
+                                "fields": [
+                                    {
+                                        "name": "tenantid",
+                                        "doc": "Tenant identifier",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "name": "deviceid",
+                                        "doc": "Device identifier",
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "turnedOffData": {
+                    "format": "Avro/1.11.1",
+                    "id": "turnedOffData",
+                    "versions": {
+                        "1": {
+                            "format": "Avro/1.11.1",
+                            "id": "1",
+                            "schema": {
+                                "type": "record",
+                                "name": "TurnedOffData",
+                                "namespace": "Fabrikam.Lumen.StateChange",
+                                "doc": "Data schema for bulb turned off event",
+                                "fields": [
+                                    {
+                                        "name": "tenantid",
+                                        "doc": "Tenant identifier",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "name": "deviceid",
+                                        "doc": "Device identifier",
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "brightnessChangedData": {
+                    "format": "Avro/1.11.1",
+                    "id": "brightnessChangedData",
+                    "versions": {
+                        "1": {
+                            "format": "Avro/1.11.1",
+                            "id": "1",
+                            "schema": {
+                                "type": "record",
+                                "name": "BrightnessChangedData",
+                                "namespace": "Fabrikam.Lumen.StateChange",
+                                "doc": "Data schema for brightness change event",
+                                "fields": [
+                                    {
+                                        "name": "tenantid",
+                                        "doc": "Tenant identifier",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "name": "deviceid",
+                                        "doc": "Device identifier",
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "colorChangedData": {
+                    "format": "Avro/1.11.1",
+                    "id": "colorChangedData",
+                    "versions": {
+                        "1": {
+                            "format": "Avro/1.11.1",
+                            "id": "1",
+                            "schema": {
+                                "type": "record",
+                                "name": "ColorChangedData",
+                                "namespace": "Fabrikam.Lumen.StateChange",
+                                "doc": "Data schema for color change event",
+                                "fields": [
+                                    {
+                                        "name": "tenantid",
+                                        "doc": "Tenant identifier",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "name": "deviceid",
+                                        "doc": "Device identifier",
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

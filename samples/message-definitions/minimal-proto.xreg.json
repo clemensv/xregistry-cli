@@ -12,7 +12,6 @@
                     "description": "",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -27,8 +26,7 @@
                                 "value": "",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1:x1"
                 }
             }
@@ -41,7 +39,6 @@
                     "id": "com.example.grp2.ev1",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -55,15 +52,13 @@
                                 "type": "uritemplate",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaurl": "#/schemagroups/com.example.grp2/schemas/s2:q1"
                 },
                 "com.example.grp2.ev2": {
                     "id": "com.example.grp2.ev2",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -77,8 +72,7 @@
                                 "type": "uritemplate",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaurl": "#/schemagroups/com.example.grp2/schemas/s1:q2"
                 }
             }

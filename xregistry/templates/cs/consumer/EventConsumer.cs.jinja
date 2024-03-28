@@ -128,8 +128,8 @@ namespace {{ project_name | pascal }}
             };
             {%- endif %}
             var endpoints = new List<Uri> {
-            {%- for uri in endpoints %}
-                new Uri("{{ uri }}")
+            {%- for epo in endpoints %}
+                new Uri("{{ epo.uri }}")
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };

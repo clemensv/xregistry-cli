@@ -25,21 +25,20 @@ messagegroups:
         description: An order has been placed
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerCreated
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerCreated
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerCreatedEventData"
       Contoso.CRM.Events.CustomerUpdated:
         type: cloudevent
@@ -47,21 +46,20 @@ messagegroups:
         description: An order has been placed
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerUpdated
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerUpdated
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerUpdatedEventData"
       Contoso.CRM.Events.CustomerDeleted:
         type: cloudevent
@@ -69,21 +67,20 @@ messagegroups:
         description: A customer has been deleted
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerDeleted
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerDeleted
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerDeletedEventData"
       Contoso.CRM.Events.CustomerStatusUpdated:
         type: cloudevent
@@ -91,21 +88,20 @@ messagegroups:
         description: A customer's status has been updated
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerStatusUpdated
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerStatusUpdated
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerStatusUpdatedEven\
           tData"
       Contoso.CRM.Events.CustomerAddressUpdated:
@@ -114,21 +110,20 @@ messagegroups:
         description: A customer's address has been updated
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerAddressUpdated
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerAddressUpdated
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerAddressUpdatedEve\
           ntData"
       Contoso.CRM.Events.CustomerContactUpdated:
@@ -137,21 +132,20 @@ messagegroups:
         description: A customer's contact information has been updated
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerContactUpdated
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerContactUpdated
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerContactUpdatedEve\
           ntData"
       Contoso.CRM.Events.CustomerNoteAdded:
@@ -160,21 +154,20 @@ messagegroups:
         description: A note has been added to a customer
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerNoteAdded
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerNoteAdded
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteAddedEventData"
       Contoso.CRM.Events.CustomerNoteDeleted:
         type: cloudevent
@@ -182,21 +175,20 @@ messagegroups:
         description: A note has been deleted from a customer
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerNoteDeleted
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerNoteDeleted
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteDeletedEventD\
           ata"
       Contoso.CRM.Events.CustomerNoteUpdated:
@@ -205,21 +197,20 @@ messagegroups:
         description: A note has been updated on a customer
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerNoteUpdated
-              required: true
-            time:
-              type: datetime
-              required: true
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
+          id:
+            type: string
+            required: true
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerNoteUpdated
+            required: true
+          time:
+            type: datetime
+            required: true
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerNoteUpdatedEventD\
           ata"
       Contoso.CRM.Events.CustomerContactAdded:
@@ -228,29 +219,28 @@ messagegroups:
         description: A contact has been added to a customer
         format: CloudEvents/1.0
         metadata:
-          attributes:
-            id:
-              type: string
-              required: true
-              description: The unique identifier of the event
-            type:
-              type: string
-              value: Contoso.CRM.Events.CustomerContactAdded
-              required: true
-              description: The type of the event
-            time:
-              type: datetime
-              required: true
-              description: The time the event occurred
-            source:
-              type: uritemplate
-              value: /crm/customers
-              required: true
-              description: The source of the event
-            subject:
-              type: string
-              required: false
-              description: The subject of the event
+          id:
+            type: string
+            required: true
+            description: The unique identifier of the event
+          type:
+            type: string
+            value: Contoso.CRM.Events.CustomerContactAdded
+            required: true
+            description: The type of the event
+          time:
+            type: datetime
+            required: true
+            description: The time the event occurred
+          source:
+            type: uritemplate
+            value: /crm/customers
+            required: true
+            description: The source of the event
+          subject:
+            type: string
+            required: false
+            description: The subject of the event
         schemaurl: "#/schemagroups/Contoso.CRM.Events/schemas/customerContactAddedEvent\
           Data"
 schemagroups:
@@ -266,7 +256,7 @@ schemagroups:
             type: schemaversion
             id: "1.0"
             format: JSONSchema/draft-07
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -305,7 +295,7 @@ schemagroups:
             type: schemaversion
             id: "1.0"
             format: JSONSchema/draft-07
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -330,7 +320,7 @@ schemagroups:
             type: schemaversion
             id: "1.0"
             format: JSONSchema/draft-07
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -348,7 +338,7 @@ schemagroups:
             type: schemaversion
             id: "1.0"
             format: JSONSchema/draft-07
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -373,7 +363,7 @@ schemagroups:
             type: schemaversion
             format: JSONSchema/draft-07
             id: "1.0"
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -398,7 +388,7 @@ schemagroups:
             type: schemaversion
             format: JSONSchema/draft-07
             id: "1.0"
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -416,7 +406,7 @@ schemagroups:
             type: schemaversion
             id: "1.0"
             format: JSONSchema/draft-07
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -441,7 +431,7 @@ schemagroups:
             type: schemaversion
             id: "1.0"
             format: JSONSchema/draft-07
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -459,7 +449,7 @@ schemagroups:
             type: schemaversion
             id: "1.0"
             format: JSONSchema/draft-07
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -477,7 +467,7 @@ schemagroups:
             type: schemaversion
             format: JSONSchema/draft-07
             id: "1.0"
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:
@@ -495,7 +485,7 @@ schemagroups:
             type: schemaversion
             id: "1.0"
             format: JSONSchema/draft-07
-            schemaobject:
+            schema:
               type: object
               properties:
                 customerId:

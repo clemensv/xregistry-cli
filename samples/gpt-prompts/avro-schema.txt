@@ -1,0 +1,77 @@
+This conversation is about generating definitions for the CNCF xRegistry message and schema registry, whose documents have the following exemplary structure. 
+
+Read the following document and then ask me for requirements to generate such a document. Do not describe the document, just ask for work. Subsequently, all output MUST be pretty printed as JSON in a code block. All custom data MUST be in the payload schemas. The CloudEvent declaration only contains the standard CloudEvents attributes.
+
+{
+    "$schema": "https://cloudevents.io/schemas/registry",
+    "specversion": "0.5-wip",
+    "id": "urn:uuid:((generate a uuid here!))}",
+    "messagegroups": {
+        "example.app.group": {
+            "id": "example.app.group",
+            "format": "CloudEvents/1.0",
+            "description": "description of the group",
+            "messages": {
+                "example.app.group.event1": {
+                    "id": "example.app.group.event1",
+                    "description": "description of event1",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                        "id": {
+                            "required": true
+                        },
+                        "type": {
+                            "value": "example.app.group.event1",
+                            "description": "this event is about ..."
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "description": "source of the event",
+                            "value": "{contextid}",
+                        },
+                        "subject": {
+                            "type": "string",
+                            "description": "subject of the event",
+                            "value": "{aspectid}",
+                        },
+                        "time": {
+                            "required": true,  
+                        },
+                    },
+                    "schemaformat": "Avro/1.11.1",
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/event1Data"
+                }
+            }
+        }
+    },
+    "schemagroups": {
+        "example.app.group": {
+            "id": "example.app.group",
+            "schemas": {
+                "event1Data": {
+                    "format": "Avro/1.11.1",
+                    "id": "event1Data",
+                    "versions": {
+                        "1": {
+                            "format": "Avro/1.11.1",
+                            "id": "1",
+                            "schema": {
+                                "type": "record",
+                                "name": "Event1Data",
+                                "namespace": "example.app.group",
+                                "doc": "event1Data schema",
+                                "fields": [
+                                    {
+                                        "name": "example",
+                                        "doc": "example field",
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

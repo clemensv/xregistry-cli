@@ -2,18 +2,20 @@
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.5-wip",
     "endpoints": {
-        "Contoso.MyAmqpProducer": {
-            "id": "Contoso.MyAmqpProducer",
+        "Contoso.MqttProducer": {
+            "id": "Contoso.MqttProducer",
             "usage": "producer",
             "config": {
-                "protocol": "AMQP/1.0",
-                "strict": false,
-                "endpoints": [
-                    "amqps://cediscoveryinterop.example.com/topic"
-                ]
+                "protocol": "MQTT/5.0",
+                "deployed": false,
+                "endpoints": [{ "uri": "mqtt://mybroker.example.com" }],
+                "options": {
+                    "topic": "events",
+                    "qos": 1
+                }
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.MyGroup"
+                "#/messagegroups/mygroup"
             ],
             "format": "CloudEvents/1.0"
         }
@@ -21,36 +23,37 @@
     "messagegroups": {
         "Contoso.MyGroup": {
             "id": "Contoso.MyGroup",
-            "binding": "AMQP/1.0",
             "messages": {
                 "Contoso.MyGroup.MyEvent": {
                     "id": "Contoso.MyGroup.MyEvent",
-                    "binding": "AMQP/1.0",
+                    "binding": "MQTT/5.0",
                     "message": {
-                        "header": {
-                            "ttl": {
-                                "type": "integer",
-                                "value": "1000"
-                            }
-                        },
                         "properties": {
-                            "subject": {
-                                "type": "string",
-                                "value": "myvalue"
-                            }
-                        },
-                        "application-properties": {
-                            "myProperty1": {
-                                "type": "string"
+                            "topic": {
+                                "type": "uritemplate",
+                                "value": "clients/{clientid}/events/{eventid}"
                             },
-                            "myProperty2": {
-                                "type": "string"
+                            "qos": {
+                                "type": "integer",
+                                "value": 1
                             },
-                            "myProperty3": {
-                                "type": "string"
-                            }
+                            "retain": {
+                                "type": "boolean",
+                                "value": false
+                            },
+                            "user-properties": [
+                                {
+                                    "name": "property1",
+                                    "type": "string"
+                                },
+                                {
+                                    "name": "property2",
+                                    "type": "integer"
+                                }
+                            ]
                         }
                     },
+                    "schemaformat": "JsonSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
@@ -67,7 +70,7 @@
                         "1.0": {
                             "id": "1.0",
                             "format": "JsonSchema/draft-07",
-                            "schemaobject": {
+                            "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",
                                 "type": "object",
                                 "properties": {

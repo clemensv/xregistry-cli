@@ -1,62 +1,95 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.5-wip",
-    "id": "urn:contoso:erp:events",
-    "description": "Contoso ERP Events",
     "endpoints": {
-        "Contoso.ERP.Eventing.HttpProducer": {
-            "id": "Contoso.ERP.Eventing.HttpProducer",
+        "Contoso.ERP.Eventing.Http": {
+            "id": "Contoso.ERP.Eventing.Http",
             "usage": "producer",
+            "config": {
+                "deployed": false,
+                "endpoints": [
+                    {
+                        "uri": "https://erpsystem.com/events"
+                    }
+                ],
+                "protocol": "HTTP"
+            },
+            "messagegroups": [
+                "#/messagegroups/Contoso.ERP.ChangeEvents"
+            ],
+            "format": "CloudEvents/1.0"
+        },
+        "Contoso.ERP.Eventing.HttpSubscriber": {
+            "id": "Contoso.ERP.Eventing.HttpSubscriber",
+            "usage": "subscriber",
             "config": {
                 "protocol": "HTTP",
-                "strict": false,
+                "deployed": false,
                 "endpoints": [
-                    "http://localhost:11001/events"
+                    {
+                        "uri": "https://erpsystem.com/events/subscriptions"
+                    }
                 ]
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.ERP.Events"
+                "#/messagegroups/Contoso.ERP.ChangeEvents"
             ],
             "format": "CloudEvents/1.0"
         },
-        "Contoso.ERP.Eventing.AmqpProducer": {
-            "id": "Contoso.ERP.Eventing.AmqpProducer",
-            "usage": "producer",
+        "Contoso.ERP.Eventing.QueueConsumer": {
+            "channel": "myqueue",
+            "id": "Contoso.ERP.Eventing.QueueConsumer",
+            "usage": "consumer",
             "config": {
                 "protocol": "AMQP/1.0",
-                "strict": false,
+                "deployed": false,
                 "endpoints": [
-                    "amqps://cediscoveryinterop.example.com/topic"
-                ]
-            },
-            "messagegroups": [
-                "#/messagegroups/Contoso.ERP.Events"
-            ],
-            "format": "CloudEvents/1.0"
-        },
-        "Contoso.ERP.Eventing.MqttProducer": {
-            "id": "Contoso.ERP.Eventing.MqttProducer",
-            "usage": "producer",
-            "config": {
-                "protocol": "MQTT/5.0",
-                "strict": false,
-                "endpoints": [
-                    "mqtt://mybroker.example.com"
+                    {
+                        "uri": "amqps://cediscoveryinterop.example.com/queue"
+                    }
                 ],
                 "options": {
-                    "topic": "events",
-                    "qos": 1
+                    "node": "queue",
+                    "link_properties": {
+                        "myprop": "prop"
+                    },
+                    "distribution_mode": "copy"
                 }
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.ERP.Events"
+                "#/messagegroups/mygroup"
+            ],
+            "format": "CloudEvents/1.0"
+        },
+        "Contoso.ERP.Eventing.QueueProducer": {
+            "channel": "myqueue",
+            "id": "Contoso.ERP.Eventing.QueueProducer",
+            "usage": "producer",
+            "config": {
+                "protocol": "AMQP/1.0",
+                "options": {
+                    "node": "queue",
+                    "link_properties": {
+                        "myprop": "prop"
+                    },
+                    "distribution_mode": "copy"
+                },
+                "deployed": false,
+                "endpoints": [
+                    {
+                        "uri": "amqps://cediscoveryinterop.example.com/queue"
+                    }
+                ]
+            },
+            "messagegroups": [
+                "#/messagegroups/mygroup"
             ],
             "format": "CloudEvents/1.0"
         }
     },
     "messagegroups": {
-        "Contoso.ERP.Events": {
-            "id": "Contoso.ERP.Events",
+        "Contoso.ERP.ChangeEvents": {
+            "id": "Contoso.ERP.ChangeEvents",
             "format": "CloudEvents/1.0",
             "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
@@ -64,59 +97,50 @@
                     "description": "A reservation has been placed",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.ERP.Events.ReservationPlaced",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/erp/orders",
-                                "required": true
-                            },
-                            "datacontenttype": {
-                                "type": "string",
-                                "value": "avro/binary",
-                                "required": true
-                            }
+                        "id": {
+                            "type": "string",
+                            "required": true
+                        },
+                        "type": {
+                            "type": "string",
+                            "value": "Contoso.ERP.Events.ReservationPlaced",
+                            "required": true
+                        },
+                        "time": {
+                            "type": "datetime",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "value": "/erp/orders",
+                            "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.8.2",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
+                    "schemaformat": "JSONSchema/draft-07",
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 },
                 "Contoso.ERP.Events.PaymentsReceived": {
                     "id": "Contoso.ERP.Events.PaymentsReceived",
                     "format": "CloudEvents/1.0",
                     "description": "A payment has been received",
                     "metadata": {
-                        "attributes": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.ERP.Events.PaymentsReceived",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/erp/payments",
-                                "required": true
-                            }
+                        "id": {
+                            "type": "string",
+                            "required": true
+                        },
+                        "type": {
+                            "type": "string",
+                            "value": "Contoso.ERP.Events.PaymentsReceived",
+                            "required": true
+                        },
+                        "time": {
+                            "type": "datetime",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "value": "/erp/payments",
+                            "required": true
                         }
                     },
                     "schemaformat": "JSONSchema/draft-07",
@@ -127,28 +151,25 @@
                     "description": "A shipment has been accepted",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.ERP.Events.ShipmentAccepted",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/erp/shipments",
-                                "required": true
-                            }
+                        "id": {
+                            "type": "string",
+                            "required": true
+                        },
+                        "type": {
+                            "type": "string",
+                            "value": "Contoso.ERP.Events.ShipmentAccepted",
+                            "required": true
+                        },
+                        "time": {
+                            "type": "datetime",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "value": "/erp/shipments",
+                            "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
                 },
                 "Contoso.ERP.Events.ShipmentRejected": {
@@ -156,7 +177,6 @@
                     "description": "A shipment has been rejected",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -175,7 +195,6 @@
                                 "value": "/erp/shipments",
                                 "required": true
                             }
-                        }
                     },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
@@ -185,7 +204,6 @@
                     "description": "A return has been requested",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -204,8 +222,7 @@
                                 "value": "/erp/returns",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/returnData"
                 },
@@ -214,7 +231,6 @@
                     "description": "A reservation has been cancelled",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -233,8 +249,7 @@
                                 "value": "/erp/orders",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData"
                 },
@@ -243,7 +258,6 @@
                     "description": "A reservation has been refunded",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -262,8 +276,7 @@
                                 "value": "/erp/orders",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/refundData"
                 },
@@ -272,7 +285,6 @@
                     "description": "Inventory has been updated",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "description": "The id of the inventory update event",
@@ -293,8 +305,7 @@
                                 "value": "/erp/inventory",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/inventoryData"
                 },
@@ -303,7 +314,6 @@
                     "description": "A product has been added",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -322,8 +332,7 @@
                                 "value": "/erp/products",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/productData"
                 },
@@ -332,7 +341,6 @@
                     "description": "A product has been deleted",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -351,8 +359,7 @@
                                 "value": "/erp/products",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/productDeletionData"
                 },
@@ -361,7 +368,6 @@
                     "description": "A product has been updated",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -380,8 +386,7 @@
                                 "value": "/erp/products",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/productUpdatedData"
                 },
@@ -389,7 +394,6 @@
                     "id": "Contoso.ERP.Events.EmployeeAdded",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -408,8 +412,7 @@
                                 "value": "/erp/employees",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/employeeData"
                 },
@@ -417,7 +420,6 @@
                     "id": "Contoso.ERP.Events.EmployeeDeleted",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -436,8 +438,7 @@
                                 "value": "/erp/employees",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/employeeDeletionData"
                 },
@@ -445,7 +446,6 @@
                     "id": "Contoso.ERP.Events.EmployeeUpdated",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -464,8 +464,7 @@
                                 "value": "/erp/employees",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/employeeUpdatedData"
                 },
@@ -473,7 +472,6 @@
                     "id": "Contoso.ERP.Events.PurchaseOrderCreated",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -492,8 +490,7 @@
                                 "value": "/erp/purchaseOrders",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderData"
                 },
@@ -501,7 +498,6 @@
                     "id": "Contoso.ERP.Events.PurchaseOrderUpdated",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -520,8 +516,7 @@
                                 "value": "/erp/purchaseOrders",
                                 "required": true
                             }
-                        }
-                    },
+                        },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderUpdatedData"
                 },
@@ -529,7 +524,6 @@
                     "id": "Contoso.ERP.Events.PurchaseOrderDeleted",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "id": {
                                 "type": "string",
                                 "required": true
@@ -549,77 +543,69 @@
                                 "required": true
                             }
                         }
-                    },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderDeletionData"
+                    }
                 }
             }
-        }
-    },
+        },
     "schemagroups": {
         "Contoso.ERP.Events": {
             "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
-                    "format": "Avro/1.8.2",
                     "id": "orderData",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
-                            "format": "Avro/1.8.2",
                             "id": "1",
-                            "schemaobject": {
-                                "type": "record",
-                                "name": "OrderData",
-                                "fields": [
-                                    {
-                                        "name": "orderId",
-                                        "type": "string"
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "orderId": {
+                                        "type": "string",
+                                        "minLength": 1
                                     },
-                                    {
-                                        "name": "customerId",
-                                        "type": "string"
+                                    "customerId": {
+                                        "type": "string",
+                                        "minLength": 1
                                     },
-                                    {
-                                        "name": "total",
-                                        "type": "double"
+                                    "total": {
+                                        "type": "number",
+                                        "minimum": 0
                                     },
-                                    {
-                                        "name": "items",
-                                        "type": {
-                                            "type": "array",
-                                            "items": {
-                                                "name": "Item",
-                                                "type": "record",
-                                                "fields": [
-                                                    {
-                                                        "name": "productId",
-                                                        "type": "string"
-                                                    },
-                                                    {
-                                                        "name": "quantity",
-                                                        "type": "double"
-                                                    },
-                                                    {
-                                                        "name": "price",
-                                                        "type": "double"
-                                                    }
-                                                ]
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "productId": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                },
+                                                "quantity": {
+                                                    "type": "number",
+                                                    "minimum": 0
+                                                },
+                                                "price": {
+                                                    "type": "number",
+                                                    "minimum": 0
+                                                }
                                             }
                                         }
                                     }
-                                ]
+                                }
                             }
                         }
                     }
                 },
-               "paymentData": {
+                "paymentData": {
                     "id": "paymentData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "transactionId": {
@@ -645,12 +631,12 @@
                 },
                 "shipmentData": {
                     "id": "shipmentData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "trackingnumber": {
@@ -672,12 +658,12 @@
                 },
                 "cancellationData": {
                     "id": "cancellationData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "orderId": {
@@ -696,12 +682,12 @@
                 },
                 "refundData": {
                     "id": "refundData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "orderId": {
@@ -723,12 +709,12 @@
                 },
                 "inventoryData": {
                     "id": "inventoryData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "productId": {
@@ -747,12 +733,12 @@
                 },
                 "productData": {
                     "id": "productData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "productId": {
@@ -777,12 +763,12 @@
                 },
                 "productDeletionData": {
                     "id": "productDeletionData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "productId": {
@@ -800,12 +786,12 @@
                 },
                 "productUpdatedData": {
                     "id": "productUpdatedData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "productId": {
@@ -835,12 +821,12 @@
                 },
                 "employeeData": {
                     "id": "employeeData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "employeeId": {
@@ -866,12 +852,12 @@
                 },
                 "employeeDeletionData": {
                     "id": "employeeDeletionData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "employeeId": {
@@ -887,12 +873,12 @@
                 },
                 "employeeUpdatedData": {
                     "id": "employeeUpdatedData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "employeeId": {
@@ -918,12 +904,12 @@
                 },
                 "purchaseOrderData": {
                     "id": "purchaseOrderData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "purchaseOrderId": {
@@ -962,12 +948,12 @@
                 },
                 "purchaseOrderUpdatedData": {
                     "id": "purchaseOrderUpdatedData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "purchaseOrderId": {
@@ -983,12 +969,12 @@
                 },
                 "purchaseOrderDeletionData": {
                     "id": "purchaseOrderDeletionData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "purchaseOrderId": {
@@ -1004,12 +990,12 @@
                 },
                 "returnData": {
                     "id": "returnData",
-                    "format" : "JSONSchema/draft-07",
+                    "format": "JSONSchema/draft-07",
                     "versions": {
                         "1": {
                             "id": "1",
-                            "format" : "JSONSchema/draft-07",
-                            "schemaobject": {
+                            "format": "JSONSchema/draft-07",
+                            "schema": {
                                 "type": "object",
                                 "properties": {
                                     "returnId": {

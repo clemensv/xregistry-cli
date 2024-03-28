@@ -5,20 +5,17 @@
     "endpoints": {
         "Fabrikam.RedmondUsWa.Building42.Environment.Temperature": {
             "id": "Fabrikam.RedmondUsWa.Building42.Environment.Temperature",
-            "usage": "consumer",
+            "usage": "producer",
             "config": {
-                "protocol": "KAFKA",
-                "strict": false,
-                "endpoints": [
-                    "SSL://myserver.example.com"
-                ],
+                "protocol": "NATS",
+                "deployed": false,
+                "endpoints": [{ "uri": "nats://myserver.example.com:4222" }],
                 "options": {
-                    "topic": "temperature",
-                    "consumer-group": "specificgroup"
+                    "subject": "temperature",
                 }
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.MyGroup"
+                "#/messagegroups/Contoso.Sensors.Temperature"
             ],
             "format": "CloudEvents/1.0"
         }
@@ -33,7 +30,6 @@
                     "description": "A set of metrics emitted by a temperature sensor",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
                             "type": {
                                 "type": "string",
                                 "value": "Contoso.Sensors.Temperature.Metrics",
@@ -44,9 +40,8 @@
                                 "value": "/contoso/{site}/sensors/{sensorid}",
                                 "required": true
                             }
-                        }
-                    },
-                    "schemaformat": "Avro/1.11.0",
+                        },
+                    "schemaformat" : "Avro/1.11.0",
                     "schemaurl": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
             }
@@ -63,7 +58,7 @@
                         "1": {
                             "format": "Avro/1.11.0",
                             "id": "1",
-                            "schemaobject": {
+                            "schema": {
                                 "type": "record",
                                 "name": "TemperatureData",
                                 "fields": [

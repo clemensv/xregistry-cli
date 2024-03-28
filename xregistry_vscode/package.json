@@ -27,7 +27,7 @@
   "json.schemas": [
     {
       "fileMatch": [
-        "*.cereg"
+        "*.json"
       ],
       "url": "./schemas/*.json"
     }
@@ -46,8 +46,8 @@
           "CloudEvents Discovery"
         ],
         "extensions": [
-          ".cereg",
-          ".yaml.cereg"
+          ".json",
+          ".yaml.json"
         ],
         "icon": {
           "light": "./themes/icons/cloudevents-icon-color.svg",
@@ -61,7 +61,7 @@
           "label": "CloudEvents Registry Tool",
           "command": "xregistry.ui",
           "definitiongroup": "CloudEvents@1",
-          "when": "resourceExtname == .cereg || resourceExtname == .yaml.cereg"
+          "when": "resourceExtname == .json || resourceExtname == .yaml.json"
         }
       ]
     }
