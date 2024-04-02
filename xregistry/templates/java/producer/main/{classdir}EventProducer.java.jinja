@@ -108,7 +108,7 @@ public class {{ className }}
     public CompletableFuture<Void> send{{ pascalDefinitionName | strip_namespace }}Async(
     {%- if definition.schemaurl -%}
     {%- set toBytes="data.toByteArray()" -%}
-    {{ definition.schemaurl | schema_type | strip_namespace | pascal }} data
+    {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | strip_namespace | pascal }} data
     {%- else -%}
     {% set toBytes="data.toBytes()" %}
     CloudEventData data

@@ -96,7 +96,7 @@ namespace {{ project_name | pascal }}
                 return response;
             }
             
-            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "logger" ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects(root, "cloudEvent", messagegroups, "logger" ) | indent(12) }}
 
             response.StatusCode = HttpStatusCode.NoContent;
             return response;

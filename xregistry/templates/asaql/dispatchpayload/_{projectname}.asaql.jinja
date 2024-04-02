@@ -20,7 +20,7 @@ WITH {% for messagegroup_key, messagegroup in root.messagegroups.items() -%}
 {%- for definitionid, definition in messagegroup.messages.items() %}
 {%- if not loop.first -%},
 {% endif %}{{ definition.id | concat_namespace  | pascal }} AS (
-    SELECT type, {% if definition.schemaurl -%}data AS {{ definition.schemaurl | schema_type | strip_namespace  | pascal }}, {% endif -%} *
+    SELECT type, {% if definition.schemaurl or definition.schema -%}data AS {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | strip_namespace  | pascal }}, {% endif -%} *
     FROM [input]
     WHERE type = '{{definition.id}}'
 )
@@ -32,17 +32,17 @@ WITH {% for messagegroup_key, messagegroup in root.messagegroups.items() -%}
 {%- if definition.schemaurl %}
 SELECT {% for attrname, attribute in definition.metadata.items() %}
 {%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor -%}
-{%- set schemalist = get("select:"+(definition.schemaurl | schema_type)).split(",") -%}
+{%- set schemalist = get("select:"+((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat))).split(",") -%}
 {%- for item in schemalist if item.strip() -%}
 ,event.{{ item }}
 {%- endfor -%}
-{%- set itemlist= get("selectitem:"+(definition.schemaurl | schema_type)).split(",") %}
+{%- set itemlist= get("selectitem:"+((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat))).split(",") %}
 {%- for item in itemlist if item.strip() -%}
 ,{{ item }}
 {%- endfor %}
 INTO [output{{ definition.id | strip_namespace | pascal }}]
 FROM {{ definition.id | concat_namespace  | pascal }} as event
-{% set apply = get("apply:"+(definition.schemaurl | schema_type)) %}
+{% set apply = get("apply:"+((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat))) %}
 {%- if apply -%}
 CROSS APPLY
     {{ apply }}

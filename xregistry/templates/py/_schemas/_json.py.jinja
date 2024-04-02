@@ -9,7 +9,7 @@
 9               {%- for allOfType in type.allOf -%}
 10                  {%- if loop.first -%}
 11                      {%- if allOfType['$ref'] -%}
-12                  : {{ allOfType['$ref'] | schema_type | camel }}
+12                  : {{ allOfType['$ref'] | schema_type(root) | camel }}
 13                      {%- endif -%}
 14                  {%- endif -%}
 15              {%- endfor -%}
@@ -80,7 +80,7 @@
 79   {%- endfor -%}
 80   {%- for name, type in schema.properties.items() -%}
 81       {%- if type.type == 'array' -%}
-82           {%- set arrayType = type.items['$ref'] | schema_type -%}
+82           {%- set arrayType = type.items['$ref'] | schema_type(root) -%}
 83           class {{ name | camel }}({{ list_type }}[{{ arrayType | camel }}]):
 84               pass
 85       {%- else -%}

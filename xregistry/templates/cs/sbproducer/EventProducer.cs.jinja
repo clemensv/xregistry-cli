@@ -151,8 +151,8 @@ namespace {{ project_name | pascal }}
         /// </summary>
         {%- endif %}
         public async Task Send{{ pascalDefinitionName | strip_namespace }}Async(
-        {%- if definition.schemaurl -%}
-        {%- set type_name = definition.schemaurl | schema_type | strip_namespace | pascal %}
+        {%- if definition.schemaurl or definition.schema -%}
+        {%- set type_name = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | strip_namespace | pascal %}
         {%- else -%}
         {%- set type_name = "object" %}
         {%- endif -%}

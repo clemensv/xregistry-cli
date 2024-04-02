@@ -140,7 +140,7 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(message, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(root, message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "mqtt" ) %}
 try {
    Regex regex; 
@@ -155,8 +155,8 @@ try {
    if (match.Success)
    {
       return this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
-      {%- if message.schemaurl -%}
-      {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
+      {%- if message.schemaurl or message.schema -%}
+      {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
       {%- else -%}
       {{ message }}.Data
       {%- endif %}, match.Groups.Values.Where(g => g.Name != "0").ToDictionary(g => g.Name, g => g.Value));
@@ -171,7 +171,7 @@ return CompletableFuture.completedFuture(null);
 {%- endmacro -%}
 
 
-{%- macro DeclareDispatchInterfaceV5(project_name, messagegroup, pascalGroupName, interfaceName) -%}
+{%- macro DeclareDispatchInterfaceV5(root, project_name, messagegroup, pascalGroupName, interfaceName) -%}
 package {{ pascalGroupName | namespace(project_name) | lower() }};
 
 import io.cloudevents.CloudEvent;
@@ -182,8 +182,8 @@ public interface {{ interfaceName }}
 {
     {%- for id, message in messagegroup.messages.items() if (message | exists( "format", "mqtt" )) -%}
     {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
-    {%- if message.schemaurl -%}
-    {%- set dataType = message.schemaurl | schema_type | strip_namespace  | pascal -%}
+    {%- if message.schemaurl or message.schema -%}
+    {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
     {%- else -%}
     {%- set dataType = "Object" -%}
     {%- endif %}   
@@ -198,7 +198,7 @@ public interface {{ interfaceName }}
 {%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
 {%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal -%}
 {%- set interfaceName = "I"+(pascalGroupName | strip_namespace)+"MqttDispatcher" -%}
-{{- DeclareDispatchInterfaceV5(project_name, messagegroup, pascalGroupName, interfaceName) | pushfile(interfaceName+".java") -}}
+{{- DeclareDispatchInterfaceV5(root, project_name, messagegroup, pascalGroupName, interfaceName) | pushfile(interfaceName+".java") -}}
 {%- endfor -%}
 {%- endif -%}
 {%- endmacro -%}

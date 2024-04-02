@@ -1,6 +1,7 @@
 import datetime
 import os
 import json
+from typing import Any
 import uuid
 import yaml
 import jinja2
@@ -12,7 +13,7 @@ import glob
 import jsonpointer
 import pandas as pd
 
-from jinja2 import nodes
+from jinja2 import Template, nodes
 from jinja2.ext import Extension
 from jinja2 import TemplateAssertionError, TemplateSyntaxError, TemplateRuntimeError, TemplateNotFound
 
@@ -84,9 +85,8 @@ class ExitExtension(Extension):
     tags = set(['exit'])
 
     def parse(self, parser):
-        lineno = next(parser.stream)        
-        return nodes.CallBlock(self.call_method('_exit', []), [], [],
-                               []).set_lineno(lineno)
+        lineno = next(parser.stream).lineno
+        return nodes.CallBlock(self.call_method('_exit', [], lineno=lineno), [], [], []).set_lineno(lineno)
 
     def _exit(self, caller):
         raise StopIteration()
@@ -101,7 +101,7 @@ class UuidExtension(Extension):
         return nodes.Output([result], lineno=lineno)
 
     def _render(self, context) -> str:
-        return uuid.uuid4()
+        return uuid.uuid4().hex
 
 class TimeExtension(Extension):
     tags = { 'time'}
@@ -119,9 +119,20 @@ class TimeExtension(Extension):
 # Jinja filter that checks whether the given property exists 
 # anywhere in the doc with the value prefixed with the given string (case-insensitive)
 def exists(obj, prop, value):
-    df = pd.json_normalize(obj)
-    result = df[df.filter(like=prop).map(lambda x: x.lower()).apply(lambda x: x.str.startswith(value))].any().any()
-    return result
+    def recursive_search(obj, prop, value):
+        if isinstance(obj, dict):
+            for key, val in obj.items():
+                if key.lower().startswith(prop) and isinstance(val, str) and val.lower().startswith(value):
+                    return True
+                if recursive_search(val, prop, value):
+                    return True
+        elif isinstance(obj, list):
+            for item in obj:
+                if recursive_search(item, prop, value):
+                    return True
+        return False
+
+    return recursive_search(obj, prop, value)
 
 
 # Jinja filter to perform a regex search. Returns a list of matches.
@@ -162,7 +173,7 @@ def pascal(string):
         words = re.findall(r'[A-Z][a-z0-9_]*\.?', string)
     else:
         # camelCase
-        words = re.findall(r'[a-z]+\.?|[A-Z][a-z0-9_]*\.?', string)
+        words = re.findall(r'[a-z0-9]+\.?|[A-Z][a-z0-9_]*\.?', string)
     result = ''.join(word.capitalize() for word in words)
     return result
 
@@ -230,20 +241,20 @@ def namespace(class_reference, namespace_prefix=""):
 
 # Jinja filter that concats the namespace/package portions of
 # an expression, removing the dots.
-def concat_namespace(class_reference):
+def concat_namespace(class_reference) -> str:
     if class_reference:
         return "".join(class_reference.split("."))
     return class_reference
 
 # Jinja filter that formats the given object as YAML
-def toyaml(obj : any, indent : int = 4):
+def toyaml(obj : Any, indent : int = 4) -> str:
     return yaml.dump(obj, default_flow_style=False, indent=indent)
 
-def proto(proto_text : str):
+def proto(proto_text : str) -> str:
     # Add newlines after ';'
     proto_text = re.sub(r"([;{}])", r"\1\n", proto_text)
 
-     # Indent all lines after '{' or '}'
+    # Indent all lines after '{' or '}'
     indent = 0
     lines = proto_text.split("\n")
     for i in range(len(lines)):
@@ -251,7 +262,6 @@ def proto(proto_text : str):
         if "}" in line: indent -= 1
         lines[i] = "    "*indent + line
         if "{" in line: indent += 1
-           
     proto_text = "\n".join(lines)
 
     # Remove extra newlines
@@ -266,55 +276,160 @@ def proto(proto_text : str):
 schema_files_collected = set()
 schema_references_collected = set()
 
-def schema_type(schema_url: str):
+def get_json_pointer(root: dict, node: dict | str) -> str:
+    # This helper function recursively finds the path to the node.
+    def find_path(current, target, path):
+        if current is target:
+            return path
+        elif isinstance(current, dict):
+            for k, v in current.items():
+                new_path = find_path(v, target, path + [k])
+                if new_path is not None:
+                    return new_path
+        elif isinstance(current, list):
+            for i, item in enumerate(current):
+                new_path = find_path(item, target, path + [str(i)])
+                if new_path is not None:
+                    return new_path
+        return None
+
+    # This function converts the path to a JSON Pointer string.
+    def path_to_pointer(path):
+        pointer = ""
+        for p in path:
+            # Escaping special characters in JSON Pointer
+            escaped = p.replace("~", "~0").replace("/", "~1")
+            pointer += f"/{escaped}"
+        return pointer
+
+    # Find the path from root to the node and convert it to JSON Pointer
+    path = find_path(root, node, [])
+    if path is None:
+        raise RuntimeError("Node not found in document")
+    return path_to_pointer(path)
+
+
+def schema_type(schema_ref: str | dict, root: dict, schema_format: str = "jsonschema/draft-07"):
     global schema_files_collected
     global schema_references_collected
 
-    # if the schema URL is a fragment, then it is a local reference
-    if schema_url.startswith("#"):
-        if not schema_url in schema_references_collected:
-            schema_references_collected.add(schema_url)
+    class_name = ''
+    if schema_format.lower().startswith("proto") and isinstance(schema_ref, str) and "syntax" in schema_ref:
+        ptr = get_json_pointer(root, schema_ref)
+        # we actually need the parent of the schema object, so we remove the last segment
+        ptr = ptr.rsplit("/", 1)[0]
+        schema_references_collected.add('#' + ptr)     
+        schema_format = schema_format.lower().split("/")[0]
+        schema_object = schema_ref
+        schema_ref = '#' + ptr
+    elif isinstance(schema_ref, str):
+        # if the schema URL is a fragment, then it is a local reference
+        if schema_ref.startswith("#"):
+            if not schema_ref in schema_references_collected:
+                schema_references_collected.add(schema_ref)        
+            if ":" in schema_ref:
+                schema_ref, class_name = schema_ref.split(":")            
+            schema_object: object = jsonpointer.resolve_pointer(root, schema_ref[1:])
+        else:
+            # split the schema URL into a base URL and a fragment
+            schema_ref, fragment = urllib.parse.urldefrag(schema_ref)
+            # if the schema URL is a full URL, then it is an external reference
+            _, schema_object = load_definitions(schema_ref, {}, True)
+            if fragment:
+                fragment, class_name = fragment.split(":")
+                schema_object = jsonpointer.resolve_pointer(schema_object, fragment)
         
-        # if the fragment ends with ":{type}" return that type
+        schema_version = None
+        if isinstance(schema_object, dict) and "versions" in schema_object:
+            latestversion = schema_object.get('latestversionid', '')
+            if not latestversion or latestversion not in schema_object['versions']:
+                # get all the versions and use the lexically greatest
+                versions = schema_object['versions']
+                latestversion = max(versions.keys())
+            schema_version = schema_object['versions'][latestversion]
+        elif isinstance(schema_object, dict):
+            schema_version = schema_object
+        if not schema_version:
+            raise RuntimeError("Schema version not found: " + schema_ref)
+        if not "format" in schema_version or schema_format != schema_version["format"]:
+            raise RuntimeError("Schema format mismatch: " + schema_format + " != " + schema_version["format"])
+                
+        schema_format = schema_version["format"].lower().split("/")[0]
+        
+        if "schemaurl" in schema_version:
+            external_schema_url = schema_version["schemaurl"]
+            schema_object = load_definitions(external_schema_url, {}, True)
+            if not schema_object:
+                raise RuntimeError("Schema not found: " + external_schema_url)
+        elif "schema" in schema_version:
+            schema_object = schema_version["schema"]        
+        else:
+            raise RuntimeError("Schema not found: " + schema_ref)
+    else:
+        ptr = get_json_pointer(root, schema_ref)
+        # we actually need the parent of the schema object, so we remove the last segment
+        ptr = ptr.rsplit("/", 1)[0]
+        schema_references_collected.add('#' + ptr)     
+        schema_format = schema_format.lower().split("/")[0]
+        schema_object = schema_ref
+        schema_ref = '#' + ptr
+    
+    if schema_format == "avro":
+        if isinstance(schema_object, dict) and "type" in schema_object and schema_object["type"] == "record":
+            ref = ''
+            if "namespace" in schema_object:
+                ref = schema_object["namespace"] + "." + schema_object["name"]
+            else:
+                ref = schema_object["name"]
+            # if a class_name had been given, it must match
+            if class_name:
+                if ref != class_name:
+                    raise RuntimeError("Avro: Class name reference mismatch for top-level record object: " + ref + " != " + class_name)
+            return ref
+        elif isinstance(schema_object, list):
+            if not class_name:
+                raise RuntimeError("Avro: Explicit class name reference (':{classname}' suffix) required for Avro schema with top-level union: ")
+            for record in schema_object:
+                if "type" in record and record["type"] == "record":
+                    ref = ''
+                    if "namespace" in record:
+                        ref = record["namespace"] + "." + record["name"]
+                    else:
+                        ref = record["name"]
+                    # if a class_name had been given, it must match
+                    if ref == class_name:
+                        return ref
+        raise RuntimeError("Avro: Top-level record object not found in Avro schema: ")
+    elif schema_format == "proto":
+        if isinstance(schema_object, str):
+            # namespace is the last segment of the schema URL
+            namespace = schema_ref.split('/')[-1]
+            if not class_name:
+                # find the top-level message object in the proto schema using regex
+                match = re.search(r"message[\s]+([\w]+)[\s]*{", schema_object)
+                if match:
+                    # if we have more than 1 match, we cannot determine the class name
+                    if len(match.groups()) > 1:
+                        raise RuntimeError("Proto: Multiple top-level message objects found in Proto schema: ")
+                    return namespace + '.' + match.group(1)
+                else:
+                    raise RuntimeError("Proto: Top-level message object not found in Proto schema: ")
+            else:    
+                # try to find a message with the given class name using regex
+                match = re.search(r"message[\s]+" + class_name + r"[\s]*{", schema_object)
+                if match:
+                    return namespace + '.' + class_name
+        raise RuntimeError("Proto: Top-level message object not found in Proto schema: ")
+    else:
+        
         # otherwise return the last element of the fragment	unless the penultimate
         # segment name is "versions". Then return the parent segment of
         # versions. 
-
-        # handle the case where the fragment is "#/definitions/anything:{type}"
-        if ":" in schema_url:
-            return schema_url.split(":")[-1]        
-
-        path_elements = schema_url.split('/')
+        path_elements = schema_ref.split('/')
         if path_elements[-2] == "versions":
             return path_elements[-3]
         else:
             return path_elements[-1]
-
-    if get_current_url():
-        schema_url = urllib.parse.urljoin(get_current_url(), schema_url)
-
-    parsed_url = urllib.parse.urlparse(schema_url)
-    if parsed_url.fragment:
-        fragment = parsed_url.fragment
-        path_elements = fragment.split('/')
-        plain_url = urllib.parse.urlunparse(parsed_url._replace(fragment=''))
-        # if the URL is not already in the list of schemas, add it
-        if plain_url not in schema_files_collected:
-            schema_files_collected.add(schema_url)
-        # if the fragment ends with ":{type}" return that type
-        # otherwise return the last element of the fragment
-        if ":" in fragment:
-            return fragment.split(":")[-1]
-        elif path_elements[-2] == "versions":
-            return path_elements[-3]        
-        return path_elements[-1]
-    else:
-        if schema_url not in schema_files_collected:
-            schema_files_collected.add(schema_url)
-        match = re.search(r"/schemas/([\.\w]+)$", schema_url)
-        if match:
-            return match.definitiongroup(1)
-    return "object"
 
 def schema_object(root: dict, schema_url: str):
     try:
@@ -324,10 +439,10 @@ def schema_object(root: dict, schema_url: str):
     return obj
 
 def latest_dict_entry(dict: dict):
-   # find the length m of the longest key in the dictionary
-   # left justify each key with spaces to length m to make a list in which all keys have same length 
-   # then sort the keys and trim them
-   # return the dictionary entry with the last key
+    # find the length m of the longest key in the dictionary
+    # left justify each key with spaces to length m to make a list in which all keys have same length 
+    # then sort the keys and trim them
+    # return the dictionary entry with the last key
     m = max([len(k) for k in dict.keys()])
     return dict[sorted([k.ljust(m) for k in dict.keys()])[-1].strip()] 
 
@@ -344,13 +459,13 @@ def latest_dict_entry(dict: dict):
 #   suppress_code_output: if True, do not output generated code. This will still run through all templates and collect schema references
 #   suppress_schema_output: if True, do not output generated schemas
 def generate(project_name: str, language: str, style: str, output_dir: str,
-             definitions_file_arg: str, headers: dict, template_dirs: list, template_args: dict, 
-             suppress_code_output: bool, suppress_schema_output: bool):
+                definitions_file_arg: str, headers: dict, template_dirs: list, template_args: dict, 
+                suppress_code_output: bool, suppress_schema_output: bool):
     global schema_references_collected
     
     # Load definitions
     definitions_file, docroot = load_definitions(definitions_file_arg, headers, style == "schema")
-    if not definitions_file:
+    if not definitions_file or not docroot:
         raise RuntimeError("definitions file not found or invalid {}".format(definitions_file_arg))
 
     # Load templates
@@ -376,23 +491,22 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
     code_env = setup_jinja_env(code_template_and_include_dirs)
     schema_env = setup_jinja_env(schema_template_dirs)
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dirs, code_env, False, template_args, suppress_code_output)
+                            code_template_dirs, code_env, False, template_args, suppress_code_output)
     render_code_templates(project_name, style, output_dir, docroot,
-                          schema_template_dirs, schema_env, False, template_args, suppress_schema_output)
+                            schema_template_dirs, schema_env, False, template_args, suppress_schema_output)
     
     # now we need to handle any local schema references we found in the document
- 
     # we redo the overall loop until we have handled all the schema references
     # check whether there are references in schema_references_collected 
     # that are not in   handled
     while not schema_references_collected.issubset(get_schemas_handled()):
-         # we need to iterate over a copy of the set because we may add to it
+        # we need to iterate over a copy of the set because we may add to it
         for schema_reference in set(schema_references_collected):
             if schema_reference not in get_schemas_handled():
                 add_schema_to_handled(schema_reference)
                 set_current_url(None)
                 schema_format = None
-                class_name = None
+                class_name = ''
 
                 # if the scheme reference is a JSON Pointer reference, we resolve it
                 # to an object in the document. Remove a leading # if present
@@ -407,7 +521,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     else:
                         definitions_file = path_elements[-1]
 
-                    if class_name is None:
+                    if not class_name:
                         class_name = definitions_file
 
                     try:
@@ -418,7 +532,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     except jsonpointer.JsonPointerException as e:
                         print("Error resolving JSON Pointer: " + str(e))
                         continue
-  
+
                 if schema_root and isinstance(schema_root,dict):
                     # now we need to figure out what the reference points to. 
                     # a) This could be an inline schema inside a message definition
@@ -428,7 +542,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     #    the local reference 
 
                     schema_version = None
-                    if "format" in schema_root and "versions" in schema_root:
+                    if "versions" in schema_root:
                         # the reference pointed to a schema definition. Now we need to find the
                         # most recent version in the versions dictionary by sorting the keys
                         # and picking the last one. To sort the keys, we need to make them the same length 
@@ -440,10 +554,16 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     elif "schema" in schema_root or "schemaurl" in schema_root or "schema" in schema_root:
                         # the reference pointed to a schema version definition
                         schema_version = schema_root
-
+                        
                     if schema_version and isinstance(schema_version,dict):
+                        schema_format = ''
                         if "schemaformat" in schema_version:
                             schema_format = schema_version["schemaformat"]
+                        elif "format" in schema_version:
+                            schema_format = schema_version["format"]
+                        
+                        if not schema_format:
+                            raise RuntimeError("Schema format not found: " + schema_reference)
 
                         # case c): if the schema version contains a schemaurl attribute, then we need to
                         # add the schemaurl to the list of schemas to be processed and continue
@@ -461,16 +581,14 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                                 schema_root = schema_version["schema"]
 
                             set_current_url (schema_reference)
-                            schema_format_short = None
-
-                            if "format" in schema_version:
-                                format_string = schema_version["format"].lower()
-                                if format_string.startswith("proto"):
-                                    schema_format_short = "proto"
-                                elif format_string.startswith("jsonschema"):
-                                    schema_format_short = "json"
-                                elif format_string.startswith("avro"):
-                                    schema_format_short = "avro"
+                            schema_format_short = ''
+                            format_string = schema_format.lower()
+                            if format_string.startswith("proto"):
+                                schema_format_short = "proto"
+                            elif format_string.startswith("jsonschema"):
+                                schema_format_short = "json"
+                            elif format_string.startswith("avro"):
+                                schema_format_short = "avro"
                             
                             render_schema_templates(schema_format_short, project_name, class_name, language,
                                                     output_dir, definitions_file, schema_root, schema_template_dirs, schema_env, template_args, suppress_schema_output)
@@ -479,21 +597,21 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                             print("Warning: unable to find schema reference " + schema_reference)
 
                     # schema_root is not a schema version or schema definition, so it is a schema      
-                    schema_format_short = None 
+                    schema_format_short = '' 
                     if schema_format is not None and schema_format.lower().startswith("proto"):
                         schema_format_short = "proto"
                     elif schema_format is not None and schema_format.lower().startswith("avro"):
                         schema_format_short = "avro"
                     else:
                         schema_format_short = "json"
-                                               
+
                     render_schema_templates(schema_format_short, project_name, class_name, language,
                                             output_dir, definitions_file, schema_root, schema_template_dirs, schema_env, template_args, suppress_schema_output)
                 else:
                     print("Warning: unable to find schema reference " + schema_reference)
             
     render_code_templates(project_name, style, output_dir, docroot,
-                          code_template_dirs, code_env, True, template_args, suppress_code_output)
+                            code_template_dirs, code_env, True, template_args, suppress_code_output)
     
     
     # reset the references collected in this file 
@@ -501,7 +619,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 
     if style == "schema":
         render_schema_templates(None, project_name, None, language,
-                                output_dir, definitions_file, docroot, schema_template_dirs, schema_env, suppress_schema_output)
+                                output_dir, definitions_file, docroot, schema_template_dirs, schema_env, template_args, suppress_schema_output)
 
 
 # for templates, except in _schemas, the filename may lead (!) with the
@@ -514,8 +632,8 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
 # the {class*} patterns break the input information set up such that the
 # generator is fed just one CloudEvent definition but the information set
 # remains anchored at "messagegroups"
-def render_code_templates(project_name : str, style : str, output_dir : str, docroot : dict,
-                          code_template_dirs : list, env : jinja2.Environment, post_process : bool, template_args : dict, suppress_output : bool = False):
+def render_code_templates(project_name : str, style : str, output_dir : str, docroot : Dict[str, Any],
+                            code_template_dirs : list, env : jinja2.Environment, post_process : bool, template_args : dict, suppress_output : bool = False):
     class_name = None
     for template_dir in code_template_dirs:
         for root, dirs, files in os.walk(template_dir):
@@ -530,6 +648,7 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                 template_path = relpath + "/" + file  
                 # all codegen for CE is anchored on the included messagegroups
                 scope = docroot
+                class_name = ''
 
                 file_dir = file_dir_base = os.path.join(output_dir, os.path.join(*relpath.split("/")))
                 ## strip the jinja suffix
@@ -571,6 +690,8 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                             if not package_name:
                                 package_name = project_name
                             class_name = scope_parts[-1]
+                            if not class_name:
+                                raise RuntimeError("class name not found")
                             if file_name_base.find("{classdir}") > -1:
                                 file_dir = os.path.join(file_dir_base, 
                                                         os.path.join(*package_name.split("."))).lower()
@@ -591,8 +712,8 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                 render_template(project_name, class_name, scope, file_dir, file_name, template, template_args, suppress_output)
 
 
-def render_schema_templates(schema_type : str, project_name : str, class_name : str, language : str,
-                            output_dir : str, definitions_file : str, docroot : dict|str, schema_template_dirs : list, env : jinja2.Environment,
+def render_schema_templates(schema_type : str|None, project_name : str, class_name : str|None, language : str,
+                            output_dir : str, definitions_file : str, docroot : Dict[str,Any], schema_template_dirs : list, env : jinja2.Environment,
                             template_args : dict, suppress_output : bool = False):
     global uses_protobuf
     global uses_avro
@@ -608,8 +729,31 @@ def render_schema_templates(schema_type : str, project_name : str, class_name : 
 
     if schema_type == "proto":
         uses_protobuf = True
-    if schema_type == "avro":
+        if isinstance(docroot,str) and re.search(r"syntax[\s]*=[\s]*\"proto3\"", docroot):
+            # find the first message
+            match = re.search(r"message[\s]+([\w]+)[\s]*{", docroot)
+            if match:
+                class_name = class_name + '.' + match.group(1)            
+    elif schema_type == "avro":
         uses_avro = True
+        if isinstance(docroot,dict) and "type" in docroot and docroot["type"] == "record":
+            class_name = docroot["namespace"] + "." + docroot["name"]
+        elif isinstance(docroot,list):
+            if class_name:
+                cns = class_name.split(".", 1)
+                if len(cns) == 2:
+                    ns = cns[0]
+                    cn = cns[1]
+                else:
+                    ns = ""
+                    cn = cns[0]                
+            for record in docroot:
+                if isinstance(record, dict) and "type" in record and record["type"] == "record" \
+                    and "namespace" in record and "name" in record \
+                    and record["name"].lower() == cn and record["namespace"].lower() == ns:
+                        class_name = record["namespace"] + "." + record["name"]                    
+                        break
+            raise RuntimeError("Avro: Top-level record object not found in Avro schema: ")
 
     file_dir = file_dir_base = output_dir
     if class_name is None:
@@ -637,16 +781,14 @@ def render_schema_templates(schema_type : str, project_name : str, class_name : 
             # if the file name is just the language indicator,
             # eg. "cs", take the filename of the schema doc
             if file_name_base == language or file_name_base == "proto" or file_name_base == "avsc":
-                file_name_base = pascal(class_name) + "." + file_name_base
-            file_name_base = file_name_base.replace("{projectname}",
-                                                    pascal(project_name))
-            file_name_base = file_name_base.replace("{classname}",
-                                                    pascal(class_name))
+                file_name_base = class_name + "." + file_name_base
+            file_name_base = file_name_base.replace("{projectname}", project_name)
+            file_name_base = file_name_base.replace("{classname}", class_name)
             
             file_name = file_name_base
             if file_name_base.find("{classdir}") > -1:
                 file_dir = os.path.join(file_dir, os.path.join(*project_name.split(".")).lower())
-                file_name = file_name_base.replace("{classdir}", pascal(class_name))
+                file_name = file_name_base.replace("{classdir}", class_name)
                     
             
             # remember the schema class name we generated a file for 
@@ -658,7 +800,7 @@ def render_schema_templates(schema_type : str, project_name : str, class_name : 
             render_template(project_name, class_name, scope, file_dir, file_name, template, template_args, suppress_output)
 
 
-def render_template(project_name : str, class_name : str, scope : dict, file_dir : str, file_name : str, template : str, template_args : dict, suppress_output : bool = False):
+def render_template(project_name : str, class_name : str, scope : Dict[str,Any], file_dir : str, file_name : str, template : Template, template_args : dict, suppress_output : bool = False):
 
     global uses_protobuf
     global uses_avro
@@ -777,8 +919,7 @@ def generate_code(args) -> int:
 
             # generate external schemas
             for schema in schema_files_collected:
-                generate(args.project_name, args.language, "schema", args.output_dir,
-                        schema, headers, args.template_dirs, template_args, )
+                generate(args.project_name, args.language, "schema", args.output_dir,  schema, headers, args.template_dirs, template_args, suppress_code_output, suppress_schema_output)
             
             if stack("files"):
                 for file, content in stack("files"):
@@ -788,7 +929,7 @@ def generate_code(args) -> int:
             if not uses_avro and not uses_protobuf:
                 break
         except SystemExit as err:
-            return err.code if err.code is int else 1
+            return 1
         except Exception as err:
             print(err)
             return 1

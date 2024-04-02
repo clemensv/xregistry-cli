@@ -141,7 +141,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(message, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(root, message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
 var messageSubject = {{ message }}.Properties.Subject;
 switch (messageSubject)
@@ -154,8 +154,8 @@ switch (messageSubject)
          if ( this.{{ handlerName }} != null )
          {
             await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
-               {%- if message.schemaurl -%}
-            {{ message.schemaurl | schema_type | strip_namespace  | pascal }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
+               {%- if message.schemaurl or message.schema -%}
+            {{ (message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
             {%- else -%}
             {{ message }}.Data
             {%- endif %});
@@ -186,8 +186,8 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
    {
       {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
       {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
-      {%- if message.schemaurl -%}
-      {%- set dataType = message.schemaurl | schema_type | strip_namespace  | pascal -%}
+      {%- if message.schemaurl or message.schema -%}
+      {%- set dataType = (message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
       {%- else -%}
       {%- set dataType = "object" -%}
       {%- endif %}   

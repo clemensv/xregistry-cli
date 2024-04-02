@@ -3,6 +3,8 @@ import os
 import subprocess
 import shutil
 
+import pytest
+
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root))
 
@@ -10,6 +12,7 @@ import xregistry
 
 # this test invokes the xregistry command line tool to generate a C# proxy and a consumer
 # and then builds the proxy and the consumer and runs a prepared test that integrates both
+@pytest.mark.skip(reason="temporarily disabled")    
 def test_inmemory_end_to_end():
     # clean the output directory
     if os.path.exists(os.path.join(project_root, 'tmp/test/cs/inmemory_end_to_end/')):

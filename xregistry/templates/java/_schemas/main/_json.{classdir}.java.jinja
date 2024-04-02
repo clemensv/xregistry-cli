@@ -7,7 +7,7 @@
 {%- if type.allOf -%}
     {%- for allOfType in type.allOf -%}
         {%- if allOfType['$ref'] %}
-public class {{ typeName }} extends {{ allOfType['$ref'] | schema_type }} 
+public class {{ typeName }} extends {{ allOfType['$ref'] | schema_type(root) }} 
 {
         {% else %}
 public class {{ typeName }} 
@@ -134,7 +134,7 @@ public class {{ typeName }}
                 {%- endif -%}
             {%- elif property.items['$ref'] -%}
                 {%- set ref = property.items['$ref'] -%}
-                {%- set javaType = list_type+"<"+(ref | schema_type | pascal)+">" -%}
+                {%- set javaType = list_type+"<"+(ref | schema_type(root) | pascal)+">" -%}
             {%- else -%}
                 {%- set javaType = list_type+"<"+((propertyName + "Item") | pascal)+">" -%}
                 {{ emitclass( property['items'], (propertyName + "Item") | pascal) | indent }}
@@ -145,7 +145,7 @@ public class {{ typeName }}
         {%- if not property.type and not property.items -%}
             {%- if property['$ref'] -%}
                 {%- set ref = property['$ref'] -%}
-                {%- set javaType = ref | schema_type | pascal -%}
+                {%- set javaType = ref | schema_type(root) | pascal -%}
             {%- elif property.properties -%}
                 {%- set javaType = (propertyName + "Item") | pascal -%}
                 {{ emitclass(property, javaType) | indent }}

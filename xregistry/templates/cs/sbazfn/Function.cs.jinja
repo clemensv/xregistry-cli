@@ -26,7 +26,7 @@ namespace {{ project_name | pascal }}
         public async virtual Task Run(ServiceBusReceivedMessage message, ILogger log)
         {
             var cloudEvent = CloudEventFromServiceBusMessage(message);
-            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects( root, "cloudEvent", messagegroups, "log" ) | indent(12) }}
         }
     }
 }

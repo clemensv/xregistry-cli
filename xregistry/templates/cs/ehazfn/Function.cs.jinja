@@ -24,7 +24,7 @@ namespace {{ project_name | pascal }}
             foreach(var ev in events)
             {
                 var cloudEvent = CloudEventFromEventData(ev);
-                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects( root, "cloudEvent", messagegroups, "log" ) | indent(16) }}
             }
         }
     }

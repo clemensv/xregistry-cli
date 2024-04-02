@@ -1,8 +1,8 @@
 {#- triggering generation of all schema-based elements with this loop #}
 {%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
    {%- for definitionid, definition in messagegroup.messages.items() %}
-    {%- if definition.schemaurl -%}
-        {% set x=definition.schemaurl | schema_type -%}
+    {%- if definition.schemaurl or definition.schema -%}
+        {% set x=(definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) -%}
     {%-endif -%}
     {%- endfor -%}
 {%- endfor %}

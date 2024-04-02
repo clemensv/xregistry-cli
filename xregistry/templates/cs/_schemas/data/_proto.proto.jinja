@@ -1,8 +1,6 @@
+{%- set schema_name = class_name -%}
 syntax="proto3";
 
-option csharp_namespace = "{{ project_name | pascal }}";
-
-import "google/protobuf/any.proto";
-import "google/protobuf/timestamp.proto";
+option csharp_namespace = "{{ class_name | namespace  }}";
 
 {{ root | proto | regex_replace('syntax[\\s]*=[\\s]*["\']proto3["\'];[\\s]*\n', '') }}

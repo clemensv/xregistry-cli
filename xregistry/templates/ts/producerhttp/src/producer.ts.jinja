@@ -62,8 +62,8 @@ export class {{ pascalGroupName | concat_namespace }}EventProducer
    {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}
    {%- set isMqtt = not isCloudEvent and definition.format.lower().startswith("mqtt") %}
    async send{{ pascalDefinitionName | strip_namespace }}Async(
-   {%- if definition.schemaurl -%}
-   {% set dataType = "types." + (definition.schemaurl | schema_type | strip_namespace | pascal) %}
+   {%- if definition.schemaurl or definition.schema -%}
+   {% set dataType = "types." + ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | strip_namespace | pascal) %}
    {%- else -%}
    {% set dataType = "any" %}
    {%- endif %}    

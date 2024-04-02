@@ -13,7 +13,7 @@
         {%- for allOfType in type.allOf -%}
             {%- if loop.first -%}
             {%- if allOfType['$ref'] -%}
-                : {{ allOfType['$ref'] | schema_type | pascal }}
+                : {{ allOfType['$ref'] | schema_type(root) | pascal }}
             {%- endif -%}
             {%- endif -%}
         {%- endfor -%}
@@ -50,8 +50,9 @@
         /// <summary>
         /// Serializes this object into a byte array using the JSON serializer
         /// </summary>
-        public byte[] ToByteArray() 
+        public byte[] ToByteArray(out string contentType) 
         {
+            contentType = "application/json";
             return JsonSerializer.SerializeToUtf8Bytes(this);
         }
 
@@ -171,7 +172,7 @@
                 {%- endif -%}
             {%- elif property.items['$ref'] -%} 
                 {%- set ref = property.items['$ref'] -%}
-                {%- set csharpType = list_type+"<"+(ref | schema_type | pascal)+">" -%}
+                {%- set csharpType = list_type+"<"+(ref | schema_type(root) | pascal)+">" -%}
             {%- elif 'type' in property['items'] and property['items']['type'] == "object" and 'properties' in property['items'] -%}
                 {%- set csharpType = list_type+"<"+((propertyName + "Item") | pascal)+">" -%}
                 {{ emitclass( property['items'], (propertyName + "Item") | pascal) | indent }}
@@ -184,7 +185,7 @@
         {%- if (not property.type) or property.type == "object"  -%}
             {%- if property['$ref'] -%}
                 {%- set ref = property['$ref'] -%}
-                {%- set csharpType = ref | schema_type | pascal -%}
+                {%- set csharpType = ref | schema_type(root) | pascal -%}
             {%- elif property.properties -%}
                 {%- set csharpType = (propertyName + "Item") | pascal -%}
                 {{ emitclass(property, csharpType) | indent }}
@@ -310,9 +311,9 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace {{ project_name | pascal }}
+namespace {{ schema_name | namespace }}
 {
-    {{- emitclass(schema, schema_name) }}
+    {{- emitclass( schema, schema_name | strip_namespace ) }}
 }
 
 

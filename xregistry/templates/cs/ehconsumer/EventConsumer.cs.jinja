@@ -76,7 +76,7 @@ namespace {{ project_name | pascal }}
         {
             try 
             {
-                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "this.logger" ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects( root, "cloudEvent", messagegroups, "this.logger" ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -90,7 +90,7 @@ namespace {{ project_name | pascal }}
         {
             try 
             {
-                {{ eventhubs.DispatchToDispatchObjects( "eventData", messagegroups, "this.logger" ) | indent(16) }}
+                {{ eventhubs.DispatchToDispatchObjects( root, "eventData", messagegroups, "this.logger" ) | indent(16) }}
             }
             catch (Exception ex)
             {

@@ -1,19 +1,15 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "amqp.jinja.include" as amqp -%}
-{%- import "mqtt.jinja.include" as mqtt -%}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
-{%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
-{%- set uses_mqtt_endpoint = (root | exists( "protocol", "mqtt" )) %}
 {%- set function_name = project_name | pascal -%}
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Text.RegularExpressions;
-using CloudNative.CloudEvents.Experimental.Endpoints;
 
 {%- if uses_cloudevents_message %}
 using CloudNative.CloudEvents;
@@ -21,9 +17,6 @@ using CloudNative.CloudEvents.SystemTextJson;
 {%- endif %}
 {%- if uses_amqp_message %}
 {{ amqp.AmqpNetLiteHeaders() }}
-{%- endif %}
-{%- if uses_mqtt_message %}
-{{ mqtt.MqttNetHeaders() }}
 {%- endif %}
 using Microsoft.Extensions.Logging;
  
@@ -34,36 +27,22 @@ namespace {{ project_name | pascal }}
      {%- set class_name = ( pascalGroupName | strip_namespace )+"EventConsumer" %}
     public class {{ class_name }} : IDisposable
     {
+        private AmqpConsumer endpoint;
+
         {%- if uses_cloudevents_message %}
         {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
-        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "AmqpConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
         {%- endif %}
         {%- if uses_amqp_message %}
         {{ amqp.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
-        {{ amqp.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchMessageAsync += DispatchMessageAsync;") | indent(8) }}
+        {{ amqp.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "AmqpConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchMessageAsync += DispatchMessageAsync;") | indent(8) }}
         {%- endif %}
-        {%- if uses_mqtt_message %}
-        {{ mqtt.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
-        {{ mqtt.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchApplicationMessageAsync += DispatchApplicationMessageAsync;") | indent(8) }}
-        {%- endif %}
-
-        private ConsumerEndpoint endpoint;
-        public ConsumerEndpoint Endpoint
-        {
-            get 
-            {
-                return this.endpoint;
-            }
-        }
-
-        
         {%- if uses_cloudevents_message %}
-        
         public async Task DispatchCloudEventAsync( CloudEvent cloudEvent, ILogger log)
         {
             try 
             {
-                {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "log" ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects(root, "cloudEvent", messagegroups, "log" ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -77,21 +56,7 @@ namespace {{ project_name | pascal }}
         {
             try 
             {
-                {{ amqp.DispatchToDispatchObjects( "amqpMessage", messagegroups, "log" ) | indent(16) }}
-            }
-            catch (Exception ex)
-            {
-                log.LogError(ex, "Error dispatching message");
-            }
-        }
-        {%- endif %}
-
-        {%- if uses_mqtt_message %}
-        public async Task DispatchApplicationMessageAsync( MqttApplicationMessage mqttMessage, ILogger log)
-        {
-            try 
-            {
-               {{ mqtt.DispatchToDispatchObjects( "mqttMessage", messagegroups, "log" ) | indent(16) }}
+                {{ amqp.DispatchToDispatchObjects(root, "amqpMessage", messagegroups, "log" ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -103,7 +68,6 @@ namespace {{ project_name | pascal }}
         public void Dispose()
         {
             this.endpoint.Dispose();
-            this.endpoint = null;
         }
 
         {%- if root.endpoints -%} 
@@ -115,7 +79,6 @@ namespace {{ project_name | pascal }}
            {%- set endpoints = endpoint.config.endpoints %}
            {%- set isCloudEvent = not endpoint.format or endpoint.format.lower().startswith("cloudevents") -%}
            {%- set isAmqp = not isCloudEvent and endpoint.format.lower().startswith("amqp") %}
-           {%- set isMqtt = not isCloudEvent and endpoint.format.lower().startswith("mqtt") %}
                 
         public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
         {       
@@ -133,7 +96,7 @@ namespace {{ project_name | pascal }}
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };
-            var endpoint = ConsumerEndpoint.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints);
+            var endpoint = AmqpConsumer.CreateAmqp(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints);
             var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, false ) -}});
             return consumer;
         }

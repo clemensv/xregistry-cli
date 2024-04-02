@@ -32,7 +32,7 @@ class {{ groupName.split('.')[-1]}}_event_producer:
         {%- endif -%}
     {%- endfor -%} 
     data: {%- if definition.schemaurl -%}
-    {{ definition.schemaurl | schema_type | strip_namespace | snake }}
+    {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | strip_namespace | snake }}
     {%- else -%}
     object
     {%- endif -%}) -> None:

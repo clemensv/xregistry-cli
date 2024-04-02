@@ -1,10 +1,10 @@
 {%- set schema = root -%}
 {%- set namespace = project_name | pascal -%}
 {
-    "namespace": "{{ namespace }}",
+    {%- if 'namespace' not in schema.keys() %}
+        "namespace": "{{ namespace }}",
+    {%- endif %}    
     {%- for attr, value in schema.items() %}
-    {%- if attr != 'namespace' %}
     "{{ attr }}": {{ value | tojson(3) }},
-    {%- endif %}
     {%- endfor %}
 }

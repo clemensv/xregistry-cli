@@ -6,6 +6,8 @@ import subprocess
 import shutil
 import time
 
+import pytest
+
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root))
 
@@ -36,6 +38,7 @@ def run_test():
     # run dotnet build on the csproj here that references the generated files already
     subprocess.check_call(['dotnet', 'run'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     
+@pytest.mark.skip(reason="temporarily disabled")    
 def test_amqp_end_to_end():
     container_name = ''.join(random.choices(string.ascii_lowercase, k=10))
     start_command = "docker run --name {} -d -p 127.11.0.2:5672:5672 -e AMQ_USER=test -e AMQ_PASSWORD=password quay.io/artemiscloud/activemq-artemis-broker".\

@@ -5,6 +5,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Python: Code Generator C# EH",
+      "type": "python",
+      "request": "launch",
+      "program": "-m xregistry",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "jinja": true,
+      //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\compact\\cloudevent-avro-embedded.json --projectname Sample --language cs --style ehproducer --output c:\\temp\\outp\\cs12"
+      //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\embedded-schema\\cloudevent-mixed-embedded.json --projectname Sample --language cs --style ehproducer --output c:\\temp\\outp\\cs13"
+      "args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\separate-schema\\cloudevent-avro-separate.json --projectname Sample --language cs --style mqttproducer --output c:\\temp\\outp\\cs19"
+    },
+    {
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
       "name": "Launch Extension",
       "preLaunchTask": "tsc: build - xregistry_vscode/tsconfig.json",

@@ -76,7 +76,7 @@ public class {{ className }}
     public CompletableFuture<Void> dispatchCloudEventAsync(
             CloudEvent cloudEvent)
     {
-            {{ cloudEvents.DispatchToDispatchObjects( "cloudEvent", messagegroups, "_logger" ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects(root,  "cloudEvent", messagegroups, "_logger" ) | indent(12) }}
     }
     {%- endif %}
 
@@ -84,7 +84,7 @@ public class {{ className }}
     public CompletableFuture<Void> dispatchMessageAsync(
             Message amqpMessage, MessageContext messageContext)
     {
-            {{ amqp.DispatchToDispatchObjects( "amqpMessage", messagegroups, "_logger" ) | indent(12) }}
+            {{ amqp.DispatchToDispatchObjects(root, "amqpMessage", messagegroups, "_logger" ) | indent(12) }}
     }
     {%- endif %}
 
@@ -92,13 +92,13 @@ public class {{ className }}
     public CompletableFuture<Void> dispatchMqttMessageV5Async(
             MqttMessageV5 mqttMessage)
     {
-            {{ mqtt.DispatchToDispatchObjects( "mqttMessage", messagegroups, "_logger" ) | indent(12) }}
+            {{ mqtt.DispatchToDispatchObjects(root, "mqttMessage", messagegroups, "_logger" ) | indent(12) }}
     }
 
     public CompletableFuture<Void> dispatchMqttMessageV3Async(
             MqttMessageV3 mqttMessage)
     {
-            {{ mqtt.DispatchToDispatchObjects( "mqttMessage", messagegroups, "_logger") | indent(12) }}
+            {{ mqtt.DispatchToDispatchObjects(root, "mqttMessage", messagegroups, "_logger") | indent(12) }}
     }
     {%- endif %}
 

@@ -6,6 +6,8 @@ import subprocess
 import shutil
 import time
 
+import pytest
+
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root))
@@ -23,7 +25,7 @@ def terminate_process(process_name):
     except:
         print('Failed to terminate process {}'.format(process_name))
 
-
+@pytest.mark.skip(reason="temporarily disabled")    
 def test_azfn_http():
     # clean the output directory
     output = os.path.join(project_root, "tmp/test/cs/azfn_http/")

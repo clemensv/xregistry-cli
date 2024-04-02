@@ -1,5 +1,5 @@
 {%- set uses_protobuf = uses_protobuf | default(true) -%}
-{%- set uses_avro = uses_avro | default(true) -%}
+{%- set uses_avro = uses_avro or (root.schemagroups | exists( "format", "avro" )) or (root | exists( "schemaformat", "avro" )) -%}
 {%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists("protocol", "amqp" )) %}
 {%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
@@ -25,10 +25,9 @@
   <ItemGroup>
     <PackageReference Include="CloudNative.CloudEvents" Version="2.5.1" />
     <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.5.1" />
-    {%- if uses_amqp_message or uses_amqp_endpoint %}
     <PackageReference Include="Azure.Messaging.EventHubs" Version="5.11.1" />
-    {%- endif %}
     {%- if uses_protobuf %}
+    <PackageReference Include="Google.Protobuf" Version="3.26.1" />
     <PackageReference Include="Grpc.Tools" Version="2.50.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -36,7 +35,7 @@
     {%- endif %}
     <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
     {%- if uses_avro %}
-    <PackageReference Include="Apache.Avro" Version="1.11.1" />
+    <PackageReference Include="Apache.Avro" Version="1.11.2" />
     {%- endif %}
   </ItemGroup>
   {% if uses_avro %}

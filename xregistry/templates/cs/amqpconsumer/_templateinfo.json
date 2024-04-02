@@ -1,0 +1,4 @@
+{
+    "description" : "C# CloudEvents SDK AMQP endpoint consumer class",
+    "priority" : 1
+}

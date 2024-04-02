@@ -24,34 +24,21 @@
   {% endif %}
   <ItemGroup>
     <PackageReference Include="CloudNative.CloudEvents" Version="2.5.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints" Version="1.2.1" />    
     <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.5.1" />
+    <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.5.1" />
+    <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.5.1" />
     <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
-    {%- if uses_amqp_message or uses_amqp_endpoint %}
     <PackageReference Include="AMQPNetLite" Version="2.4.5" />
-    {%- endif %}
-    {%- if uses_mqtt_message or uses_mqtt_endpoint %}
-    <PackageReference Include="MQTTnet" Version="3.0.15.0" />
-    {%- endif %}
-    {%- if uses_mqtt_endpoint %}
-    <PackageReference Include="CloudNative.CloudEvents.Mqtt" Version="2.5.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints.Mqtt" Version="1.2.1" /> 
-    {%- endif %}
-    {%- if uses_amqp_endpoint %}
     <PackageReference Include="CloudNative.CloudEvents.Amqp" Version="2.5.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Experimental.Endpoints.Amqp" Version="1.2.1" /> 
-    {%- endif %}
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     {%- if uses_protobuf %}
     <PackageReference Include="Grpc.Tools" Version="2.50.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     {%- endif %}
-    {%- if uses_avro or uses_protobuf %}
-    <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
-    {%- endif %}
     {%- if uses_avro %}
-    <PackageReference Include="Apache.Avro" Version="1.11.1" />
+    <PackageReference Include="Apache.Avro" Version="1.11.2" />
     {%- endif %}
   </ItemGroup>
   {% if uses_avro %}  
