@@ -2,8 +2,6 @@
 {%- set uses_avro = uses_avro or (root.schemagroups | exists( "format", "avro" )) or (root | exists( "schemaformat", "avro" )) -%}
 {%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists("protocol", "amqp" )) %}
-{%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
-{%- set uses_mqtt_endpoint = (root | exists("protocol", "mqtt" )) %}
 
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>

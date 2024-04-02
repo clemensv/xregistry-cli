@@ -91,7 +91,7 @@ new MqttUserProperty("{{ prop.name }}",
 {%- endfor -%}
 {%- endmacro -%}
 
-{#- Generates AMQP message objects from mqttDefinition as message -#}
+{#- Generates MQTT message objects from mqttDefinition as message -#}
 {%- macro DeclareMqttNetMessage(variable, message) -%}
 {%- set properties = message.message["properties"] %}
 MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
