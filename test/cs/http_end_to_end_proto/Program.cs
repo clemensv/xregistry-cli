@@ -2,7 +2,6 @@
 // to send and receive messages.
 
 using CloudNative.CloudEvents;
-using CloudNative.CloudEvents.Experimental.Endpoints;
 using CloudNative.CloudEvents.SystemTextJson;
 using Contoso.ERP.Consumer;
 using Contoso.ERP.Producer;
@@ -19,18 +18,16 @@ public class Program
         var blockingQueue = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
         var unmatchedEvents = new HashSet<string>();
 
-        HttpProtocol.Initialize();
-
         JsonEventFormatter formatter = new JsonEventFormatter();
         var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
         var logger = loggerFactory.CreateLogger("TestLogger");
         // Create a new instance of the Consumer class.
         
         var consumer = EventsEventConsumer.CreateForHttpConsumer(logger, null, new EventsEventDispatcher(unmatchedEvents));
-        await consumer.Endpoint.StartAsync();
+        await consumer.StartAsync();
 
         var producer = EventsEventProducer.CreateForHttpProducer(logger, null, ContentMode.Structured, formatter);
-        producer.Endpoint.BeforeSend += (o, e) =>
+        producer.BeforeSend += (o, e) =>
         {
             if (e.Id == null) throw new ArgumentNullException();
             unmatchedEvents.Add(e.Id);
@@ -58,7 +55,7 @@ public class Program
 
         await Task.Delay(5000);
 
-        await consumer.Endpoint.StopAsync();
+        await consumer.StopAsync();
 
         if (unmatchedEvents.Count != 0)
         {
@@ -79,21 +76,21 @@ internal class EventsEventDispatcher : IEventsDispatcher
     }
 
     
-    public Task OnPaymentsReceivedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.PaymentData data)
+    public Task OnPaymentsReceivedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.PaymentData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
     
-    public Task OnReservationCancelledAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.CancellationData data)
+    public Task OnReservationCancelledAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.CancellationData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnReservationPlacedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.OrderData data)
+    public Task OnReservationPlacedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.OrderData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
@@ -101,14 +98,14 @@ internal class EventsEventDispatcher : IEventsDispatcher
     }
     
     
-    public Task OnShipmentAcceptedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ShipmentData data)
+    public Task OnShipmentAcceptedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ShipmentData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnShipmentRejectedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ShipmentData data)
+    public Task OnShipmentRejectedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ShipmentData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);

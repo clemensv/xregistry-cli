@@ -2,7 +2,6 @@
 // to send and receive messages.
 
 using CloudNative.CloudEvents;
-using CloudNative.CloudEvents.Experimental.Endpoints;
 using CloudNative.CloudEvents.SystemTextJson;
 using Contoso.ERP.Consumer;
 using Contoso.ERP.Producer;
@@ -19,20 +18,18 @@ public class Program
         var blockingQueue = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
         var unmatchedEvents = new HashSet<string>();
 
-        AmqpProtocol.Initialize();
-
         JsonEventFormatter formatter = new JsonEventFormatter();
         var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
         var logger = loggerFactory.CreateLogger("TestLogger");
         // Create a new instance of the Consumer class.
 
-        var passwordCredential = new PlainEndpointCredential("test", "password");
+        var consumerPasswordCredential = new Contoso.ERP.Consumer.PlainEndpointCredential("test", "password");
+        var consumer = EventsEventConsumer.CreateForAmqpConsumer(logger, consumerPasswordCredential, new EventsEventDispatcher(unmatchedEvents));
+        await consumer.StartAsync();
 
-        var consumer = EventsEventConsumer.CreateForAmqpConsumer(logger, passwordCredential, new EventsEventDispatcher(unmatchedEvents));
-        await consumer.Endpoint.StartAsync();
-
-        var producer = EventsEventProducer.CreateForAmqpProducer(logger, passwordCredential, ContentMode.Structured, formatter);
-        producer.Endpoint.BeforeSend += (o, e) =>
+        var producerPasswordCredential = new Contoso.ERP.Producer.PlainEndpointCredential("test", "password");
+        var producer = EventsEventProducer.CreateProducerForAmqpProducer(logger, producerPasswordCredential, ContentMode.Structured, formatter);
+        producer.BeforeSend += (o, e) =>
         {
             if (e.Id == null) throw new ArgumentNullException();
             unmatchedEvents.Add(e.Id);
@@ -122,7 +119,7 @@ public class Program
 
         await Task.Delay(5000);
 
-        await consumer.Endpoint.StopAsync();
+        await consumer.StopAsync();
 
         if (unmatchedEvents.Count != 0)
         {

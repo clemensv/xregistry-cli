@@ -2,7 +2,6 @@
 // to send and receive messages.
 
 using CloudNative.CloudEvents;
-using CloudNative.CloudEvents.Experimental.Endpoints;
 using CloudNative.CloudEvents.SystemTextJson;
 using Contoso.ERP.Consumer;
 using Contoso.ERP.Producer;
@@ -19,18 +18,16 @@ public class Program
         var blockingQueue = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
         var unmatchedEvents = new HashSet<string>();
 
-        HttpProtocol.Initialize();
-
         JsonEventFormatter formatter = new JsonEventFormatter();
         var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
         var logger = loggerFactory.CreateLogger("TestLogger");
         // Create a new instance of the Consumer class.
         
         var consumer = EventsEventConsumer.CreateForHttpConsumer(logger, null, new EventsEventDispatcher(unmatchedEvents));
-        await consumer.Endpoint.StartAsync();
+        await consumer.StartAsync();
 
         var producer = EventsEventProducer.CreateForHttpProducer(logger, null, ContentMode.Structured, formatter);
-        producer.Endpoint.BeforeSend += (o, e) =>
+        producer.BeforeSend += (o, e) =>
         {
             if (e.Id == null) throw new ArgumentNullException();
             unmatchedEvents.Add(e.Id);
@@ -120,7 +117,7 @@ public class Program
 
         await Task.Delay(5000);
 
-        await consumer.Endpoint.StopAsync();
+        await consumer.StopAsync();
 
         if (unmatchedEvents.Count != 0)
         {
@@ -140,70 +137,70 @@ internal class EventsEventDispatcher : IEventsDispatcher
         this.unmatchedEvents = unmatchedEvents;
     }
 
-    public Task OnEmployeeAddedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.EmployeeData data)
+    public Task OnEmployeeAddedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.EmployeeData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnEmployeeDeletedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.EmployeeDeletionData data)
+    public Task OnEmployeeDeletedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.EmployeeDeletionData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnEmployeeUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.EmployeeUpdatedData data)
+    public Task OnEmployeeUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.EmployeeUpdatedData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnInventoryUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.InventoryData data)
+    public Task OnInventoryUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.InventoryData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnPaymentsReceivedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.PaymentData data)
+    public Task OnPaymentsReceivedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.PaymentData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnProductAddedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ProductData data)
+    public Task OnProductAddedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ProductData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnProductDeletedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ProductDeletionData data)
+    public Task OnProductDeletedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ProductDeletionData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnProductUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ProductUpdatedData data)
+    public Task OnProductUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ProductUpdatedData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnPurchaseOrderCreatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.PurchaseOrderData data)
+    public Task OnPurchaseOrderCreatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.PurchaseOrderData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnPurchaseOrderDeletedAsync(CloudEvent cloudEvent, object data)
+    public Task OnPurchaseOrderDeletedAsync(CloudEvent cloudEvent, object? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
@@ -211,49 +208,49 @@ internal class EventsEventDispatcher : IEventsDispatcher
 
     }
 
-    public Task OnPurchaseOrderUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.PurchaseOrderUpdatedData data)
+    public Task OnPurchaseOrderUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.PurchaseOrderUpdatedData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnReservationCancelledAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.CancellationData data)
+    public Task OnReservationCancelledAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.CancellationData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnReservationPlacedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.OrderData data)
+    public Task OnReservationPlacedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.OrderData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnReservationRefundedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.RefundData data)
+    public Task OnReservationRefundedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.RefundData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnReturnRequestedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ReturnData data)
+    public Task OnReturnRequestedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ReturnData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnShipmentAcceptedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ShipmentData data)
+    public Task OnShipmentAcceptedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ShipmentData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);
         return Task.CompletedTask;
     }
 
-    public Task OnShipmentRejectedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ShipmentData data)
+    public Task OnShipmentRejectedAsync(CloudEvent cloudEvent, Contoso.ERP.Consumer.ShipmentData? data)
     {
         if (cloudEvent.Id != null)
             unmatchedEvents.Remove(cloudEvent.Id);

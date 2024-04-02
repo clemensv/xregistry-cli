@@ -1,0 +1,4 @@
+{
+    "description" : "C# CloudEvents SDK HTTP endpoint consumer class",
+    "priority" : 1
+}

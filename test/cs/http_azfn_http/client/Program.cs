@@ -2,7 +2,6 @@
 // to send and receive messages.
 
 using CloudNative.CloudEvents;
-using CloudNative.CloudEvents.Experimental.Endpoints;
 using CloudNative.CloudEvents.SystemTextJson;
 using Contoso.ERP.Producer;
 using Microsoft.Extensions.Logging;
@@ -20,15 +19,13 @@ public class Program
         var sent = new StreamWriter(fileName, new FileStreamOptions() { Mode = FileMode.Create, Access = FileAccess.Write });
         sent.AutoFlush = true;
         
-        HttpProtocol.Initialize();
-
         JsonEventFormatter formatter = new JsonEventFormatter();
         var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
         var logger = loggerFactory.CreateLogger("TestLogger");
         // Create a new instance of the Consumer class.
         
         var producer = EventsEventProducer.CreateForHttpProducer(logger, null, ContentMode.Structured, formatter);
-        producer.Endpoint.BeforeSend += (o, e) =>
+        producer.BeforeSend += (o, e) =>
         {
             sent.WriteLine($"{e.Id}");
             

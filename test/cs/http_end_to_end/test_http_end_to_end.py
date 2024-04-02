@@ -12,14 +12,14 @@ import xregistry
 
 # this test invokes the xregistry command line tool to generate a C# proxy and a consumer
 # and then builds the proxy and the consumer and runs a prepared test that integrates both
-@pytest.mark.skip(reason="temporarily disabled")    
+#@pytest.mark.skip(reason="temporarily disabled")    
 def test_http_end_to_end():
     # clean the output directory
     if os.path.exists(os.path.join(project_root, 'tmp/test/cs/http_end_to_end/')):
         shutil.rmtree(os.path.join(project_root, 'tmp/test/cs/http_end_to_end/'))
     # generate the producer
     sys.argv = ['xregistry', 'generate',  
-                '--style', 'producer', 
+                '--style', 'httpproducer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/http_end_to_end/producer/'),
@@ -27,7 +27,7 @@ def test_http_end_to_end():
     xregistry.cli()
     # generate the consumer
     sys.argv = [ 'xregistry', 'generate',  
-                '--style', 'consumer', 
+                '--style', 'httpconsumer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/http_end_to_end/consumer/'),

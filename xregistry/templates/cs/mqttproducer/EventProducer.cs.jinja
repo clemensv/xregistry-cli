@@ -23,6 +23,7 @@ namespace {{ project_name | pascal }}
         {%- if uses_cloudevents_message %}
         private readonly ContentMode contentMode;
         private readonly CloudEventFormatter formatter;
+        public event EventHandler<CloudEvent>? BeforeSend;
         {%- endif %}
         private readonly MqttProducer endpoint;
         public {{ class_name }}(MqttProducer endpoint{%- if uses_cloudevents_message -%}, ContentMode contentMode, CloudEventFormatter formatter{%- endif -%})
@@ -58,7 +59,7 @@ namespace {{ project_name | pascal }}
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };
-            return new {{ class_name }}(MqttProducer.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
+            return new {{ class_name }}(new MqttProducer(logger, credential,  {% if options %}options, {% else %}new Dictionary<string,string>(), {% endif %}endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
         }
         {%- endif -%}
         {%- endfor -%}
@@ -94,6 +95,7 @@ namespace {{ project_name | pascal }}
             {%- endif -%}
             {%- else -%}data{%- endif %};
             cloudEvent.DataContentType = contentType;
+            BeforeSend?.Invoke(this, cloudEvent);
             await endpoint.SendAsync(cloudEvent, contentMode, formatter);
             {% elif isMqtt %}
             {{- mqtt.DeclareMqttNetMessage("mqttMessage", definition) | indent(12)}}

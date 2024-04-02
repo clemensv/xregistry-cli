@@ -22,8 +22,10 @@ namespace {{ project_name | pascal }}
          {%- if uses_cloudevents_message %}
          private readonly ContentMode contentMode;
          private readonly CloudEventFormatter formatter;
+         public event EventHandler<CloudEvent>? BeforeSend;
          {%- endif %}
          private readonly AmqpProducer endpoint;
+
  
          private {{ class_name }}(AmqpProducer endpoint{%- if uses_cloudevents_message -%}, ContentMode contentMode, CloudEventFormatter formatter{%- endif -%})
          {
@@ -57,7 +59,7 @@ namespace {{ project_name | pascal }}
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };
-            return new {{ class_name }}(AmqpProducer.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
+            return new {{ class_name }}(new AmqpProducer(logger, credential, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
         }
         {%- endif -%}
         {%- endfor -%}
@@ -98,6 +100,10 @@ namespace {{ project_name | pascal }}
             {%- endif -%}
             {%- else -%}data{%- endif %};
             cloudEvent.DataContentType = contentType;
+            if (BeforeSend != null)
+            {
+                BeforeSend(this, cloudEvent);
+            }
             await endpoint.SendAsync(cloudEvent, contentMode, formatter);
             {% elif isAmqp %}
             {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", definition) | indent(12)}}

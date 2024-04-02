@@ -37,6 +37,10 @@ namespace {{ project_name | pascal }}
         {{ amqp.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
         {{ amqp.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "AmqpConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchMessageAsync += DispatchMessageAsync;") | indent(8) }}
         {%- endif %}
+
+        public Task StartAsync() => this.endpoint.StartAsync();
+        public Task StopAsync() => this.endpoint.StopAsync();
+
         {%- if uses_cloudevents_message %}
         public async Task DispatchCloudEventAsync( CloudEvent cloudEvent, ILogger log)
         {
@@ -96,7 +100,7 @@ namespace {{ project_name | pascal }}
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };
-            var endpoint = AmqpConsumer.CreateAmqp(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints);
+            var endpoint = new AmqpConsumer(logger, credential, {% if options %}options, {% else %}null, {% endif %}endpoints);
             var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, false ) -}});
             return consumer;
         }

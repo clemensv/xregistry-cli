@@ -23,6 +23,7 @@
     <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.5.1" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.6.0" />
     {%- if uses_protobuf %}
+    <PackageReference Include="Google.Protobuf" Version="3.26.1" />
     <PackageReference Include="Grpc.Tools" Version="2.50.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

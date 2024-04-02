@@ -21,7 +21,7 @@ def run_test():
         shutil.rmtree(os.path.join(project_root, 'tmp/test/cs/mqtt_end_to_end/'))
     # generate the producer
     sys.argv = ['xregistry', 'generate',  
-                '--style', 'producer', 
+                '--style', 'mqttproducer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/mqtt_end_to_end/producer/'),
@@ -29,7 +29,7 @@ def run_test():
     xregistry.cli()
     # generate the consumer
     sys.argv = [ 'xregistry', 'generate', 
-                '--style', 'consumer', 
+                '--style', 'mqttconsumer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/mqtt_end_to_end/consumer/'),
@@ -38,7 +38,7 @@ def run_test():
     # run dotnet build on the csproj here that references the generated files already
     subprocess.check_call(['dotnet', 'run'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     
-@pytest.mark.skip(reason="temporarily disabled")    
+#@pytest.mark.skip(reason="temporarily disabled")    
 def test_mqtt_end_to_end():
     container_name = ''.join(random.choices(string.ascii_lowercase, k=10))
     start_command = "docker run --name {} -p 127.11.0.1:1883:1883 -v {}:/mosquitto/config/ -v {}:/mosquitto/log -d eclipse-mosquitto".\

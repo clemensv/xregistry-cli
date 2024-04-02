@@ -25,7 +25,7 @@ def terminate_process(process_name):
     except:
         print('Failed to terminate process {}'.format(process_name))
 
-@pytest.mark.skip(reason="temporarily disabled")    
+#@pytest.mark.skip(reason="temporarily disabled")    
 def test_azfn_http():
     # clean the output directory
     output = os.path.join(project_root, "tmp/test/cs/azfn_http/")
@@ -33,7 +33,7 @@ def test_azfn_http():
         shutil.rmtree(output)
     # generate the producer
     sys.argv = ['xregistry', 'generate',  
-                '--style', 'producer', 
+                '--style', 'httpproducer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/producer/'),

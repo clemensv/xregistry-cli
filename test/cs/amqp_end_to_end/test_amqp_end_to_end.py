@@ -21,7 +21,7 @@ def run_test():
         shutil.rmtree(os.path.join(project_root, 'tmp/test/cs/amqp_end_to_end/'))
     # generate the producer
     sys.argv = ['xregistry', 'generate',  
-                '--style', 'producer', 
+                '--style', 'amqpproducer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'amqp_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/amqp_end_to_end/producer/'),
@@ -29,7 +29,7 @@ def run_test():
     xregistry.cli()
     # generate the consumer
     sys.argv = [ 'xregistry', 'generate',  
-                '--style', 'consumer', 
+                '--style', 'amqpconsumer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'amqp_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/amqp_end_to_end/consumer/'),
@@ -38,7 +38,7 @@ def run_test():
     # run dotnet build on the csproj here that references the generated files already
     subprocess.check_call(['dotnet', 'run'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     
-@pytest.mark.skip(reason="temporarily disabled")    
+#@pytest.mark.skip(reason="temporarily disabled")    
 def test_amqp_end_to_end():
     container_name = ''.join(random.choices(string.ascii_lowercase, k=10))
     start_command = "docker run --name {} -d -p 127.11.0.2:5672:5672 -e AMQ_USER=test -e AMQ_PASSWORD=password quay.io/artemiscloud/activemq-artemis-broker".\

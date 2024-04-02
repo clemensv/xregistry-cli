@@ -1,9 +1,6 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
-{%- import "mqtt.jinja.include" as mqtt -%}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
-{%- set uses_mqtt_endpoint = (root | exists( "protocol", "mqtt" )) %}
 {%- set function_name = project_name | pascal -%}
 using System;
 using System.Collections.Generic;
@@ -14,9 +11,6 @@ using System.Text.RegularExpressions;
 {%- if uses_cloudevents_message %}
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
-{%- endif %}
-{%- if uses_mqtt_message %}
-{{ mqtt.MqttNetHeaders() }}
 {%- endif %}
 using Microsoft.Extensions.Logging;
  
@@ -29,14 +23,10 @@ namespace {{ project_name | pascal }}
     {
         {%- if uses_cloudevents_message %}
         {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
-        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "MqttConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "HttpListenerConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
         {%- endif %}
-        {%- if uses_mqtt_message %}
-        {{ mqtt.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
-        {{ mqtt.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "MqttConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchApplicationMessageAsync += DispatchApplicationMessageAsync;") | indent(8) }}
-        {%- endif %}
-
-        private MqttConsumer endpoint;
+        
+        private HttpListenerConsumer endpoint;
         
         public Task StartAsync() => this.endpoint.StartAsync();
         public Task StopAsync() => this.endpoint.StopAsync();
@@ -56,20 +46,6 @@ namespace {{ project_name | pascal }}
         }
         {%- endif %}
         
-        {%- if uses_mqtt_message %}
-        public async Task DispatchApplicationMessageAsync( MqttApplicationMessage mqttMessage, ILogger log)
-        {
-            try 
-            {
-               {{ mqtt.DispatchToDispatchObjects(root, "mqttMessage", messagegroups, "log" ) | indent(16) }}
-            }
-            catch (Exception ex)
-            {
-                log.LogError(ex, "Error dispatching message");
-            }
-        }
-        {%- endif %}
-
         public void Dispose()
         {
             this.endpoint.Dispose();
@@ -83,9 +59,8 @@ namespace {{ project_name | pascal }}
            {%- set options = endpoint.config.options -%}
            {%- set endpoints = endpoint.config.endpoints %}
            {%- set isCloudEvent = not endpoint.format or endpoint.format.lower().startswith("cloudevents") -%}
-           {%- set isMqtt = not isCloudEvent and endpoint.format.lower().startswith("mqtt") %}
                 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -101,8 +76,8 @@ namespace {{ project_name | pascal }}
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };
-            var endpoint = new MqttConsumer(logger, credential,  {% if options %}options, {% else %}null, {% endif %}endpoints);
-            var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, false ) -}});
+            var endpoint = new HttpListenerConsumer(logger, credential,  {% if options %}options, {% else %}null, {% endif %}endpoints);
+            var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, false ) -}});
             return consumer;
         }
         {%- endif -%}
