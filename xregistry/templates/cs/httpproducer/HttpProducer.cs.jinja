@@ -1,3 +1,5 @@
+{%- import "util.jinja.include" as util -%}
+
 using System;
 using System.Net;
 using CloudNative.CloudEvents;
@@ -6,43 +8,24 @@ using Microsoft.Extensions.Logging;
 
 namespace {{ project_name | pascal }}
 {
-
-    public interface IEndpointCredential
-    {
-    }
-
-     public interface IPlainEndpointCredential : IEndpointCredential
-    {
-        public string ClientId { get; }
-        public string ClientSecret { get; }
-    }
-
-    public interface ITokenEndpointCredential : IEndpointCredential
-    {
-        public Task<string> GetTokenAsync();
-    }
- 
-    public interface IHeaderEndpointCredential : IEndpointCredential
-    {
-        public Dictionary<string, string> Headers { get; }
-    }
+    {{ util.EndpointCredentialClasses() | indent(4) }}
 
     class HttpProducer
     {
         private HttpClient _httpClient;
         private readonly ILogger _logger;
-        private readonly IEndpointCredential _credential;
+        private readonly EndpointCredential _credential;
         private List<Uri> _endpoints;
 
-        public HttpProducer(ILogger logger, IEndpointCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
+        public HttpProducer(ILogger logger, EndpointCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
         {
             this._logger = logger;
             this._credential = credential;
             this._endpoints = endpoints;
             _httpClient = new HttpClient();
-            if ( credential is IHeaderEndpointCredential )
+            if ( credential is HeaderEndpointCredential )
             {
-                foreach(var header in ((IHeaderEndpointCredential)credential).Headers)
+                foreach(var header in ((HeaderEndpointCredential)credential).Headers)
                 {
                     _httpClient.DefaultRequestHeaders.Add(header.Key, header.Value);
                 }

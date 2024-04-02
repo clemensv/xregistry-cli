@@ -80,7 +80,7 @@ namespace {{ project_name | pascal }}
            {%- set isCloudEvent = not endpoint.format or endpoint.format.lower().startswith("cloudevents") -%}
            {%- set isAmqp = not isCloudEvent and endpoint.format.lower().startswith("amqp") %}
                 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {

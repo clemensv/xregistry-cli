@@ -17,7 +17,7 @@ import io.cloudevents.core.v1.CloudEventBuilder;
 import io.cloudevents.core.format.EventFormat;
 import io.cloudevents.core.message.Encoding;
 import io.cloudevents.experimental.endpoints.ProducerEndpoint;
-import io.cloudevents.experimental.endpoints.IEndpointCredential;
+import io.cloudevents.experimental.endpoints.EndpointCredential;
 
 {%- if uses_http_endpoint %}
 import io.cloudevents.experimental.endpoints.http.HttpProtocol;
@@ -82,7 +82,7 @@ public class {{ className }}
     {%- set options = endpoint.config.options -%}
     {%- set endpoints = endpoint.config.endpoints %}
         
-    public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(IEndpointCredential credential {% if uses_cloudevents_message %}, Encoding encoding, EventFormat eventFormat {% endif %})  {       
+    public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(EndpointCredential credential {% if uses_cloudevents_message %}, Encoding encoding, EventFormat eventFormat {% endif %})  {       
         {%- if options %}
         var options = new java.util.HashMap<String, String>();
         {%- for key, value in options.items()%}

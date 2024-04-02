@@ -37,7 +37,7 @@ namespace {{ project_name | pascal }}
            {%- set options = endpoint.config.options -%}
            {%- set endpoints = endpoint.config.endpoints %}
                 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -58,7 +58,7 @@ namespace {{ project_name | pascal }}
         {%- endif -%}
         {%- endfor -%}
         {% else %}
-        public static {{ class_name }} Create(ILogger logger, IEndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}, Dictionary<string, string> options = null, List<Uri> endpoints = null) 
+        public static {{ class_name }} Create(ILogger logger, EndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}, Dictionary<string, string> options = null, List<Uri> endpoints = null) 
         {
             return new {{ class_name }}(new HttpProducer(logger, credential, options, endpoints), {% if uses_cloudevents_message %}contentMode, formatter{% endif %});
         }

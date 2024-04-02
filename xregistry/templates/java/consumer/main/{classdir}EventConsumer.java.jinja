@@ -12,7 +12,7 @@
 package {{ project_name | lower }};
 
 import io.cloudevents.experimental.endpoints.ConsumerEndpoint;
-import io.cloudevents.experimental.endpoints.IEndpointCredential;
+import io.cloudevents.experimental.endpoints.EndpointCredential;
 {%- if uses_http_endpoint %}
 import io.cloudevents.experimental.endpoints.http.HttpProtocol;
 {%- endif %}
@@ -124,7 +124,7 @@ public class {{ className }}
         {%- set isAmqp = not isCloudEvent and endpoint.format.lower().startswith("amqp") %}
         {%- set isMqtt = not isCloudEvent and endpoint.format.lower().startswith("mqtt") %}
             
-    public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(IEndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
+    public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
     {       
         {%- if options %}
         var options = new java.util.HashMap<String, String>();

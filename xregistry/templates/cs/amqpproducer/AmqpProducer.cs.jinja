@@ -1,4 +1,4 @@
-// (c) Cloud Native Computing Foundation. See LICENSE for details
+{%- import "util.jinja.include" as util -%}
 
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.Amqp;
@@ -8,33 +8,17 @@ using Microsoft.Extensions.Logging;
 
 namespace {{ project_name | pascal }}
 {
-    public interface IEndpointCredential
-    {
-    }
+    {{ util.EndpointCredentialClasses() | indent(4) }}
 
-     public interface IPlainEndpointCredential : IEndpointCredential
-    {
-        public string ClientId { get; }
-        public string ClientSecret { get; }
-    }
-
-    public interface ITokenEndpointCredential : IEndpointCredential
-    {
-        public Task<string> GetTokenAsync();
-    }
-
-    /// <summary>
-    /// A producer endpoint that sends CloudEvents to an AMQP endpoint.
-    /// </summary>
-    public class AmqpProducerEndpoint 
+    internal class AmqpProducer 
     {
         private readonly ILogger _logger;
-        private readonly IEndpointCredential _credential;
+        private readonly EndpointCredential _credential;
         private List<Uri> _endpoints;
         private Dictionary<Uri, Tuple<Connection, Session, SenderLink>> endpointConnections = new();
         private string? _node;
         
-        public AmqpProducerEndpoint(ILogger logger, IEndpointCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
+        public AmqpProducer(ILogger logger, EndpointCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
         {
             this._logger = logger;
             this._credential = credential;
@@ -101,20 +85,20 @@ namespace {{ project_name | pascal }}
                    endpoint.Host,
                    endpoint.Port == -1 ? endpoint.Scheme == "amqps" ? 5671 : 5672 : endpoint.Port,
                    path: _node != null ? _node : endpoint.AbsolutePath, scheme: endpoint.Scheme.ToUpper(),
-                   user: (_credential as IPlainEndpointCredential)?.ClientId,
-                   password: (_credential as IPlainEndpointCredential)?.ClientSecret);
+                   user: (_credential as PlainEndpointCredential)?.ClientId,
+                   password: (_credential as PlainEndpointCredential)?.ClientSecret);
 
                 ConnectionFactory factory = new ConnectionFactory();
-                if (_credential is ITokenEndpointCredential tokenCredential)
+                if (_credential is TokenEndpointCredential tokenCredential)
                 {
                     factory.SASL.Profile = SaslProfile.Anonymous;
                 }
 
                 var connection = await factory.CreateAsync(address);
                 var session = new Session(connection);
-                if (_credential is ITokenEndpointCredential)
+                if (_credential is TokenEndpointCredential)
                 {
-                    var token = ((ITokenEndpointCredential)_credential).GetTokenAsync().Result;
+                    var token = ((TokenEndpointCredential)_credential).GetTokenAsync().Result;
                     var cbsSender = new SenderLink(session, "$cbs", "$cbs");
                     var request = new global::Amqp.Message(token);
                     request.Properties.MessageId = Guid.NewGuid().ToString();
@@ -136,17 +120,5 @@ namespace {{ project_name | pascal }}
                 throw;
             }
         }
-
-        private static AmqpProducerEndpoint CreateAmqp(ILogger logger, IEndpointCredential credential, string protocol, Dictionary<string, string> options, List<Uri> endpoints)
-        {
-            switch (protocol)
-            {
-                case "amqp":
-                    return new AmqpProducerEndpoint(logger, credential, options, endpoints);
-                default:
-                    throw new NotSupportedException($"Protocol '{protocol}' is not supported.");
-            }
-        }
-
     }
 }

@@ -5,7 +5,6 @@
 {%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
 using CloudNative.CloudEvents;
-using CloudNative.CloudEvents.Experimental.Endpoints;
 using CloudNative.CloudEvents.SystemTextJson;
 {%- if uses_amqp_message %}
 {{ amqp.AmqpNetLiteHeaders() }}
@@ -24,9 +23,9 @@ namespace {{ project_name | pascal }}
          private readonly ContentMode contentMode;
          private readonly CloudEventFormatter formatter;
          {%- endif %}
-         private readonly AmqpProducerEndpoint endpoint;
+         private readonly AmqpProducer endpoint;
  
-         public {{ class_name }}(AmqpProducerEndpoint endpoint{%- if uses_cloudevents_message -%}, ContentMode contentMode, CloudEventFormatter formatter{%- endif -%})
+         private {{ class_name }}(AmqpProducer endpoint{%- if uses_cloudevents_message -%}, ContentMode contentMode, CloudEventFormatter formatter{%- endif -%})
          {
             {%- if uses_cloudevents_message %}
              this.contentMode = contentMode;
@@ -42,8 +41,7 @@ namespace {{ project_name | pascal }}
            {%- set protocol = endpoint.config.protocol | lower -%}
            {%- set options = endpoint.config.options -%}
            {%- set endpoints = endpoint.config.endpoints %}
-                
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, IEndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
+        public static {{ class_name }} CreateProducerFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -59,12 +57,17 @@ namespace {{ project_name | pascal }}
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };
-            return new {{ class_name }}(AmqpProducerEndpoint.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
+            return new {{ class_name }}(AmqpProducer.Create(logger, credential, {{ protocol | pascal }}Protocol.Name, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
         }
         {%- endif -%}
         {%- endfor -%}
         {% endif %}
 
+        public static {{ class_name }} CreateProducer(ILogger logger, EndpointCredential credential{% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter{% endif %}, Dictionary<string, string> options, List<Uri> endpoints)
+        {
+            return new {{ class_name }}(new AmqpProducer(logger, credential, options, endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
+        }
+        
         {% for id in messagegroup.messages -%}
         {%- set definition = messagegroup.messages[id] -%}
         {%- set pascalDefinitionName = definition.id | pascal %}
@@ -99,7 +102,7 @@ namespace {{ project_name | pascal }}
             {% elif isAmqp %}
             {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", definition) | indent(12)}}
             amqpMessage.BodySection = new Data() { Binary = data.ToByteArray() };
-            await ((AmqpProducerEndpoint)endpoint).SendAsync(amqpMessage);
+            await ((AmqpProducer)endpoint).SendAsync(amqpMessage);
             {%- endif %}
         }
         {% endfor %}

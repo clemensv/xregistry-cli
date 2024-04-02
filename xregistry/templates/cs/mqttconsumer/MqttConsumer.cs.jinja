@@ -1,3 +1,4 @@
+{%- import "util.jinja.include" as util -%}
 
 using MQTTnet;
 using MQTTnet.Client;
@@ -11,20 +12,7 @@ using MQTTnet.Protocol;
 
 namespace {{ project_name | pascal }}
 {
-    public interface IEndpointCredential
-    {
-    }
-
-     public interface IPlainEndpointCredential : IEndpointCredential
-    {
-        public string ClientId { get; }
-        public string ClientSecret { get; }
-    }
-
-    public interface ITokenEndpointCredential : IEndpointCredential
-    {
-        public Task<string> GetTokenAsync();
-    }
+    {{ util.EndpointCredentialClasses() | indent(4) }}
 
     public class MqttConsumer : IDisposable
     {
@@ -38,14 +26,14 @@ namespace {{ project_name | pascal }}
         private CloudEventFormatter _jsonFormatter = new JsonEventFormatter();
         private CloudEventFormatter _protoFormatter = new ProtobufEventFormatter();
         private CloudEventFormatter _avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
-        private IEndpointCredential _credential;
+        private EndpointCredential _credential;
         private IMqttClientOptions? _options;
         private string _topic;
         private byte _qos;
         private List<Uri> _endpoints;
         private ILogger Logger { get; }
 
-        internal MqttConsumer(ILogger logger, IEndpointCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
+        internal MqttConsumer(ILogger logger, EndpointCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
         {
             Logger = logger;
             _credential = credential;
@@ -73,11 +61,11 @@ namespace {{ project_name | pascal }}
                 optionsBuilder = optionsBuilder.WithTls();
             }
             optionsBuilder = optionsBuilder.WithTcpServer(endpoint.Host);
-            if (_credential is IPlainEndpointCredential plainCredential)
+            if (_credential is PlainEndpointCredential plainCredential)
             {
                 optionsBuilder = optionsBuilder.WithCredentials(plainCredential.ClientId, plainCredential.ClientSecret);
             }
-            else if (_credential is ITokenEndpointCredential tokenCredential)
+            else if (_credential is TokenEndpointCredential tokenCredential)
             {
                 var token = tokenCredential.GetTokenAsync().Result;
                 optionsBuilder = optionsBuilder.WithCredentials("Bearer", System.Text.Encoding.ASCII.GetBytes(token));
@@ -157,7 +145,7 @@ namespace {{ project_name | pascal }}
             }
         }
 
-        private static MqttConsumer? CreateMqtt(ILogger logger, IEndpointCredential credential, string protocol, Dictionary<string, string> options, List<Uri> endpoints)
+        private static MqttConsumer? CreateMqtt(ILogger logger, EndpointCredential credential, string protocol, Dictionary<string, string> options, List<Uri> endpoints)
         {
             switch (protocol)
             {
