@@ -4,6 +4,8 @@ import os
 import subprocess
 import shutil
 
+import pytest
+
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.append(os.path.join(project_root))
 
