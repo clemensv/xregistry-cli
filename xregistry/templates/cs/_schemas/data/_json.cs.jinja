@@ -311,7 +311,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace {{ project_name }}
+namespace {{ schema_name | namespace(project_name) }}
 {
     {{- emitclass( schema, schema_name | strip_namespace ) }}
 }

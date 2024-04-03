@@ -1,6 +1,6 @@
 {%- set schema_name = class_name -%}
 syntax="proto3";
 
-option csharp_namespace = "{{ project_name }}";
+option csharp_namespace = "{{ schema_name | namespace(project_name) }}";
 
 {{ root | proto | regex_replace('syntax[\\s]*=[\\s]*["\']proto3["\'];[\\s]*\n', '') }}

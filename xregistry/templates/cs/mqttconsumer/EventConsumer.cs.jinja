@@ -2,7 +2,7 @@
 {%- import "mqtt.jinja.include" as mqtt -%}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
+{%- set uses_mqtt_message = (root | exists( "binding", "mqtt" )) %}
 {%- set uses_mqtt_endpoint = (root | exists( "protocol", "mqtt" )) %}
 {%- set function_name = project_name | pascal -%}
 using System;

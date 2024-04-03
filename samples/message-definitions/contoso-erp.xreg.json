@@ -15,7 +15,13 @@
                 "protocol": "HTTP"
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.ERP.ChangeEvents"
+                "#/messagegroups/Contoso.ERP.ReservationEvents",
+                "#/messagegroups/Contoso.ERP.PaymentEvents",
+                "#/messagegroups/Contoso.ERP.ShippingEvents",
+                "#/messagegroups/Contoso.ERP.InventoryEvents",
+                "#/messagegroups/Contoso.ERP.ProductEvents",
+                "#/messagegroups/Contoso.ERP.EmployeeEvents",
+                "#/messagegroups/Contoso.ERP.PurchasingEvents"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -32,7 +38,13 @@
                 ]
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.ERP.ChangeEvents"
+                "#/messagegroups/Contoso.ERP.ReservationEvents",
+                "#/messagegroups/Contoso.ERP.PaymentEvents",
+                "#/messagegroups/Contoso.ERP.ShippingEvents",
+                "#/messagegroups/Contoso.ERP.InventoryEvents",
+                "#/messagegroups/Contoso.ERP.ProductEvents",
+                "#/messagegroups/Contoso.ERP.EmployeeEvents",
+                "#/messagegroups/Contoso.ERP.PurchasingEvents"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -57,7 +69,13 @@
                 }
             },
             "messagegroups": [
-                "#/messagegroups/mygroup"
+                "#/messagegroups/Contoso.ERP.ReservationEvents",
+                "#/messagegroups/Contoso.ERP.PaymentEvents",
+                "#/messagegroups/Contoso.ERP.ShippingEvents",
+                "#/messagegroups/Contoso.ERP.InventoryEvents",
+                "#/messagegroups/Contoso.ERP.ProductEvents",
+                "#/messagegroups/Contoso.ERP.EmployeeEvents",
+                "#/messagegroups/Contoso.ERP.PurchasingEvents"
             ],
             "format": "CloudEvents/1.0"
         },
@@ -82,14 +100,20 @@
                 ]
             },
             "messagegroups": [
-                "#/messagegroups/mygroup"
+                "#/messagegroups/Contoso.ERP.ReservationEvents",
+                "#/messagegroups/Contoso.ERP.PaymentEvents",
+                "#/messagegroups/Contoso.ERP.ShippingEvents",
+                "#/messagegroups/Contoso.ERP.InventoryEvents",
+                "#/messagegroups/Contoso.ERP.ProductEvents",
+                "#/messagegroups/Contoso.ERP.EmployeeEvents",
+                "#/messagegroups/Contoso.ERP.PurchasingEvents"
             ],
             "format": "CloudEvents/1.0"
         }
     },
     "messagegroups": {
-        "Contoso.ERP.ChangeEvents": {
-            "id": "Contoso.ERP.ChangeEvents",
+        "Contoso.ERP.ReservationEvents": {
+            "id": "Contoso.ERP.ReservationEvents",
             "format": "CloudEvents/1.0",
             "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
@@ -119,6 +143,66 @@
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 },
+                "Contoso.ERP.Events.ReservationCancelled": {
+                    "id": "Contoso.ERP.Events.ReservationCancelled",
+                    "description": "A reservation has been cancelled",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.ERP.Events.ReservationCancelled",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/orders",
+                                "required": true
+                            }
+                        },
+                    "schemaformat": "JSONSchema/draft-07",
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData"
+                },
+                "Contoso.ERP.Events.ReservationRefunded": {
+                    "id": "Contoso.ERP.Events.ReservationRefunded",
+                    "description": "A reservation has been refunded",
+                    "format": "CloudEvents/1.0",
+                    "metadata": {
+                            "id": {
+                                "type": "string",
+                                "required": true
+                            },
+                            "type": {
+                                "type": "string",
+                                "value": "Contoso.ERP.Events.ReservationRefunded",
+                                "required": true
+                            },
+                            "time": {
+                                "type": "datetime",
+                                "required": true
+                            },
+                            "source": {
+                                "type": "uritemplate",
+                                "value": "/erp/orders",
+                                "required": true
+                            }
+                        },
+                    "schemaformat": "JSONSchema/draft-07",
+                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/refundData"
+                }
+            }
+        },
+        "Contoso.ERP.PaymentEvents": {
+            "id": "Contoso.ERP.PaymentEvents",
+            "format": "CloudEvents/1.0",
+            "messages": {
                 "Contoso.ERP.Events.PaymentsReceived": {
                     "id": "Contoso.ERP.Events.PaymentsReceived",
                     "format": "CloudEvents/1.0",
@@ -145,7 +229,13 @@
                     },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/paymentData"
-                },
+                }
+            }
+        },
+        "Contoso.ERP.ShippingEvents": {
+            "id": "Contoso.ERP.ShippingEvents",
+            "format": "CloudEvents/1.0",
+            "messages": {
                 "Contoso.ERP.Events.ShipmentAccepted": {
                     "id": "Contoso.ERP.Events.ShipmentAccepted",
                     "description": "A shipment has been accepted",
@@ -170,6 +260,7 @@
                             "required": true
                         }
                     },
+                    "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
                 },
                 "Contoso.ERP.Events.ShipmentRejected": {
@@ -225,61 +316,13 @@
                         },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/returnData"
-                },
-                "Contoso.ERP.Events.ReservationCancelled": {
-                    "id": "Contoso.ERP.Events.ReservationCancelled",
-                    "description": "A reservation has been cancelled",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.ERP.Events.ReservationCancelled",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/erp/orders",
-                                "required": true
-                            }
-                        },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData"
-                },
-                "Contoso.ERP.Events.ReservationRefunded": {
-                    "id": "Contoso.ERP.Events.ReservationRefunded",
-                    "description": "A reservation has been refunded",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.ERP.Events.ReservationRefunded",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/erp/orders",
-                                "required": true
-                            }
-                        },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/refundData"
-                },
+                }
+            }
+        },
+        "Contoso.ERP.InventoryEvents": {
+            "id": "Contoso.ERP.InventoryEvents",
+            "format": "CloudEvents/1.0",
+            "messages": {
                 "Contoso.ERP.Events.InventoryUpdated": {
                     "id": "Contoso.ERP.Events.InventoryUpdated",
                     "description": "Inventory has been updated",
@@ -308,7 +351,13 @@
                         },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/inventoryData"
-                },
+                }
+            }
+        },
+        "Contoso.ERP.ProductEvents": {
+            "id": "Contoso.ERP.ProductEvents",
+            "format": "CloudEvents/1.0",
+            "messages": {
                 "Contoso.ERP.Events.ProductAdded": {
                     "id": "Contoso.ERP.Events.ProductAdded",
                     "description": "A product has been added",
@@ -329,7 +378,7 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/products",
+                                "value": "/{tenantid}/erp/products",
                                 "required": true
                             }
                         },
@@ -356,7 +405,7 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/products",
+                                "value": "/{tenantid}/erp/products",
                                 "required": true
                             }
                         },
@@ -383,16 +432,23 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/products",
+                                "value": "/{tenantid}/erp/products",
                                 "required": true
                             }
                         },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/productUpdatedData"
-                },
+                }
+            }
+        },
+        "Contoso.ERP.EmployeeEvents": {
+            "id": "Contoso.ERP.EmployeeEvents",
+            "format": "CloudEvents/1.0",
+            "messages": {
                 "Contoso.ERP.Events.EmployeeAdded": {
                     "id": "Contoso.ERP.Events.EmployeeAdded",
                     "format": "CloudEvents/1.0",
+                    "description": "An employee has been added",
                     "metadata": {
                             "id": {
                                 "type": "string",
@@ -409,7 +465,7 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/employees",
+                                "value": "/{tenantid}/erp/employees",
                                 "required": true
                             }
                         },
@@ -419,6 +475,7 @@
                 "Contoso.ERP.Events.EmployeeDeleted": {
                     "id": "Contoso.ERP.Events.EmployeeDeleted",
                     "format": "CloudEvents/1.0",
+                    "description": "An employee has been deleted",
                     "metadata": {
                             "id": {
                                 "type": "string",
@@ -435,7 +492,7 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/employees",
+                                "value": "/{tenantid}/erp/employees",
                                 "required": true
                             }
                         },
@@ -445,6 +502,7 @@
                 "Contoso.ERP.Events.EmployeeUpdated": {
                     "id": "Contoso.ERP.Events.EmployeeUpdated",
                     "format": "CloudEvents/1.0",
+                    "description": "An employee has been updated",
                     "metadata": {
                             "id": {
                                 "type": "string",
@@ -461,16 +519,23 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/employees",
+                                "value": "/{tenantid}/erp/employees",
                                 "required": true
                             }
                         },
                     "schemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/employeeUpdatedData"
-                },
+                }
+            }
+        },
+        "Contoso.ERP.PurchasingEvents": {
+            "id": "Contoso.ERP.PurchasingEvents",
+            "format": "CloudEvents/1.0",
+            "messages": {
                 "Contoso.ERP.Events.PurchaseOrderCreated": {
                     "id": "Contoso.ERP.Events.PurchaseOrderCreated",
                     "format": "CloudEvents/1.0",
+                    "description": "A purchase order has been created",
                     "metadata": {
                             "id": {
                                 "type": "string",
@@ -487,7 +552,7 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/purchaseOrders",
+                                "value": "/{tenantid}/erp/purchasing",
                                 "required": true
                             }
                         },
@@ -497,6 +562,7 @@
                 "Contoso.ERP.Events.PurchaseOrderUpdated": {
                     "id": "Contoso.ERP.Events.PurchaseOrderUpdated",
                     "format": "CloudEvents/1.0",
+                    "description": "A purchase order has been updated",
                     "metadata": {
                             "id": {
                                 "type": "string",
@@ -513,7 +579,7 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/purchaseOrders",
+                                "value": "/{tenantid}/erp/purchasing",
                                 "required": true
                             }
                         },
@@ -523,6 +589,7 @@
                 "Contoso.ERP.Events.PurchaseOrderDeleted": {
                     "id": "Contoso.ERP.Events.PurchaseOrderDeleted",
                     "format": "CloudEvents/1.0",
+                    "description": "A purchase order has been deleted",
                     "metadata": {
                             "id": {
                                 "type": "string",
@@ -539,7 +606,7 @@
                             },
                             "source": {
                                 "type": "uritemplate",
-                                "value": "/erp/purchaseOrders",
+                                "value": "/{tenantid}/erp/purchasing",
                                 "required": true
                             }
                         }
@@ -830,14 +897,17 @@
                                 "type": "object",
                                 "properties": {
                                     "employeeId": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "description": "The employee id"
                                     },
                                     "name": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "description": "The employee name"
                                     },
                                     "email": {
                                         "type": "string",
-                                        "format": "email"
+                                        "format": "email",
+                                        "description": "The employee email"
                                     },
                                     "position": {
                                         "type": "string"

@@ -104,12 +104,27 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsFields(project_name, class_name, messagegroups) -%}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
-{%- set handlerName=(messagegroup.id | default(messagegroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
-{%- set handlerType="I"+(messagegroup.id | default(messagegroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
+{%- macro DeclareDispatchObjectField(messagegroup) -%}
+{%- set handlerName=(messagegroup.id | strip_namespace | camel)+"AmqpDispatcher" -%}
+{%- set handlerType="I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" %}
 {{ handlerType }} {{ handlerName }};
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsFields(messagegroups) -%}
+{%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) %}
+{{ DeclareDispatchObjectField( messagegroup )}}
 {%- endfor %}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectConstructor(project_name, class_name, messagegroup, args, body) -%}
+public {{ class_name }}({%- if args %}{{ args }}, {%- endif -%}
+    {%- set handlerName=(messagegroup.id | strip_namespace | camel)+"AmqpDispatcher" -%}
+    {%- set handlerType="I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    {{ handlerType }} {{ handlerName }}
+{
+    this.{{ handlerName }} = {{ handlerName }};
+    {{ body | indent(4) }}
+}
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}

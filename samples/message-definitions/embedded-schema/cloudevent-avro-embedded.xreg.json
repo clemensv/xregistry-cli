@@ -19,7 +19,7 @@
                     "schema": {
                         "type": "record",
                         "namespace": "Com.Example.Group1",
-                        "name": "Event1",
+                        "name": "Event1Data",
                         "fields": [
                             {
                                 "name": "Field1",

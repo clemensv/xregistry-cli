@@ -1,6 +1,6 @@
 {%- set uses_protobuf = uses_protobuf | default(true) -%}
 {%- set uses_avro = uses_avro | default(true) -%}
-{%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
+{%- set uses_mqtt_message = (root | exists( "binding", "mqtt" )) %}
 {%- set uses_mqtt_endpoint = (root | exists("protocol", "mqtt" )) %}
 
 <Project Sdk="Microsoft.NET.Sdk">

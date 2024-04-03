@@ -1,0 +1,242 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "eventhubs.jinja.include" as eventhub -%}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_plain_amqp_message = (root | exists( "binding", "amqp" )) %}
+{%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
+{%- set function_name = project_name | pascal -%}
+using System;
+using System.Threading.Tasks;
+using Azure;
+using Azure.Core;
+using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Processor;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Logging;
+{%- if uses_cloudevents_message %}
+{{ eventhub.CloudEventsUsings() }}
+{%- endif %}
+
+namespace {{ project_name | pascal }}
+{
+    namespace Tools
+    {
+        public class DispatcherBase
+        {
+            {{ eventhub.CloudEventsMethods() | indent(8) }}
+        }
+    } 
+    {% for messagegroup_key, messagegroup in messagegroups.items() -%}
+    {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
+    {%- set uses_plain_amqp_message = (messagegroup | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
+    {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+    {%- set class_name = ( pascalGroupName | strip_namespace )+"EventDispatcher" %}
+    namespace {{ pascalGroupName | namespace }} 
+    {
+        public class {{ class_name }} : {{ project_name | pascal }}.Tools.DispatcherBase
+        {
+            {%- if (messagegroup | exists( "format", "cloudevents" )) %}
+            
+            {%- endif %}
+            {%- for id, message in messagegroup.messages.items() -%}
+            {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
+            {%- if message.schemaurl or message.schema -%}
+            {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
+            {%- else -%}
+            {%- set dataType = "object" -%}
+            {%- endif %}
+            {%- if message.description %}   
+            /// <summary>
+            /// {{ message.description }}
+            /// </summary>
+            {%- endif -%}
+            {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) -%}
+            {%- set isAmqp = (message | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
+            public event Func<EventData, {%if isCloudEvent%}CloudEvent?, {%endif%}{{dataType}}?, Task>? {{ pascalDefinitionName | strip_namespace }}Async;
+            {%- endfor %}
+
+            public async Task ProcessEventAsync(ProcessEventArgs eventArgs)
+            {
+                {%- if uses_cloudevents_message %}
+                if ( IsCloudEvent(eventArgs.Data) )
+                {
+                    var cloudEvent = CloudEventFromEventData(eventArgs.Data);
+                    await DispatchCloudEventAsync(eventArgs.Data, cloudEvent);
+                    return;
+                }
+                {%- endif %}
+                {%- if uses_plain_amqp_message %}
+                var eventData = eventArgs.Data;
+                if (eventData != null)
+                {
+                    await DispatchEventDataAsync(eventData);
+                }
+                {%- endif %}
+            }
+            
+            {%- if uses_cloudevents_message %}        
+            private async Task DispatchCloudEventAsync(EventData eventData, CloudEvent cloudEvent)
+            {
+                var cloudEventType = cloudEvent.Type;
+                switch (cloudEventType)
+                {
+                    {% for id, message in messagegroup.messages.items() -%}
+                    {%- set pascalDefinitionName = message.id | pascal %}
+                    {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) -%}
+                    {%- if message.schemaurl or message.schema -%}
+                    {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
+                    {%- else -%}
+                    {%- set dataType = "object" -%}
+                    {%- endif %}
+                    case "{{ message.id }}":
+                        if ({{ pascalDefinitionName | strip_namespace }}Async != null) 
+                            {
+                                await Task.WhenAll(Array.ConvertAll({{ pascalDefinitionName | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(eventData,
+                                {%- if isCloudEvent %}cloudEvent, {%- endif -%}
+                                {%- if dataType != "object" -%}{{ dataType }}.FromData(cloudEvent.Data, cloudEvent.DataContentType){%- else -%}cloudEvent.Data{%- endif %})??Task.CompletedTask)));
+                            }
+                            break;
+                    {%- endfor %}
+                    default:
+                        break;
+                }
+            }
+            {%- endif %}
+
+            {%- if uses_plain_amqp_message %}
+            private async Task DispatchEventDataAsync(EventData eventData)
+            {
+                var messageSubject = eventData.GetRawAmqpMessage().Properties.Subject;
+                switch (messageSubject)
+                {
+                {% for id, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) -%}
+                {%- set pascalDefinitionName = message.id | pascal %}
+                {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) -%}
+                {%- if message.schemaurl or message.schema -%}
+                {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
+                {%- else -%}
+                {%- set dataType = "object" -%}
+                {%- endif %}
+                    case "{{ message.id }}":
+                            if ({{ pascalDefinitionName | strip_namespace }}Async != null) 
+                            {
+                                await Task.WhenAll(Array.ConvertAll({{ pascalDefinitionName | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(eventData,
+                            {%- if isCloudEvent%}null, {% endif %}
+                            {%- if dataType != "object" -%}{{ dataType }}.FromData(eventData.Body, eventData.ContentType){%- else -%} {{ message }}.Data{%- endif %})??Task.CompletedTask)));
+                            }
+                            break;
+                {%- endfor %}
+                    default:
+                        break;
+                }
+            }
+            {%- endif %}
+
+            public static EventProcessorClient CreateEventProcessorClient(BlobContainerClient checkpointBlobClient, AzureNamedKeyCredential credential, string fullyQualifiedNamespace, string eventHubName, string consumerGroupName, {{ class_name }} dispatcher) 
+            {       
+                var eventHubProcessorClient = new EventProcessorClient(checkpointBlobClient, consumerGroupName, fullyQualifiedNamespace, eventHubName, credential);
+                eventHubProcessorClient.ProcessEventAsync += dispatcher.ProcessEventAsync;
+                return eventHubProcessorClient;
+            }
+
+            public static EventProcessorClient CreateEventProcessorClient(BlobContainerClient checkpointBlobClient, TokenCredential credential, string fullyQualifiedNamespace, string eventHubName, string consumerGroupName, {{ class_name }} dispatcher) 
+            {       
+                var eventHubProcessorClient = new EventProcessorClient(checkpointBlobClient, consumerGroupName, fullyQualifiedNamespace, eventHubName, credential);
+                eventHubProcessorClient.ProcessEventAsync += dispatcher.ProcessEventAsync;
+                return eventHubProcessorClient;
+            }
+
+            public static EventProcessorClient CreateEventProcessorClient(BlobContainerClient checkpointBlobClient, AzureSasCredential credential, string fullyQualifiedNamespace, string eventHubName, string consumerGroupName, {{ class_name }} dispatcher) 
+            {       
+                var eventHubProcessorClient = new EventProcessorClient(checkpointBlobClient, consumerGroupName, fullyQualifiedNamespace, eventHubName, credential);
+                eventHubProcessorClient.ProcessEventAsync += dispatcher.ProcessEventAsync;
+                return eventHubProcessorClient;
+            }
+        }
+    }
+    {% endfor %}    
+    
+    
+    {%- if root.endpoints -%} 
+    {%- for endpoint_key in root.endpoints.keys() -%}
+    {%- set endpoint = root.endpoints[endpoint_key] -%}
+    {%- set pascalGroupName = endpoint.id | default(endpoint_key) | pascal -%}
+    {%- if endpoint.usage == "consumer" -%}
+    {%- set protocol = endpoint.config.protocol | lower -%}
+    {%- if protocol.startswith("amqp") -%}
+    {%- set options = endpoint.config.options -%}
+    {%- set endpoints = endpoint.config.endpoints -%}
+    {%- set messagegroupuris = endpoint.messagegroups %}
+    {%- macro MessageGroupArgs() -%}
+    {%- for uri in messagegroupuris %}
+    {%- set group = schema_object( root, uri ) -%}
+    {%- if group %}
+    {%- set groupname = group.id | pascal -%}
+    {{ groupname }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
+    {%- if not loop.last -%}, {%- endif -%}
+    {%- endif %}
+    {%- endfor -%}
+    {%- endmacro -%}    
+    {%- macro MessageGroupHooks(arg) -%}
+    Task.WhenAll(
+    {%- for uri in messagegroupuris %}
+    {%- set group = schema_object( root, uri ) -%}
+    {% if group %}
+    {%- set groupname = group.id | pascal -%}
+    {{- groupname | strip_namespace | camel }}Dispatcher != null?{{- groupname | strip_namespace | camel }}Dispatcher.ProcessEventAsync({{ arg }}):Task.CompletedTask
+    {%- if not loop.last -%}, {%- endif -%}
+    {%- endif %}
+    {%- endfor -%}
+    )
+    {%- endmacro -%}    
+    {%- macro createforbody(class_name, endpoints, options) -%}
+        {%- set ehnamespace = geturlhost(endpoints[0].uri) -%}
+        {%- set ehtopic = geturlpath(endpoints[0].uri)[1:] -%}
+        fullyQualifiedNamespace = fullyQualifiedNamespace ?? "{{ ehnamespace }}";
+        {%- if options and 'node' in options %}
+        eventHubName = eventHubName ?? "{{ options['node'] }}";
+        {%- elif ehtopic %}
+        eventHubName = eventHubName ?? "{{ ehtopic }}";
+        {%- else %}
+        if ( eventHubName == null )
+        {
+            throw new ArgumentNullException(nameof(eventHubName));
+        }
+        {%- endif %}
+        {%- if options and 'consumer_group' in options %}
+        consumerGroupName = consumerGroupName ?? "{{ options['consumer_group'] }}";
+        {%- else %}
+        consumerGroupName = consumerGroupName ?? "$Default";
+        {%- endif %}
+        var eventHubProcessorClient = new EventProcessorClient(checkpointBlobClient, consumerGroupName, fullyQualifiedNamespace, eventHubName, credential);
+        eventHubProcessorClient.ProcessEventAsync += (eventArgs) => {{ MessageGroupHooks("eventArgs") }};
+        return eventHubProcessorClient;
+    {%- endmacro %}
+    
+
+    namespace {{ pascalGroupName | namespace }}
+    {
+        {%- set class_name = ( pascalGroupName | strip_namespace )+"EventProcessorFactory" %}
+        public class {{ class_name }} 
+        {
+            public static EventProcessorClient CreateEventProcessorClientFor{{ endpoint_key | pascal | strip_namespace }}(BlobContainerClient checkpointBlobClient, TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null, string? consumerGroupName = null, {{ MessageGroupArgs() }}) 
+            {   
+                {{ createforbody(class_name, endpoints, options) | indent(8) }}
+            }
+
+            public static EventProcessorClient CreateEventProcessorClientFor{{ endpoint_key | pascal | strip_namespace }}(BlobContainerClient checkpointBlobClient, AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null, string? consumerGroupName = null, {{ MessageGroupArgs() }}) 
+            {       
+                {{ createforbody(class_name, endpoints, options) | indent(8) }}
+            }
+
+            public static EventProcessorClient CreateEventProcessorClientFor{{ endpoint_key | pascal | strip_namespace }}(BlobContainerClient checkpointBlobClient, AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null, string? consumerGroupName = null, {{ MessageGroupArgs() }}) 
+            {       
+                {{ createforbody(class_name, endpoints, options) | indent(8) }}
+            }
+        }
+    }
+        {%- endif -%}
+        {%- endif -%}
+        {%- endfor -%}
+        {% endif %}
+}

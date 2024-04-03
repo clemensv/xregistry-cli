@@ -2,7 +2,7 @@
 {%- import "amqp.jinja.include" as amqp -%}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
+{%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;

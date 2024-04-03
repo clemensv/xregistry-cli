@@ -180,7 +180,7 @@ import java.util.concurrent.CompletableFuture;
 
 public interface {{ interfaceName }}
 {
-    {%- for id, message in messagegroup.messages.items() if (message | exists( "format", "mqtt" )) -%}
+    {%- for id, message in messagegroup.messages.items() if (message | exists( "binding", "mqtt" )) -%}
     {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
     {%- if message.schemaurl or message.schema -%}
     {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}

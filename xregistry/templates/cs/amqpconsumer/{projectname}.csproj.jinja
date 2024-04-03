@@ -1,6 +1,6 @@
 {%- set uses_protobuf = uses_protobuf | default(true) -%}
 {%- set uses_avro = uses_avro | default(true) -%}
-{%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
+{%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists("protocol", "amqp" )) %}
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>

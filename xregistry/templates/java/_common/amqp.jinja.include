@@ -101,7 +101,7 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsFields(project_name, class_name, messagegroups) -%}
+{%- macro DeclareDispatchObjectsFields(messagegroups) -%}
 {%- for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
 {%- set handlerName=(messagegroup.id | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
 {%- set handlerType="I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
@@ -181,7 +181,7 @@ import java.util.concurrent.CompletableFuture;
 
 public interface {{ interfaceName }}
 {
-    {%- for id, message in messagegroup.messages.items() if (message | exists( "format", "amqp" )) -%}
+    {%- for id, message in messagegroup.messages.items() if (message | exists( "binding", "amqp" )) -%}
     {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
     {%- if message.schemaurl or message.schema -%}
     {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}

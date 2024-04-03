@@ -86,7 +86,7 @@ AmqpAnnotatedMessage am = {{ variable }}.GetRawAmqpMessage();
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsFields(project_name, class_name, messagegroups) -%}
+{%- macro DeclareDispatchObjectsFields(messagegroups) -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
 {%- set handlerName=(messagegroup.id | default(messagegroup_key) | strip_namespace | camel)+"ServiceBusDispatcher" -%}
 {%- set handlerType="I"+(messagegroup.id | default(messagegroup_key) | strip_namespace | pascal)+"ServiceBusDispatcher" -%}
@@ -159,7 +159,6 @@ switch (messageSubject)
 {%- set function_name = project_name | pascal -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
 {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal %}
-{{- AmqpNetLiteHeaders() }}
 using System.Threading.Tasks;
 
 namespace {{ pascalGroupName | namespace(project_name) | pascal }}
@@ -197,13 +196,13 @@ using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
 {%- endmacro -%}
 
 {%- macro CloudEventsMethods() -%}
-private const string amqpCloudEventPrefix1 = "cloudEvents_";
-private const string amqpCloudEventPrefix2 = "cloudEvents:";
-private static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
-private static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
-private static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
+protected const string amqpCloudEventPrefix1 = "cloudEvents_";
+protected const string amqpCloudEventPrefix2 = "cloudEvents:";
+protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
+protected static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
+protected static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
 
-private string? GetCloudEventAttribute(ServiceBusReceivedMessage serviceBusMessage, string key)
+protected string? GetCloudEventAttribute(ServiceBusReceivedMessage serviceBusMessage, string key)
 {
    if (serviceBusMessage.ApplicationProperties.TryGetValue(amqpCloudEventPrefix1+key, out var value) ||
          serviceBusMessage.ApplicationProperties.TryGetValue(amqpCloudEventPrefix2+key, out value))
@@ -213,7 +212,7 @@ private string? GetCloudEventAttribute(ServiceBusReceivedMessage serviceBusMessa
    return null;
 } 
 
-private CloudEvent CloudEventFromServiceBusMessage(ServiceBusReceivedMessage serviceBusMessage) 
+protected CloudEvent CloudEventFromServiceBusMessage(ServiceBusReceivedMessage serviceBusMessage) 
 {
    CloudEventFormatter? formatter = null;
    var contentType = serviceBusMessage.ContentType?.Split(';')[0];

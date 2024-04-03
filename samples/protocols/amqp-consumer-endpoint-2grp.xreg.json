@@ -2,13 +2,13 @@
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.5-wip",
     "endpoints": {
-        "MyEventQueue1": {
-            "id": "MyEventQueue1",
+        "MyEventStream": {
+            "id": "MyEventStream",
             "usage": "consumer",
             "config": {
                 "protocol": "AMQP/1.0",
                 "deployed": false,
-                "endpoints": [{ "uri": "amqps://cediscoveryinterop.example.com/queue" }],
+                "endpoints": [{ "uri": "amqps://cediscoveryinterop.example.com/stream" }],
                 "options": {
                     "link_properties": {
                         "myprop": "prop"
@@ -17,17 +17,55 @@
                 }
             },
             "messagegroups": [
-                "#/messagegroups/Contoso.MyGroup"
+                "#/messagegroups/Contoso.MyGroup1",
+                "#/messagegroups/Contoso.MyGroup2"
             ]           
         }
     },
     "messagegroups": {
-        "Contoso.MyGroup": {
-            "id": "Contoso.MyGroup",
+        "Contoso.MyGroup1": {
+            "id": "Contoso.MyGroup1",
             "binding": "AMQP/1.0",
             "messages": {
-                "Contoso.MyGroup.MyEvent": {
-                    "id": "Contoso.MyGroup.MyEvent",
+                "Contoso.MyGroup1.MyEvent": {
+                    "id": "Contoso.MyGroup1.MyEvent",
+                    "binding": "AMQP/1.0",
+                    "message": {
+                        "header": {
+                            "ttl": {
+                                "type": "integer",
+                                "value": "1000"
+                            }
+                        },
+                        "properties": {
+                            "subject": {
+                                "type": "string",
+                                "value": "myvalue"
+                            }
+                        },
+                        "application-properties": {
+                            "myProperty1": {
+                                "type": "string"
+                            },
+                            "myProperty2": {
+                                "type": "string"
+                            },
+                            "myProperty3": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "schemaformat": "JsonSchema/draft-07",
+                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                }
+            }
+        },
+        "Contoso.MyGroup2": {
+            "id": "Contoso.MyGroup2",
+            "binding": "AMQP/1.0",
+            "messages": {
+                "Contoso.MyGroup2.MyEvent": {
+                    "id": "Contoso.MyGroup2.MyEvent",
                     "binding": "AMQP/1.0",
                     "message": {
                         "header": {

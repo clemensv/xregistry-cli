@@ -3,6 +3,7 @@ import os
 import json
 from typing import Any
 import uuid
+from matplotlib.pyplot import cla
 import yaml
 import jinja2
 import urllib.request
@@ -28,6 +29,18 @@ from .core import *
 uses_avro : bool = False
 uses_protobuf : bool = False
 
+
+def geturlhost(url: str) -> str | None:
+    return urllib.parse.urlparse(url).hostname
+
+def geturlpath(url: str) -> str:
+    return urllib.parse.urlparse(url).path
+
+def geturlscheme(url: str) -> str:
+    return urllib.parse.urlparse(url).scheme
+
+def geturlport(url: str) -> str:
+    return str(urllib.parse.urlparse(url).port)
 
 # Create a global stack structure
 context_stacks = dict()
@@ -134,6 +147,22 @@ def exists(obj, prop, value):
 
     return recursive_search(obj, prop, value)
 
+def existswithout(obj, prop, value, propother, valueother):
+    def recursive_search(obj, prop, value, propother, valueother):
+        if isinstance(obj, dict):
+            for key, val in obj.items():
+                if key.lower().startswith(prop) and isinstance(val, str) and val.lower().startswith(value):
+                    if not exists(obj, propother, valueother):
+                        return True
+                if recursive_search(val, prop, value, propother, valueother):
+                    return True
+        elif isinstance(obj, list):
+            for item in obj:
+                if recursive_search(item, prop, value, propother, valueother):
+                    return True
+        return False
+
+    return recursive_search(obj, prop, value, propother, valueother) 
 
 # Jinja filter to perform a regex search. Returns a list of matches.
 def regex_search(string, pattern):
@@ -227,16 +256,21 @@ def strip_namespace(class_reference):
 # an expression. Assumes dot-notation, e.g. namespace.class
 def namespace(class_reference, namespace_prefix=""):
     if class_reference:
-        ns = re.sub(r'\.[^.]+$', '', class_reference)
-        if namespace_prefix:
-            if ns.startswith(namespace_prefix):
-                return ns
-            if namespace_prefix.startswith(ns):
-                return namespace_prefix
+        if '.' in class_reference:
+            ns = re.sub(r'\.[^.]+$', '', class_reference)
+            if namespace_prefix:
+                if ns.startswith(namespace_prefix):
+                    return ns
+                if namespace_prefix.startswith(ns):
+                    return namespace_prefix
+                elif ns:
+                    return namespace_prefix + "." + ns
+                else:   
+                    return namespace_prefix
             else:
-                return namespace_prefix + "." + ns
+                return ns
         else:
-            return ns
+            return namespace_prefix
     return class_reference
 
 # Jinja filter that concats the namespace/package portions of
@@ -547,6 +581,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         # most recent version in the versions dictionary by sorting the keys
                         # and picking the last one. To sort the keys, we need to make them the same length 
                         # by prepending spaces to the keys that are shorter than the longest key
+                        class_name = schema_root.get("id", class_name)
                         versions = schema_root["versions"]
                         max_key_length = max([len(key) for key in versions.keys()])
                         sorted_keys = sorted(versions.keys(), key=lambda key: key.rjust(max_key_length))
@@ -554,7 +589,11 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     elif "schema" in schema_root or "schemaurl" in schema_root or "schema" in schema_root:
                         # the reference pointed to a schema version definition
                         schema_version = schema_root
-                        
+                        parent_reference = schema_reference.rsplit("/", 1)[0]
+                        parent = jsonpointer.resolve_pointer(docroot, parent_reference[1:])
+                        if parent and isinstance(parent, dict):
+                            class_name = parent.get("id", class_name)
+                                                    
                     if schema_version and isinstance(schema_version,dict):
                         schema_format = ''
                         if "schemaformat" in schema_version:
@@ -861,6 +900,7 @@ def setup_jinja_env(template_dirs : list[str]):
     env.filters['toyaml'] = toyaml
     env.filters['proto'] = proto
     env.filters['exists'] = exists
+    env.filters['existswithout'] = existswithout
     env.filters['push'] = push
     env.filters['pushfile'] = pushfile
     env.filters['save'] = save
@@ -869,6 +909,10 @@ def setup_jinja_env(template_dirs : list[str]):
     env.globals['get'] = get
     env.globals['schema_object'] = schema_object
     env.globals['latest_dict_entry'] = latest_dict_entry
+    env.globals['geturlhost'] = geturlhost
+    env.globals['geturlpath'] = geturlpath
+    env.globals['geturlport'] = geturlport
+    env.globals['geturlscheme'] = geturlscheme    
     return env
 
 

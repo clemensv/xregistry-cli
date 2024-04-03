@@ -1,9 +1,9 @@
 {%- set uses_protobuf = uses_protobuf | default(false) -%}
 {%- set uses_avro = uses_avro | default(false) -%}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_amqp_message = (root | exists( "format", "amqp" )) %}
+{%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists("protocol", "amqp" )) %}
-{%- set uses_mqtt_message = (root | exists( "format", "mqtt" )) %}
+{%- set uses_mqtt_message = (root | exists( "binding", "mqtt" )) %}
 {%- set uses_mqtt_endpoint = (root | exists("protocol", "mqtt" )) %}
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
