@@ -95,7 +95,7 @@ namespace {{ project_name | pascal }}
         {%- endif %}
         public async Task Send{{ pascalDefinitionName | strip_namespace }}Async(
         {%- if definition.schemaurl or definition.schema -%}
-        {%- set type_name = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root,definition.schemaformat) | pascal %}
+        global::{%- set type_name = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root,definition.schemaformat) | pascal %}
         {%- else -%}
         {%- set type_name = "object" %}
         {%- endif -%}

@@ -77,7 +77,7 @@ namespace {{ project_name | pascal }}
         {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}
         public async Task Send{{ pascalDefinitionName | strip_namespace }}Async(
         {%- if definition.schemaurl or definition.schema -%}
-        {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | pascal }} data
+        global::{{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | pascal }} data
         {%- else -%}
         object data
         {%- endif %}    

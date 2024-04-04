@@ -153,7 +153,7 @@ try {
          {
                return this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
                {%- if message.schemaurl or message.schema -%}
-               {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace  | pascal }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
+               {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
                {%- else -%}
                {{ message }}.Data
                {%- endif %});
