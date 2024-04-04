@@ -104,17 +104,17 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endmacro -%}
 
 
-{%- macro DeclareDispatchObjectsArgs(messagegroups, withType) -%}
+{%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal %}
-{%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id | default(messagegroup_key) | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- set pascalGroupName = messagegroup.id  | pascal %}
+{%- if withType -%}global::{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id  | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsFields(messagegroups) -%}
+{%- macro DeclareDispatchObjectsFields(project_name,messagegroups) -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
-{%- set handlerName=(messagegroup.id | default(messagegroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
-{%- set handlerType="I"+(messagegroup.id | default(messagegroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
+{%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"MqttDispatcher" -%}
+{%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"MqttDispatcher" -%}
 {{ handlerType }} {{ handlerName }};
 {%- endfor %}
 {%- endmacro-%}
@@ -123,17 +123,17 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- if messagegroups | exists("binding", "mqtt" ) %}
 public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- for messagegroup_key, messagegroup in messagegroups.items() -%}
-    {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%} 
-    {%- set handlerName=(messagegroup.id | default(messagegroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
-    {%- set handlerType="I"+(messagegroup.id | default(messagegroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
+    {%- set pascalGroupName = messagegroup.id  | pascal -%} 
+    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"MqttDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"MqttDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
 {
     {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-    {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal %}
-    {%- set handlerName=(messagegroup.id | default(messagegroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
-   {%- set handlerType="I"+(messagegroup.id | default(messagegroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
+    {%- set pascalGroupName = messagegroup.id  | pascal %}
+    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"MqttDispatcher" -%}
+   {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"MqttDispatcher" -%}
     this.{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
     {{ body | indent(4) }}
@@ -147,7 +147,7 @@ Regex regex;
 Match match; 
 var messageTopic = {{ message }}.Topic;
 {% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
-{%- set handlerName=(messagegroup.id | default(messagegroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
+{%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"MqttDispatcher" -%}
 {% for id, message in messagegroup.messages.items() if (message | exists("binding", "mqtt" )) -%}
 {% set pascalDefinitionName = message.id | pascal %}
 regex = new Regex("^" + "{{ message.message.properties.topic.value}}".Replace("{", "(?<").Replace("}", ">[^/]+)") + "$");
@@ -156,7 +156,7 @@ if (match.Success)
 {
    await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
    {%- if message.schemaurl or message.schema -%}
-   {{( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
+   global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
    {%- else -%}
    {{ message }}.Data
    {%- endif %}, match.Groups.Values.Where(g => g.Name != "0").ToDictionary(g => g.Name, g => g.Value));
@@ -171,7 +171,7 @@ if (match.Success)
 {%- if messagegroups | exists("binding", "mqtt" ) %}
 {%- set function_name = project_name | pascal -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal %}
+{%- set pascalGroupName = messagegroup.id  | pascal %}
 using MQTTnet;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
@@ -184,7 +184,7 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {%- for id, message in messagegroup.messages.items() if ( message | exists("binding", "mqtt" )) -%}
         {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
         {%- if message.schemaurl or message.schema -%}
-        {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
+        {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   

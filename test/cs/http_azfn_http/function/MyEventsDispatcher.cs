@@ -3,10 +3,11 @@ using Contoso.ERP.AzureFunction;
 using CloudNative.CloudEvents;
 using System;
 using System.IO;
+using Contoso.ERP.AzureFunction.Contoso.ERP;
 
 namespace function
 {
-    public class MyEventsDispatcher : IEventsDispatcher
+    public class MyEventsDispatcher : Contoso.ERP.AzureFunction.Contoso.ERP.IEventsDispatcher
     {
         StreamWriter received; 
 
@@ -26,55 +27,55 @@ namespace function
             received.Close();
         }
 
-        public Task OnEmployeeAddedAsync(CloudEvent cloudEvent, EmployeeData data)
+        public Task OnEmployeeAddedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.EmployeeData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnEmployeeDeletedAsync(CloudEvent cloudEvent, EmployeeDeletionData data)
+        public Task OnEmployeeDeletedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.EmployeeDeletionData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnEmployeeUpdatedAsync(CloudEvent cloudEvent, EmployeeUpdatedData data)
+        public Task OnEmployeeUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.EmployeeUpdatedData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnInventoryUpdatedAsync(CloudEvent cloudEvent, InventoryData data)
+        public Task OnInventoryUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.InventoryData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnPaymentsReceivedAsync(CloudEvent cloudEvent, PaymentData data)
+        public Task OnPaymentsReceivedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.PaymentData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnProductAddedAsync(CloudEvent cloudEvent, ProductData data)
+        public Task OnProductAddedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.ProductData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnProductDeletedAsync(CloudEvent cloudEvent, ProductDeletionData data)
+        public Task OnProductDeletedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.ProductDeletionData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnProductUpdatedAsync(CloudEvent cloudEvent, ProductUpdatedData data)
+        public Task OnProductUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.ProductUpdatedData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnPurchaseOrderCreatedAsync(CloudEvent cloudEvent, PurchaseOrderData data)
+        public Task OnPurchaseOrderCreatedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.PurchaseOrderData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
@@ -86,43 +87,43 @@ namespace function
             return Task.CompletedTask;
         }
 
-        public Task OnPurchaseOrderUpdatedAsync(CloudEvent cloudEvent, PurchaseOrderUpdatedData data)
+        public Task OnPurchaseOrderUpdatedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.PurchaseOrderUpdatedData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnReservationCancelledAsync(CloudEvent cloudEvent, CancellationData data)
+        public Task OnReservationCancelledAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.CancellationData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnReservationPlacedAsync(CloudEvent cloudEvent, OrderData data)
+        public Task OnReservationPlacedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.OrderData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnReservationRefundedAsync(CloudEvent cloudEvent, RefundData data)
+        public Task OnReservationRefundedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.RefundData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnReturnRequestedAsync(CloudEvent cloudEvent, ReturnData data)
+        public Task OnReturnRequestedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.ReturnData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnShipmentAcceptedAsync(CloudEvent cloudEvent, ShipmentData data)
+        public Task OnShipmentAcceptedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.ShipmentData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;
         }
 
-        public Task OnShipmentRejectedAsync(CloudEvent cloudEvent, ShipmentData data)
+        public Task OnShipmentRejectedAsync(CloudEvent cloudEvent, Contoso.ERP.AzureFunction.Contoso.ERP.Events.ShipmentData data)
         {
             received.WriteLine(cloudEvent.Id);
             return Task.CompletedTask;

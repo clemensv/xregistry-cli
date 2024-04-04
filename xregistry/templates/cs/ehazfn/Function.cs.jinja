@@ -15,7 +15,7 @@ namespace {{ project_name | pascal }}
     {%- set class_name = (project_name | pascal | strip_namespace)+"Base" %}
     public class {{ class_name }}
     {
-        {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
         {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "", "") | indent(8) }}
         {{ eventhubs.CloudEventsMethods() | indent(8) }}
 
@@ -24,7 +24,7 @@ namespace {{ project_name | pascal }}
             foreach(var ev in events)
             {
                 var cloudEvent = CloudEventFromEventData(ev);
-                {{ cloudEvents.DispatchToDispatchObjects( root, "cloudEvent", messagegroups, "log" ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects( project_name, root, "cloudEvent", messagegroups, "log" ) | indent(16) }}
             }
         }
     }

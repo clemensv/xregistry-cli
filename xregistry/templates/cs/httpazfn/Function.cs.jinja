@@ -29,7 +29,7 @@ namespace {{ project_name | pascal }}
         private static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
         private static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
 
-       {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
+       {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "", "") | indent(8) }}
 
         public virtual async Task<HttpResponseData> Run(
@@ -96,7 +96,7 @@ namespace {{ project_name | pascal }}
                 return response;
             }
             
-            {{ cloudEvents.DispatchToDispatchObjects(root, "cloudEvent", messagegroups, "logger" ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects(project_name, root, "cloudEvent", messagegroups, "logger" ) | indent(12) }}
 
             response.StatusCode = HttpStatusCode.NoContent;
             return response;

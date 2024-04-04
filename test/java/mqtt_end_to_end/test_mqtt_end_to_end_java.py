@@ -32,7 +32,7 @@ def run_test():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/producer/'.replace('/', os.path.sep)),
                 '--projectname', 'Contoso.ERP.Producer']
-    xregistry.cli()
+    assert xregistry.cli() == 0
     subprocess.check_call(['mvn', '--quiet', 'install', local_repo_arg], cwd=os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/producer/'.replace('/', os.path.sep)), stdout=sys.stdout, stderr=sys.stderr)
     # generate the consumer
     sys.argv = [ 'xregistry', 'generate', 
@@ -41,7 +41,7 @@ def run_test():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'mqtt_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
-    xregistry.cli()
+    assert xregistry.cli() == 0
     subprocess.check_call(['mvn', '--quiet', 'clean', 'install',local_repo_arg], cwd=os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/consumer/'.replace('/', os.path.sep)), stdout=sys.stdout, stderr=sys.stderr)
     # run mvn verify on the s here that references the generated files already
     

@@ -15,7 +15,7 @@
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\compact\\cloudevent-avro-embedded.json --projectname Sample --language cs --style ehproducer --output c:\\temp\\outp\\cs12"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\embedded-schema\\cloudevent-mixed-embedded.json --projectname Sample --language cs --style ehproducer --output c:\\temp\\outp\\cs13"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\separate-schema\\cloudevent-avro-separate.json --projectname Sample --language cs --style amqpproducer --output c:\\temp\\outp\\cs1"
-      "args": "generate --definitions C:\\git\\cedisco-codegen\\samples\\protocols\\amqp-producer-endpoint.xreg.json --projectname Sample --language cs --style ehproducer --output c:\\temp\\outp\\cs7"
+      "args": "generate --definitions C:\\git\\cedisco-codegen\\test\\cs\\amqp_end_to_end\\amqp_end_to_end.xreg.json --projectname Sample --language cs --style amqpconsumer --output c:\\temp\\outp\\cs25"
     },
     {
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],

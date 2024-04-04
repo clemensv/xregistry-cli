@@ -28,7 +28,7 @@
             {%- endif -%}
         {%- elif property.items['$ref'] -%} 
             {%- set ref = property.items['$ref'] -%}
-            {%- set typeScriptType = list_type+"<"+(ref | schema_type(root) | pascal)+">" -%}
+            {%- set typeScriptType = list_type+"<"+(ref | schema_type( project_name, root) | pascal)+">" -%}
         {%- elif 'type' in property['items'] and property['items']['type'] == "object" and 'properties' in property['items'] -%}
             {% set itemTypeScriptType = schema_name + ((propertyName + "Item") | pascal) %}
             {%- set typeScriptType = list_type+"<"+itemTypeScriptType+">" -%}
@@ -44,7 +44,7 @@
     {%- if (not property.type) or property.type == "object"  -%}
         {%- if property['$ref'] -%}
             {%- set ref = property['$ref'] -%}
-            {%- set typeScriptType = ref | schema_type(root) | pascal -%}
+            {%- set typeScriptType = ref | schema_type( project_name, root) | pascal -%}
         {%- elif property.properties -%}
             {%- set typeScriptType = schema_name + ( propertyName | pascal ) -%}
             {%- if not typeScriptType in stack("classes") -%}
@@ -64,7 +64,7 @@ export class {{ type_name | pascal }}
     {%- for allOfType in type.allOf -%}
         {%- if loop.first -%}
         {%- if allOfType['$ref'] -%}
-            : {{ allOfType['$ref'] | schema_type(root) | pascal }}
+            : {{ allOfType['$ref'] | schema_type( project_name, root) | pascal }}
         {%- endif -%}
         {%- endif -%}
     {%- endfor -%}

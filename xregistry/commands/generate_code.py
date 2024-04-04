@@ -1,8 +1,10 @@
 import datetime
+from multiprocessing import parent_process
 import os
 import json
 from typing import Any
 import uuid
+from attr import has
 from matplotlib.pyplot import cla
 import yaml
 import jinja2
@@ -191,6 +193,12 @@ def strip_invalid_identifier_characters(string):
 # Jinja filter that turns a string expression into PascalCase
 # The input can be snake_case or camelCase or any other string
 def pascal(string):
+    if '::' in string:
+        strings = string.split('::')
+        return strings[0] + '::' + '::'.join(pascal(s) for s in strings[1:])
+    if '.' in string:
+        strings = string.split('.')
+        return '.'.join(pascal(s) for s in strings)
     if not string or len(string) == 0:
         return string
     words = []
@@ -212,6 +220,12 @@ def pascal(string):
 
 
 def snake(string):
+    if '::' in string:
+        strings = string.split('::')
+        return strings[0] + '::' + '::'.join(snake(s) for s in strings[1:])
+    if '.' in string:
+        strings = string.split('.')
+        return '.'.join(snake(s) for s in strings)
     if not string:
         return string
     result = re.sub(r'(?<!^)(?=[A-Z])', '_', string).lower()
@@ -223,6 +237,12 @@ def snake(string):
 def camel(string):
     if not string:
         return string
+    if '::' in string:
+        strings = string.split('::')
+        return strings[0] + '::' + '::'.join(camel(s) for s in strings[1:])
+    if '.' in string:
+        strings = string.split('.')
+        return '.'.join(camel(s) for s in strings)
     if '_' in string:
         # snake_case
         words = re.split(r'_', string)
@@ -232,10 +252,10 @@ def camel(string):
     else:
         # default case: return string as-is
         return string
-    camel = words[0].lower()
+    camels = words[0].lower()
     for word in words[1:]:
-        camel += word.capitalize()
-    return camel
+        camels += word.capitalize()
+    return camels
 
 # Jinja filter that left-justified pads a string with spaces
 # to the specified length
@@ -259,11 +279,11 @@ def namespace(class_reference, namespace_prefix=""):
         if '.' in class_reference:
             ns = re.sub(r'\.[^.]+$', '', class_reference)
             if namespace_prefix:
-                if ns.startswith(namespace_prefix):
-                    return ns
-                if namespace_prefix.startswith(ns):
-                    return namespace_prefix
-                elif ns:
+                #if ns.startswith(namespace_prefix):
+                #    return ns
+                #if namespace_prefix.startswith(ns):
+                #    return namespace_prefix
+                if ns:
                     return namespace_prefix + "." + ns
                 else:   
                     return namespace_prefix
@@ -272,6 +292,12 @@ def namespace(class_reference, namespace_prefix=""):
         else:
             return namespace_prefix
     return class_reference
+
+def namespace_dot(class_reference, namespace_prefix=""):
+    ns = namespace(class_reference, namespace_prefix)
+    if ns:
+        return ns + "."
+    return ns
 
 # Jinja filter that concats the namespace/package portions of
 # an expression, removing the dots.
@@ -343,7 +369,7 @@ def get_json_pointer(root: dict, node: dict | str) -> str:
     return path_to_pointer(path)
 
 
-def schema_type(schema_ref: str | dict, root: dict, schema_format: str = "jsonschema/draft-07"):
+def schema_type( schema_ref: str | dict, project_name: str, root: dict, schema_format: str = "jsonschema/draft-07"):
     global schema_files_collected
     global schema_references_collected
 
@@ -358,11 +384,11 @@ def schema_type(schema_ref: str | dict, root: dict, schema_format: str = "jsonsc
         schema_ref = '#' + ptr
     elif isinstance(schema_ref, str):
         # if the schema URL is a fragment, then it is a local reference
+        if ":" in schema_ref:
+            schema_ref, class_name = schema_ref.split(":")            
         if schema_ref.startswith("#"):
             if not schema_ref in schema_references_collected:
                 schema_references_collected.add(schema_ref)        
-            if ":" in schema_ref:
-                schema_ref, class_name = schema_ref.split(":")            
             schema_object: object = jsonpointer.resolve_pointer(root, schema_ref[1:])
         else:
             # split the schema URL into a base URL and a fragment
@@ -381,8 +407,26 @@ def schema_type(schema_ref: str | dict, root: dict, schema_format: str = "jsonsc
                 versions = schema_object['versions']
                 latestversion = max(versions.keys())
             schema_version = schema_object['versions'][latestversion]
+            if not class_name:
+                class_name = schema_object.get("id", '')
+            parent_reference = schema_ref.rsplit("/", 2)[0]
+            parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
+            if parent and isinstance(parent, dict):
+                prefix = parent.get("id", '')
+                if not class_name.startswith(prefix):
+                    class_name = prefix + '.' + class_name
         elif isinstance(schema_object, dict):
             schema_version = schema_object
+            parent_reference = schema_ref.rsplit("/", 1)[0]
+            parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
+            if parent and isinstance(parent, dict) and not class_name:
+                class_name = parent.get("id", class_name)
+            parent_reference = parent_reference.rsplit("/", 2)[0]
+            parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
+            if parent and isinstance(parent, dict):
+                prefix = parent.get("id", '')
+                if not class_name.startswith(prefix):
+                    class_name = prefix + '.' + class_name
         if not schema_version:
             raise RuntimeError("Schema version not found: " + schema_ref)
         if not "format" in schema_version or schema_format != schema_version["format"]:
@@ -408,7 +452,7 @@ def schema_type(schema_ref: str | dict, root: dict, schema_format: str = "jsonsc
         schema_object = schema_ref
         schema_ref = '#' + ptr
     
-    if schema_format == "avro":
+    if schema_format.startswith("avro"):
         if isinstance(schema_object, dict) and "type" in schema_object and schema_object["type"] == "record":
             ref = ''
             if "namespace" in schema_object:
@@ -419,7 +463,7 @@ def schema_type(schema_ref: str | dict, root: dict, schema_format: str = "jsonsc
             if class_name:
                 if ref != class_name:
                     raise RuntimeError("Avro: Class name reference mismatch for top-level record object: " + ref + " != " + class_name)
-            return ref
+            return project_name + '.' + ref
         elif isinstance(schema_object, list):
             if not class_name:
                 raise RuntimeError("Avro: Explicit class name reference (':{classname}' suffix) required for Avro schema with top-level union: ")
@@ -432,30 +476,37 @@ def schema_type(schema_ref: str | dict, root: dict, schema_format: str = "jsonsc
                         ref = record["name"]
                     # if a class_name had been given, it must match
                     if ref == class_name:
-                        return ref
+                         return project_name + '.' + ref
         raise RuntimeError("Avro: Top-level record object not found in Avro schema: ")
-    elif schema_format == "proto":
+    elif schema_format.startswith("proto"):
         if isinstance(schema_object, str):
             # namespace is the last segment of the schema URL
-            namespace = schema_ref.split('/')[-1]
-            if not class_name:
+            if class_name:
                 # find the top-level message object in the proto schema using regex
+                local_class_name = strip_namespace(class_name)           
                 match = re.search(r"message[\s]+([\w]+)[\s]*{", schema_object)
-                if match:
+                if local_class_name and match:
+                    for g in match.groups():
+                        if g.lower() == local_class_name.lower():
+                            return project_name + '.' + class_name
+                if match and match.groups() and len(match.groups()) == 1:
+                    class_name = namespace_dot(class_name) + match.groups()[0]            
+                    return project_name + '.' + class_name
+                else:
+                    raise RuntimeError(f"Proto: Top-level message {class_name} not found in Proto schema") 
+            else:
+                match = re.search(r"message[\s]+([\w]+)[\s]*{", schema_object)
+                if match:                    
                     # if we have more than 1 match, we cannot determine the class name
                     if len(match.groups()) > 1:
                         raise RuntimeError("Proto: Multiple top-level message objects found in Proto schema: ")
-                    return namespace + '.' + match.group(1)
+                    return project_name + '.' + match.group(1)
                 else:
                     raise RuntimeError("Proto: Top-level message object not found in Proto schema: ")
-            else:    
-                # try to find a message with the given class name using regex
-                match = re.search(r"message[\s]+" + class_name + r"[\s]*{", schema_object)
-                if match:
-                    return namespace + '.' + class_name
         raise RuntimeError("Proto: Top-level message object not found in Proto schema: ")
     else:
-        
+        if class_name:
+            return project_name + '.' + class_name
         # otherwise return the last element of the fragment	unless the penultimate
         # segment name is "versions". Then return the parent segment of
         # versions. 
@@ -548,7 +599,7 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                     # split off a suffix reference with ':'
                     if ":" in schema_reference:
                         schema_reference, class_name = schema_reference.split(":")
-
+                
                     path_elements = schema_reference.split('/')
                     if path_elements[-2] == "versions":
                         definitions_file = path_elements[-3]
@@ -581,7 +632,14 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         # most recent version in the versions dictionary by sorting the keys
                         # and picking the last one. To sort the keys, we need to make them the same length 
                         # by prepending spaces to the keys that are shorter than the longest key
-                        class_name = schema_root.get("id", class_name)
+                        if not class_name:
+                            class_name = schema_root.get("id", '')
+                        parent_reference = schema_reference.rsplit("/", 2)[0]
+                        parent = jsonpointer.resolve_pointer(docroot, parent_reference[1:])
+                        if parent and isinstance(parent, dict):
+                            prefix = parent.get("id", '')
+                            if not class_name.startswith(prefix):
+                                class_name = prefix + '.' + class_name       
                         versions = schema_root["versions"]
                         max_key_length = max([len(key) for key in versions.keys()])
                         sorted_keys = sorted(versions.keys(), key=lambda key: key.rjust(max_key_length))
@@ -591,8 +649,14 @@ def generate(project_name: str, language: str, style: str, output_dir: str,
                         schema_version = schema_root
                         parent_reference = schema_reference.rsplit("/", 1)[0]
                         parent = jsonpointer.resolve_pointer(docroot, parent_reference[1:])
-                        if parent and isinstance(parent, dict):
+                        if parent and isinstance(parent, dict) and not class_name:
                             class_name = parent.get("id", class_name)
+                        parent_reference = parent_reference.rsplit("/", 2)[0]
+                        parent = jsonpointer.resolve_pointer(docroot, parent_reference[1:])
+                        if parent and isinstance(parent, dict):
+                            prefix = parent.get("id", '')
+                            if not class_name.startswith(prefix):
+                                class_name = prefix + '.' + class_name                          
                                                     
                     if schema_version and isinstance(schema_version,dict):
                         schema_format = ''
@@ -769,10 +833,20 @@ def render_schema_templates(schema_type : str|None, project_name : str, class_na
     if schema_type == "proto":
         uses_protobuf = True
         if isinstance(docroot,str) and re.search(r"syntax[\s]*=[\s]*\"proto3\"", docroot):
-            # find the first message
+            # find the specific message we are looking for in the proto file
+            local_class_name = strip_namespace(class_name)           
             match = re.search(r"message[\s]+([\w]+)[\s]*{", docroot)
-            if match:
-                class_name = class_name + '.' + match.group(1)            
+            found = False
+            if local_class_name and match:
+                for g in match.groups():
+                    if g.lower() == local_class_name.lower():
+                        class_name = namespace_dot(class_name) + g
+                        found = True
+                        break
+            if not found and match and match.groups() and len(match.groups()) == 1:
+                class_name = namespace_dot(class_name) + match.groups()[0]            
+            elif not found:
+                raise RuntimeError(f"Proto: Top-level message {class_name} not found in Proto schema")                
     elif schema_type == "avro":
         uses_avro = True
         if isinstance(docroot,dict) and "type" in docroot and docroot["type"] == "record":
@@ -892,6 +966,7 @@ def setup_jinja_env(template_dirs : list[str]):
     env.filters['snake'] = snake
     env.filters['strip_namespace'] = strip_namespace
     env.filters['namespace'] = namespace
+    env.filters['namespace_dot'] = namespace_dot
     env.filters['concat_namespace'] = concat_namespace
     env.filters['schema_type'] = schema_type
     env.filters['camel'] = camel

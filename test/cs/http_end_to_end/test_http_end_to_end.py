@@ -24,7 +24,7 @@ def test_http_end_to_end():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/http_end_to_end/producer/'),
                 '--projectname', 'Contoso.ERP.Producer']
-    xregistry.cli()
+    assert xregistry.cli() == 0
     # generate the consumer
     sys.argv = [ 'xregistry', 'generate',  
                 '--style', 'httpconsumer', 
@@ -32,7 +32,7 @@ def test_http_end_to_end():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'http_end_to_end.xreg.json'),
                 '--output', os.path.join(project_root, 'tmp/test/cs/http_end_to_end/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
-    xregistry.cli()
+    assert xregistry.cli() == 0
     # run dotnet build on the csproj here that references the generated files already
     subprocess.check_call(['dotnet', 'run'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
     

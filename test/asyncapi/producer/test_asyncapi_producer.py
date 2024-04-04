@@ -27,8 +27,7 @@ def test_asyncapi_producer():
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducerBinary',
                 '--template-args', 'ce_content_mode=binary']
-    if xregistry.cli() != 0:
-        raise Exception("xregistry failed")
+    assert xregistry.cli() == 0
     # run dotnet build on the csproj here that references the generated files already
     cmd = 'asyncapi validate ' + os.path.join(output_dir, "ContosoErpProducerBinary.yml")
     subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
@@ -41,8 +40,7 @@ def test_asyncapi_producer():
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducerStructured',
                 '--template-args', 'ce_content_mode=structured']
-    if xregistry.cli() != 0:
-        raise Exception("xregistry failed")
+    assert xregistry.cli() == 0
     # run dotnet build on the csproj here that references the generated files already
     cmd = 'asyncapi validate ' + os.path.join(output_dir, "ContosoErpProducerStructured.yml")
     subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)

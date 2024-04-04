@@ -17,12 +17,10 @@ def test_validate():
         # generate the producer
         sys.argv = ['xregistry', 'validate',  
                     '--definitions', os.path.join(input_dir, disco_file)]
-        if xregistry.cli() != 0:
-            raise Exception("validation failed")
+        assert xregistry.cli() == 0
     disco_files = glob.glob("**/*.xreg.yaml", root_dir=input_dir, recursive=True)
     for disco_file in disco_files:
         # generate the producer
         sys.argv = ['xregistry', 'validate',  
                     '--definitions', os.path.join(input_dir, disco_file)]
-        if xregistry.cli() != 0:
-            raise Exception("validation failed")
+        assert xregistry.cli() == 0

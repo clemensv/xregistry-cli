@@ -18,7 +18,7 @@ using Microsoft.Azure.Messaging.EventGrid.CloudNativeCloudEvents;
 using System.Threading.Tasks;
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
 namespace {{ project_name | pascal }}
 {
     {%- set class_name = ( pascalGroupName | strip_namespace )+"ProducerClient" %}
@@ -95,7 +95,7 @@ namespace {{ project_name | pascal }}
         {%- endif %}
         public async Task Send{{ pascalDefinitionName | strip_namespace }}Async(
         {%- if definition.schemaurl or definition.schema -%}
-        {%- set type_name = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root,definition.schemaformat) | strip_namespace | pascal %}
+        {%- set type_name = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root,definition.schemaformat) | pascal %}
         {%- else -%}
         {%- set type_name = "object" %}
         {%- endif -%}

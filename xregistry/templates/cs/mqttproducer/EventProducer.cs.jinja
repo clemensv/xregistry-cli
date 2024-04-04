@@ -13,7 +13,7 @@ using CloudNative.CloudEvents.SystemTextJson;
 using Microsoft.Extensions.Logging;
  
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
 namespace {{ project_name | pascal }}
 {
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventProducer" %}
@@ -72,7 +72,7 @@ namespace {{ project_name | pascal }}
         {%- set isMqtt = not isCloudEvent and definition.format.lower().startswith("mqtt") %}
         public async Task Send{{ pascalDefinitionName | strip_namespace }}Async(
         {%- if definition.schemaurl or definition.schema -%}
-        {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | pascal }} data
+        global::{{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | pascal }} data
         {%- else -%}
         object data
         {%- endif %}    

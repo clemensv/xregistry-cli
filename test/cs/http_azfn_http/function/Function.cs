@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
+using Contoso.ERP.AzureFunction.Contoso.ERP;
 
 
 namespace TestFunction

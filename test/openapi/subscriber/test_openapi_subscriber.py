@@ -23,7 +23,7 @@ def test_openapi_subscriber():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_subscriber.xreg.json'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpSubscriber']
-    xregistry.cli()
+    assert xregistry.cli() == 0
     # run dotnet build on the csproj here that references the generated files already
     cmd = 'openapi-generator-cli validate -i ' + os.path.join(output_dir, "ContosoErpSubscriber.yml")
     subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)

@@ -40,7 +40,7 @@ import java.util.ArrayList;
 
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
 {%- set className = (pascalGroupName | strip_namespace)+"EventProducer" %}
 public class {{ className }}
 {
@@ -108,7 +108,7 @@ public class {{ className }}
     public CompletableFuture<Void> send{{ pascalDefinitionName | strip_namespace }}Async(
     {%- if definition.schemaurl -%}
     {%- set toBytes="data.toByteArray()" -%}
-    {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | strip_namespace | pascal }} data
+    {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | strip_namespace | pascal }} data
     {%- else -%}
     {% set toBytes="data.toBytes()" %}
     CloudEventData data

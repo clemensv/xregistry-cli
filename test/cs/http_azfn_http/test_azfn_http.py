@@ -32,21 +32,25 @@ def test_azfn_http():
     if os.path.exists(output):
         shutil.rmtree(output)
     # generate the producer
+    output_dir = os.path.join(project_root, 'tmp/test/cs/azfn_http/producer/')
     sys.argv = ['xregistry', 'generate',  
                 '--style', 'httpproducer', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.xreg.json'),
-                '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/producer/'),
+                '--output', output_dir,
                 '--projectname', 'Contoso.ERP.Producer']
-    xregistry.cli()
+    assert xregistry.cli() == 0
+    assert subprocess.check_call(['dotnet', 'build'], cwd=output_dir, stdout=sys.stdout, stderr=sys.stderr) == 0
     # generate the consumer
+    output_dir = os.path.join(project_root, 'tmp/test/cs/azfn_http/azfn/')
     sys.argv = [ 'xregistry', 'generate',  
                 '--style', 'httpazfn', 
                 '--language', 'cs',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'azfn_http.xreg.json'),
-                '--output', os.path.join(project_root, 'tmp/test/cs/azfn_http/azfn/'),
+                '--output', output_dir,
                 '--projectname', 'Contoso.ERP.AzureFunction']
-    xregistry.cli()
+    assert xregistry.cli() == 0
+    assert subprocess.check_call(['dotnet', 'build'], cwd=output_dir, stdout=sys.stdout, stderr=sys.stderr) == 0
     
     sentFileName = os.path.join(os.path.dirname(__file__),  "client", "sent.txt")
     receivedFileName = os.path.join(os.path.dirname(__file__), "function","bin","output","received.txt")

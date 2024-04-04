@@ -12,7 +12,7 @@ using CloudNative.CloudEvents.SystemTextJson;
 using Microsoft.Extensions.Logging;
  
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
 namespace {{ project_name | pascal }}
 {
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventProducer" %}
@@ -59,7 +59,7 @@ namespace {{ project_name | pascal }}
                 {%- if not loop.last -%},{%- endif %}
             {%- endfor %}
             };
-            return new {{ class_name }}(new AmqpProducer(logger, credential, {% if options %}options, {% else %}null, {% endif %}endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
+            return new {{ class_name }}(new AmqpProducer(logger, credential, {% if options %}options, {% else %}new Dictionary<string, string>(), {% endif %}endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
         }
         {%- endif -%}
         {%- endfor -%}
@@ -77,7 +77,7 @@ namespace {{ project_name | pascal }}
         {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}
         public async Task Send{{ pascalDefinitionName | strip_namespace }}Async(
         {%- if definition.schemaurl or definition.schema -%}
-        {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | pascal }} data
+        {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | pascal }} data
         {%- else -%}
         object data
         {%- endif %}    

@@ -40,7 +40,7 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
 {%- set className = (pascalGroupName | strip_namespace)+"EventConsumer" %}
 public class {{ className }}
 {
@@ -60,15 +60,15 @@ public class {{ className }}
     private ConsumerEndpoint endpoint;
     
     {%- if uses_cloudevents_message %}
-    {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(4) }}
+    {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(4) }}
     {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, className, messagegroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;") | indent(4) }}
     {%- endif %}
     {%- if uses_amqp_message %}
-    {{ amqp.DeclareDispatchObjectsFields( messagegroups ) | indent(4) }}
+    {{ amqp.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(4) }}
     {{ amqp.DeclareDispatchObjectsConstructor( project_name, className, messagegroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;") | indent(4) }}
     {%- endif %}
     {%- if uses_mqtt_message %}
-    {{ mqtt.DeclareDispatchObjectsFields( messagegroups ) | indent(4) }}
+    {{ mqtt.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(4) }}
     {{ mqtt.DeclareDispatchObjectsConstructor( project_name, className, messagegroups, "ConsumerEndpoint endpoint", "this.endpoint = endpoint;") | indent(4) }}
     {%- endif %}
 
@@ -76,7 +76,7 @@ public class {{ className }}
     public CompletableFuture<Void> dispatchCloudEventAsync(
             CloudEvent cloudEvent)
     {
-            {{ cloudEvents.DispatchToDispatchObjects(root,  "cloudEvent", messagegroups, "_logger" ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects(project_name, root,  "cloudEvent", messagegroups, "_logger" ) | indent(12) }}
     }
     {%- endif %}
 
@@ -84,7 +84,7 @@ public class {{ className }}
     public CompletableFuture<Void> dispatchMessageAsync(
             Message amqpMessage, MessageContext messageContext)
     {
-            {{ amqp.DispatchToDispatchObjects(root, "amqpMessage", messagegroups, "_logger" ) | indent(12) }}
+            {{ amqp.DispatchToDispatchObjects(project_name, root, "amqpMessage", messagegroups, "_logger" ) | indent(12) }}
     }
     {%- endif %}
 
@@ -92,13 +92,13 @@ public class {{ className }}
     public CompletableFuture<Void> dispatchMqttMessageV5Async(
             MqttMessageV5 mqttMessage)
     {
-            {{ mqtt.DispatchToDispatchObjects(root, "mqttMessage", messagegroups, "_logger" ) | indent(12) }}
+            {{ mqtt.DispatchToDispatchObjects(project_name, root, "mqttMessage", messagegroups, "_logger" ) | indent(12) }}
     }
 
     public CompletableFuture<Void> dispatchMqttMessageV3Async(
             MqttMessageV3 mqttMessage)
     {
-            {{ mqtt.DispatchToDispatchObjects(root, "mqttMessage", messagegroups, "_logger") | indent(12) }}
+            {{ mqtt.DispatchToDispatchObjects(project_name, root, "mqttMessage", messagegroups, "_logger") | indent(12) }}
     }
     {%- endif %}
 
@@ -124,7 +124,7 @@ public class {{ className }}
         {%- set isAmqp = not isCloudEvent and endpoint.format.lower().startswith("amqp") %}
         {%- set isMqtt = not isCloudEvent and endpoint.format.lower().startswith("mqtt") %}
             
-    public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
+    public static {{ className }} createFor{{ endpoint_key | pascal | strip_namespace }}(EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( project_name,  messagegroups, true ) }}{{ amqp.DeclareDispatchObjectsArgs( project_name,  messagegroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( project_name,  messagegroups, true ) }}) 
     {       
         {%- if options %}
         var options = new java.util.HashMap<String, String>();
@@ -137,7 +137,7 @@ public class {{ className }}
         endpoints.add(java.net.URI.create("{{ epo.uri }}"));
         {%- endfor %}
         var endpoint = ConsumerEndpoint.create(credential, {{ protocol | pascal }}Protocol.NAME, {% if options %}options, {% else %}null, {% endif %}endpoints);
-        var consumer = new {{ className }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, false ) -}});
+        var consumer = new {{ className }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( project_name,  messagegroups, false ) -}}{{ amqp.DeclareDispatchObjectsArgs( project_name,  messagegroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( project_name,  messagegroups, false ) -}});
         {%- if isAmqp %}
         if ( endpoint isinstanceof AmqpConsumerEndpoint)
         {

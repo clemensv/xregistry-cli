@@ -103,17 +103,17 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endmacro -%}
 
 
-{%- macro DeclareDispatchObjectsArgs(messagegroups, withType) -%}
+{%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
 {%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
 {%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal %}
-{%- if withType -%}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- if withType -%}{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id | default(definitiongroup_key) | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectsFields(messagegroups) -%}
+{%- macro DeclareDispatchObjectsFields(project_name,messagegroups) -%}
 {%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
 {%- set handlerName=(messagegroup.id | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
-{%- set handlerType="I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
+{%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
 {{ handlerType }} _{{ handlerName }};
 {%- endfor %}
 {%- endmacro-%}
@@ -124,7 +124,7 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
     {%- for definitiongroup_key, messagegroup in messagegroups.items() -%}
     {%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal -%} 
     {%- set handlerName=(messagegroup.id | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
-    {%- set handlerType="I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
@@ -132,7 +132,7 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
     {% for definitiongroup_key, messagegroup in messagegroups.items() -%}
     {%- set pascalGroupName = messagegroup.id | default(definitiongroup_key) | pascal %}
     {%- set handlerName=(messagegroup.id | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
-   {%- set handlerType="I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
+   {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
     this._{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
     {{ body | indent(4) }}
@@ -156,7 +156,7 @@ try {
    {
       return this._{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
       {%- if message.schemaurl or message.schema -%}
-      {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
+      {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
       {%- else -%}
       {{ message }}.Data
       {%- endif %}, match.Groups.Values.Where(g => g.Name != "0").ToDictionary(g => g.Name, g => g.Value));
@@ -183,7 +183,7 @@ public interface {{ interfaceName }}
     {%- for id, message in messagegroup.messages.items() if (message | exists( "binding", "mqtt" )) -%}
     {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
     {%- if message.schemaurl or message.schema -%}
-    {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
+    {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal -%}
     {%- else -%}
     {%- set dataType = "Object" -%}
     {%- endif %}   

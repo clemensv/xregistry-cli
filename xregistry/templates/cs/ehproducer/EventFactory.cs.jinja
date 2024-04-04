@@ -9,8 +9,8 @@ using CloudNative.CloudEvents.SystemTextJson;
 using Azure.Messaging.EventHubs;
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
-namespace {{ pascalGroupName | namespace(project_name) }}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
+namespace {{ pascalGroupName | namespace(project_name) | pascal }}
 {
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventFactory" %}
     public partial class {{ class_name }}
@@ -116,7 +116,7 @@ namespace {{ pascalGroupName | namespace(project_name) }}
         {%- endif %}
         public static EventData Create{{ pascalDefinitionName | strip_namespace }}Event(
         {%- if definition.schemaurl or definition.schema -%}
-        {%- set type_name = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) %}
+        {%- set type_name = 'global::' + ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | pascal )  %}
         {%- if definition.schemaformat.lower().startswith("jsonschema") %}
         {%- set type_name = type_name | pascal %}
         {%- endif %}

@@ -28,11 +28,11 @@ namespace {{ project_name | pascal }}
     {% for messagegroup_key, messagegroup in messagegroups.items() -%}
     {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
     {%- set uses_plain_amqp_message = (messagegroup | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
-    {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+    {%- set pascalGroupName = messagegroup.id  | pascal -%}
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventDispatcher" %}
-    namespace {{ pascalGroupName | namespace }} 
+    namespace {{ pascalGroupName | namespace(project_name) | pascal }} 
     {
-        public class {{ class_name }} : {{ project_name | pascal }}.Tools.DispatcherBase
+        public class {{ class_name }} : global::{{ project_name | pascal }}.Tools.DispatcherBase
         {
             {%- if (messagegroup | exists( "format", "cloudevents" )) %}
             
@@ -40,7 +40,7 @@ namespace {{ project_name | pascal }}
             {%- for id, message in messagegroup.messages.items() -%}
             {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
             {%- if message.schemaurl or message.schema -%}
-            {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
+            {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
             {%- else -%}
             {%- set dataType = "object" -%}
             {%- endif %}
@@ -82,7 +82,7 @@ namespace {{ project_name | pascal }}
                     {%- set pascalDefinitionName = message.id | pascal %}
                     {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) -%}
                     {%- if message.schemaurl or message.schema -%}
-                    {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
+                    {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
                     {%- else -%}
                     {%- set dataType = "object" -%}
                     {%- endif %}
@@ -111,7 +111,7 @@ namespace {{ project_name | pascal }}
                 {%- set pascalDefinitionName = message.id | pascal %}
                 {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) -%}
                 {%- if message.schemaurl or message.schema -%}
-                {%- set dataType = ( message.schemaurl if message.schemaurl else message.schema) | schema_type(root, message.schemaformat) | strip_namespace  | pascal -%}
+                {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
                 {%- else -%}
                 {%- set dataType = "object" -%}
                 {%- endif %}
@@ -182,7 +182,7 @@ namespace {{ project_name | pascal }}
     {%- endmacro -%}    
     
 
-    namespace {{ pascalGroupName | namespace }}
+    namespace {{ pascalGroupName | namespace(project_name) | pascal  }}
     {
         {%- set class_name = ( pascalGroupName | strip_namespace )+"ServiceBusProcessorFactory" %}
         public class {{ class_name }} 

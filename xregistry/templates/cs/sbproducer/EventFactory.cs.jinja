@@ -9,15 +9,15 @@ using CloudNative.CloudEvents.SystemTextJson;
 using Azure.Messaging.ServiceBus;
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
-namespace {{ pascalGroupName | namespace(project_name) }}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
+namespace {{ pascalGroupName | namespace(project_name) | pascal }}
 {
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventFactory" %}
     public partial class {{ class_name }}
     {
         private const string cePrefix = "cloudEvents_";
         private const string applicationOctetStream = "application/octet-stream";
-        public delegate byte[] Serialize<T>(T data, out ContentType contentType);
+        public delegate byte[] Serialize<T>(T data, out string contentType);
         private static CloudEventFormatter defaultFormatter = new JsonEventFormatter();
 
         {%- if root.endpoints -%} 
@@ -68,7 +68,7 @@ namespace {{ pascalGroupName | namespace(project_name) }}
         {%- endfor -%}
         {% endif %}
 
-        private ServiceBusMessage CreateMessage<T>(CloudEvent? cloudEvent, T data, Serialize<T>? bodySerializer = null, CloudEventFormatter? formatter = null) where T : notnull
+        private static ServiceBusMessage CreateMessage<T>(CloudEvent? cloudEvent, T data, Serialize<T>? bodySerializer = null, CloudEventFormatter? formatter = null) where T : notnull
         {
             if (formatter == null)
             {
@@ -77,9 +77,9 @@ namespace {{ pascalGroupName | namespace(project_name) }}
                 {
                     throw new ArgumentNullException(nameof(bodySerializer));
                 }
-                var contentType = new ContentType(applicationOctetStream);
+                var contentType = applicationOctetStream;
                 ServiceBusMessage message = new ServiceBusMessage(bodySerializer == null ? (byte[])(object)data : bodySerializer(data, out contentType));
-                message.ContentType = contentType.ToString();
+                message.ContentType = contentType;
                 if (cloudEvent != null)
                 {
                     foreach (var attr in cloudEvent.GetPopulatedAttributes())
@@ -117,7 +117,7 @@ namespace {{ pascalGroupName | namespace(project_name) }}
         {%- endif %}
         public static ServiceBusMessage Create{{ pascalDefinitionName | strip_namespace }}Event(
         {%- if definition.schemaurl or definition.schema -%}
-        {%- set type_name = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | strip_namespace | pascal %}
+        {%- set type_name = 'global::' + ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | pascal) %}
         {%- else -%}
         {%- set type_name = "object" %}
         {%- endif -%}
@@ -138,7 +138,6 @@ namespace {{ pascalGroupName | namespace(project_name) }}
             {
                 formatter = defaultFormatter;
             }
-            {%- if isCloudEvent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12) }}
             return CreateMessage(cloudEvent, data, bodySerializer, formatter);
             {%- elif isAmqp %}

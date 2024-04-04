@@ -9,7 +9,7 @@ import { httpTransport, emitterFor, CloudEvent } from "cloudevents";
 import { v4 as uuidv4 } from "uuid";
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
 
 export class {{ pascalGroupName | concat_namespace }}EventProducer
 {
@@ -63,7 +63,7 @@ export class {{ pascalGroupName | concat_namespace }}EventProducer
    {%- set isMqtt = not isCloudEvent and definition.format.lower().startswith("mqtt") %}
    async send{{ pascalDefinitionName | strip_namespace }}Async(
    {%- if definition.schemaurl or definition.schema -%}
-   {% set dataType = "types." + ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type(root, definition.schemaformat) | strip_namespace | pascal) %}
+   {% set dataType = "types." + ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | strip_namespace | pascal) %}
    {%- else -%}
    {% set dataType = "any" %}
    {%- endif %}    

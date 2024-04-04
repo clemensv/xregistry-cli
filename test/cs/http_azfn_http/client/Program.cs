@@ -31,7 +31,7 @@ public class Program
             
         };
         
-        await producer.SendEmployeeAddedAsync(new Contoso.ERP.Producer.EmployeeData()
+        await producer.SendEmployeeAddedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.EmployeeData()
         {
             EmployeeId = "123",
             Email = "johndoe@example.com",
@@ -39,12 +39,12 @@ public class Program
             Name = "John Doe",
             Position = "Sales Manager"
         });
-        await producer.SendEmployeeDeletedAsync(new Contoso.ERP.Producer.EmployeeDeletionData()
+        await producer.SendEmployeeDeletedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.EmployeeDeletionData()
         {
             EmployeeId = "123",
             Reason = "Termination"
         });
-        await producer.SendEmployeeUpdatedAsync(new Contoso.ERP.Producer.EmployeeUpdatedData()
+        await producer.SendEmployeeUpdatedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.EmployeeUpdatedData()
         {
             EmployeeId = "123",
             Email = "johndoe@example.com",
@@ -52,59 +52,59 @@ public class Program
             Name = "John Doe",
             Position = "Sales Manager"
         });
-        await producer.SendInventoryUpdatedAsync(new Contoso.ERP.Producer.InventoryData()
+        await producer.SendInventoryUpdatedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.InventoryData()
         {
             Location = "Musterstadt",
             ProductId = "abcdef",
             Quantity = 100
         });
-        await producer.SendReservationCancelledAsync(new Contoso.ERP.Producer.CancellationData()
+        await producer.SendReservationCancelledAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.CancellationData()
         {
             OrderId = "2001272727",
             Reason = "Unknown",
             Status = "Cancelled"
         });
-        await producer.SendReservationPlacedAsync(new Contoso.ERP.Producer.OrderData()
+        await producer.SendReservationPlacedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.OrderData()
         {
             CustomerId = "123",
             OrderId = "abc",
             Total = 1000,
-            Items = new List<Contoso.ERP.Producer.OrderData.ItemsItem>()
+            Items = new List<Contoso.ERP.Producer.Contoso.ERP.Events.OrderData.ItemsItem>()
             {
-                new Contoso.ERP.Producer.OrderData.ItemsItem() {
+                new Contoso.ERP.Producer.Contoso.ERP.Events.OrderData.ItemsItem() {
                     ProductId = "123",
                     Price = 10,
                     Quantity = 5
                 }
             }
         });
-        await producer.SendReservationRefundedAsync(new Contoso.ERP.Producer.RefundData()
+        await producer.SendReservationRefundedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.RefundData()
         {
             OrderId = "123",
             Amount = 1000,
             Reason = "Unknown",
             Status = "Refunded"
         });
-        await producer.SendProductAddedAsync(new Contoso.ERP.Producer.ProductData()
+        await producer.SendProductAddedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.ProductData()
         {
             ProductId = "124",
             Description = "Foo",
             Name = "Foo",
             Price = 123
         });
-        await producer.SendProductDeletedAsync(new Contoso.ERP.Producer.ProductDeletionData()
+        await producer.SendProductDeletedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.ProductDeletionData()
         {
             ProductId = "124",
             Reason = "Discontinued"
         });
-        await producer.SendProductUpdatedAsync(new Contoso.ERP.Producer.ProductUpdatedData()
+        await producer.SendProductUpdatedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.ProductUpdatedData()
         {
             ProductId = "124",
             Description = "Foo",
             Name = "Foo",
             Price = 123
         });
-        await producer.SendPaymentsReceivedAsync(new Contoso.ERP.Producer.PaymentData()
+        await producer.SendPaymentsReceivedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.PaymentData()
         {
             OrderId = "123",
             Paymentmethod = "Visa",

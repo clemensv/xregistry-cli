@@ -1,91 +1,132 @@
-1   {%- set schema_name = class_name | camel -%}
-2   {%- set list_type = "list" %}
-3   {%- set schema = root %}
-4   
-5   {%- macro emitclass(type, type_name) -%}
-6       {%- if type.type == 'object' or not type.type %}
-7       class {{ type_name | camel }}:
-8           {%- if type.allOf -%}
-9               {%- for allOfType in type.allOf -%}
-10                  {%- if loop.first -%}
-11                      {%- if allOfType['$ref'] -%}
-12                  : {{ allOfType['$ref'] | schema_type(root) | camel }}
-13                      {%- endif -%}
-14                  {%- endif -%}
-15              {%- endfor -%}
-16           {%- endif %}
-17               def __init__(self):
-18                   pass
-19               @staticmethod
-20               def from_data(data):
-21                   if isinstance(data, {{ type_name | camel }})
-22                       return data
-23                   if isinstance(data, dict):
-24                       return json.loads(json.dumps(data), object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
-25                   else if isinstance(data, str):
-26                       return json.loads(data, object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
-27                   raise TypeError("Data is not of a supported type for conversion to {{ type_name | camel }}")
-28            {% if type.properties %}
-29            {% for pn, property in type.properties.items()  -%}
-30                {%- set propertyName = pn | snake_case %}
-31                {%- set pythonType = "" -%}
-32                {%- if property.type == 'integer' -%}
-33                    {%- if property.format == 'int32' -%}
-34                        {%- set pythonType = "int" -%}
-35                    {%- elif property.format == 'int64' -%}
-36                        {%- set pythonType = "int" -%}
-37                    {%- else -%}    
-38                        {%- set pythonType = "int" -%}
-39                    {%- endif -%}
-40                {%- elif property.type == 'number' -%}
-41                    {%- if property.format == 'float' -%}
-42                        {%- set pythonType = "float" -%}
-43                    {%- elif property.format == 'double' -%}
-44                        {%- set pythonType = "float" -%}
-45                    {%- elif property.format == 'decimal' -%}
-46                        {%- set pythonType = "float" -%}
-47                    {%- else -%}
-48                        {%- set pythonType = "float" -%}
-49                    {%- endif -%}
-50                {%- elif property.type == 'string' -%}
-51                    {%- if property.format == 'date-time' -%}
-52                        {%- set pythonType = "datetime" -%}
-53                    {%- endif -%}
-54                    {%- if property.format == 'email' -%}
-55                        {%- set pythonType = "str" -%}
-56                    {%- endif -%}
-57                    {%- if property.format == 'uri' -%}
-58                        {%- set pythonType = "str" -%}
-59                    {%- endif -%}
-60                    {%- if property.format == 'date' -%}
-61                        {%- set pythonType = "datetime" -%}
-62                    {%- endif -%}
-63                    {%- if property.format == 'time' -%}
-64                        {%- set pythonType = "timedelta" -%}
-65                    {%- endif -%}
-66                    {%- if property.format == 'uuid' -%}
-67                        {%- set pythonType = "str" -%}
-68                    {%- endif -%}
-69                    {%- if property.format == 'ipv4' -%}
-70                        {%- set pythonType = "str" -%}
-71                    {%- endif -%}
-72                {%- endif -%}
-73                self.{{ propertyName }} = {{ pythonType }}
-74            {%- endfor -%}
-75            {%- endif %}
-76   {%- endmacro -%}
+# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring
+from typing import Any, Dict, List, Optional, Union
+from datetime import datetime, date
+import json
+from copy import deepcopy
 
-77   {%- for name, type in schema.messages.items() -%}
-78       {{ emitclass(type, name) }}
-79   {%- endfor -%}
-80   {%- for name, type in schema.properties.items() -%}
-81       {%- if type.type == 'array' -%}
-82           {%- set arrayType = type.items['$ref'] | schema_type(root) -%}
-83           class {{ name | camel }}({{ list_type }}[{{ arrayType | camel }}]):
-84               pass
-85       {%- else -%}
-86           {{ emitclass(type, name) }}
-87       {%- endif -%}
-88   {%- endfor -%}
+{% set schema_name = class_name | snake -%}
+{%- set schema = root %}
+{%- macro python_type(json_type, format=None, nested_name=None) -%}
+    {%- if json_type == 'integer' -%}
+        int
+    {%- elif json_type == 'number' -%}
+        float
+    {%- elif json_type == 'string' -%}
+        {%- if format == 'date-time' -%}
+            datetime
+        {%- elif format == 'date' -%}
+            date
+        {%- else -%}
+            str
+        {%- endif -%}
+    {%- elif json_type == 'boolean' -%}
+        bool
+    {%- elif json_type == 'array' -%}
+        {%- if nested_name -%}
+            List[{{nested_name}}]
+        {%- else -%}
+            List
+        {%- endif -%}
+    {%- elif json_type == 'object' -%}
+        {%- if nested_name -%}
+            {{ nested_name }}
+        {%- else -%}
+            Dict
+        {%- endif -%}
+    {%- else -%}
+        Any
+    {%- endif -%}
+{%- endmacro -%}
 
+{%- macro emitclass(type, prefix_type_name, type_name, is_nested=False) -%}
+{% if prefix_type_name %}
+{%- set prefix_type_name = prefix_type_name + '.' %}
+{%- endif %}
+{%- if type.type == 'object' or not type.type %}
+class {{ type_name | snake }}:
+{%- if type.properties %}
+{%- for pn, property in type.properties.items() %}
+{%- if property.type == 'object' %}
+{%- set nested_class_name = pn + '_type' | snake %}
+{{- emitclass(property, prefix_type_name + type_name, nested_class_name, is_nested=True) }}
+{%- elif property.type == 'array' %}
+{%- set nested_class_name = pn + '_type' | snake %}
+{{- emitclass(property['items'], prefix_type_name + type_name, nested_class_name, is_nested=True) | indent(4) }}
+{%- endif %}
+{%- endfor %}
+{%- endif %}
 
+    def __init__(self, data: Optional[Dict[str, Any]] = None) -> None:
+        """{{ type.description | default(type_name | snake, true) }}"""
+        {%- if type.properties %}
+        {%- for pn, property in type.properties.items() %}
+        {%- set propertyName = pn | snake %}
+        {%- if property.type == 'object' %}
+        {%- set nested_class_name = type_name + '.' + propertyName + '_type' | snake %}
+        self.{{ propertyName }}: {{prefix_type_name}}{{ nested_class_name }} = {{prefix_type_name}}{{ nested_class_name }}(data.get('{{ pn }}', {})) if data else {{prefix_type_name}}{{ nested_class_name }}()
+        {%- elif property.type == 'array' %}
+        {%- set nested_class_name = type_name + '.' + propertyName + '_type' | snake %}
+        self.{{ propertyName }}: List[{{prefix_type_name}}{{ nested_class_name }}] = [{{prefix_type_name}}{{ nested_class_name }}.from_data(item) for item in data.get('{{ pn }}', [])] if data else []
+        {%- else %}
+        {%- set propertyType = python_type(property.type, property.format, '') %}
+        self.{{ propertyName }}: {{ propertyType }} = data.get('{{ pn }}', None) if data else None
+        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+
+    @classmethod
+    def from_data(cls, data: Union[str, Dict[str, Any], '{{prefix_type_name}}{{ type_name | snake }}']) -> '{{prefix_type_name}}{{ type_name | snake }}':
+        """Create an instance of {{prefix_type_name}}{{ type_name | snake }} from a dictionary or JSON string"""
+        if isinstance(data, cls):
+            return data
+        elif isinstance(data, dict):
+            return cls(data)
+        elif isinstance(data, str):
+            try:
+                return cls(json.loads(data))
+            except ValueError as e:
+                raise ValueError(f"Error parsing string as JSON: {str(e)}") from e
+        else:
+            raise TypeError("Data is not of a supported type for conversion to {{prefix_type_name}}{{ type_name | snake }}")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert this object to a dictionary"""
+        return {attr: getattr(self, attr).to_dict() if hasattr(getattr(self, attr), 'to_dict') else getattr(self, attr) for attr in self.__dict__ if not attr.startswith('_')}
+
+    def clone(self) -> '{{prefix_type_name}}{{ type_name | snake }}':
+        """Create a deep copy of this object"""
+        return deepcopy(self)
+
+{% if type.properties %}
+{%- for pn, property in type.properties.items() %}
+{%- if property.type != 'object' and property.type != 'array' %}
+    @property
+    def {{ pn | snake }}(self) -> {{ python_type(property.type, property.format, (pn | snake) if property.type == 'object' else None).strip("'") }}:
+        return self._{{ pn | snake }}
+
+    @{{ pn | snake }}.setter
+    def {{ pn | snake }}(self, value: {{ python_type(property.type, property.format, (pn | snake) if property.type == 'object' else None).strip("'") }}) -> None:
+        self._{{ pn | snake }} = value
+{%- elif property.type == 'array' %}
+    @property
+    def {{ pn | snake }}(self) -> List[{{ prefix_type_name }}{{ pn + '_type' | snake }}]:
+        return self._{{ pn | snake }}
+
+    @{{ pn | snake }}.setter
+    def {{ pn | snake }}(self, value: List[{{ prefix_type_name }}{{ pn + '_type' | snake }}]) -> None:
+        self._{{ pn | snake }} = value
+{%- else %}
+    @property
+    def {{ pn | snake }}(self) -> {{ prefix_type_name }}{{ pn + '_type' | snake }}:
+        return self._{{ pn | snake }}
+
+    @{{ pn | snake }}.setter
+    def {{ pn | snake }}(self, value: {{ prefix_type_name }}{{ pn + '_type' | snake }}) -> None:
+        self._{{ pn | snake }} = value
+{%- endif %}
+{%- endfor %}
+{%- endif %}
+{%- endif %}
+{%- endmacro -%}
+
+{{ emitclass(schema, '', schema_name) }}

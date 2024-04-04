@@ -21,18 +21,18 @@ using CloudNative.CloudEvents.SystemTextJson;
 using Microsoft.Extensions.Logging;
  
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
- {%- set pascalGroupName = messagegroup.id | default(messagegroup_key) | pascal -%}
+ {%- set pascalGroupName = messagegroup.id  | pascal -%}
 namespace {{ project_name | pascal }}
 {
      {%- set class_name = ( pascalGroupName | strip_namespace )+"EventConsumer" %}
     public class {{ class_name }} : IDisposable
     {
         {%- if uses_cloudevents_message %}
-        {{ cloudEvents.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
         {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "MqttConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
         {%- endif %}
         {%- if uses_mqtt_message %}
-        {{ mqtt.DeclareDispatchObjectsFields( messagegroups ) | indent(8) }}
+        {{ mqtt.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
         {{ mqtt.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "MqttConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchApplicationMessageAsync += DispatchApplicationMessageAsync;") | indent(8) }}
         {%- endif %}
 
@@ -47,7 +47,7 @@ namespace {{ project_name | pascal }}
         {
             try 
             {
-                {{ cloudEvents.DispatchToDispatchObjects(root, "cloudEvent", messagegroups, "log" ) | indent(16) }}
+                {{ cloudEvents.DispatchToDispatchObjects(project_name, root, "cloudEvent", messagegroups, "log" ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -61,7 +61,7 @@ namespace {{ project_name | pascal }}
         {
             try 
             {
-               {{ mqtt.DispatchToDispatchObjects(root, "mqttMessage", messagegroups, "log" ) | indent(16) }}
+               {{ mqtt.DispatchToDispatchObjects(project_name, root, "mqttMessage", messagegroups, "log" ) | indent(16) }}
             }
             catch (Exception ex)
             {
@@ -85,7 +85,7 @@ namespace {{ project_name | pascal }}
            {%- set isCloudEvent = not endpoint.format or endpoint.format.lower().startswith("cloudevents") -%}
            {%- set isMqtt = not isCloudEvent and endpoint.format.lower().startswith("mqtt") %}
                 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, true ) }}) 
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( project_name,  messagegroups, true ) }}{{ mqtt.DeclareDispatchObjectsArgs( project_name,  messagegroups, true ) }}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -102,7 +102,7 @@ namespace {{ project_name | pascal }}
             {%- endfor %}
             };
             var endpoint = new MqttConsumer(logger, credential,  {% if options %}options, {% else %}null, {% endif %}endpoints);
-            var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( messagegroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( messagegroups, false ) -}});
+            var consumer = new {{ class_name }}(endpoint, {{ cloudEvents.DeclareDispatchObjectsArgs( project_name,  messagegroups, false ) -}}{{ mqtt.DeclareDispatchObjectsArgs( project_name,  messagegroups, false ) -}});
             return consumer;
         }
         {%- endif -%}

@@ -23,7 +23,7 @@ def test_openapi_producer():
                 '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_producer.xreg.json'),
                 '--output', output_dir,
                 '--projectname', 'ContosoErpProducer']
-    xregistry.cli()
+    assert xregistry.cli() == 0
     # run dotnet build on the csproj here that references the generated files already
     cmd = 'openapi-generator-cli validate -i ' + os.path.join(output_dir, "ContosoErpProducer.yml")
     
