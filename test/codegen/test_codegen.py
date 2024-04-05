@@ -52,6 +52,7 @@ def test_codegen_py():
                         '--projectname', f'test.{dir_name}']
             assert xregistry.cli() == 0
             
+@pytest.mark.skipif(sys.platform.startswith("linux"), reason="Skip on Linux")
 def test_codegen_java():
     # check whether maven is installed
     if subprocess.check_call(['mvn', '-v'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True) != 0:
