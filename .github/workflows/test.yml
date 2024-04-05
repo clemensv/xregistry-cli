@@ -56,7 +56,7 @@ jobs:
         ref: main
         path: javaendpoints
     - name: build CloudNative.CloudEvents.Endpoint package code
-      run: mvn install -Dmaven.test.skip -f $GITHUB_WORKSPACE/javaendpoints/pom.xml
+      run: mvn install -Dmaven.test.skip -f javaendpoints/pom.xml
     # end section
     - name: Set up Python
       uses: actions/setup-python@v2
