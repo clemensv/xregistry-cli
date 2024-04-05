@@ -20,6 +20,7 @@
     {%- endif %}
     <log4j.version>2.23.1</log4j.version>
     <io.cloudevents.version>3.0.0</io.cloudevents.version>
+    <io.cloudevents.experimental.version>0.1.1-SNAPSHOT</io.cloudevents.experimental.version>
   </properties>
   <dependencies>
      <dependency>
@@ -45,10 +46,24 @@
       <version>${io.cloudevents.version}</version>
     </dependency>
     <dependency>
-        <groupId>io.cloudevents</groupId>
-        <artifactId>cloudevents-json-jackson</artifactId>
-        <version>${io.cloudevents.version}</version>
+      <groupId>io.cloudevents.experimental</groupId>
+      <artifactId>endpoints</artifactId>
+      <version>${io.cloudevents.experimental.version}</version>
     </dependency>
+   {%- if uses_amqp_endpoint %}
+    <dependency>
+      <groupId>io.cloudevents.experimental</groupId>
+      <artifactId>endpoints-amqp</artifactId>
+      <version>${io.cloudevents.experimental.version}</version>
+    </dependency>
+    {%- endif %}
+    {%- if uses_mqtt_endpoint %}
+    <dependency>
+      <groupId>io.cloudevents.experimental</groupId>
+      <artifactId>endpoints-mqtt</artifactId>
+      <version>${io.cloudevents.experimental.version}</version>
+    </dependency>
+    {%- endif %}
     {%- if uses_protobuf %}
     <dependency>
       <groupId>io.cloudevents</groupId>

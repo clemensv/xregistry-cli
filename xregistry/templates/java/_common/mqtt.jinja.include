@@ -2,7 +2,7 @@
 
 {%- macro PahoImports() -%}
 import org.eclipse.paho.client.mqttv3.MqttMessage as MqttMessageV2;
-iomport org.eclipse.paho.mqttv5.common.packet.MqttWireMessage as MqttMessageV5;
+import org.eclipse.paho.mqttv5.common.packet.MqttWireMessage as MqttMessageV5;
 {%- endmacro -%}
 
 {%- macro EmitArguments(props) -%}
