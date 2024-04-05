@@ -52,4 +52,25 @@ def test_codegen_py():
                         '--projectname', f'test.{dir_name}']
             assert xregistry.cli() == 0
             
+def test_codegen_java():
+    # check whether maven is installed
+    if subprocess.check_call(['mvn', '-v'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True) != 0:
+        pytest.skip('Maven is not installed')
     
+    input_dir = os.path.join(project_root, 'xregistry/templates/java'.replace('/', os.path.sep))
+    # loop through all dirs in the input directory that have no leading underscore in their name
+    for dir_name in os.listdir(input_dir):
+        if os.path.exists(os.path.join(project_root, f'tmp/test/java/{dir_name}/'.replace('/', os.path.sep))):
+            shutil.rmtree(os.path.join(project_root, f'tmp/test/java/{dir_name}/'.replace('/', os.path.sep)))
+        output_dir = os.path.join(project_root, f'tmp/test/java/{dir_name}'.replace('/', os.path.sep))
+        if not dir_name.startswith('_') and os.path.isdir(os.path.join(input_dir, dir_name)):
+            # generate the code for each directory
+            sys.argv = ['xregistry', 'generate',  
+                        '--style', dir_name, 
+                        '--language', 'java',
+                        '--definitions', os.path.join(project_root, 'samples/message-definitions/contoso-erp.xreg.json'.replace('/', os.path.sep)),
+                        '--output', output_dir,
+                        '--projectname', f'test.{dir_name}']
+            assert xregistry.cli() == 0
+            # run dotnet build on the csproj here that references the generated files already
+            assert subprocess.check_call(['mvn', 'package'], cwd=output_dir, stdout=sys.stdout, stderr=sys.stderr, shell=True) == 0

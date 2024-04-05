@@ -17,7 +17,7 @@ servers:
 {%- set options = endpoint.config.options -%}
 {%- set endpoints = endpoint.config.endpoints -%}
 {%- for endpointObject in endpoints %}
-  {{ endpoint_key | concat_namespace }}:
+  {{ endpoint_key | strip_dots }}:
       url: {{ endpointObject.uri }}
 {%- if endpoint.description is defined %}
       description: {{ endpoint.description }}
@@ -32,10 +32,10 @@ channels:
 {%- set protocol = endpoint.config.protocol | lower() -%}
 {%- set options = endpoint.config.options -%}
 {%- set endpoints = endpoint.config.endpoints %}
-  {{ endpoint_key | concat_namespace }}:
-    servers: ["{{ endpoint_key | concat_namespace }}"]
+  {{ endpoint_key | strip_dots }}:
+    servers: ["{{ endpoint_key | strip_dots }}"]
     {% if endpoint.usage == "producer" -%}publish:{%-else-%}subscribe:{%- endif %}
-      operationId: "{{ endpoint_key | concat_namespace }}"
+      operationId: "{{ endpoint_key | strip_dots }}"
       {%- if protocol.startswith("http") %}
       bindings:
         http:
@@ -46,7 +46,7 @@ channels:
   {%- if ce_content_mode == "structured" -%}
   {# structured mode #}
       message:
-        messageId: "{{ endpoint_key | concat_namespace }}.cloudEvent"
+        messageId: "{{ endpoint_key | strip_dots }}.cloudEvent"
         contentType: "application/cloudevents+json"
         schemaformat: "application/schema+json;version=draft-07"
         correlationId:
@@ -81,7 +81,7 @@ channels:
           {%- if groupObject is mapping %}
           {%- for eventkey, event in groupObject.messages.items() -%}         
            {%- set x = (protocol+":"+groupObject.id+":"+event.id) | push("messages") %}
-          - $ref: "#/components/messages/{{protocol | pascal}}{{ event.id | concat_namespace | pascal }}"
+          - $ref: "#/components/messages/{{ protocol | strip_dots | pascal}}{{ event.id | strip_dots | pascal }}"
           {%- endfor -%}
           {%- endif -%}
         {%- endfor -%}
@@ -97,8 +97,8 @@ components:
     {%- set eventid = message.split(':')[2] -%}
     {%- for messagegroup_key, messagegroup in root.messagegroups.items() if messagegroup_key == groupid -%}
     {%- for eventkey, event in messagegroup.messages.items() if eventkey == eventid %}
-    {{protocol | pascal}}{{ event.id | concat_namespace | pascal }}:
-      messageId: "{{protocol | pascal}}{{ event.id | concat_namespace | pascal }}"
+    {{protocol | pascal}}{{ event.id | strip_dots | pascal }}:
+      messageId: "{{protocol | strip_dots | pascal}}{{ event.id | strip_dots | pascal }}"
       title: "{{ event.id }}"
       summary: "{{ event.description }}"
       {%- if event.metadata.datacontenttype is defined and event.metadata.datacontenttype.value is defined %}

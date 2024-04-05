@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from "uuid";
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
 {%- set pascalGroupName = messagegroup.id  | pascal -%}
 
-export class {{ pascalGroupName | concat_namespace }}EventProducer
+export class {{ pascalGroupName | strip_dots }}EventProducer
 {
     credential : any;
     endpoints : any;
@@ -31,7 +31,7 @@ export class {{ pascalGroupName | concat_namespace }}EventProducer
       {%- set options = endpoint.config.options -%}
       {%- set endpoints = endpoint.config.endpoints %}
            
-   static createFor{{ endpoint_key | pascal | concat_namespace }}(credential : any) 
+   static createFor{{ endpoint_key | pascal | strip_dots }}(credential : any) 
    {       
        {%- if options %}
        var options = { 
@@ -49,7 +49,7 @@ export class {{ pascalGroupName | concat_namespace }}EventProducer
            {%- if not loop.last -%},{%- endif %}
        {%- endfor %}
        ];
-       return new {{ pascalGroupName | concat_namespace }}EventProducer(credential, endpoints, options);
+       return new {{ pascalGroupName | strip_dots }}EventProducer(credential, endpoints, options);
    }
    {%- endif -%}
    {%- endfor -%}

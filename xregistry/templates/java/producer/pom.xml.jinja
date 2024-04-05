@@ -13,13 +13,13 @@
   <version>1.0-SNAPSHOT</version>
   <properties>
     {%- if uses_avro %}
-    <avro.version>1.11.1</avro.version>
+    <avro.version>1.11.3</avro.version>
     {%- endif %}
     {%- if uses_protobuf %}
     <protobuf.version>3.11.4</protobuf.version>
     {%- endif %}
-    <log4j.version>2.19.0</log4j.version>
-    <io.cloudevents.version>2.4.0</io.cloudevents.version>
+    <log4j.version>2.23.1</log4j.version>
+    <io.cloudevents.version>3.0.0</io.cloudevents.version>
     <io.cloudevents.experimental.version>0.1.1-SNAPSHOT</io.cloudevents.experimental.version>
   </properties>
   <dependencies>
@@ -164,7 +164,7 @@
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-resources-plugin</artifactId>
-            <version>3.1.0</version>
+            <version>3.3.1</version>
             <configuration>
                <encoding>UTF-8</encoding>
             </configuration>
@@ -172,9 +172,9 @@
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.8.0</version>
+            <version>3.13.0</version>
             <configuration>
-               <release>17</release>
+               <release>21</release>
               <encoding>UTF-8</encoding>             
             </configuration>
           </plugin>

@@ -1,5 +1,5 @@
 {%- set schema = root -%}
-{%- set namespace = project_name | pascal -%}
+{%- set namespace = class_name | namespace(project_name) -%}
 {
     "namespace": "{{ namespace | lower() }}",
     {%- for attr, value in schema.items() %}

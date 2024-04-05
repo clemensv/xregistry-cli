@@ -19,18 +19,18 @@ public class {{ typeName }}
 {
     {% endif -%}
 
-    public static {{ typeName | pascal }} fromData(Object data) throws JsonProcessingException, JsonMappingException {
-        if ( data instanceof {{ typeName | pascal }}) {
-            return ({{ typeName | pascal }})data;
+    public static {{ typeName }} fromData(Object data) throws JsonProcessingException, JsonMappingException {
+        if ( data instanceof {{ typeName }}) {
+            return ({{ typeName }})data;
         }
         if (data instanceof JsonNode) {
-            return (new ObjectMapper()).readValue(((JsonNode)data).toString(), {{ typeName | pascal }}.class);
+            return (new ObjectMapper()).readValue(((JsonNode)data).toString(), {{ typeName }}.class);
         }
         else if ( data instanceof String)
         {
-            return (new ObjectMapper()).readValue(((String)data), {{ typeName | pascal }}.class);
+            return (new ObjectMapper()).readValue(((String)data), {{ typeName }}.class);
         }
-        throw new UnsupportedOperationException("Data is not of a supported type for conversion to {{ typeName | pascal }}");
+        throw new UnsupportedOperationException("Data is not of a supported type for conversion to {{ typeName }}");
     }
 
     public byte[] toByteArray() throws JsonProcessingException {
@@ -231,7 +231,7 @@ public class {{ typeName }}
 {% endif %}
 }
 {%- endmacro -%}
-package {{ project_name | lower }};
+package {{ class_name | namespace(project_name) | lower }};
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -239,4 +239,4 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
-{{ emitclass(schema, schema_name) }}
+{{ emitclass(schema, schema_name | strip_namespace | pascal ) }}

@@ -301,7 +301,7 @@ def namespace_dot(class_reference, namespace_prefix=""):
 
 # Jinja filter that concats the namespace/package portions of
 # an expression, removing the dots.
-def concat_namespace(class_reference) -> str:
+def strip_dots(class_reference) -> str:
     if class_reference:
         return "".join(class_reference.split("."))
     return class_reference
@@ -788,27 +788,32 @@ def render_code_templates(project_name : str, style : str, output_dir : str, doc
                                 "messagegroups": {}
                             }
                             subscope["messagegroups"][id] = definitiongroup
+                            class_name = id
                             scope_parts = id.split(".")
+                            class_package_name = scope_parts[-1]
                             package_name = id
                             if not package_name:
                                 package_name = project_name
-                            class_name = scope_parts[-1]
-                            if not class_name:
+                            elif not package_name.startswith(project_name):
+                                package_name = project_name + "." + package_name
+                            if not class_package_name:
                                 raise RuntimeError("class name not found")
                             if file_name_base.find("{classdir}") > -1:
                                 file_dir = os.path.join(file_dir_base, 
                                                         os.path.join(*package_name.split("."))).lower()
-                                file_name = file_name_base.replace("{classdir}", pascal(class_name))
+                                file_name = file_name_base.replace("{classdir}", pascal(class_package_name))
+                                class_name = f'{package_name}.{file_name.split(".")[0]}'
                             else:
                                 file_name = file_name_base.replace(
-                                    "{classfull}", id).replace("{classname}",
-                                                            pascal(class_name))
+                                    "{classfull}", id).replace("{classname}", pascal(class_package_name))
+                            if not class_name:
+                                raise RuntimeError("class name not found")
                             render_template(project_name, class_name, subscope, file_dir,
                                             file_name, template, template_args, suppress_output)
                     continue  # skip back to the outer loop
 
                 if file_name.startswith("{projectdir}"):
-                    file_dir = os.path.join(file_dir_base, os.path.join(*package_name.split("."))).lower()
+                    file_dir = os.path.join(file_dir_base, os.path.join(*project_name.split("."))).lower()
                     file_name = file_name_base.replace("{projectdir}", "")
 
                 
@@ -900,8 +905,14 @@ def render_schema_templates(schema_type : str|None, project_name : str, class_na
             
             file_name = file_name_base
             if file_name_base.find("{classdir}") > -1:
-                file_dir = os.path.join(file_dir, os.path.join(*project_name.split(".")).lower())
-                file_name = file_name_base.replace("{classdir}", class_name)
+                scope_parts = class_name.split(".")
+                class_package_name = scope_parts[-1]
+                package_name = '.'.join(scope_parts[:-1])
+                if not package_name.startswith(project_name):
+                    package_name = project_name + "." + package_name
+                
+                file_dir = os.path.join(file_dir, os.path.join(*package_name.split(".")).lower())
+                file_name = file_name_base.replace("{classdir}", pascal(class_package_name))
                     
             
             # remember the schema class name we generated a file for 
@@ -967,7 +978,7 @@ def setup_jinja_env(template_dirs : list[str]):
     env.filters['strip_namespace'] = strip_namespace
     env.filters['namespace'] = namespace
     env.filters['namespace_dot'] = namespace_dot
-    env.filters['concat_namespace'] = concat_namespace
+    env.filters['strip_dots'] = strip_dots
     env.filters['schema_type'] = schema_type
     env.filters['camel'] = camel
     env.filters['strip_invalid_identifier_characters'] = strip_invalid_identifier_characters

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace {{ project_name | pascal }}
 {
-    {%- set class_name = (project_name | pascal | concat_namespace)+"Base" %}
+    {%- set class_name = (project_name | pascal | strip_dots)+"Base" %}
     public class {{ class_name }}
     {
         {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}

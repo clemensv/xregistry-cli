@@ -19,7 +19,7 @@ CROSS APPLY
 WITH {% for messagegroup_key, messagegroup in root.messagegroups.items() -%}
 {%- for definitionid, definition in messagegroup.messages.items() %}
 {%- if not loop.first -%},
-{% endif %}{{ definition.id | concat_namespace  | pascal }} AS (
+{% endif %}{{ definition.id | strip_dots  | pascal }} AS (
     SELECT type, {% if definition.schemaurl or definition.schema -%}data AS {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | strip_namespace  | pascal }}, {% endif -%} *
     FROM [input]
     WHERE type = '{{definition.id}}'
@@ -41,7 +41,7 @@ SELECT {% for attrname, attribute in definition.metadata.items() %}
 ,{{ item }}
 {%- endfor %}
 INTO [output{{ definition.id | strip_namespace | pascal }}]
-FROM {{ definition.id | concat_namespace  | pascal }} as event
+FROM {{ definition.id | strip_dots  | pascal }} as event
 {% set apply = get("apply:"+((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat))) %}
 {%- if apply -%}
 CROSS APPLY
@@ -51,7 +51,7 @@ CROSS APPLY
 SELECT {% for attrname, attribute in definition.metadata.items() %}
 {%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor %}
 INTO [output{{ definition.id | strip_namespace | pascal }}]
-FROM {{ definition.id | concat_namespace  | pascal }} as event
+FROM {{ definition.id | strip_dots  | pascal }} as event
 {%- endif -%}
 {%- endfor -%}
 {%- endfor -%}

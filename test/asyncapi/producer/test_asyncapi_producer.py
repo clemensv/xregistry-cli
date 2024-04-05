@@ -13,7 +13,7 @@ import xregistry
 
 # this test invokes the xregistry command line tool to generate a C# proxy and a consumer
 # and then builds the proxy and the consumer and runs a prepared test that integrates both
-@pytest.mark.skip(reason="Some issue with the CLI tool for verifying the generated code")
+#@pytest.mark.skip(reason="Some issue with the CLI tool for verifying the generated code")
 def test_asyncapi_producer():
     # clean the output directory
     output_dir = os.path.join(project_root, 'tmp/test/asyncapi/asyncapi_producer'.replace('/', os.path.sep))
