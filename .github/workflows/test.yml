@@ -28,11 +28,6 @@ jobs:
       with:
         java-version: 21
         maven-version: '3.9.6'
-    - name: Check Maven Path
-      run: |
-        mvn -v
-        echo "Maven Path: $(which mvn)"
-        echo "MAVEN_PATH=$(dirname $(which mvn))" >> $GITHUB_ENV
     # section only required while we need the temp package
     - run: mkdir $GITHUB_WORKSPACE/packages
     - run: echo "CEDISCO_NUGET_LOCAL_FEED=$GITHUB_WORKSPACE/packages" >> $GITHUB_ENV
@@ -75,6 +70,5 @@ jobs:
         npm install -g @openapitools/openapi-generator-cli      
     - name: Run tests
       run: |
-        echo "PATH=$MAVEN_PATH:$PATH" >> $GITHUB_ENV
         pytest
 
