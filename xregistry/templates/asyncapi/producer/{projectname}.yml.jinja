@@ -1,24 +1,27 @@
-{#- This is a template that can convert a CloudEvents Discovery document into an AsyncAPI 2.6 document -#}
+{#- This is a template that can convert a Cloudmessages Discovery document into an AsyncAPI 2.6 document -#}
 {%- if ce_content_mode is not defined or ce_content_mode not in ["structured", "binary"] -%}
 {%- set ce_content_mode="binary" -%}
 {%- endif -%}
-asyncapi: 2.6.0
+asyncapi: 3.0.0
 id: "urn:{{ project_name }}"
-tags: 
-- name: xregistry
 info:
   title: "{{ root.description }}"
   version: "1.0"
   description: "{{ root.description }}"
+  tags: 
+  - name: xregistry
   
-defaultContentType: "application/cloudevents+json"
+defaultContentType: "application/cloudmessages+json"
 servers:
 {%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.config -%}
 {%- set options = endpoint.config.options -%}
 {%- set endpoints = endpoint.config.endpoints -%}
 {%- for endpointObject in endpoints %}
   {{ endpoint_key | strip_dots }}:
-      url: {{ endpointObject.uri }}
+      host: {{ geturlhost( endpointObject.uri ) }}
+      {%- if geturlpath( endpointObject.uri ) %}
+      pathname: {{ geturlpath( endpointObject.uri ) }}    
+      {%- endif %}  
 {%- if endpoint.description is defined %}
       description: {{ endpoint.description }}
 {%- endif -%}
@@ -28,81 +31,35 @@ servers:
 {%- endfor -%}  
 {%- endfor %}
 channels:
-{%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.config -%}
-{%- set protocol = endpoint.config.protocol | lower() -%}
-{%- set options = endpoint.config.options -%}
-{%- set endpoints = endpoint.config.endpoints %}
-  {{ endpoint_key | strip_dots }}:
-    servers: ["{{ endpoint_key | strip_dots }}"]
-    {% if endpoint.usage == "producer" -%}publish:{%-else-%}subscribe:{%- endif %}
-      operationId: "{{ endpoint_key | strip_dots }}"
-      {%- if protocol.startswith("http") %}
-      bindings:
-        http:
-          type: request
-          method: POST
-          bindingVersion: '0.1.0'
-      {%- endif %}
-  {%- if ce_content_mode == "structured" -%}
-  {# structured mode #}
-      message:
-        messageId: "{{ endpoint_key | strip_dots }}.cloudEvent"
-        contentType: "application/cloudevents+json"
-        schemaformat: "application/schema+json;version=draft-07"
-        correlationId:
-          location: "$message.payload#/id"
-        {%- if protocol.startswith("http") %}
-        bindings:
-          http:
-            headers:
-              type: object
-              properties:
-                Content-Type:
-                  type: string
-                  enum: ["application/cloudevents+json"]
-            bindingVersion: '0.1.0'
-        {%- endif %}
-        payload:
-          oneOf:
-          {%- for messagegroup in endpoint.messagegroups -%}
-            {%- set groupObject = schema_object(root, messagegroup) %}
-            {%- if groupObject is mapping %}
-            {%- for eventkey, event in groupObject.messages.items() %}
-            - $ref: "#/components/schemas/{{ event.id }}"
-            {%- endfor -%}
-            {%- endif -%}
-          {%- endfor %}
-  {%- else %}
-  {#- binary mode #}
-      message:
-        oneOf:  
-        {%- for messagegroup in endpoint.messagegroups -%}
-          {%- set groupObject = schema_object(root, messagegroup) %}
-          {%- if groupObject is mapping %}
-          {%- for eventkey, event in groupObject.messages.items() -%}         
-           {%- set x = (protocol+":"+groupObject.id+":"+event.id) | push("messages") %}
-          - $ref: "#/components/messages/{{ protocol | strip_dots | pascal}}{{ event.id | strip_dots | pascal }}"
-          {%- endfor -%}
-          {%- endif -%}
-        {%- endfor -%}
-  {%- endif %}
+{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
+  {{messagegroup.id | strip_dots }}:
+    description: "{{ messagegroup.description }}"
+    messages:
+    {%- for messagekey, message in messagegroup.messages.items() -%}         
+    {%- set protocol = (message.binding if message.binding else message.format) %}
+      {{ message.id | strip_dots | pascal }}:
+        $ref: "#/components/messages/{{ message.id | strip_dots | pascal }}"
+    {%- endfor %}
+    {%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.messagegroups -%}
+    {%- if loop.first %}
+    servers:
+    {%- endif %}
+    {%- for group in endpoint.messagegroups if group.endswith('/'+messagegroup.id) %}
+      - $ref: "#/servers/{{ endpoint_key | strip_dots }}"
+    {%- endfor -%}      
+    {%- endfor -%}
 {%- endfor %}
 components:
-  {%- if ce_content_mode == "binary" -%}
-  {# binary mode messages#}
   messages:
-  {%- for message in stack("messages") | unique -%}
-    {%- set protocol = message.split(':')[0] -%}
-    {%- set groupid = message.split(':')[1] -%}
-    {%- set eventid = message.split(':')[2] -%}
-    {%- for messagegroup_key, messagegroup in root.messagegroups.items() if messagegroup_key == groupid -%}
-    {%- for eventkey, event in messagegroup.messages.items() if eventkey == eventid %}
-    {{protocol | pascal}}{{ event.id | strip_dots | pascal }}:
-      messageId: "{{protocol | strip_dots | pascal}}{{ event.id | strip_dots | pascal }}"
-      title: "{{ event.id }}"
-      summary: "{{ event.description }}"
-      {%- if event.metadata.datacontenttype is defined and event.metadata.datacontenttype.value is defined %}
-      contentType: {{ event.metadata.datacontenttype.value }}
+  {%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
+  {%- for messagekey, message in messagegroup.messages.items() -%}         
+  {%- set protocol = (message.binding if message.binding else message.format) %}
+    {{ message.id | strip_dots | pascal }}:
+      {# messageId: "{{protocol | strip_dots | pascal}}{{ message.id | strip_dots | pascal }}" #}
+      title: "{{ message.id }}"
+      summary: "{{ message.description }}"
+      {%- if message.metadata.datacontenttype is defined and message.metadata.datacontenttype.value is defined %}
+      contentType: {{ message.metadata.datacontenttype.value }}
       {%- else %}
       contentType: "application/json"
       {%- endif %}
@@ -111,7 +68,7 @@ components:
       headers:
         type: object
         properties:
-          {%- for attributeKey, attribute in event.metadata.items() %}
+          {%- for attributeKey, attribute in message.metadata.items() %}
           {% if protocol == "http" -%}ce-{% elif protocol == "amqp"%}ce_{%- endif -%}        
           {{ attributeKey }}:
             {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
@@ -150,56 +107,57 @@ components:
               properties:
                 Content-Type:
                   type: string
-                   {%- if event.metadata.datacontenttype is defined and event.metadata.datacontenttype.value is defined %}
-                  enum: ["{{ event.metadata.datacontenttype.value }}"]
+                   {%- if message.metadata.datacontenttype is defined and message.metadata.datacontenttype.value is defined %}
+                  enum: ["{{ message.metadata.datacontenttype.value }}"]
                    {%- else %}
                   enum: ["application/json"]
                    {%- endif %}
             bindingVersion: '0.1.0'
         {%- endif %}
-        {%- if event.schemaurl %}
-            {%- if event.schemaurl.startswith('#') %}
-              {%- set schemaObj = schema_object(root, event.schemaurl ) -%}
+        {%- if message.schemaurl %}
+            {%- if message.schemaurl.startswith('#') %}
+              {%- set schemaObj = schema_object(root, message.schemaurl ) -%}
                 {%- if schemaObj.format is defined -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
                   {%- if schemaVersion.schema is defined -%}
                   {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
-      schemaformat: "application/schema+json;version=draft-07"
       payload:
-          $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+          schemaFormat: "application/schema+json;version=draft-07"
+          schema:
+              $ref: "#/components/schemas/{{ message.schemaurl[1:].split('/')[-3] | pascal }}.{{ message.schemaurl[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
                   {%- set fileName = (schemaObj.id | lower | snake) +".proto" -%}
                   {%- set x = schemaVersion.schema | pushfile(fileName) %}
-      schemaformat: "application/vnd.google.protobuf;version={{schemaObj.format.split('/')[-1]}};type=proto"
       payload:
-          $ref: "{{ fileName }}"
+        schemaFormat: "application/vnd.google.protobuf;version={{schemaObj.format.split('/')[-1]}};type=proto"
+        schema:
+            $ref: "{{ fileName }}"
                   {%- elif schemaObj.format.lower().startswith("avro")%}
                   {%- set fileName = (schemaObj.id | lower | snake) +".avsc" -%}
                   {%- set x = schemaVersion.schema | tojson | pushfile(fileName) %}
-      schemaformat: "application/vnd.apache.avro;version={{schemaObj.format.split('/')[-1]}}"
       payload:
-          $ref: "{{ fileName }}"
-                  {%- endif -%}
+        schemaFormat: "application/vnd.apache.avro;version={{schemaObj.format.split('/')[-1]}}"
+        schema:
+            $ref: "{{ fileName }}"
+                {%- endif -%}
                 {%- endif -%}
               {%- endif -%}
             {%- else %}
-            $ref: "{{ event.schemaurl }}"
+            $ref: "{{ message.schemaurl }}"
             {%- endif %}
         {%- else %}
             type: "object"
         {%- endif %}
     {%- endfor -%}
-    {%- endfor -%}
-  {%- endfor %}
-  {%- endif %}  
+    {%- endfor %}
   schemas:
   {%- if ce_content_mode == "structured" -%}
   {%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
-    {%- for eventkey, event in messagegroup.messages.items() %}
-    {{ event.id }}:
+    {%- for messagekey, message in messagegroup.messages.items() %}
+    {{ message.id }}:
       type: "object"
       properties:
-        {%- for attributeKey, attribute in event.metadata.items() %}
+        {%- for attributeKey, attribute in message.metadata.items() %}
         "{{ attributeKey }}":
           {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
           type: "string"
@@ -230,14 +188,14 @@ components:
           {%- endif %}
         {%- endfor %}
         data:
-        {%- if event.schemaurl %}
-             {%- if event.schemaurl.startswith('#') %}
-              {%- set schemaObj = schema_object(root, event.schemaurl ) -%}
+        {%- if message.schemaurl %}
+             {%- if message.schemaurl.startswith('#') %}
+              {%- set schemaObj = schema_object(root, message.schemaurl ) -%}
                 {%- if schemaObj.format is defined -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
                   {%- if schemaVersion.schema is defined -%}
                   {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
-                  $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+                  $ref: "#/components/schemas/{{ message.schemaurl[1:].split('/')[-3] | pascal }}.{{ message.schemaurl[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
                   {%- set x = schemaVersion.schema | pushfile(schemaObj.id+".proto") %}
                   type: string
@@ -250,13 +208,13 @@ components:
                 {%- endif -%}
               {%- endif -%}
             {%- else %}
-            $ref: "{{ event.schemaurl }}"
+            $ref: "{{ message.schemaurl }}"
             {%- endif %}
         {%- else %}
             type: "object"
         {%- endif %}
       required:
-        {%- for attributeKey, attribute in event.metadata.items() %}
+        {%- for attributeKey, attribute in message.metadata.items() %}
         {%- if attribute.required %}
         - "{{ attributeKey }}"
         {%- endif %}
