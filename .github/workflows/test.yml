@@ -41,14 +41,14 @@ jobs:
       with:
         repository: clemensv/CloudNative.CloudEvents.Endpoints
         ref: main
-        path: /csendpoints
+        path: csendpoints
     - name: build CloudNative.CloudEvents.Endpoint package code
       run: |
-        pushd $GITHUB_WORKSPACE/csendpoints/source 
+        pushd csendpoints/source 
         dotnet build CloudNative.CloudEvents.Experimental.Endpoints.sln
         popd
     - name: create package into temp feed 
-      run: cp $GITHUB_WORKSPACE/csendpoints/source/packages/* $GITHUB_WORKSPACE/packages 
+      run: cp csendpoints/source/packages/* $GITHUB_WORKSPACE/packages 
     - name: Get CloudNative.CloudEvents.Endpoint package code (java)
       uses: actions/checkout@v3
       with:
