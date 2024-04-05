@@ -22,12 +22,16 @@ servers:
       {%- if geturlpath( endpointObject.uri ) %}
       pathname: {{ geturlpath( endpointObject.uri ) }}    
       {%- endif %}  
+      {%- if endpoint.config.protocol %}
+      {%- set pv = endpoint.config.protocol.split('/') %}
+      protocol: {{ pv[0] | lower }}
+      {%- if pv[1] %}
+      protocolVersion: '{{ pv[1] }}'
+      {%- endif %}
+      {%- endif %}
 {%- if endpoint.description is defined %}
       description: {{ endpoint.description }}
 {%- endif -%}
-{%- if endpoint.config.protocol is defined %}
-      protocol: {{ endpoint.config.protocol | lower }}
-{%- endif %}
 {%- endfor -%}  
 {%- endfor %}
 channels:
