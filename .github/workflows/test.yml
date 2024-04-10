@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -28,11 +28,6 @@ jobs:
       with:
         java-version: 21
         maven-version: '3.9.6'
-    - name: Check Maven Path
-      run: |
-        mvn -v
-        echo "Maven Path: $(which mvn)"
-        echo "MAVEN_PATH=$(dirname $(which mvn))" >> $GITHUB_ENV
     # section only required while we need the temp package
     - run: mkdir $GITHUB_WORKSPACE/packages
     - run: echo "CEDISCO_NUGET_LOCAL_FEED=$GITHUB_WORKSPACE/packages" >> $GITHUB_ENV
@@ -56,7 +51,7 @@ jobs:
         ref: main
         path: javaendpoints
     - name: build CloudNative.CloudEvents.Endpoint package code
-      run: mvn install -Dmaven.test.skip -f javaendpoints/pom.xml
+      run: mvn install -DskipTests -f javaendpoints/pom.xml
     # end section
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -75,6 +70,5 @@ jobs:
         npm install -g @openapitools/openapi-generator-cli      
     - name: Run tests
       run: |
-        echo "PATH=$MAVEN_PATH:$PATH" >> $GITHUB_ENV
         pytest
 
