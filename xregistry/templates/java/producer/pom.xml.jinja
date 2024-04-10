@@ -12,6 +12,7 @@
   <artifactId>producer</artifactId>
   <version>1.0-SNAPSHOT</version>
   <properties>
+    <jackson-version>2.17.0</jackson-version>
     {%- if uses_avro %}
     <avro.version>1.11.3</avro.version>
     {%- endif %}
@@ -48,6 +49,11 @@
         <groupId>io.cloudevents</groupId>
         <artifactId>cloudevents-json-jackson</artifactId>
         <version>${io.cloudevents.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson-version}</version>
     </dependency>
     {%- if uses_protobuf %}
     <dependency>
@@ -93,7 +99,7 @@
 
   <build>
       <defaultGoal>clean package install</defaultGoal>
-      <sourceDirectory>main</sourceDirectory>
+      <sourceDirectory>src/main/java</sourceDirectory>
       <plugins>
          {%- if uses_protobuf %}
          <plugin>
@@ -125,25 +131,6 @@
                     </configuration>
                 </execution>
             </executions>
-        </plugin>
-        {%- endif %}
-        {%- if uses_avro %}
-        <plugin>
-          <groupId>org.apache.avro</groupId>
-          <artifactId>avro-maven-plugin</artifactId>
-          <version>${avro.version}</version>
-          <executions>
-            <execution>
-              <phase>generate-sources</phase>
-              <goals>
-                <goal>schema</goal>
-              </goals>
-              <configuration>
-                <sourceDirectory>main/avro</sourceDirectory>
-                <outputDirectory>target/generated-sources/avro</outputDirectory>
-              </configuration>
-            </execution>
-          </executions>
         </plugin>
         {%- endif %}
          <plugin>

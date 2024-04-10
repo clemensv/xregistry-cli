@@ -14,8 +14,6 @@ package {{ class_name | namespace | lower }};
 import io.cloudevents.CloudEvent;
 import io.cloudevents.CloudEventData;
 import io.cloudevents.core.v1.CloudEventBuilder;
-import io.cloudevents.core.format.EventFormat;
-import io.cloudevents.core.message.Encoding;
 
 {%- if uses_amqp_message %}
 {{ amqp.AmqpImports() }}
@@ -23,7 +21,6 @@ import io.cloudevents.core.message.Encoding;
 {%- if uses_mqtt_message %}
 {{ mqtt.PahoImports() }}
 {%- endif %}
-import java.util.ArrayList;
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
 {%- set pascalGroupName = messagegroup.id  | pascal -%}
@@ -38,15 +35,16 @@ public class {{ className | strip_namespace }}
     {%- set isMqtt = not isCloudEvent and definition.format.lower().startswith("mqtt") %}
     public {% if isCloudEvent %}CloudEvent{% elif isAmqp %}Amqp.Message{% elif isMqtt %}MqttMessageV5{% endif %} create{{ pascalDefinitionName | strip_namespace }}(
     {%- if definition.schemaurl -%}
-    {%- set toBytes="data.toByteArray()" -%}
+    {%- set toBytes="data.toByteArray(contentType)" -%}
     {%- set type = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) %}
     {%- set typePackage = type | namespace | lower %}
     {%- set typeName = type | strip_namespace | pascal %}    
-    {{ typePackage }}.{{ typeName }} data
+    {{- typePackage }}.{{ typeName }} data
     {%- else -%}
     {% set toBytes="data.toBytes()" %}
     CloudEventData data
-    {%- endif %}    
+    {%- endif -%}
+    , String contentType
     {%- if isCloudEvent -%}
     {{- cloudEvents.DeclareUriTemplateArguments(definition) -}}
     {%- elif isAmqp -%}
@@ -56,7 +54,7 @@ public class {{ className | strip_namespace }}
     {%- endif -%}
     ) throws Exception {
         {% if isCloudEvent %}
-        {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", toBytes, definition) | indent(12)}}
+        {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", toBytes, definition, 'contentType') | indent(12)}}
         return cloudEvent;
         {%- elif isAmqp %}
         {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", definition) | indent(12)}}

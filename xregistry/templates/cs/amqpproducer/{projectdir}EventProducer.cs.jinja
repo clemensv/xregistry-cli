@@ -86,15 +86,14 @@ namespace {{ project_name | pascal }}
         {%- elif isAmqp -%}
         {{- amqp.DeclareUriTemplateArguments(definition) -}}
         {%- endif -%}
-        )
+        , string contentType = System.Net.Mime.MediaTypeNames.Application.Json)
         {
             {% if isCloudEvent %}
-            string? contentType = null;
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12)}}
             cloudEvent.Data = {% if definition.schemaurl -%}
             {%- set schemaObj = schema_object(root, definition.schemaurl ) -%}
             {%- if schemaObj and "format" in schemaObj and not schemaObj.format.lower().startswith("json") -%}
-            data.ToByteArray(out contentType)
+            data.ToByteArray(contentType)
             {%- else -%}
             data
             {%- endif -%}

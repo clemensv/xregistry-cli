@@ -39,20 +39,20 @@ public class Program
             OrderId = "2001272727",
             Reason = "Unknown",
             Status = "Cancelled"
-        });
+        }, "application/protobuf");
         await producer.SendReservationPlacedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.OrderData()
         {
             CustomerId = "123",
             OrderId = "abc",
             Total = 1000,
-        });
+        }, "application/protobuf");
         await producer.SendPaymentsReceivedAsync(new Contoso.ERP.Producer.Contoso.ERP.Events.PaymentData()
         {
             OrderId = "123",
             Status = "Settled",
             Amount = 1000,
             TransactionId = "abc"
-        });
+        }, "application/protobuf");
 
         await Task.Delay(5000);
 

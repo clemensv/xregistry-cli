@@ -1,0 +1,8 @@
+{%- macro DeclareDataType(project_name, root, message) -%}
+{%- if message.schemaurl or message.schema -%}
+{%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal) -%}
+{%- else -%}
+{%- set dataType = "object" -%}
+{%- endif -%}   
+{{ dataType }}
+{%- endmacro -%}

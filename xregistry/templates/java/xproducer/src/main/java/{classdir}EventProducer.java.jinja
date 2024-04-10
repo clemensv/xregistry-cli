@@ -125,7 +125,7 @@ public class {{ className | strip_namespace }}
     {%- endif -%}
     ) throws Exception {
         {% if isCloudEvent %}
-        {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", toBytes, definition) | indent(12)}}
+        {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", toBytes, definition, 'contentType') | indent(12)}}
         return endpoint.sendAsync(cloudEvent, encoding, eventFormat);
         {%- elif isAmqp %}
         {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", definition) | indent(12)}}

@@ -16,7 +16,7 @@
 {%- endmacro -%}
 
 {#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as message -#}
-{%- macro DeclareCloudNativeCloudEvent(variable, data, message) -%}
+{%- macro DeclareCloudNativeCloudEvent(variable, data, message, contentType) -%}
 CloudEvent {{ variable }} = new CloudEventBuilder()
 {%- for attrname in message.metadata -%}
 {%- set attribute = message.metadata[attrname] -%}
@@ -58,7 +58,8 @@ CloudEvent {{ variable }} = new CloudEventBuilder()
     {%- else -%}{{ attrname }}{%- endif -%})
 {%- endif -%}
 {%- endfor %}
-    .withData({%- if message.metadata.datacontenttype -%}"{{ message.metadata.datacontenttype.value }}", {% endif -%}
+    .withData({%- if message.metadata.datacontenttype -%}"{{ message.metadata.datacontenttype.value }}", 
+              {%- elif contentType -%}{{ contentType }}, {% endif -%}
               {%- if message.metadata.dataschema -%}"{{ message.metadata.dataschema }}", {% endif -%} {{ data }} )
     .build();
 {%- endmacro -%}

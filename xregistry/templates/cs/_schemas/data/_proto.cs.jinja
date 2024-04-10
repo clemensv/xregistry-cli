@@ -34,16 +34,19 @@ using System;
             return {{ type_name }}.Parser.ParseFrom(stream);
         }
 
-        public byte[] ToByteArray(out string contentType)
+        public byte[] ToByteArray(string contentType)
         {
-            contentType = "application/protobuf";
-            var memoryStream = new MemoryStream();
-            using (var output = new Google.Protobuf.CodedOutputStream(memoryStream))
+            if ( contentType == "application/protobuf" )
             {
-                this.WriteTo(output);
-                output.Flush();
-                return memoryStream.ToArray();
+                var memoryStream = new MemoryStream();
+                using (var output = new Google.Protobuf.CodedOutputStream(memoryStream))
+                {
+                    this.WriteTo(output);
+                    output.Flush();
+                    return memoryStream.ToArray();
+                }
             }
+            throw new NotSupportedException("Content type not supported for serialization to byte array: " + contentType);
         }
     }
 {%- endmacro %}

@@ -22,7 +22,7 @@ def run_test():
 #@pytest.mark.skip(reason="temporarily disabled")    
 def test_amqp_end_to_end():
     if os.path.exists(os.path.join(project_root, 'tmp/test/cs/amqp_end_to_end/')):
-        shutil.rmtree(os.path.join(project_root, 'tmp/test/cs/amqp_end_to_end/'))
+        shutil.rmtree(os.path.join(project_root, 'tmp/test/cs/amqp_end_to_end/'), ignore_errors=True)
     # generate the producer
     sys.argv = ['xregistry', 'generate',  
                 '--style', 'amqpproducer', 

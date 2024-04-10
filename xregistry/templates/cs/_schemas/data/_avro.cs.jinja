@@ -17,7 +17,7 @@ using System;
                 return ({{ type_name }})data;
             }
             contentType = contentType?.Split(';')[0].Trim().ToLowerInvariant();
-            var isJson = contentType != null && (contentType == "application/json" || contentType.EndsWith("+json"));
+            var isJson = contentType != null && (contentType == System.Net.Mime.MediaTypeNames.Application.Json || contentType.EndsWith("+json"));
             var stream = data switch
             {
                 Stream s => s,
@@ -39,14 +39,16 @@ using System;
             }
         }
 
-        public byte[] ToByteArray(out string contentType) 
+        public byte[] ToByteArray(string contentType) 
         {
-            contentType = "avro/binary";
-            var stream = new MemoryStream();
-            var encoder = new Avro.IO.BinaryEncoder(stream);
-            var writer = new Avro.Specific.SpecificDatumWriter<{{ type_name }}>({{ type_name }}._SCHEMA);
-            writer.Write(this, encoder);
-            return stream.ToArray();
+            if ( contentType == "avro/binary" ) {
+                var stream = new MemoryStream();
+                var encoder = new Avro.IO.BinaryEncoder(stream);
+                var writer = new Avro.Specific.SpecificDatumWriter<{{ type_name }}>({{ type_name }}._SCHEMA);
+                writer.Write(this, encoder);
+                return stream.ToArray();
+            }
+            throw new NotSupportedException("Content type not supported for serialization");
         }
     }
     {%- endif %}

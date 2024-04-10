@@ -87,7 +87,7 @@ namespace {{ project_name | pascal }}
                     {%- set dataType = "object" -%}
                     {%- endif %}
                     case "{{ message.id }}":
-                        if ({{ pascalDefinitionName | strip_namespace }}Async != null) 
+                        if ({{ pascalDefinitionName | strip_namespace }}Async != null && cloudEvent.Data != null) 
                             {
                                 await Task.WhenAll(Array.ConvertAll({{ pascalDefinitionName | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
                                 {%- if isCloudEvent %}cloudEvent, {%- endif -%}

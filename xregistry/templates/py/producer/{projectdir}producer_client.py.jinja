@@ -1,3 +1,5 @@
+{%- import "util.include.jinja" as util -%}
+
 # pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
 import sys
 import requests
@@ -9,9 +11,9 @@ from cloudevents.http import CloudEvent
 {%- set messagegroup = messagegroups[messagegroup_key] -%}
 {%- for id in messagegroup.messages -%}
 {%- set definition = messagegroup.messages[id] %}
-{%- if definition.schemaurl %}
-{%- set type_name = ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | strip_namespace | snake) %}
-{%- set import_statement = "from " + type_name | camel + " import " + type_name %}
+{%- set type_name = util.DeclareDataType( '', root, definition ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace | pascal %}
 {%- if import_statement not in imports %}
 {%- set _ = imports.append(import_statement) %}
 {{ import_statement }}
@@ -44,11 +46,7 @@ class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
             _{{ attrname }}: str {%- if not attribute.required -%} = default {% endif %},
         {%- endif -%}
     {%- endfor -%} 
-    data: {%- if definition.schemaurl -%}
-    {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | strip_namespace | snake }}
-    {%- else -%}
-    object
-    {%- endif -%}) -> None:
+    data: {{ util.DeclareDataType( project_name, root, definition ) | strip_namespace }} ) -> None:
         """ send_{{definitionName.split('.')[-1]}} """
         attributes = {
         {%- for attrname in definition.metadata -%}
@@ -61,7 +59,7 @@ class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
                 {%- if phs %}
                 .format(
                 {%- for placeholder in phs -%}
-                    {{ placeholder }} = _{{ placeholder | snake }}
+                    {{ placeholder }} = _{{ placeholder | pascal }}
                 {%- if not loop.last -%},{%- endif%}
                 {%- endfor -%}
                 )   

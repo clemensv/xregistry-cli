@@ -50,10 +50,13 @@
         /// <summary>
         /// Serializes this object into a byte array using the JSON serializer
         /// </summary>
-        public byte[] ToByteArray(out string contentType) 
+        public byte[] ToByteArray(string contentType) 
         {
-            contentType = "application/json";
-            return JsonSerializer.SerializeToUtf8Bytes(this);
+            if ( contentType = System.Net.Mime.MediaTypeNames.Application.Json )
+            {
+                return JsonSerializer.SerializeToUtf8Bytes(this);
+            }
+            throw new NotSupportedException("Serialization to " + contentType + " is not supported");
         }
 
         /// <summary>

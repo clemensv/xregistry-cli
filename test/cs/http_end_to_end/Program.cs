@@ -72,9 +72,9 @@ public class Program
             CustomerId = "123",
             OrderId = "abc",
             Total = 1000,
-            Items = new List<Contoso.ERP.Producer.Contoso.ERP.Events.OrderData.ItemsItem>()
+            Items = new List<Contoso.ERP.Producer.Contoso.ERP.Events.OrderdataTypes.Items>()
             {
-                new Contoso.ERP.Producer.Contoso.ERP.Events.OrderData.ItemsItem() {
+                new Contoso.ERP.Producer.Contoso.ERP.Events.OrderdataTypes.Items() {
                     ProductId = "123",
                     Price = 10,
                     Quantity = 5

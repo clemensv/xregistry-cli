@@ -25,6 +25,7 @@ dependencies = [
     "jsonschema>=4.17.3",
     "pydot>=1.4.2",
     "anytree>=2.8.0",
+    "avrotize>=1.2.0"
 ]
 
 [project.scripts]

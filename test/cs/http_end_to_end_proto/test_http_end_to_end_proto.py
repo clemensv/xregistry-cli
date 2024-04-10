@@ -16,7 +16,7 @@ import xregistry
 def test_http_end_to_end_proto():
     # clean the output directory
     if os.path.exists(os.path.join(project_root, 'tmp/test/cs/http_end_to_end_proto/')):
-        shutil.rmtree(os.path.join(project_root, 'tmp/test/cs/http_end_to_end_proto/'))
+        shutil.rmtree(os.path.join(project_root, 'tmp/test/cs/http_end_to_end_proto/'), ignore_errors=True)
     # generate the producer
     sys.argv = ['xregistry', 'generate',  
                 '--style', 'httpproducer', 
