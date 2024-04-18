@@ -77,7 +77,12 @@ namespace {{ project_name | pascal }}
         {%- if isCloudEvent -%}
         {{- cloudEvents.DeclareUriTemplateArguments(definition) -}}
         {%- endif -%}
-        , string contentType = System.Net.Mime.MediaTypeNames.Application.Json)
+        {%- if isCloudEvent and "datacontenttype" in definition.metadata and "value" in definition.metadata["datacontenttype"] %}
+        , string contentType = "{{ definition.metadata["datacontenttype"]["value"] }}"
+        {%- else %}
+        , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
+        {%- endif %}
+        {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
         {
             {% if isCloudEvent %}
             {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12)}}

@@ -21,8 +21,11 @@ CloudEvent {{ variable }} = new CloudEvent()
 {
 {%- for attrname in message.metadata -%}
 {%- set attribute = message.metadata[attrname] -%}
-{%- if attrname in ["subject", "type", "datacontenttype"] -%}
-    {%- set attrProp = attrname | pascal | replace("Datacontenttype", "DataContentType") %}
+{%- if attrname in ["datacontenttype"] %}
+    DataContentType = contentType,
+{%- endif -%}
+{%- if attrname in ["subject", "type"] %}
+    {%- set attrProp = attrname | pascal %}
     {{ attrProp }} = {% if attribute.value -%}$"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%},
 {%- endif -%}
 {%- if attrname in [ "source", "dataschema"] -%}

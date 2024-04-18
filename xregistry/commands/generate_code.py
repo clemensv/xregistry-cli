@@ -1332,5 +1332,5 @@ def generate_code(args) -> int:
         # pylint: disable=broad-exception-caught
         except Exception as err:
             print(err)
-            return 1
+            raise err # re-raise the exception
     return 0

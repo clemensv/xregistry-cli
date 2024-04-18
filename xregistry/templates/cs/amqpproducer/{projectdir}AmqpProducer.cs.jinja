@@ -1,6 +1,7 @@
 {%- import "util.jinja.include" as util -%}
 
 using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.SystemTextJson;
 using CloudNative.CloudEvents.Amqp;
 using Amqp;
 using Amqp.Sasl;
@@ -17,6 +18,7 @@ namespace {{ project_name | pascal }}
         private List<Uri> _endpoints;
         private Dictionary<Uri, Tuple<Connection, Session, SenderLink>> endpointConnections = new();
         private string? _node;
+        private static CloudEventFormatter _formatter = new JsonEventFormatter();
         
         public AmqpProducer(ILogger logger, EndpointCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
         {
@@ -29,7 +31,7 @@ namespace {{ project_name | pascal }}
             }
         }
 
-        public async Task SendAsync(CloudEvent cloudEvent, ContentMode contentMode, CloudEventFormatter formatter)
+        public async Task SendAsync(CloudEvent cloudEvent, ContentMode contentMode, CloudEventFormatter? formatter)
         {
             foreach (var endpoint in _endpoints)
             {
@@ -37,7 +39,7 @@ namespace {{ project_name | pascal }}
                 var sender = connectionTuple.Item3;
                 try
                 {
-                    await sender.SendAsync(cloudEvent.ToAmqpMessage(contentMode, formatter));
+                    await sender.SendAsync(cloudEvent.ToAmqpMessage(contentMode, formatter??AmqpProducer._formatter));
                 }
                 catch (AmqpException ex)
                 {

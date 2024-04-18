@@ -1,71 +1,69 @@
 {
     "$schema": "https://cloudevents.io/schemas/registry",
     "specversion": "0.5-wip",
-    "id": "urn:uuid:a-specific-uuid",
+    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
-        "Fabrikam.Lumen.StateChange": {
-            "id": "Fabrikam.Lumen.StateChange",
+        "Fabrikam.Lumen": {
+            "id": "Fabrikam.Lumen",
             "format": "CloudEvents/1.0",
             "description": "State change events for a Fabrikam smart lightbulb",
             "messages": {
-                "Fabrikam.Lumen.StateChange.TurnedOn": {
-                    "id": "Fabrikam.Lumen.StateChange.TurnedOn",
+                "Fabrikam.Lumen.TurnedOn": {
+                    "id": "Fabrikam.Lumen.TurnedOn",
                     "description": "Event for when the bulb is turned on",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                            "id": {
-                                "required": true
-                            },
-                            "type": {
-                                "value": "Fabrikam.Lumen.StateChange.TurnedOn",
-                                "description": "Event when the bulb is turned on"
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "description": "source of the event",
-                                "value": "{tenantid}/{deviceid}"
-                            },
-                            "subject": {
-                                "type": "string",
-                                "description": "subject of the event"
-                            },
-                            "time": {
-                                "required": true
-                            }
+                        "id": {
+                            "required": true
                         },
+                        "type": {
+                            "value": "Fabrikam.Lumen.TurnedOn",
+                            "description": "Event raised when the bulb is turned on"
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "description": "source of the event",
+                            "value": "{tenantid}/{deviceid}"
+                        },
+                        "time": {
+                            "required": true
+                        },
+                        "datacontenttype": {
+                            "value": "application/json"
+                        }
+                    },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Lumen.StateChange/schemas/turnedOnData"
+                    "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOnEventData"
                 },
-                "Fabrikam.Lumen.StateChange.TurnedOff": {
-                    "id": "Fabrikam.Lumen.StateChange.TurnedOff",
+                "Fabrikam.Lumen.TurnedOff": {
+                    "id": "Fabrikam.Lumen.TurnedOff",
                     "description": "Event for when the bulb is turned off",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                            "id": {
-                                "required": true
-                            },
-                            "type": {
-                                "value": "Fabrikam.Lumen.StateChange.TurnedOff",
-                                "description": "Event when the bulb is turned off"
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "description": "source of the event",
-                                "value": "{tenantid}/{deviceid}"
-                            },
-                            "subject": {
-                                "type": "string",
-                                "description": "subject of the event"
-                            },
-                            "time": {
-                                "required": true
-                            }
+                        "id": {
+                            "required": true
                         },
+                        "type": {
+                            "value": "Fabrikam.Lumen.TurnedOff",
+                            "description": "Event raised when the bulb is turned off"
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "description": "source of the event",
+                            "value": "{tenantid}/{deviceid}"
+                        },
+                        "time": {
+                            "required": true
+                        },
+                        "datacontenttype": {
+                            "value": "application/json"
+                        }
+                    },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Lumen.StateChange/schemas/turnedOffData"
+                    "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOffEventData"
                 },
-                "Fabrikam.Lumen.StateChange.BrightnessChanged": {
-                    "id": "Fabrikam.Lumen.StateChange.BrightnessChanged",
+                "Fabrikam.Lumen.BrightnessChanged": {
+                    "id": "Fabrikam.Lumen.BrightnessChanged",
                     "description": "Event for when the bulb's brightness changes",
                     "format": "CloudEvents/1.0",
                     "metadata": {
@@ -74,28 +72,24 @@
                                 "required": true
                             },
                             "type": {
-                                "value": "Fabrikam.Lumen.StateChange.BrightnessChanged",
-                                "description": "Event when the bulb's brightness changes"
+                                "value": "Fabrikam.Lumen.BrightnessChanged",
+                                "description": "Event raised when the bulb's brightness changes"
                             },
                             "source": {
                                 "type": "uritemplate",
                                 "description": "source of the event",
                                 "value": "{tenantid}/{deviceid}"
                             },
-                            "subject": {
-                                "type": "string",
-                                "description": "subject of the event"
-                            },
-                            "time": {
-                                "required": true
+                            "datacontenttype": {
+                                "value": "application/json"
                             }
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Lumen.StateChange/schemas/brightnessChangedData"
+                    "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.BrightnessChangedEventData"
                 },
-                "Fabrikam.Lumen.StateChange.ColorChanged": {
-                    "id": "Fabrikam.Lumen.StateChange.ColorChanged",
+                "Fabrikam.Lumen.ColorChanged": {
+                    "id": "Fabrikam.Lumen.ColorChanged",
                     "description": "Event for when the bulb's color changes",
                     "format": "CloudEvents/1.0",
                     "metadata": {
@@ -104,44 +98,43 @@
                                 "required": true
                             },
                             "type": {
-                                "value": "Fabrikam.Lumen.StateChange.ColorChanged",
-                                "description": "Event when the bulb's color changes"
+                                "value": "Fabrikam.Lumen.ColorChanged",
+                                "description": "Event raised when the bulb's color changes"
                             },
                             "source": {
                                 "type": "uritemplate",
                                 "description": "source of the event",
                                 "value": "{tenantid}/{deviceid}"
                             },
-                            "subject": {
-                                "type": "string",
-                                "description": "subject of the event"
-                            },
                             "time": {
                                 "required": true
+                            },
+                            "datacontenttype": {
+                                "value": "application/json"
                             }
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Lumen.StateChange/schemas/colorChangedData"
+                    "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.ColorChangedEventData"
                 }
             }
         }
     },
     "schemagroups": {
-        "Fabrikam.Lumen.StateChange": {
-            "id": "Fabrikam.Lumen.StateChange",
+        "Fabrikam.Lumen": {
+            "id": "Fabrikam.Lumen",
             "schemas": {
-                "turnedOnData": {
+                "Fabrikam.Lumen.TurnedOnEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "turnedOnData",
+                    "id": "Fabrikam.Lumen.TurnedOnEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
                             "id": "1",
                             "schema": {
                                 "type": "record",
-                                "name": "TurnedOnData",
-                                "namespace": "Fabrikam.Lumen.StateChange",
+                                "name": "TurnedOnEventData",
+                                "namespace": "Fabrikam.Lumen",
                                 "doc": "Data schema for bulb turned on event",
                                 "fields": [
                                     {
@@ -153,23 +146,59 @@
                                         "name": "deviceid",
                                         "doc": "Device identifier",
                                         "type": "string"
+                                    },
+                                    {
+                                        "name": "switchSource",
+                                        "doc": "Source of the switch event",
+                                        "type": {
+                                            "type": "enum",
+                                            "name": "SwitchSource",
+                                            "symbols": [
+                                                "PhysicalSwitch",
+                                                "AppSwitch",
+                                                "VoiceSwitch"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "name": "brightness",
+                                        "doc": "Brightness level (in Lumen)",
+                                        "unit": "lm",
+                                        "type": "int"
+                                    },
+                                    {
+                                        "name": "color",
+                                        "doc": "Color of the light (in RGB hex format)",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "name": "colorTemperature",
+                                        "doc": "Color temperature of the light (in Kelvin)",
+                                        "unit": "K",
+                                        "type": "int"
+                                    },
+                                    {
+                                        "name": "powerConsumption",
+                                        "doc": "Power consumption of the light (in Watts)",
+                                        "unit": "W",
+                                        "type": "float"
                                     }
                                 ]
                             }
                         }
                     }
                 },
-                "turnedOffData": {
+                "Fabrikam.Lumen.TurnedOffEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "turnedOffData",
+                    "id": "Fabrikam.Lumen.TurnedOffEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
                             "id": "1",
                             "schema": {
                                 "type": "record",
-                                "name": "TurnedOffData",
-                                "namespace": "Fabrikam.Lumen.StateChange",
+                                "name": "TurnedOffEventData",
+                                "namespace": "Fabrikam.Lumen",
                                 "doc": "Data schema for bulb turned off event",
                                 "fields": [
                                     {
@@ -181,23 +210,29 @@
                                         "name": "deviceid",
                                         "doc": "Device identifier",
                                         "type": "string"
+                                    },
+                                    {
+                                        "name": "powerConsumption",
+                                        "doc": "Power consumption of the light (in Watts)",
+                                        "unit": "W",
+                                        "type": "float"
                                     }
                                 ]
                             }
                         }
                     }
                 },
-                "brightnessChangedData": {
+                "Fabrikam.Lumen.BrightnessChangedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "brightnessChangedData",
+                    "id": "Fabrikam.Lumen.BrightnessChangedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
                             "id": "1",
                             "schema": {
                                 "type": "record",
-                                "name": "BrightnessChangedData",
-                                "namespace": "Fabrikam.Lumen.StateChange",
+                                "name": "BrightnessChangedEventData",
+                                "namespace": "Fabrikam.Lumen",
                                 "doc": "Data schema for brightness change event",
                                 "fields": [
                                     {
@@ -209,23 +244,46 @@
                                         "name": "deviceid",
                                         "doc": "Device identifier",
                                         "type": "string"
+                                    },
+                                    {
+                                        "name": "brightness",
+                                        "doc": "Brightness level (in Lumen)",
+                                        "unit": "lm",
+                                        "type": "int"
+                                    },
+                                    {
+                                        "name": "color",
+                                        "doc": "Color of the light (in RGB hex format)",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "name": "colorTemperature",
+                                        "doc": "Color temperature of the light (in Kelvin)",
+                                        "unit": "K",
+                                        "type": "int"
+                                    },
+                                    {
+                                        "name": "powerConsumption",
+                                        "doc": "Power consumption of the light (in Watts)",
+                                        "unit": "W",
+                                        "type": "float"
                                     }
                                 ]
                             }
                         }
                     }
                 },
-                "colorChangedData": {
+                "Fabrikam.Lumen.ColorChangedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "colorChangedData",
+                    "id": "Fabrikam.Lumen.ColorChangedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
                             "id": "1",
                             "schema": {
                                 "type": "record",
-                                "name": "ColorChangedData",
-                                "namespace": "Fabrikam.Lumen.StateChange",
+                                "name": "ColorChangedEventData",
+                                "namespace": "Fabrikam.Lumen",
                                 "doc": "Data schema for color change event",
                                 "fields": [
                                     {
@@ -237,6 +295,30 @@
                                         "name": "deviceid",
                                         "doc": "Device identifier",
                                         "type": "string"
+                                    },
+                                    {
+                                        "name": "brightness",
+                                        "doc": "Brightness level (in Lumen)",
+                                        "unit": "lm",
+                                        "type": "int"
+                                    },
+                                    {
+                                        "name": "color",
+                                        "doc": "Color of the light (in RGB hex format)",
+                                        "type": "string",
+                                        "unit": "RGB"
+                                    },
+                                    {
+                                        "name": "colorTemperature",
+                                        "doc": "Color temperature of the light (in Kelvin)",
+                                        "unit": "K",
+                                        "type": "int"
+                                    },
+                                    {
+                                        "name": "powerConsumption",
+                                        "doc": "Power consumption of the light (in Watts)",
+                                        "unit": "W",
+                                        "type": "float"
                                     }
                                 ]
                             }

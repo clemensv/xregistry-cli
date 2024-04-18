@@ -1,6 +1,7 @@
 {%- import "util.jinja.include" as util -%}
 
 using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.SystemTextJson;
 using CloudNative.CloudEvents.Mqtt;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
@@ -20,6 +21,7 @@ namespace {{ project_name | pascal }}
         private Dictionary<Uri, IMqttClient> endpointConnections = new();
         private string _topic;
         private int _qos;
+        private static CloudEventFormatter _formatter = new JsonEventFormatter();
 
         public MqttProducer(ILogger logger, EndpointCredential credential, Dictionary<string, string> options, List<Uri> endpoints)
         {
@@ -39,7 +41,7 @@ namespace {{ project_name | pascal }}
             this._endpoints = endpoints;
         }
 
-        public async Task SendAsync(CloudEvent cloudEvent, ContentMode contentMode, CloudEventFormatter formatter)
+        public async Task SendAsync(CloudEvent cloudEvent, ContentMode contentMode, CloudEventFormatter? formatter)
         {
             _logger.LogInformation("Sending message to endpoints");
             try
@@ -47,7 +49,7 @@ namespace {{ project_name | pascal }}
                 foreach (var endpoint in _endpoints)
                 {
                     var connection = await GetEndpointConnectionAsync(endpoint);
-                    var message = cloudEvent.ToMqttApplicationMessage(contentMode, formatter, _topic);
+                    var message = cloudEvent.ToMqttApplicationMessage(contentMode, formatter??MqttProducer._formatter, _topic);
                     message.Topic = _topic;
                     message.QualityOfServiceLevel = (MQTTnet.Protocol.MqttQualityOfServiceLevel)_qos;
                     try

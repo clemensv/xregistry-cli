@@ -100,8 +100,8 @@ namespace {{ project_name | pascal }}
         {%- set type_name = "object" %}
         {%- endif -%}
         {{ type_name }} data
-        {{- cloudEvents.DeclareUriTemplateArguments(definition) -}}
-        )
+        {{- cloudEvents.DeclareUriTemplateArguments(definition) -}},
+        string contentType = System.Net.Mime.MediaTypeNames.Application.Json)
         {
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12) }}
             cloudEvent.Data = data;

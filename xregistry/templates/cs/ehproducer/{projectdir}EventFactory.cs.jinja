@@ -13,13 +13,15 @@ using Azure.Messaging.EventHubs;
 namespace {{ pascalGroupName | namespace(project_name) | pascal }}
 {
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventFactory" %}
+    /// <summary>
+    /// Factory class to create Azure Event Hubs `EventData` for the messages declared in the `{{ messagegroup.id }}` message group.
+    /// </summary>
     public partial class {{ class_name }}
     {
         private const string cePrefix = "cloudEvents_";
         private const string applicationOctetStream = "application/octet-stream";
         private delegate byte[] Serialize<T>(T data, string contentType);
         private static CloudEventFormatter defaultFormatter = new JsonEventFormatter();
-
         {%- if root.endpoints -%} 
         {%- for endpoint_key in root.endpoints.keys() -%}
         {%- set endpoint = root.endpoints[endpoint_key] -%}
@@ -48,16 +50,37 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
             return new EventHubProducerClient(fullyQualifiedNamespace, eventHubName, credential);
         {%- endmacro %}
         
+        /// <summary>
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// </summary>
+        /// <param name="credential">The Azure credential to use for authentication.</param>
+        /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
+        /// <param name="eventHubName">The name of the Event Hub.</param>
+        /// <returns>A new instance of the `EventHubProducerClient`.</returns>
         public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {   
             {{ createforbody(class_name, endpoints, options) }}
         }
 
+        /// <summary>
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// </summary>
+        /// <param name="credential">The Azure credential to use for authentication.</param>
+        /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
+        /// <param name="eventHubName">The name of the Event Hub.</param>
+        /// <returns>A new instance of the `EventHubProducerClient`.</returns>
         public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
 
+        /// <summary>
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// </summary>
+        /// <param name="credential">The Azure credential to use for authentication.</param>
+        /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
+        /// <param name="eventHubName">The name of the Event Hub.</param>
+        /// <returns>A new instance of the `EventHubProducerClient`.</returns>
         public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
@@ -67,6 +90,16 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {%- endfor -%}
         {% endif %}
 
+        /// <summary>
+        /// Create an `EventData` instance for the specified message.
+        /// </summary>
+        /// <typeparam name="T">The type of the message data.</typeparam>
+        /// <param name="cloudEvent">The CloudEvent instance to use for the message.</param>
+        /// <param name="data">The message data.</param>
+        /// <param name="contentType">The content type of the message data.</param>
+        /// <param name="bodySerializer">The serializer to use for the message data.</param>
+        /// <param name="formatter">The CloudEvent formatter to use for the message.</param>
+        /// <returns>An `EventData` instance for the specified message.</returns>
         private static EventData CreateEventData<T>(CloudEvent? cloudEvent, T data, string contentType, Serialize<T>? bodySerializer = null, CloudEventFormatter? formatter = null) where T : notnull
         {
             if (formatter == null)
@@ -76,7 +109,8 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
                 {
                     throw new ArgumentNullException(nameof(bodySerializer));
                 }
-                EventData eventData = new EventData(bodySerializer == null ? (byte[])(object)data : bodySerializer(data, contentType));
+                var eventPayload = bodySerializer == null ? (byte[])(object)data : bodySerializer(data, contentType);
+                EventData eventData = new EventData(eventPayload);
                 eventData.ContentType = contentType;
                 if (cloudEvent != null)
                 {
@@ -93,7 +127,20 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
                 {
                     throw new ArgumentNullException(nameof(cloudEvent));
                 }
-                cloudEvent.Data = data;
+                if ( formatter is CloudNative.CloudEvents.SystemTextJson.JsonEventFormatter && 
+                     new System.Net.Mime.ContentType(contentType).MediaType == System.Net.Mime.MediaTypeNames.Application.Json )
+                {
+                    cloudEvent.Data = data;
+                }
+                else
+                {
+                    bool isRawBytes = typeof(T) == typeof(byte[]);
+                    if (bodySerializer == null && !isRawBytes)
+                    {
+                        throw new ArgumentNullException(nameof(bodySerializer));
+                    }
+                    cloudEvent.Data = bodySerializer == null ? data : bodySerializer(data, contentType);
+                }
                 var eventBody = formatter.EncodeStructuredModeMessage(cloudEvent, out var eventContentType);
                 var eventData = new EventData(eventBody)
                 {
@@ -104,46 +151,66 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         }
 
         {% for id in messagegroup.messages -%}
-        {%- set definition = messagegroup.messages[id] -%}
-        {%- set pascalDefinitionName = definition.id | pascal %}
-        {%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
-        {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}
-        {%- if definition.description %}
-        /// <summary>
-        /// {{ definition.description }}
-        /// </summary>
-        {%- endif %}
-        public static EventData Create{{ pascalDefinitionName | strip_namespace }}Event(
-        {%- if definition.schemaurl or definition.schema -%}
-        {%- set type_name = 'global::' + ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | pascal )  %}
-        {%- if definition.schemaformat.lower().startswith("jsonschema") %}
+        {%- set message = messagegroup.messages[id] -%}
+        {%- set pascalDefinitionName = message.id | pascal %}
+        {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+        {%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
+        {%- if message.schemaurl or message.schema -%}
+        {%- set type_name = 'global::' + ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal )  %}
+        {%- if message.schemaformat.lower().startswith("jsonschema") %}
         {%- set type_name = type_name | pascal %}
         {%- endif %}
         {%- else -%}
         {%- set type_name = "object" %}
         {%- endif -%}
+        {%- if isCloudEvent %}
+        {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
+        {%- elif isAmqp %}
+        {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
+        {%- endif %}
+        /// <summary>
+        /// Create an `EventData` instance for the `{{ pascalDefinitionName }}` event
+        {%- if message.description %}
+        /// Event description: "{{ message.description }}"
+        {%- endif %}
+        /// </summary>
+        /// <param name="data">The event data object.</param>
+        {%- if uriargs %}
+        {%- for arg in uriargs.split(',') if arg.strip() %}
+        {%- set splitarg = arg.strip().split(' ')%}
+        /// <param name="{{ splitarg[1] }}"> URI template argument</param>
+        {%- endfor %}
+        {%- endif %}
+        /// <param name="contentType">The desired content type of the message data.</param>
+        {%- if isCloudEvent %}
+        /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
+        {%- endif %}
+        /// <returns>An `EventData` instance for the {{ pascalDefinitionName }} message.</returns>
+        public static EventData Create{{ pascalDefinitionName | strip_namespace }}Event(
         {{ type_name }} data
-        {%- if isCloudEvent -%}
-        {{- cloudEvents.DeclareUriTemplateArguments(definition) -}}
-        {%- elif isAmqp -%}
-        {{- amqp.DeclareUriTemplateArguments(definition) -}}
+        {%- if uriargs -%}
+        {{- uriargs -}}
         {%- endif -%}
+        {%- if isCloudEvent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] -%}
+        , string contentType = "{{ message.metadata["datacontenttype"]["value"] }}"
+        {%- else -%}
         , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
+        {%- endif %}
         {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
         {
             {% if type_name != "object" %}
-            Serialize<{{ type_name }}> bodySerializer = ({{ type_name }} data, string contentType) => {
+            Serialize<{{ type_name }}>? bodySerializer = (formatter != null)?null:({{ type_name }} data, string contentType) => {
                 return data.ToByteArray(contentType);
             };
             {%- if isCloudEvent %}
-            {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12) }}
+            {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
             return CreateEventData(cloudEvent, data, contentType, bodySerializer, formatter);
             {%- elif isAmqp %}
             return CreateEventData(null, data, contentType, bodySerializer, null);
             {%- endif %}
             {% else %}
             {%- if isCloudEvent %}
-            {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12) }}
+            {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
             return CreateEventData(cloudEvent, data, contentType, null, formatter);
             {%- elif isAmqp %}
             return CreateEventData(null, data, contentType, null, null);

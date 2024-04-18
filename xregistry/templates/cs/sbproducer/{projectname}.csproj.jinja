@@ -40,17 +40,4 @@
     <PackageReference Include="Apache.Avro" Version="1.11.3" />
     {%- endif %}
   </ItemGroup>
-  {% if uses_avro %}
-  <Target Name="GenerateAvroCode" BeforeTargets="PrepareForBuild">
-     <CombinePath BasePath="$(ProjectDir)" Paths="generated">
-      <Output TaskParameter="CombinedPaths" ItemName="GeneratedCodeDirectory" />
-    </CombinePath>
-    <RemoveDir Directories="@(GeneratedCodeDirectory)" />
-    <MakeDir Directories="@(GeneratedCodeDirectory)" />
-    <Exec Command="avrogen --namespace &quot;$(ProjectName):$(ProjectName)&quot; -s &quot;%(AvroSchemas.Identity)&quot; &quot;@(GeneratedCodeDirectory)&quot;">
-      <Output TaskParameter="ExitCode" PropertyName="AvroGenExitCode"/>
-    </Exec>
-    <Error Condition="'$(AvroGenExitCode)' != '0'" Text="AvroGen invocation failed with exit code $(AvroGenExitCode). if the tool is not installed, install it with 'dotnet tool install --global Apache.Avro.Tools --version 1.11.1'" />
-  </Target>
-  {% endif %}
 </Project>
