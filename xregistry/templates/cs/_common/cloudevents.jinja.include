@@ -2,12 +2,12 @@
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- for attrname in message.metadata -%}
+{%- for attrname in message.metadata if attrname not in ["datacontenttype", "dataschema"] -%}
 {%- set attribute = message.metadata[attrname] -%}
     {%- if attribute.type == "uritemplate" -%}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
         , string {{ placeholder }}
-        {%- endfor -%}
+        {%- endfor -%}    
     {%- elif attribute.value is not defined -%}
         {%- if not attrname == "time" and not attrname == "id" -%}
         , string {{ attrname }}{%- if not attribute.required %} = default {%- endif %}{% endif -%}
@@ -24,13 +24,16 @@ CloudEvent {{ variable }} = new CloudEvent()
 {%- if attrname in ["datacontenttype"] %}
     DataContentType = contentType,
 {%- endif -%}
+{%- if attrname in ["dataschema"] and message.schemaurl %}
+    DataSchema = new Uri("{{message.schemaurl.lstrip('#/')}}", UriKind.RelativeOrAbsolute),
+{%- endif -%}
 {%- if attrname in ["subject", "type"] %}
     {%- set attrProp = attrname | pascal %}
     {{ attrProp }} = {% if attribute.value -%}$"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%},
 {%- endif -%}
-{%- if attrname in [ "source", "dataschema"] -%}
+{%- if attrname in [ "source"] -%}
     {%- set attrProp = attrname | pascal | replace("Dataschema", "DataSchema") %}
-    {{ attrProp }} = {% if attribute.value -%}new Uri($"{{ attribute.value }}", UriKind.RelativeOrAbsolute){%- else -%}{{ attrname }}{%- endif -%},
+    {{ attrProp }} = {% if attribute.value -%}new Uri($"{{ attribute.value }}", UriKind.RelativeOrAbsolute){%- else -%}new Uri({{ attrname }}){%- endif -%},
 {%- endif -%}
 {%- if attrname in ["time"] %}
     {{ attrname | pascal }} = {% if attribute.value -%}
@@ -51,7 +54,7 @@ CloudEvent {{ variable }} = new CloudEvent()
 {% for attrname in message.metadata -%}
 {%- set attribute = message.metadata[attrname] -%}
 {%- if attrname not in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
-cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
+cloudEvent.SetAttributeFromString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
 {%- endif -%}
 {%- endfor -%}
 {%- endmacro -%}
@@ -62,7 +65,7 @@ cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ a
 {% for attrname in message.metadata -%}
 {%- set attribute = message.metadata[attrname] -%}
 {%- if attrname not in ["id", "time", "source", "subject", "type", "dataschema", "datacontenttype", "source"] -%}
-cloudEvent.SetAttributeAsString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
+cloudEvent.SetAttributeFromString("{{ attrname }}",{%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%});
 {%- endif -%}
 {%- endfor -%}
 {%- endmacro -%}

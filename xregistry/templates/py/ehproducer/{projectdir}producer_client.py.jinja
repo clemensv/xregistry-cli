@@ -1,0 +1,93 @@
+{%- import "util.include.jinja" as util -%}
+
+# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
+import sys
+from azure.eventhub import EventHubProducerClient, EventData
+from cloudevents.conversion import to_binary, to_structured
+from cloudevents.http import CloudEvent
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroup_key in messagegroups.keys() -%}
+{%- set messagegroup = messagegroups[messagegroup_key] -%}
+{%- for id in messagegroup.messages -%}
+{%- set definition = messagegroup.messages[id] %}
+{%- set type_name = util.DeclareDataType( '', root, definition ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace | pascal %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+{%- for messagegroup_key in messagegroups.keys() -%}
+{%- set messagegroup = messagegroups[messagegroup_key] -%}
+{%- set parts = messagegroup.id.split('.') -%}
+{%- set groupName = parts | join('_') | lower %}
+
+class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
+    def __init__(self, connection_str, eventhub_name, content_mode='structured'):
+        """ init """
+        self.producer = EventHubProducerClient.from_connection_string(
+            conn_str=connection_str,
+            eventhub_name=eventhub_name
+        )
+        self.content_mode = content_mode
+
+    {% for id in messagegroup.messages -%}
+    {%- set definition = messagegroup.messages[id] -%}
+    {%- set parts = definition.id.split('.') -%}
+    {%- set definitionName = parts|join('_')|lower %}
+    def send_{{definitionName.split('.')[-1]}}(self,
+    {%- for attrname in definition.metadata -%}
+    {%- set attribute = definition.metadata[attrname] -%}
+        {%- if attribute.type == "uritemplate" -%}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} : str, {% endfor -%}
+        {%- elif attribute.value is not defined -%}
+            _{{ attrname }}: str {%- if not attribute.required -%} = default {% endif %},
+        {%- endif -%}
+    {%- endfor -%} 
+    data: {{ util.DeclareDataType( project_name, root, definition ) | strip_namespace }} ) -> None:
+        """ send_{{definitionName.split('.')[-1]}} """
+        attributes = {
+        {%- for attrname in definition.metadata -%}
+        {%- set attribute = definition.metadata[attrname] %}
+            "{{ attrname }}": 
+            {%- if attribute.value -%}
+            "{{ attribute.value }}"
+            {%- if attribute.type == "uritemplate" -%}
+                {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+                {%- if phs %}
+                .format(
+                {%- for placeholder in phs -%}
+                    {{ placeholder }} = _{{ placeholder | pascal }}
+                {%- if not loop.last -%},{%- endif%}
+                {%- endfor -%}
+                )   
+                {%- endif %}        
+            {%- endif %}
+            {%- else -%}
+                _{{ attrname }}
+            {%- endif-%}
+            {%- if not loop.last -%},{%- endif%}
+        {%- endfor %}
+        }
+        event = CloudEvent(attributes, data)
+        if self.content_mode == "structured":
+            headers, body = to_structured(event)
+        else:
+            headers, body = to_binary(event)
+        event_data = EventData(body)
+        if "Content-Type" in headers:
+            event_data.content_type = headers["Content-Type"]
+            del headers["Content-Type"]
+        for key, value in headers.items():
+            if key.lower().startswith("ce-"):
+                event_data.properties["cloudEvents_"+key[3:]] = value
+            else:
+                event_data.properties[key] = value
+        self.producer.send_event(event_data)
+{% endfor %}
+{% endfor %}

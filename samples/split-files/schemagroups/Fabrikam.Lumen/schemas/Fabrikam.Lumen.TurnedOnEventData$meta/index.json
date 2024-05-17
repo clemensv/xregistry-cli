@@ -1,0 +1,11 @@
+{
+    "format": "Avro/1.11.1",
+    "id": "Fabrikam.Lumen.TurnedOnEventData",
+    "versions": {
+        "1": {
+            "format": "Avro/1.11.1",
+            "id": "1",
+            "schemaurl": "/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOnEventData"
+        }
+    }
+}

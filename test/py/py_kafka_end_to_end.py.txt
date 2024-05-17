@@ -1,0 +1,81 @@
+# pylint: enable=invalid-name,line-too-long,too-many-instance-attributes, missing-class-docstring, missing-function-docstring, missing-module-docstring
+# test_fabrikam_lumen_events.py
+
+import asyncio
+from confluent_kafka import Consumer, KafkaException
+from .kafka_producer.producer_client import FabrikamLumenEventProducer
+from .kafka_consumer.dispatcher import LumenEventDispatcher, TurnedOnEventData, TurnedOffEventData, BrightnessChangedEventData, ColorChangedEventData
+
+class TestFabrikamLumenEvents:
+
+    def __init__(self, bootstrap_servers, topic, group_id):
+        self.bootstrap_servers = bootstrap_servers
+        self.topic = topic
+        self.group_id = group_id
+
+        self.producer = FabrikamLumenEventProducer(
+            bootstrap_servers=self.bootstrap_servers,
+            topic=self.topic,
+            content_mode='structured'
+        )
+
+        self.dispatcher = LumenEventDispatcher()
+
+        # Event flags to verify event processing
+        self.turned_on_received = asyncio.Event()
+        self.turned_off_received = asyncio.Event()
+        self.brightness_changed_received = asyncio.Event()
+        self.color_changed_received = asyncio.Event()
+
+        # Async handlers to set flags
+        self.dispatcher.TurnedOn_async = self.handle_turned_on_event
+        self.dispatcher.TurnedOff_async = self.handle_turned_off_event
+        self.dispatcher.BrightnessChanged_async = self.handle_brightness_changed_event
+        self.dispatcher.ColorChanged_async = self.handle_color_changed_event
+
+        self.consumer_manager = LumenEventDispatcher.ConsumerManager.create_consumer_manager(
+            group_id=self.group_id,
+            bootstrap_servers=self.bootstrap_servers,
+            dispatcher=self.dispatcher,
+            topics=[self.topic]
+        )
+
+    async def handle_turned_on_event(self, message, cloud_event, data):
+        self.turned_on_received.set()
+
+    async def handle_turned_off_event(self, message, cloud_event, data):
+        self.turned_off_received.set()
+
+    async def handle_brightness_changed_event(self, message, cloud_event, data):
+        self.brightness_changed_received.set()
+
+    async def handle_color_changed_event(self, message, cloud_event, data):
+        self.color_changed_received.set()
+
+    async def send_and_receive_events(self):
+        # Create event data
+        turned_on_data = TurnedOnEventData(tenantid='tenant-1', deviceid='device-1', switchSource='switch-1', brightness=100, color='#FF0000', colorTemperature=2700, powerConsumption=10.5)
+        turned_off_data = TurnedOffEventData(tenantid='tenant-1', deviceid='device-1', powerConsumption=0.0)
+        brightness_changed_data = BrightnessChangedEventData(tenantid='tenant-1', deviceid='device-1', brightness=50, color='#FF0000', colorTemperature=2700, powerConsumption=5.0)
+        color_changed_data = ColorChangedEventData(tenantid='tenant-1', deviceid='device-1', brightness=50, color='#00FF00', colorTemperature=2700, powerConsumption=5.0)
+
+  
+        # Send events
+        self.producer.send_fabrikam_lumen_turnedon(turned_on_data, turned_on_data.tenantid, turned_on_data.deviceid)
+        self.producer.send_fabrikam_lumen_turnedoff(turned_off_data, turned_on_data.tenantid, turned_on_data.deviceid)
+        self.producer.send_fabrikam_lumen_brightnesschanged(brightness_changed_data, turned_on_data.tenantid, turned_on_data.deviceid)
+        self.producer.send_fabrikam_lumen_colorchanged(color_changed_data, turned_on_data.tenantid, turned_on_data.deviceid)
+
+        # Run the consumer to process the messages
+        self.consumer_manager.run()
+        
+        # Wait for events to be processed
+        await asyncio.wait_for(self.turned_on_received.wait(), timeout=10)
+        await asyncio.wait_for(self.turned_off_received.wait(), timeout=10)
+        await asyncio.wait_for(self.brightness_changed_received.wait(), timeout=10)
+        await asyncio.wait_for(self.color_changed_received.wait(), timeout=10)
+        
+        self.consumer_manager.shutdown()
+
+    def test_send_and_receive_events(self):        
+        asyncio.run(self.send_and_receive_events())

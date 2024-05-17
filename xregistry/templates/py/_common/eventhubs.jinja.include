@@ -1,0 +1,209 @@
+# eventhubs.jinja.include
+
+# Event Hubs macros
+
+{%- macro EventHubsHeaders() -%}
+from azure.eventhub import EventHubProducerClient, EventData
+from azure.eventhub.aio import EventHubConsumerClient
+from azure.eventhub.amqp import AmqpAnnotatedMessage
+{%- endmacro -%}
+
+{%- macro EmitArguments(props) -%}
+{%- for propname, prop in props.items() %}
+{%- if prop.type == "uritemplate" -%}
+   {%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+   , {{ placeholder }}
+   {%- endfor -%}
+{%- elif prop.value is not defined -%}
+   , {{ propname }}=None
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
+# Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates
+{%- macro DeclareUriTemplateArguments(message) -%}
+{%- if message.message["header"] -%}{{ EmitArguments(message.message["header"]) }}{%- endif -%}
+{%- if message.message["footer"] -%}{{ EmitArguments(message.message["footer"]) }}{%- endif -%}
+{%- if message.message["message-annotations"] -%}{{ EmitArguments(message.message["message-annotations"]) }}{%- endif -%}
+{%- if message.message["delivery-annotations"] -%}{{ EmitArguments(message.message["delivery-annotations"]) }}{%- endif -%}
+{%- if message.message["properties"] -%}{{ EmitArguments(message.message["properties"]) }}{%- endif -%}
+{%- if message.message["application-properties"] -%}{{ EmitArguments(message.message["application-properties"]) }}{%- endif -%}
+{%- endmacro %}
+
+# Helper macro for assigning properties
+{%- macro AssignProps(target, props, as_dict = False) -%}
+{%- for propname, prop in props.items() -%}
+{%- if as_dict %}
+["{{ propname }}"] = {% else %}
+{{ target }}.{{ propname }} = {% endif -%}
+{%- if prop.value -%}
+   {%- if prop.type in ["integer", "number", "boolean"] -%}
+      {{ prop.value }}
+   {%- elif prop.type == "uri" or prop.type == "uritemplate" -%}
+      f"{{ prop.value }}"
+   {%- else -%}
+      "{{ prop.value }}"
+   {%- endif -%}
+{%- else -%}
+   {{ propname }}
+{%- endif -%},
+{%- endfor -%}
+{%- endmacro -%}
+
+# Generates AMQP message objects from amqpDefinition as message
+{%- macro DeclareEventdata(variable, message) -%}
+{%- set header = message.message["header"] %}
+{%- set footer = message.message["footer"] %}
+{%- set messageAnnotations = message.message["message-annotations"] %}
+{%- set deliveryAnnotations = message.message["delivery-annotations"] %}
+{%- set properties = message.message["properties"] %}
+{%- set applicationProperties = message.message["application-properties"] %}
+event_data = EventData()
+am = event_data.raw_amqp_message
+{%- if header %}
+{{- AssignProps("am.header", header) }}
+{%- endif %}
+{%- if footer %}
+{{- AssignProps("am.footer", footer, True) }}
+{%- endif %}
+{%- if messageAnnotations %}
+{{- AssignProps("am.message_annotations", messageAnnotations, True) }}
+{%- endif %}
+{%- if deliveryAnnotations %}
+{{- AssignProps("am.delivery_annotations", deliveryAnnotations, True) }}
+{%- endif %}
+{%- if properties %}
+{{- AssignProps("am.properties", properties) }}
+{%- endif %}
+{%- if applicationProperties %}
+{{- AssignProps("am.application_properties", applicationProperties, True) }}
+{%- endif %}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
+{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
+{%- set pascalGroupName = messagegroup.id  | pascal %}
+{%- if withType -%}{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher{% endif %} {{ messagegroup.id  | strip_namespace | camel }}_eventhub_dispatcher
+{%- if not loop.last %}, {%- endif -%}
+{%- endfor %}
+{%- endmacro-%}
+
+{%- macro DeclareDispatchObjectField(project_name,messagegroup) %}
+{%- set handlerName=(messagegroup.id | strip_namespace | camel)+"_eventhub_dispatcher" -%}
+{%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id | strip_namespace | pascal)+"Dispatcher" %}
+{{ handlerType }} {{ handlerName }}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsFields(project_name,messagegroups) %}
+{%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) %}
+{{ DeclareDispatchObjectField( project_name, messagegroup ) }}
+{%- endfor %}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectConstructor(project_name, class_name, messagegroup, args, body) %}
+def __init__(self, {{ args }}, {{ messagegroup.id | strip_namespace | camel }}_eventhub_dispatcher):
+    self.{{ messagegroup.id | strip_namespace | camel }}_eventhub_dispatcher = {{ messagegroup.id | strip_namespace | camel }}_eventhub_dispatcher
+    {{ body | indent(4) }}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) %}
+{%- if messagegroups | exists("binding", "amqp" ) %}
+def __init__(self, {{ args }}, {%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%} {{ messagegroup.id | strip_namespace | camel }}_eventhub_dispatcher {%- if not loop.last %}, {%- endif -%}{%- endfor -%}):
+    {%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
+    self.{{ messagegroup.id  | strip_namespace | camel }}_eventhub_dispatcher = {{ messagegroup.id  | strip_namespace | camel }}_eventhub_dispatcher
+    {%- endfor %}
+    {{ body | indent(4) }}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DispatchToDispatchObject(project_name, root, message, messagegroup, logger) -%}
+message_subject = {{ message }}.raw_amqp_message.properties.subject
+switcher = {
+    {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
+    {%- set pascalDefinitionName = message.id | pascal %}
+    "{{ message.id }}": lambda: self.{{ messagegroup.id | strip_namespace | camel }}_eventhub_dispatcher.on_{{ pascalDefinitionName | strip_namespace }}_async({{ message }},
+    {%- if message.schemaurl or message.schema -%}
+    {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.body, {{ message }}.content_type)
+    {%- else -%}
+    {{ message }}.data
+    {%- endif %})
+    {%- if not loop.last %},
+    {%- endif %}
+    {%- endfor %}
+}
+func = switcher.get(message_subject, lambda: {{ logger }}.error(f"Unsupported message subject {message_subject}"))
+if func:
+    await func()
+{%- endmacro -%}
+
+{%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
+{%- if messagegroups | exists("binding", "amqp" ) %}
+message_subject = {{ message }}.raw_amqp_message.properties.subject
+switcher = {
+    {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
+    {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
+    {%- set pascalDefinitionName = message.id | pascal %}
+    "{{ message.id }}": lambda: self.{{ messagegroup.id  | strip_namespace | camel }}_eventhub_dispatcher.on_{{ pascalDefinitionName | strip_namespace }}_async({{ message }},
+    {%- if message.schemaurl or message.schema -%}
+    {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.body, {{ message }}.content_type)
+    {%- else -%}
+    {{ message }}.data
+    {%- endif %})
+    {%- if not loop.last %},
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+}
+func = switcher.get(message_subject, lambda: {{ logger }}.error(f"Unsupported message subject {message_subject}"))
+if func:
+    await func()
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- set messagegroups = root.messagegroups -%}
+{%- if messagegroups | exists("binding", "amqp" ) %}
+{%- set function_name = project_name | pascal %}
+import asyncio
+from azure.eventhub import EventData
+{% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
+{%- set pascalGroupName = messagegroup.id  | pascal %}
+class I{{ pascalGroupName | strip_namespace }}EventHubDispatcher:
+    {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
+    {%- set pascalDefinitionName = message.id | strip_namespace | pascal %}
+    {%- if message.schemaurl or message.schema -%}
+    {%- set dataType = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+    {%- else -%}
+    {%- set dataType = "object" %}
+    {%- endif %}
+    {%- if message.description %}
+    # {{ message.description }}
+    {%- endif %}
+    async def on_{{ pascalDefinitionName | strip_namespace }}_async(self, event_data: EventData, data: {{ dataType }} = None):
+        pass
+    {%- endfor %}
+{% endfor %}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro CloudEventsUsings() -%}
+from cloudevents.sdk.event import v1 as CloudEvent
+import cloudevents.sdk.conversion as ce_conversions
+{%- endmacro -%}
+
+{%- macro CloudEventsMethods() -%}
+AMQP_CLOUDEVENT_PREFIX1 = "cloudEvents_"
+AMQP_CLOUDEVENT_PREFIX2 = "cloudEvents:"
+
+def get_cloud_event_attribute(event_data, key):
+    return event_data.properties.get(AMQP_CLOUDEVENT_PREFIX1 + key) or event_data.properties.get(AMQP_CLOUDEVENT_PREFIX2 + key)
+
+def is_cloud_event(event_data):
+    return ce_conversions.is_binary(event_data.content_type) or \
+           any(key.startswith(AMQP_CLOUDEVENT_PREFIX1) or key.startswith(AMQP_CLOUDEVENT_PREFIX2) for key in event_data.properties)
+
+def cloud_event_from_event_data(event_data):
+    content_type = event_data.content_type.split(';')[0] if event_data.content_type else None
+    formatter = ce_conversions.json if content_type and content_type.endswith('+json') else ce_conversions.proto
+    return formatter.decode(event_data.body)
+{%- endmacro -%}

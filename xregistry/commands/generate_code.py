@@ -500,7 +500,7 @@ def schema_type(schema_ref: JsonNode, project_name: str, root: JsonNode, schema_
 
         schema_version = None
         if isinstance(schema_obj, dict) and "versions" in schema_obj and isinstance(schema_obj['versions'], dict):
-            latestversion = str(schema_obj.get('latestversionid', ''))
+            latestversion = str(schema_obj.get('defaultversionid', ''))
             if not latestversion or latestversion not in schema_obj['versions']:
                 # get all the versions and use the lexically greatest
                 versions = schema_obj['versions']

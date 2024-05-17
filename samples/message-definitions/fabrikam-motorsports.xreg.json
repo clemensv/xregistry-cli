@@ -38,7 +38,7 @@
                 "net.fabrikam.telemetry.channel": {
                     "id": "net.fabrikam.telemetry.channel",
                     "description": "Channel Timeseries Event Data",
-                    "latestversionid": "1",
+                    "defaultversionid": "1",
                     "versions": {
                         "1": {
                             "id": "1",

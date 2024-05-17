@@ -29,7 +29,7 @@
                 "com.example.group1.schema1": {
                     "id": "com.example.group1.schema1",
                     "format": "AVRO/1.11.2",
-                    "latestversionid": "1",
+                    "defaultversionid": "1",
                     "versions": {
                         "1" : {
                             "id": "1",

@@ -28,7 +28,7 @@
             "schemas": {
                 "com.example.group1.example": {
                     "id": "com.example.group1.example",
-                    "latestversionid": "1",
+                    "defaultversionid": "1",
                     "versions" : {
                         "1": {
                             "id": "1",
