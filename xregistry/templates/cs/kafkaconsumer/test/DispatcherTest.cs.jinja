@@ -31,8 +31,7 @@ namespace {{ project_name | pascal }}.Test
 {
     public class {{ project_name | pascal }}Fixture : IAsyncLifetime
     {
-        public IContainer? KafkaContainer { get; protected set; }
-        public INetwork? Network { get; protected set; }
+        public KafkaContainer? KafkaContainerInstance { get; protected set; }
         public string? KafkaBootstrapServers { get; protected set; }
         private ILoggerFactory _loggerFactory;
         private ILogger _logger;
@@ -55,25 +54,16 @@ namespace {{ project_name | pascal }}.Test
         {
             try
             {
-                Network = new NetworkBuilder()
-                    .WithName(Guid.NewGuid().ToString("D"))
-                    .Build();
-
-                KafkaContainer = new ContainerBuilder()
-                        .WithImage("confluentinc/cp-kafka:latest")
-                        .WithPortBinding(9092, false)
-                        .WithNetwork(Network)
-                        .WithNetworkAliases("kafka")
-                        .WithEnvironment("KAFKA_BROKER_ID", "1")
-                        .WithEnvironment("KAFKA_ZOOKEEPER_CONNECT", "localhost:2181")
-                        .WithEnvironment("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://kafka:9092")
-                        .WithEnvironment("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
-                        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*started.*"))
+                _logger.LogDebug("Initializing Kafka test fixture.");
+                
+                KafkaContainerInstance = new KafkaBuilder()
                         .Build();
 
-                await Network.CreateAsync();
-                await KafkaContainer.StartAsync();
-                KafkaBootstrapServers = "localhost:9092";
+                await KafkaContainerInstance.StartAsync();
+                _logger.LogDebug("Kafka container started.");
+
+                KafkaBootstrapServers = KafkaContainerInstance.GetBootstrapAddress();
+                _logger.LogDebug($"Kafka bootstrap servers: {KafkaBootstrapServers}");
             }
             catch (Exception ex)
             {
@@ -86,15 +76,14 @@ namespace {{ project_name | pascal }}.Test
         {
             try
             {
-                if (KafkaContainer != null)
+                _logger.LogDebug("Disposing Kafka test fixture.");
+                
+                if (KafkaContainerInstance != null)
                 {
-                    await KafkaContainer.StopAsync();
+                    await KafkaContainerInstance.StopAsync();
+                    _logger.LogDebug("Kafka container stopped.");
                 }
-                if (Network != null)
-                {
-                    await Network.DeleteAsync();
-                }
-            }
+               }
             catch (Exception ex)
             {
                 Console.WriteLine($"An error occurred during DisposeAsync: {ex.Message}");
@@ -149,6 +138,7 @@ namespace {{ project_name | pascal }}.Test
 
                 var processor = dispatcher.CreateKafkaProcessor(consumerConfig);
                 await processor.StartAsync();
+                _logger.LogDebug("Kafka processor started.");
 
                 var producerConfig = new ProducerConfig { BootstrapServers = _fixture.KafkaBootstrapServers };
                 using var producer = new ProducerBuilder<byte[], byte[]>(producerConfig).Build();
@@ -165,6 +155,7 @@ namespace {{ project_name | pascal }}.Test
                     }
                 };
 
+                _logger.LogDebug("Producing test message to Kafka.");
                 await producer.ProduceAsync("test-topic", kafkaMessage);
                 _logger.LogInformation("Test message sent");
 
@@ -173,7 +164,7 @@ namespace {{ project_name | pascal }}.Test
                 _logger.LogInformation("Message received validation completed");
 
                 await processor.StopAsync();
-                _logger.LogInformation("Processor stopped");
+                _logger.LogDebug("Kafka processor stopped.");
             }
             catch (Exception ex)
             {
