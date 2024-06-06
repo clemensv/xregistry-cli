@@ -1,0 +1,188 @@
+{%- import "cloudevents.jinja.include" as cloudEvents %}
+{%- import "kafka.jinja.include" as kafka %}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_plain_kafka_message = (root | exists( "binding", "kafka" )) %}
+{%- set uses_kafka_endpoint = (root | exists( "protocol", "kafka" )) %}
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Threading;
+using Confluent.Kafka;
+using Xunit;
+using Microsoft.Extensions.Logging;
+using Testcontainers.Kafka;
+using DotNet.Testcontainers.Containers;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Networks;
+
+using {{ project_name | pascal }};
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascal_group_name = messagegroup.id | pascal %}
+using {{ project_name | pascal }}.{{ pascal_group_name | pascal  }};
+{%- endfor %}
+{%- if uses_cloudevents_message %}
+{{ kafka.CloudEventsUsings() }}
+{%- endif %}
+
+namespace {{ project_name | pascal }}.Test
+{
+    public class {{ project_name | pascal }}Fixture : IAsyncLifetime
+    {
+        public IContainer? KafkaContainer { get; protected set; }
+        public INetwork? Network { get; protected set; }
+        public string? KafkaBootstrapServers { get; protected set; }
+        private ILoggerFactory _loggerFactory;
+        private ILogger _logger;
+
+        public ILoggerFactory GetLoggerFactory()
+        {
+            return _loggerFactory;
+        }
+
+        public {{ project_name | pascal }}Fixture()
+        {
+            _loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder.AddDebug().AddConsole();
+            });
+            _logger = _loggerFactory.CreateLogger<{{ project_name | pascal }}Fixture>();
+        }
+
+        public async Task InitializeAsync()
+        {
+            try
+            {
+                Network = new NetworkBuilder()
+                    .WithName(Guid.NewGuid().ToString("D"))
+                    .Build();
+
+                KafkaContainer = new ContainerBuilder()
+                        .WithImage("confluentinc/cp-kafka:latest")
+                        .WithPortBinding(9092, false)
+                        .WithNetwork(Network)
+                        .WithNetworkAliases("kafka")
+                        .WithEnvironment("KAFKA_BROKER_ID", "1")
+                        .WithEnvironment("KAFKA_ZOOKEEPER_CONNECT", "localhost:2181")
+                        .WithEnvironment("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://kafka:9092")
+                        .WithEnvironment("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
+                        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*started.*"))
+                        .Build();
+
+                await Network.CreateAsync();
+                await KafkaContainer.StartAsync();
+                KafkaBootstrapServers = "localhost:9092";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during InitializeAsync");
+                throw;
+            }
+        }
+
+        public async Task DisposeAsync()
+        {
+            try
+            {
+                if (KafkaContainer != null)
+                {
+                    await KafkaContainer.StopAsync();
+                }
+                if (Network != null)
+                {
+                    await Network.DeleteAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred during DisposeAsync: {ex.Message}");
+            }
+        }
+    }
+
+    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroup.id | pascal %}
+    {%- set class_name = (pascal_group_name | strip_namespace) + "EventDispatcher" %}
+    {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"Tests" %}
+    public class {{ test_class_name }} : IClassFixture<{{ project_name | pascal }}Fixture>
+    {
+        private readonly {{ project_name | pascal }}Fixture _fixture;
+        private readonly ILogger _logger;
+
+        public {{ test_class_name }}({{ project_name | pascal }}Fixture fixture)
+        {
+            _fixture = fixture;
+            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();
+        }
+
+#pragma warning disable CS8604 // init takes care of nullables 
+
+        {%- for id, message in messagegroup.messages.items() %}
+        {%- set pascal_message_name = message.id | strip_namespace | pascal %}
+        [Fact]
+        public async Task Test{{ pascal_message_name }}Message()
+        {
+            _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
+            try
+            {
+                var dispatcher = new {{ class_name }}(_fixture.GetLoggerFactory());
+                var messageReceived = new TaskCompletionSource<bool>();
+
+                dispatcher.{{ pascal_message_name }}Async += (message, cloudEvent, messageObj) =>
+                {
+                    _logger.LogInformation("{{ pascal_message_name }} message received");
+                    Assert.NotNull(message);
+                    Assert.NotNull(cloudEvent);
+                    Assert.NotNull(messageObj);
+                    messageReceived.SetResult(true);
+                    return Task.CompletedTask;
+                };
+
+                var consumerConfig = new ConsumerConfig
+                {
+                    BootstrapServers = _fixture.KafkaBootstrapServers,
+                    GroupId = "test-group",
+                    AutoOffsetReset = AutoOffsetReset.Earliest
+                };
+
+                var processor = dispatcher.CreateKafkaProcessor(consumerConfig);
+                await processor.StartAsync();
+
+                var producerConfig = new ProducerConfig { BootstrapServers = _fixture.KafkaBootstrapServers };
+                using var producer = new ProducerBuilder<byte[], byte[]>(producerConfig).Build();
+                var kafkaMessage = new Message<byte[], byte[]>
+                {
+                    Value = Encoding.UTF8.GetBytes("test-message"),
+                    Headers = new Headers
+                    {
+                        new Header("content-type", Encoding.UTF8.GetBytes("application/json")),
+                        new Header("cloudEvents_type", Encoding.UTF8.GetBytes("{{ message.id }}")),
+                        new Header("cloudEvents_specversion", Encoding.UTF8.GetBytes("1.0")),
+                        new Header("cloudEvents_source", Encoding.UTF8.GetBytes("/test")),
+                        new Header("cloudEvents_id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))
+                    }
+                };
+
+                await producer.ProduceAsync("test-topic", kafkaMessage);
+                _logger.LogInformation("Test message sent");
+
+                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(10000));
+                Assert.True(messageReceived.Task.IsCompleted, "The message was not received within the timeout period.");
+                _logger.LogInformation("Message received validation completed");
+
+                await processor.StopAsync();
+                _logger.LogInformation("Processor stopped");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during Test{{ pascal_message_name }}Message");
+                throw;
+            }
+        }
+
+        {%- endfor %}
+    }
+    {%- endfor %}
+}

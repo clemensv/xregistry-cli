@@ -47,11 +47,6 @@ class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
 
     {% for id in messagegroup.messages -%}
     {%- set definition = messagegroup.messages[id] -%}
-    {%- if "type" not in definition.metadata %}
-    {%- set metadata = definition.metadata %}
-    {%- set _ = metadata.update({"type": {"type": "string", "value": definition.id}}) %}
-    {%- set definition.metadata = metadata %}
-    {%- endif %}
     {%- set parts = definition.id.split('.') -%}
     {%- set definitionName = parts|join('_')|lower %}
     def send_{{definitionName.split('.')[-1]}}(self, data: 

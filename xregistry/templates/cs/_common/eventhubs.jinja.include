@@ -227,10 +227,10 @@ using CloudNative.CloudEvents.Core;
 using CloudNative.CloudEvents.SystemTextJson;
 using CloudNative.CloudEvents.Protobuf;
 using CloudNative.CloudEvents.Avro;
-using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
 {%- endmacro -%}
 
 {%- macro CloudEventsMethods() -%}
+private static string[] ceAttribs = ["specversion", "dataschema", "time", "source", "subject", "type", "id"];
 protected const string amqpCloudEventPrefix1 = "cloudEvents_";
 protected const string amqpCloudEventPrefix2 = "cloudEvents:";
 protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
@@ -239,59 +239,133 @@ protected static readonly CloudEventFormatter avroFormatter = new global::CloudN
 
 protected string? GetCloudEventAttribute(EventData eventData, string key)
 {
-   if (eventData.Properties.TryGetValue(amqpCloudEventPrefix1+key, out var value) ||
-      eventData.Properties.TryGetValue(amqpCloudEventPrefix2+key, out value))
-   {
-      return value as string;
-   }
-   return null;
+    _logger.LogInformation($"Getting CloudEvent attribute {key}");
+    if (eventData.Properties.TryGetValue(amqpCloudEventPrefix1 + key, out var value) ||
+        eventData.Properties.TryGetValue(amqpCloudEventPrefix2 + key, out value))
+    {
+        return value as string;
+    }
+    return null;
 } 
 
-protected static bool IsCloudEvent(EventData eventData) =>
-      MimeUtilities.IsCloudEventsContentType(eventData.ContentType) ||
-      eventData.Properties.ContainsKey(amqpCloudEventPrefix1) ||
-      eventData.Properties.ContainsKey(amqpCloudEventPrefix2);
-
-protected CloudEvent CloudEventFromEventData(EventData eventData) 
+protected bool IsCloudEvent(EventData eventData)
 {
-   CloudEventFormatter? formatter = null;
-   var contentType = eventData.ContentType?.Split(';')[0];
-   if ( contentType != null && contentType.StartsWith("application/cloudevents") )
+    _logger.LogInformation("Checking if EventData is a CloudEvent.");
+    return MimeUtilities.IsCloudEventsContentType(eventData.ContentType) ||
+           eventData.Properties.ContainsKey(amqpCloudEventPrefix1+"specversion") ||
+           eventData.Properties.ContainsKey(amqpCloudEventPrefix2+"specversion");
+}
+
+
+protected CloudEvent CloudEventFromEventData(EventData eventData)
+{
+   try
    {
-      formatter = contentType.EndsWith("+proto") ? protoFormatter: contentType.EndsWith("+avro") ? avroFormatter : jsonFormatter;
-      return formatter.DecodeStructuredModeMessage(eventData.EventBody.ToStream(), new System.Net.Mime.ContentType(contentType), null);
-   }
-   else
-   {
-      // binary mode
-      var cloudEvent = new CloudEvent()
+      _logger.LogInformation("Extracting CloudEvent from EventData.");
+      CloudEventFormatter? formatter = null;
+      var contentType = eventData.ContentType?.Split(';')[0];
+      if (contentType != null && contentType.StartsWith("application/cloudevents"))
       {
-         Data = eventData.EventBody,
-         DataContentType = contentType,
-      };
-      string? specVersion = GetCloudEventAttribute(eventData, "specversion");
-      if (specVersion != "1.0") throw new Exception("Unsupported CloudEvent specversion: " + specVersion);
-      string? dataSchema = GetCloudEventAttribute(eventData, "dataschema");
-      string? time = GetCloudEventAttribute(eventData, "time");
-      string? source = GetCloudEventAttribute(eventData, "source");
-      string? subject = GetCloudEventAttribute(eventData, "subject");
-      string? type = GetCloudEventAttribute(eventData, "type");
-      string? id = GetCloudEventAttribute(eventData, "id");
-      if (dataSchema != null) cloudEvent.DataSchema = new Uri(dataSchema);
-      if (time != null) cloudEvent.Time = DateTime.Parse(time);
-      if (source != null) cloudEvent.Source = new Uri(source);
-      if (subject != null) cloudEvent.Subject = subject;
-      if (type != null) cloudEvent.Type = type;
-      if (id != null) cloudEvent.Id = id;
-      foreach (var key in eventData.Properties.Keys)
-      {
-         if (key.StartsWith(amqpCloudEventPrefix1) || key.StartsWith(amqpCloudEventPrefix2))
-         {
-            var attributeName = key.Substring(amqpCloudEventPrefix1.Length);
-            cloudEvent[attributeName] = eventData.Properties[key] as string;
-         }
+         _logger.LogInformation($"Using structured mode for CloudEvent with content type {contentType}.");
+         formatter = contentType.EndsWith("+proto") ? protoFormatter : contentType.EndsWith("+avro") ? avroFormatter : jsonFormatter;
+         return formatter.DecodeStructuredModeMessage(eventData.EventBody.ToStream(), new System.Net.Mime.ContentType(contentType), null);
       }
-      return cloudEvent;
-   }         
+      else
+      {
+         _logger.LogInformation("Using binary mode for CloudEvent.");
+         var cloudEvent = new CloudEvent
+         {
+            Data = eventData.EventBody,
+            DataContentType = contentType,
+         };
+         string? specVersion = GetCloudEventAttribute(eventData, "specversion");
+         if (specVersion != "1.0") throw new Exception("Unsupported CloudEvent specversion: " + specVersion);
+         string? dataSchema = GetCloudEventAttribute(eventData, "dataschema");         
+         if (dataSchema != null) cloudEvent.DataSchema = new Uri(dataSchema, UriKind.RelativeOrAbsolute);
+         string? time = GetCloudEventAttribute(eventData, "time");
+         if (time != null) cloudEvent.Time = DateTime.Parse(time);
+         string? source = GetCloudEventAttribute(eventData, "source");         
+         if (source != null) cloudEvent.Source = new Uri(source, UriKind.RelativeOrAbsolute);
+         string? subject = GetCloudEventAttribute(eventData, "subject");
+         if (subject != null) cloudEvent.Subject = subject;
+         string? type = GetCloudEventAttribute(eventData, "type");
+         if (type != null) cloudEvent.Type = type;
+         string? id = GetCloudEventAttribute(eventData, "id");
+         if (id != null) cloudEvent.Id = id;
+         foreach (var key in eventData.Properties.Keys)
+         {
+            if (key.StartsWith(amqpCloudEventPrefix1) || key.StartsWith(amqpCloudEventPrefix2))
+            {
+                  var attributeName = key.Substring(amqpCloudEventPrefix1.Length);
+                  if (ceAttribs.Any(a=>a==attributeName))
+                  {
+                     continue;
+                  }
+                  cloudEvent[attributeName] = eventData.Properties[key] as string;
+            }
+         }
+         return cloudEvent;
+      }
+   }
+   catch (Exception e)
+   {
+      _logger.LogError(e, "Error extracting CloudEvent from EventData.");
+      throw;
+   }
+}
+{%- endmacro -%}
+
+
+{%- macro testFixtureClass(namespace) %}
+
+using System;
+using System.Threading.Tasks;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
+using Xunit;
+
+namespace {{ namespace }}
+{
+   public class EventHubEmulatorFixture : IAsyncLifetime
+   {
+      public TestcontainersContainer AzuriteContainer { get; }
+      public TestcontainersContainer EmulatorContainer { get; }
+      public string EventHubConnectionString { get; private set; }
+      public string BlobStorageConnectionString { get; private set; }
+
+      public EventHubEmulatorFixture()
+      {
+         AzuriteContainer = new TestcontainersBuilder<TestcontainersContainer>()
+               .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+               .WithPortBinding(10000, 10000)
+               .WithPortBinding(10001, 10001)
+               .WithPortBinding(10002, 10002)
+               .Build();
+
+         EmulatorContainer = new TestcontainersBuilder<TestcontainersContainer>()
+               .WithImage("mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest")
+               .WithPortBinding(5672, 5672)
+               .WithEnvironment("BLOB_SERVER", "localhost")
+               .WithEnvironment("METADATA_SERVER", "localhost")
+               .WithEnvironment("ACCEPT_EULA", "Y")
+               .DependsOn(AzuriteContainer)
+               .Build();
+      }
+
+      public async Task InitializeAsync()
+      {
+         await AzuriteContainer.StartAsync();
+         await EmulatorContainer.StartAsync();
+
+         EventHubConnectionString = "Endpoint=sb://localhost:5672/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=RootManageSharedAccessKey;EntityPath=eh1";
+         BlobStorageConnectionString = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFezsmYwA==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;";
+      }
+
+      public async Task DisposeAsync()
+      {
+         await EmulatorContainer.StopAsync();
+         await AzuriteContainer.StopAsync();
+      }
+   }
 }
 {%- endmacro -%}

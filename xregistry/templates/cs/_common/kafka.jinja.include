@@ -1,0 +1,350 @@
+{#- Kafka macros -#}
+
+{%- macro KafkaHeaders() -%}
+using Confluent.Kafka;
+{%- endmacro -%}
+
+{%- macro EmitArguments(props) -%}
+{%- for propname, prop in props.items() %}
+{%- if prop.type == "uritemplate" -%}
+   {%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+   , string {{ placeholder }}
+   {%- endfor -%}
+{%- elif prop.value is not defined -%}
+   , string {{ propname }}{%- if not prop.required %} = default {%- endif %}{% endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{%- macro DeclareUriTemplateArguments(message) -%}
+{%- if message.message["headers"] -%}{{ EmitArguments(message.message["headers"]) }}{%- endif -%}
+{%- if message.message["key"] -%}{{ EmitArguments(message.message["key"]) }}{%- endif -%}
+{%- if message.message["partition"] -%}{{ EmitArguments(message.message["partition"]) }}{%- endif -%}
+{%- if message.message["topic"] -%}{{ EmitArguments(message.message["topic"]) }}{%- endif -%}
+{%- if message.message["timestamp"] -%}{{ EmitArguments(message.message["timestamp"]) }}{%- endif -%}
+{%- endmacro %}
+
+{#- Helper macro for assigning properties -#}
+{%- macro AssignProps(target, props, as_dict = False) -%}
+{%- for propname, prop in props.items() -%}
+{%- if as_dict %}
+["{{ propname }}"] = {% else %}
+{{ target }}.{{ propname | pascal }} = {% endif -%}
+{%- if prop.value -%}
+   {%- if prop.type in ["integer", "number", "boolean"] -%}
+      {{ prop.value }}
+   {%- elif prop.type == "uri" or prop.type == "uritemplate" -%}
+      new Uri($"{{ prop.value }}", UriKind.RelativeOrAbsolute),
+   {%- else -%}
+      $"{{ prop.value }}"
+   {%- endif -%}
+{%- else -%}
+   {{ propname }}
+{%- endif -%},
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates Kafka message objects from kafkaDefinition as message -#}
+{%- macro DeclareKafkaMessage(variable, message) -%}
+{%- set headers = message.message["headers"] %}
+{%- set key = message.message["key"] %}
+{%- set partition = message.message["partition"] %}
+{%- set topic = message.message["topic"] %}
+{%- set timestamp = message.message["timestamp"] %}
+Message<byte[], byte[]> {{ variable }} = new Message<byte[], byte[]>();
+{%- if headers %}
+{{- AssignProps("{{ variable }}.Headers", headers, True) | indent(6) }}
+{%- endif %}
+{%- if key %}
+{{- AssignProps("{{ variable }}.Key", key) | indent(6) }}
+{%- endif %}
+{%- if partition %}
+{{- AssignProps("{{ variable }}.Partition", partition) | indent(6) }}
+{%- endif %}
+{%- if topic %}
+{{- AssignProps("{{ variable }}.Topic", topic) | indent(6) }}
+{%- endif %}
+{%- if timestamp %}
+{{- AssignProps("{{ variable }}.Timestamp", timestamp) | indent(6) }}
+{%- endif %}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsArgs(project_name, messagegroups, withType) -%}
+{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+{%- set pascalGroupName = messagegroup.id  | pascal %}
+{%- if withType -%}global::{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id  | strip_namespace | camel }}KafkaDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- endfor %}
+{%- endmacro-%}
+
+{%- macro DeclareDispatchObjectField(project_name, messagegroup) %}
+{%- set handlerName=(messagegroup.id | strip_namespace | camel)+"KafkaDispatcher" -%}
+{%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id | strip_namespace | pascal)+"KafkaDispatcher" %}
+{{ handlerType }} {{ handlerName }};
+{% endmacro -%}
+
+{%- macro DeclareDispatchObjectsFields(project_name,messagegroups) %}
+{%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) %}
+{{ DeclareDispatchObjectField( project_name, messagegroup ) }}
+{%- endfor %}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectConstructor(project_name, class_name, messagegroup, args, body) %}
+public {{ class_name }}({%- if args %}{{ args }}, {%- endif -%}
+    {%- set pascalGroupName = messagegroup.id | pascal -%} 
+    {%- set handlerName=(messagegroup.id | strip_namespace | camel)+"KafkaDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"KafkaDispatcher" -%}
+    {{ handlerType }} {{ handlerName }})
+{
+    this.{{ handlerName }} = {{ handlerName }};
+    {{- body | indent(4) }}
+}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) %}
+{%- if messagegroups | exists("binding", "kafka" ) %}
+public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
+    {%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%}
+    {%- set pascalGroupName = messagegroup.id  | pascal -%} 
+    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"KafkaDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"KafkaDispatcher" -%}
+    {{ handlerType }} {{ handlerName }}
+    {%- if not loop.last -%}, {%- endif -%}
+    {%- endfor -%})
+{
+    {% for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%}
+    {%- set pascalGroupName = messagegroup.id  | pascal %}
+    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"KafkaDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"KafkaDispatcher" -%}
+    this.{{ handlerName }} = {{ handlerName }};
+    {%- endfor %}
+    {{ body | indent(4) }}
+}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DispatchToDispatchObject(project_name, root, message, messagegroup, logger) -%}
+var messageSubject = message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes() != null 
+    ? Encoding.UTF8.GetString(message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes()) 
+    : null;
+switch (messageSubject)
+{
+   {%- set handlerName=(messagegroup.id | strip_namespace | camel)+"KafkaDispatcher" -%}
+   {% for id, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+   {% set pascalDefinitionName = message.id | pascal %}
+   case "{{ message.id }}":
+         if ( this.{{ handlerName }} != null )
+         {
+            await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
+               {%- if message.schemaurl or message.schema -%}
+            global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
+            {%- else -%}
+            {{ message }}.Data
+            {%- endif %});
+            break;
+         }
+         break;
+   {% endfor %}
+   default:
+      {{ logger }}.LogError($"Unsupported message subject {messageSubject}");
+      break;
+}
+{%- endmacro -%}
+
+{%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
+{%- if messagegroups | exists("binding", "kafka" ) %}
+var messageSubject = message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes() != null 
+    ? Encoding.UTF8.GetString(message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes()) 
+    : null;
+switch (messageSubject)
+{
+   {% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+   {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"KafkaDispatcher" -%}
+   {% for id, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+   {% set pascalDefinitionName = message.id | pascal %}
+   case "{{ message.id }}":
+         if ( this.{{ handlerName }} != null )
+         {
+            await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
+               {%- if message.schemaurl or message.schema -%}
+            global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
+            {%- else -%}
+            {{ message }}.Data
+            {%- endif %});
+            break;
+         }
+         break;
+   {% endfor %}
+   {% endfor %}
+   default:
+      {{ logger }}.LogError($"Unsupported message subject {messageSubject}");
+      break;
+}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- set messagegroups = root.messagegroups -%}
+{%- if messagegroups | exists("binding", "kafka" ) %}
+{%- set function_name = project_name | pascal %}
+using System.Threading.Tasks;
+using Confluent.Kafka;
+{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+{%- set pascalGroupName = messagegroup.id  | pascal %}
+namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+{
+   public interface I{{ pascalGroupName | strip_namespace }}KafkaDispatcher
+   {
+      {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+      {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
+      {%- if message.schemaurl or message.schema -%}
+      {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
+      {%- else -%}
+      {%- set dataType = "object" -%}
+      {%- endif %}
+      {%- if message.description %}   
+      /// <summary>
+      /// {{ message.description }}
+      /// </summary>
+      {%- endif %}
+      Task On{{ pascalDefinitionName | strip_namespace }}Async(Message<byte[], byte[]> message, {{ dataType }}? data);
+      {%- endfor %}
+   }
+}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro CloudEventsUsings() -%}
+using CloudNative.CloudEvents;
+using CloudEvent = CloudNative.CloudEvents.CloudEvent;
+using CloudNative.CloudEvents.Core;
+using CloudNative.CloudEvents.SystemTextJson;
+using CloudNative.CloudEvents.Protobuf;
+using CloudNative.CloudEvents.Avro;
+{%- endmacro -%}
+
+{%- macro CloudEventsMethods() -%}
+private static string[] ceAttribs = ["specversion", "dataschema", "time", "source", "subject", "type", "id"];
+protected const string kafkaCloudEventPrefix1 = "cloudEvents_";
+protected const string kafkaCloudEventPrefix2 = "cloudEvents:";
+protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
+protected static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
+protected static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
+
+protected string? GetCloudEventAttribute(Message<byte[], byte[]> message, string key)
+{
+    _logger.LogInformation($"Getting CloudEvent attribute {key}");
+    var header = message.Headers.FirstOrDefault(h => h.Key == kafkaCloudEventPrefix1 + key) ?? message.Headers.FirstOrDefault(h => h.Key == kafkaCloudEventPrefix2 + key);
+    return header?.GetValueBytes() != null ? Encoding.UTF8.GetString(header.GetValueBytes()) : null;
+} 
+
+protected bool IsCloudEvent(Message<byte[], byte[]> message)
+{
+    _logger.LogInformation("Checking if Message is a CloudEvent.");
+    var contentTypeHeader = message.Headers.FirstOrDefault(h => h.Key == "content-type");
+    var contentType = contentTypeHeader?.GetValueBytes() != null ? Encoding.UTF8.GetString(contentTypeHeader.GetValueBytes()) : null;
+    return MimeUtilities.IsCloudEventsContentType(contentType) ||
+           message.Headers.Any(h => h.Key == kafkaCloudEventPrefix1 + "specversion") ||
+           message.Headers.Any(h => h.Key == kafkaCloudEventPrefix2 + "specversion");
+}
+
+
+protected CloudEvent CloudEventFromMessage(Message<byte[], byte[]> message)
+{
+   try
+   {
+      _logger.LogInformation("Extracting CloudEvent from Message.");
+      CloudEventFormatter? formatter = null;
+      var contentTypeHeader = message.Headers.FirstOrDefault(h => h.Key == "content-type");
+      var contentType = contentTypeHeader?.GetValueBytes() != null ? Encoding.UTF8.GetString(contentTypeHeader.GetValueBytes())?.Split(';')[0] : null;
+      if (contentType != null && contentType.StartsWith("application/cloudevents"))
+      {
+         _logger.LogInformation($"Using structured mode for CloudEvent with content type {contentType}.");
+         formatter = contentType.EndsWith("+proto") ? protoFormatter : contentType.EndsWith("+avro") ? avroFormatter : jsonFormatter;
+         return formatter.DecodeStructuredModeMessage(new MemoryStream(message.Value), new System.Net.Mime.ContentType(contentType), null);
+      }
+      else
+      {
+         _logger.LogInformation("Using binary mode for CloudEvent.");
+         var cloudEvent = new CloudEvent
+         {
+            Data = message.Value,
+            DataContentType = contentType,
+         };
+         string? specVersion = GetCloudEventAttribute(message, "specversion");
+         if (specVersion != "1.0") throw new Exception("Unsupported CloudEvent specversion: " + specVersion);
+         string? dataSchema = GetCloudEventAttribute(message, "dataschema");         
+         if (dataSchema != null) cloudEvent.DataSchema = new Uri(dataSchema, UriKind.RelativeOrAbsolute);
+         string? time = GetCloudEventAttribute(message, "time");
+         if (time != null) cloudEvent.Time = DateTime.Parse(time);
+         string? source = GetCloudEventAttribute(message, "source");         
+         if (source != null) cloudEvent.Source = new Uri(source, UriKind.RelativeOrAbsolute);
+         string? subject = GetCloudEventAttribute(message, "subject");
+         if (subject != null) cloudEvent.Subject = subject;
+         string? type = GetCloudEventAttribute(message, "type");
+         if (type != null) cloudEvent.Type = type;
+         string? id = GetCloudEventAttribute(message, "id");
+         if (id != null) cloudEvent.Id = id;
+         foreach (var header in message.Headers)
+         {
+            var key = header.Key;
+            if (key.StartsWith(kafkaCloudEventPrefix1) || key.StartsWith(kafkaCloudEventPrefix2))
+            {
+                  var attributeName = key.Substring(kafkaCloudEventPrefix1.Length);
+                  if (ceAttribs.Any(a=>a==attributeName))
+                  {
+                     continue;
+                  }
+                  cloudEvent[attributeName] = Encoding.UTF8.GetString(header.GetValueBytes());
+            }
+         }
+         return cloudEvent;
+      }
+   }
+   catch (Exception e)
+   {
+      _logger.LogError(e, "Error extracting CloudEvent from Message.");
+      throw;
+   }
+}
+{%- endmacro -%}
+
+
+{%- macro testFixtureClass(namespace) %}
+
+using System;
+using System.Threading.Tasks;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
+using Xunit;
+
+namespace {{ namespace }}
+{
+   public class KafkaEmulatorFixture : IAsyncLifetime
+   {
+      public TestcontainersContainer KafkaContainer { get; }
+
+      public KafkaEmulatorFixture()
+      {
+         KafkaContainer = new TestcontainersBuilder<TestcontainersContainer>()
+               .WithImage("confluentinc/cp-kafka:latest")
+               .WithPortBinding(9092, 9092)
+               .WithEnvironment("KAFKA_BROKER_ID", "1")
+               .WithEnvironment("KAFKA_ZOOKEEPER_CONNECT", "localhost:2181")
+               .WithEnvironment("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://localhost:9092")
+               .WithEnvironment("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
+               .Build();
+      }
+
+      public async Task InitializeAsync()
+      {
+         await KafkaContainer.StartAsync();
+      }
+
+      public async Task DisposeAsync()
+      {
+         await KafkaContainer.StopAsync();
+      }
+   }
+}
+{%- endmacro -%}

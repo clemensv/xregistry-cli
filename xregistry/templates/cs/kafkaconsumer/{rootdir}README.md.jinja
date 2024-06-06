@@ -1,0 +1,145 @@
+# {{ project_name | pascal }} Event Hubs Consumer SDK
+
+## Overview
+
+The `{{ project_name | pascal }}` library provides a robust and strongly-typed
+API for obtaining and processing events from Azure Event Hubs and Microsoft
+Fabric Event Streams custom output endpoints that are associated with {% for
+messagegroup_key, messagegroup in root.messagegroups.items() -%}
+`{{- messagegroup.id -}}`{%- if not loop.last -%}, {%- elif not loop.first -%},
+and {%- endif -%} {%- endfor %} message group{% if (root.messagegroups.items() |
+length) %}s{% endif %}.
+
+This documentation will help you getting started.
+
+## Prerequisites
+
+Before using the `{{ project_name | pascal }}` library, ensure you have the following prerequisites:
+- .NET SDK 8.0 installed.
+- For running the unit tests: Docker or a compatible container runtime.
+
+For Azure Event Hubs:
+- An Azure account with access to Event Hubs and an Azure Storage account.
+
+For Microsoft Fabric Event Streams:
+  - A Microsoft Fabric Event Streams with a custom output endpoint.
+  - An Azure Storage account. 
+
+To use the `{{ project_name | pascal }}` library, add the necessary NuGet
+packages to your project:
+
+```bash
+dotnet add package Azure.Messaging.EventHubs
+dotnet add package Azure.Messaging.EventHubs.Processor
+dotnet add package Azure.Storage.Blobs
+```
+
+## Building, testing and packaging the SDK
+
+The code in this SDK is complete and ready for use. It includes unit tests that
+can be run using the `dotnet test` command and which verify the correctness of 
+the components, which includes running them against the Azure Event Hubs emulator.
+
+The SDK can be packaged into a NuGet package using the `dotnet pack` command.
+
+```bash
+dotnet test
+dotnet pack
+```
+
+## Usage
+
+### Creating the Event Processor Client 
+
+To start processing events from Event Hubs, create an instance of the
+`EventProcessorClient` using one of the provided methods in the {{ project_name | pascal }}Dispatcher class. These methods help configure the processor with
+various authentication mechanisms.
+
+```csharp
+var checkpointBlobClient = new BlobContainerClient("<connection-string>", "<container-name>");
+var credential = new DefaultAzureCredential();
+var dispatcher = new {{ class_name }}();
+
+var eventProcessorClient = dispatcher.CreateEventProcessorClient(
+    checkpointBlobClient,
+    credential,
+    "<fully-qualified-namespace>",
+    "<event-hub-name>",
+    "<consumer-group-name>"
+);
+```
+
+### Events and Handlers
+
+The `{{ class_name }}` class provides strongly-typed event handlers for
+different types of events. You can choose whether to handle all events or 
+only specific ones. 
+
+Below is a list of events and how to subscribe to them:
+
+{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id  | pascal %}
+{%- set class_name = ( pascalGroupName | strip_namespace )+"EventDispatcher" %}
+
+#### {{ pascalGroupName | pascal }} Events
+
+{%- for id, message in messagegroup.messages.items() %}
+{%- set pascalDefinitionName = message.id | strip_namespace | pascal %}
+{%- if message.schemaurl or message.schema %}
+{%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal) %}
+{%- else %}
+{%- set dataType = "object" %}
+{%- endif %}
+
+- **{{ pascalDefinitionName }}Async**: {{ message.description }}
+
+  Arguments:
+    - `eventData`: [`Azure.EventHubs.EventData`](): The Event Hubs event data.
+    {%- if message.format == 'CloudEvents/1.0' %}
+    - `cloudEvent`: [`CloudNative.CloudEvent`](): The CloudEvent envelope information.
+    {%- endif %}
+    - `data`: [`{{ dataType | lstrip('global::')}}`](): The event data.
+
+  ```csharp
+  dispatcher.{{ pascalDefinitionName }}Async += async (eventData, {{ 'cloudEvent, ' if message.format == 'CloudEvents/1.0' }}{{dataType}} data) =>
+  {
+      // Your event handling logic here
+  };
+  ```
+{%- endfor %}
+{%- endfor %}
+
+
+### Handling Unhandled Events
+
+If an event does not match any of the specified handlers, the
+`UnhandledMessageAsync` event will be invoked. Events that are understood but
+not subscribed by any of the handlers do not trigger this event.
+
+```csharp
+dispatcher.UnhandledMessageAsync += async (eventData) =>
+{
+    // Handle unhandled messages here
+    await Task.CompletedTask;
+};
+```
+
+### Handling Errors
+
+Error handling is built-in and can be customized by subscribing to the
+`ErrorAsync` event.
+
+```csharp
+dispatcher.ErrorAsync += async (eventArgs) =>
+{
+    Console.WriteLine($"Error: {eventArgs.Exception.Message}");
+    await Task.CompletedTask;
+};
+```
+
+## Event Schema Documentation
+
+Detailed documentation for the classes returned by the `schema_type()` can be
+found in the [data.md](data.md) document. Each class is documented with its
+corresponding properties and usage examples.
+

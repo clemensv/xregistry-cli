@@ -1,6 +1,6 @@
 {%- macro generate(event) -%}
 {
-    "id" : "{% uuid %}",
+    "id" : "{{ uuid() }}",
     "time": "{% time %}",
     "specversion" : "1.0",
     {%- if "type" in event %}
