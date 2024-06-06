@@ -225,8 +225,7 @@ using CloudNative.CloudEvents.Avro;
 
 {%- macro CloudEventsMethods() -%}
 private static string[] ceAttribs = ["specversion", "dataschema", "time", "source", "subject", "type", "id"];
-protected const string kafkaCloudEventPrefix1 = "cloudEvents_";
-protected const string kafkaCloudEventPrefix2 = "cloudEvents:";
+protected const string kafkaCloudEventPrefix = "ce_";
 protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
 protected static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
 protected static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
@@ -234,7 +233,7 @@ protected static readonly CloudEventFormatter avroFormatter = new global::CloudN
 protected string? GetCloudEventAttribute(Message<byte[], byte[]> message, string key)
 {
     _logger.LogInformation($"Getting CloudEvent attribute {key}");
-    var header = message.Headers.FirstOrDefault(h => h.Key == kafkaCloudEventPrefix1 + key) ?? message.Headers.FirstOrDefault(h => h.Key == kafkaCloudEventPrefix2 + key);
+    var header = message.Headers.FirstOrDefault(h => h.Key == kafkaCloudEventPrefix + key);
     return header?.GetValueBytes() != null ? Encoding.UTF8.GetString(header.GetValueBytes()) : null;
 } 
 
@@ -244,8 +243,7 @@ protected bool IsCloudEvent(Message<byte[], byte[]> message)
     var contentTypeHeader = message.Headers.FirstOrDefault(h => h.Key == "content-type");
     var contentType = contentTypeHeader?.GetValueBytes() != null ? Encoding.UTF8.GetString(contentTypeHeader.GetValueBytes()) : null;
     return MimeUtilities.IsCloudEventsContentType(contentType) ||
-           message.Headers.Any(h => h.Key == kafkaCloudEventPrefix1 + "specversion") ||
-           message.Headers.Any(h => h.Key == kafkaCloudEventPrefix2 + "specversion");
+           message.Headers.Any(h => h.Key == kafkaCloudEventPrefix + "specversion");
 }
 
 
@@ -288,9 +286,9 @@ protected CloudEvent CloudEventFromMessage(Message<byte[], byte[]> message)
          foreach (var header in message.Headers)
          {
             var key = header.Key;
-            if (key.StartsWith(kafkaCloudEventPrefix1) || key.StartsWith(kafkaCloudEventPrefix2))
+            if (key.StartsWith(kafkaCloudEventPrefix))
             {
-                  var attributeName = key.Substring(kafkaCloudEventPrefix1.Length);
+                  var attributeName = key.Substring(kafkaCloudEventPrefix.Length);
                   if (ceAttribs.Any(a=>a==attributeName))
                   {
                      continue;

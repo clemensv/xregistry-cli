@@ -1,7 +1,7 @@
 {%- import "cloudevents.jinja.include" as cloudEvents %}
 {%- import "kafka.jinja.include" as kafka %}
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_ce_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_kafka_message = (root | exists( "binding", "kafka" )) %}
 {%- set uses_kafka_endpoint = (root | exists( "protocol", "kafka" )) %}
 using System;
@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 using Confluent.Kafka;
+using Confluent.Kafka.Admin;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Testcontainers.Kafka;
@@ -23,7 +24,7 @@ using {{ project_name | pascal }};
 {%- set pascal_group_name = messagegroup.id | pascal %}
 using {{ project_name | pascal }}.{{ pascal_group_name | pascal  }};
 {%- endfor %}
-{%- if uses_cloudevents_message %}
+{%- if uses_ce_message %}
 {{ kafka.CloudEventsUsings() }}
 {%- endif %}
 
@@ -39,6 +40,14 @@ namespace {{ project_name | pascal }}.Test
         public ILoggerFactory GetLoggerFactory()
         {
             return _loggerFactory;
+        }
+
+        public string TopicName 
+        {
+            get
+            {
+                return "testttopic";
+            }
         }
 
         public {{ project_name | pascal }}Fixture()
@@ -64,6 +73,8 @@ namespace {{ project_name | pascal }}.Test
 
                 KafkaBootstrapServers = KafkaContainerInstance.GetBootstrapAddress();
                 _logger.LogDebug($"Kafka bootstrap servers: {KafkaBootstrapServers}");
+
+                await CreateKafkaTopic(TopicName, KafkaContainerInstance.GetBootstrapAddress());
             }
             catch (Exception ex)
             {
@@ -89,6 +100,18 @@ namespace {{ project_name | pascal }}.Test
                 Console.WriteLine($"An error occurred during DisposeAsync: {ex.Message}");
             }
         }
+
+        private static async Task CreateKafkaTopic(string topicName, string bootstrapServers)
+        {
+            using var adminClient = 
+                new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build();
+
+            await adminClient.CreateTopicsAsync(new TopicSpecification[]
+            {
+                new() { Name = topicName, ReplicationFactor = 1, NumPartitions = 1 }
+            });
+        }
+
     }
 
     {%- for messagegroup_key, messagegroup in messagegroups.items() %}
@@ -136,27 +159,43 @@ namespace {{ project_name | pascal }}.Test
                     AutoOffsetReset = AutoOffsetReset.Earliest
                 };
 
-                var processor = dispatcher.CreateKafkaProcessor(consumerConfig);
+                var processor = dispatcher.CreateKafkaProcessor(consumerConfig, _fixture.TopicName);
                 await processor.StartAsync();
                 _logger.LogDebug("Kafka processor started.");
 
                 var producerConfig = new ProducerConfig { BootstrapServers = _fixture.KafkaBootstrapServers };
                 using var producer = new ProducerBuilder<byte[], byte[]>(producerConfig).Build();
+
+                
+                {%- if message.schemaurl or message.schema -%}
+                {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
+                {%- else -%}
+                {%- set dataType = "object" -%}
+                {%- endif %}
+                {%- if dataType != "object" %}
+                var eventDataTest = new {{ dataType }}Tests();
+                var eventDataInstance = eventDataTest.CreateInstance();
+                var eventData = eventDataInstance.ToByteArray("application/json");
+                {%- else %}
+                var eventData = System.Text.Encoding.UTF8.GetBytes("Test");
+                {%- endif %}
+
                 var kafkaMessage = new Message<byte[], byte[]>
                 {
-                    Value = Encoding.UTF8.GetBytes("test-message"),
+                    Value = eventData,
                     Headers = new Headers
                     {
                         new Header("content-type", Encoding.UTF8.GetBytes("application/json")),
-                        new Header("cloudEvents_type", Encoding.UTF8.GetBytes("{{ message.id }}")),
-                        new Header("cloudEvents_specversion", Encoding.UTF8.GetBytes("1.0")),
-                        new Header("cloudEvents_source", Encoding.UTF8.GetBytes("/test")),
-                        new Header("cloudEvents_id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))
+                        new Header("ce_type", Encoding.UTF8.GetBytes("{{ message.id }}")),
+                        new Header("ce_specversion", Encoding.UTF8.GetBytes("1.0")),
+                        new Header("ce_source", Encoding.UTF8.GetBytes("/test")),
+                        new Header("ce_id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))
                     }
                 };
 
                 _logger.LogDebug("Producing test message to Kafka.");
-                await producer.ProduceAsync("test-topic", kafkaMessage);
+                await producer.ProduceAsync(_fixture.TopicName, kafkaMessage);
+                producer.Flush();
                 _logger.LogInformation("Test message sent");
 
                 var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(10000));

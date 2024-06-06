@@ -143,10 +143,10 @@ namespace {{ project_name | pascal }}
             }
             {%- endif %}
 
-            public KafkaProcessor<byte[], byte[]> CreateKafkaProcessor(ConsumerConfig config)
+            public KafkaProcessor<byte[], byte[]> CreateKafkaProcessor(ConsumerConfig config, string topicName)
             {
                 var consumer = new ConsumerBuilder<byte[], byte[]>(config).Build();
-                var processor = new KafkaProcessor<byte[], byte[]>(consumer);
+                var processor = new KafkaProcessor<byte[], byte[]>(consumer, topicName);
                 processor.Attach(this);
                 return processor;
             }

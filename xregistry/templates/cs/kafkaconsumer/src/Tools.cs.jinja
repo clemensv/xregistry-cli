@@ -58,6 +58,7 @@ namespace {{ project_name | pascal }}
         private readonly ILogger<KafkaProcessor<TKey, TValue>> _logger;
         private CancellationTokenSource _cancellationTokenSource;
         private Task _processingTask;
+        private string _topicName = string.Empty;
 
         /// <summary>
         /// Event that is raised when a message is processed.
@@ -73,12 +74,15 @@ namespace {{ project_name | pascal }}
         /// Initializes a new instance of the <see cref="KafkaProcessor{TKey, TValue}"/> class.
         /// </summary>
         /// <param name="consumer">The Kafka consumer instance.</param>
+        /// <param name="topicName"></param>
         /// <param name="loggerFactory">Optional logger factory for logging.</param>
         public KafkaProcessor(
             IConsumer<TKey, TValue> consumer,
+            string topicName,
             ILoggerFactory loggerFactory = null)
         {
             _consumer = consumer;
+            _topicName = topicName;
             _logger = loggerFactory?.CreateLogger<KafkaProcessor<TKey, TValue>>() ?? new LoggerFactory().CreateLogger<KafkaProcessor<TKey, TValue>>();
         }
 
@@ -108,6 +112,7 @@ namespace {{ project_name | pascal }}
         {
             try
             {
+                _consumer.Subscribe(_topicName);
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     try
@@ -149,6 +154,7 @@ namespace {{ project_name | pascal }}
             {
                 // Expected exception when the processing loop is cancelled.
             }
+            _consumer.Unsubscribe();
         }
     }
 }
