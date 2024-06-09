@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.8.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1">
+    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="Testcontainers" Version="3.8.0" />
+    <PackageReference Include="Testcontainers.Azurite" Version="3.8.0" />
+    <PackageReference Include="CloudNative.CloudEvents" Version="2.7.1" />
+    <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.7.1" />
+    <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.7.1" />
+    <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.7.1" />
+    <PackageReference Include="Azure.Messaging.EventHubs.Processor" Version="5.11.3" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.20.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+    <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\{{project_name|pascal}}Producer.csproj" />
+    <ProjectReference Include="..\..\{{project_name}}_data\test\{{project_name|pascal}}.Test.csproj" />
+  </ItemGroup>
+
+</Project>

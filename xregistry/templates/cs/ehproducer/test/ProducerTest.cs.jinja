@@ -1,0 +1,288 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
+{%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
+using System;
+using System.IO;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Threading;
+using Azure;
+using Azure.Core;
+using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Processor;
+using Azure.Messaging.EventHubs.Producer;
+using Azure.Storage.Blobs;
+using Xunit;
+using Microsoft.Extensions.Logging;
+using Testcontainers.Azurite;
+using DotNet.Testcontainers.Containers;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Networks;
+
+using {{ project_name | pascal }};
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascal_group_name = messagegroup.id | pascal %}
+using {{ project_name | pascal }}.{{ pascal_group_name | pascal  }};
+{%- endfor %}
+{%- if uses_cloudevents_message %}
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.SystemTextJson;
+{%- endif %}
+
+namespace {{ project_name | pascal }}.Test
+{
+    public class {{ project_name | pascal }}Fixture : IAsyncLifetime
+    {
+        public AzuriteContainer? AzuriteContainer { get; protected set; }
+        public IContainer? EmulatorContainer { get; protected set; }
+        public INetwork? Network { get; protected set; }
+        public string? EventHubConnectionString { get; protected set; }
+        public string? BlobStorageConnectionString { get; protected set; }
+        public BlobContainerClient? BlobClient { get; protected set; }
+        private ILoggerFactory _loggerFactory;
+        private ILogger _logger;
+
+        public ILoggerFactory GetLoggerFactory()
+        {
+            return _loggerFactory;
+        }
+
+        private string? emulatorConfigFilePath = null;
+        private const string emulatorConfig = @"{
+                      ""UserConfig"": {
+                        ""NamespaceConfig"": [
+                          {
+                            ""Type"": ""EventHub"",
+                            ""Name"": ""emulatorNs1"",
+                            ""Entities"": [
+                              {
+                                ""Name"": ""eh1"",
+                                ""PartitionCount"": ""2"",
+                                ""ConsumerGroups"": [
+                                  {
+                                    ""Name"": ""cg1""
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ], 
+                        ""LoggingConfig"": {
+                          ""Type"": ""File""
+                        }
+                      }
+                    }";
+
+        public {{ project_name | pascal }}Fixture()
+        {
+            _loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder.AddDebug().AddConsole();
+            });
+            _logger = _loggerFactory.CreateLogger<{{ project_name | pascal }}Fixture>();
+        }
+
+        public async Task InitializeAsync()
+        {
+            try
+            {
+                Network = new NetworkBuilder()
+                    .WithName(Guid.NewGuid().ToString("D"))
+                    .Build();
+                emulatorConfigFilePath = Path.GetTempFileName();
+                File.WriteAllText(emulatorConfigFilePath, emulatorConfig);  
+                AzuriteContainer = new AzuriteBuilder()
+                    .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+                    .WithCommand("--skipApiVersionCheck")
+                    .WithNetwork(Network)
+                    .WithNetworkAliases("azurite")
+                    .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*Azurite Blob service is successfully listening"))
+                    .Build();
+                
+                EmulatorContainer = new ContainerBuilder()
+                        .WithImage("mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest")
+                        .WithBindMount(emulatorConfigFilePath,"/Eventhubs_Emulator/ConfigFiles/Config.json")
+                        .WithPortBinding(5672, false)
+                        .WithNetwork(Network)
+                        .WithNetworkAliases("eventhubs-emulator")
+                        .WithEnvironment("BLOB_SERVER", "azurite")
+                        .WithEnvironment("METADATA_SERVER", "azurite")
+                        .WithEnvironment("ACCEPT_EULA", "Y")
+                        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*Emulator is launching with config"))
+                        .Build();
+
+                await Network.CreateAsync();
+                await AzuriteContainer.StartAsync();
+                await EmulatorContainer.StartAsync();
+                EventHubConnectionString = $"Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;EntityPath=eh1;";
+                BlobStorageConnectionString = AzuriteContainer.GetConnectionString();
+                BlobClient = new BlobContainerClient(BlobStorageConnectionString, "eventhub-checkpoints");
+                if ( !await BlobClient.ExistsAsync())
+                {
+                    await BlobClient.CreateAsync();
+                    if ( !await BlobClient.ExistsAsync())
+                    {
+                        throw new Exception("Blob container not created");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during InitializeAsync");
+                throw;
+            }
+        }
+
+        public async Task DisposeAsync()
+        {
+            try
+            {
+                if (EmulatorContainer != null)
+                {
+                    await EmulatorContainer.StopAsync();
+                }
+                if (AzuriteContainer != null)
+                {
+                    await AzuriteContainer.StopAsync();
+                }
+                if (Network != null)
+                {
+                    await Network.DeleteAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred during DisposeAsync: {ex.Message}");
+            }
+            finally
+            {
+                if (emulatorConfigFilePath != null && File.Exists(emulatorConfigFilePath))
+                {
+                    File.Delete(emulatorConfigFilePath);
+                }
+            }
+        }
+    }
+
+    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroup.id | pascal %}
+    {%- set class_name = "global::" + ( project_name | pascal ) + '.' + (pascal_group_name) + "Producer" %}
+    {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"ProducerTests" %}
+    public class {{ test_class_name }} : IClassFixture<{{ project_name | pascal }}Fixture>
+    {
+        private readonly {{ project_name | pascal }}Fixture _fixture;
+        private readonly ILogger _logger;
+        private readonly {{ class_name }} _producer;
+
+        public {{ test_class_name }}({{ project_name | pascal }}Fixture fixture)
+        {
+            _fixture = fixture;
+            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();
+            var eventHubClient = new EventHubProducerClient(_fixture.EventHubConnectionString);
+            _producer = new {{ class_name }}(eventHubClient);
+        }
+
+#pragma warning disable CS8604 // init takes care of nullables 
+
+        {%- for id, message in messagegroup.messages.items() %}
+        {%- set pascal_message_name = message.id | strip_namespace | pascal %}
+        {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+        {%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
+        [Fact]
+        public async Task Test{{ pascal_message_name }}Message()
+        {
+            _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
+            try
+            {   
+                {%- if message.schemaurl or message.schema -%}
+                {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
+                {%- else -%}
+                {%- set dataType = "object" -%}
+                {%- endif %}
+                {%- if dataType != "object" %}
+                {%- if isCloudEvent %}
+                {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
+                {%- elif isAmqp %}
+                {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
+                {%- endif %}
+                var eventDataTest = new {{ dataType }}Tests();
+                var eventDataInstance = eventDataTest.CreateInstance();
+                await _producer.Send{{ pascal_message_name }}Async(eventDataInstance
+                {%- if uriargs -%}
+                {%- for arg in uriargs.split(',') if arg.strip() -%}
+                , {{ arg.strip().split(' ')[1] -}}: "test"
+                {%- endfor -%}
+                {%- endif -%}
+                );
+                {%- else %}
+                await _producer.Send{{ pascal_message_name }}Async(new object()
+                {%- if uriargs -%}
+                {%- for arg in uriargs.split(',') if arg.strip() -%}
+                , {{ arg.strip().split(' ')[1] -}}: "test"
+                {%- endfor -%}
+                {%- endif -%}
+                );
+                {%- endif %}
+                _logger.LogInformation("Test event sent");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during Test{{ pascal_message_name }}Message");
+                throw;
+            }
+        }
+
+        [Fact]
+        public async Task Test{{ pascal_message_name }}Batch()
+        {
+            _logger.LogInformation("Starting Test{{ pascal_message_name }}Batch");
+            try
+            {   
+                {%- if message.schemaurl or message.schema -%}
+                {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
+                {%- else -%}
+                {%- set dataType = "object" -%}
+                {%- endif %}
+                {%- if dataType != "object" %}
+                {%- if isCloudEvent %}
+                {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
+                {%- elif isAmqp %}
+                {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
+                {%- endif %}
+                var eventDataTest = new {{ dataType }}Tests();
+                var eventDataInstances = new {{ dataType }}[10];
+                for (int i = 0; i < 10; i++)
+                {
+                    eventDataInstances[i] = eventDataTest.CreateInstance();
+                }
+                await _producer.Send{{ pascal_message_name }}BatchAsync(eventDataInstances
+                {%- if uriargs -%}
+                {%- for arg in uriargs.split(',') if arg.strip() -%}
+                , {{ arg.strip().split(' ')[1] -}}:"test"
+                {%- endfor -%}
+                {%- endif -%}
+                );
+                {%- else %}
+                await _producer.Send{{ pascal_message_name }}BatchAsync(new object[10]
+                {%- if uriargs -%}
+                {%- for arg in uriargs.split(',') if arg.strip() -%}
+                , {{ arg.strip().split(' ')[1] -}}:"test"
+                {%- endfor -%}
+                {%- endif -%}
+                );
+                {%- endif %}
+                _logger.LogInformation("Test batch event sent");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during Test{{ pascal_message_name }}Batch");
+                throw;
+            }
+        }
+        {%- endfor %}
+    }
+    {%- endfor %}
+}
