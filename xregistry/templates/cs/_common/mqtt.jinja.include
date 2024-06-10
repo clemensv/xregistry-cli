@@ -41,7 +41,7 @@ using MQTTnet.Protocol;
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
 {%- if message.message["properties"] -%}{{ EmitArguments(message.message["properties"]) }}{%- endif -%}
-{%- endmacro %}
+{%- endmacro -%}
 
 {#- Helper macro for assigning properties -#}
 {%- macro AssignProps(props, as_dict = False) -%}
@@ -94,15 +94,14 @@ new MqttUserProperty("{{ prop.name }}",
 {#- Generates MQTT message objects from mqttDefinition as message -#}
 {%- macro DeclareMqttNetMessage(variable, message) -%}
 {%- set properties = message.message["properties"] %}
-MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
+MqttApplicationMessage {{ variable }} = new MqttApplicationMessageBuilder()
 {
    {{- AssignProps(properties) | indent(3) }}
-   UserProperties = new List<MqttUserProperty> {
+   .WithUserProperties(new List<MqttUserProperty> {
       {{- AssignUserProps(properties) | indent(9) }}
-   }
-};
+   })
+   .Build();
 {%- endmacro -%}
-
 
 {%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
