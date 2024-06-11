@@ -144,6 +144,7 @@ namespace {{ project_name | pascal }}
             }
             {%- endif %}
 
+            
             public EventProcessorClient CreateEventProcessorClient(BlobContainerClient checkpointBlobClient, AzureNamedKeyCredential credential, string fullyQualifiedNamespace, string eventHubName, string consumerGroupName) 
             {       
                 var eventHubProcessorClient = new EventProcessorClient(checkpointBlobClient, consumerGroupName, fullyQualifiedNamespace, eventHubName, credential);
@@ -282,7 +283,7 @@ namespace {{ project_name | pascal }}
     {%- endmacro %}
     
 
-    namespace {{ pascalGroupName | namespace(project_name)| pascal  }}
+    namespace {{ pascalGroupName | concat_namespace(project_name)| pascal  }}
     {
         {%- set class_name = ( pascalGroupName | strip_namespace )+"EventProcessorFactory" %}
         public class {{ class_name }} 

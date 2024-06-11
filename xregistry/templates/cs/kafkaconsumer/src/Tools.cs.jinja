@@ -56,7 +56,7 @@ namespace {{ project_name | pascal }}
     {
         private readonly IConsumer<TKey, TValue> _consumer;
         private readonly ILogger<KafkaProcessor<TKey, TValue>> _logger;
-        private CancellationTokenSource _cancellationTokenSource;
+        private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private Task _processingTask;
         private string _topicName = string.Empty;
 
@@ -92,7 +92,6 @@ namespace {{ project_name | pascal }}
         /// <returns>A task that represents the asynchronous operation.</returns>
         public Task StartAsync()
         {
-            _cancellationTokenSource = new CancellationTokenSource();
             _processingTask = Task.Run(async () => await ProcessMessagesAsync(_cancellationTokenSource.Token));
             return Task.CompletedTask;
         }
@@ -106,6 +105,7 @@ namespace {{ project_name | pascal }}
             _cancellationTokenSource.Cancel();
             await _processingTask;
             _consumer.Close();
+            _cancellationTokenSource = new CancellationTokenSource();
         }
 
         private async Task ProcessMessagesAsync(CancellationToken cancellationToken)

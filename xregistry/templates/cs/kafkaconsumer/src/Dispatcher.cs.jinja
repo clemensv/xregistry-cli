@@ -244,7 +244,7 @@ namespace {{ project_name | pascal }}
         return processor;
     {%- endmacro %}
 
-    namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+    namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
     {
         {%- set class_name = ( pascalGroupName | strip_namespace )+"KafkaProcessorFactory" %}
         public class {{ class_name }}

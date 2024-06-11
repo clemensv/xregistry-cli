@@ -163,6 +163,14 @@ class JinjaFilters:
         return class_reference
 
     @staticmethod
+    def concat_namespace(class_reference: str, namespace_prefix: str = "") -> str:
+        """Concatenate the namespace portions of an expression."""
+        logger.debug("Concatenating namespace to class reference: %s with prefix: %s", class_reference, namespace_prefix)
+        if namespace_prefix:
+            return namespace_prefix + "." + class_reference
+        return class_reference
+
+    @staticmethod
     def namespace(class_reference: str, namespace_prefix: str = "") -> str:
         """Get the namespace portion off an expression."""
         logger.debug("Getting namespace from class reference: %s with prefix: %s", class_reference, namespace_prefix)

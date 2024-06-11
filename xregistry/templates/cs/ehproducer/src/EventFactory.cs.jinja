@@ -15,7 +15,7 @@ using Azure.Messaging.EventHubs;
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
 {%- set pascalGroupName = messagegroup.id  | pascal -%}
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventFactory" %}
     /// <summary>

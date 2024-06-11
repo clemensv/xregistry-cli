@@ -195,7 +195,7 @@ switch (messageSubject)
 {{- AmqpNetLiteHeaders() }}
 using System.Threading.Tasks;
 
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
    public interface I{{ pascalGroupName | strip_namespace }}AmqpDispatcher
    {

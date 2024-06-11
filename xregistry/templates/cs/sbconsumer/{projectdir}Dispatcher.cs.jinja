@@ -30,7 +30,7 @@ namespace {{ project_name | pascal }}
     {%- set uses_plain_amqp_message = (messagegroup | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
     {%- set pascalGroupName = messagegroup.id  | pascal -%}
     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventDispatcher" %}
-    namespace {{ pascalGroupName | namespace(project_name) | pascal }} 
+    namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }} 
     {
         public class {{ class_name }} : global::{{ project_name | pascal }}.Tools.DispatcherBase
         {

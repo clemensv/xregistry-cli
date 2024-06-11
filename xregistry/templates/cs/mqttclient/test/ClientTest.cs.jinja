@@ -88,7 +88,7 @@ namespace {{ project_name | pascal }}.Test
                     .WithImage("eclipse-mosquitto:2.0")
                     .WithBindMount(mosquittoConfigFilePath, "/mosquitto/config/mosquitto.conf")
                     .WithBindMount(mosquittoPasswdPath, "/mosquitto/config/mosquitto.passwd")
-                    .WithPortBinding(1883, false)
+                    .WithPortBinding(1883, true)
                     .Build();
 
                 await MosquittoContainerInstance.StartAsync();
@@ -125,31 +125,44 @@ namespace {{ project_name | pascal }}.Test
         }
     }
 
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    [CollectionDefinition("MQTT broker")]
+    public class {{ project_name | pascal }}FixtureCollection : ICollectionFixture<{{ project_name | pascal }}Fixture>
+    {
+    }
+
+    {% for messagegroup_key, messagegroup in messagegroups.items() %}
     {%- set pascal_group_name = messagegroup.id | pascal %}
-    {%- set class_name = "global::" + ( project_name | pascal ) + '.' + (pascal_group_name) + "Producer" %}
-    {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"ProducerTests" %}
-    public class {{ test_class_name }} : IClassFixture<{{ project_name | pascal }}Fixture>
+    {%- set producer_class_name = "global::" + ( pascal_group_name | concat_namespace(project_name) | pascal ) + '.' + ( pascal_group_name | strip_namespace ) + "Producer" %}
+    {%- set dispatcher_class_name = "global::" + ( pascal_group_name | concat_namespace(project_name) | pascal ) + '.' + ( pascal_group_name | strip_namespace ) + "Dispatcher" %}
+    
+    {%- set producer_test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"ProducerTests" %}
+    [Collection("MQTT broker")]
+    public class {{ producer_test_class_name }} : IClassFixture<{{ project_name | pascal }}Fixture>
     {
         private readonly {{ project_name | pascal }}Fixture _fixture;
         private readonly ILogger _logger;
-        private readonly {{ class_name }} _producer;
+        private readonly {{ producer_class_name }} _producer;
+        private readonly {{ dispatcher_class_name }} _dispatcher;
+        private readonly MqttSubscriber _subscriber;
 
-        public {{ test_class_name }}({{ project_name | pascal }}Fixture fixture)
+        public {{ producer_test_class_name }}({{ project_name | pascal }}Fixture fixture)
         {
             _fixture = fixture;
-            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();
+            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ producer_test_class_name }}>();
             var options = new MqttClientOptionsBuilder()
                 .WithTcpServer(_fixture.MosquittoBrokerHost, _fixture.MosquittoBrokerPort)
                 .WithProtocolVersion(MQTTnet.Formatter.MqttProtocolVersion.V500)
-                .WithClientId("{{ test_class_name }}Client")
+                .WithClientId("{{ producer_test_class_name }}Client")
                 .WithCredentials("test", "password")
                 .WithCleanSession()
                 .Build();
             var factory = new MqttFactory();
             var client = factory.CreateMqttClient();
             client.ConnectAsync(options).Wait();
-            _producer = new {{ class_name }}(client);
+            _producer = new {{ producer_class_name }}(client);
+            _subscriber = new MqttSubscriber(client, new string[] { _fixture.TopicName });
+            _dispatcher = new {{ dispatcher_class_name }}(_subscriber, _fixture.GetLoggerFactory());
+            _subscriber.SubscribeAsync().GetAwaiter().GetResult();
         }
 
 #pragma warning disable CS8604 // init takes care of nullables 
@@ -167,14 +180,20 @@ namespace {{ project_name | pascal }}.Test
                 {%- if message.schemaurl or message.schema -%}
                 {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
                 {%- else -%}
-                {%- set dataType = "object" -%}
+                {%- set dataType = "byte[]" -%}
                 {%- endif %}
-                {%- if dataType != "object" %}
+                var tcs = new TaskCompletionSource<{{ dataType }}>();
+                _dispatcher.{{ pascal_message_name }}Async += (mqtt, ce, data) =>
+                {
+                    tcs.SetResult(data);
+                    return Task.CompletedTask;
+                };
                 {%- if isCloudEvent %}
                 {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
                 {%- elif isMqtt %}
                 {%- set uriargs = mqtt.DeclareUriTemplateArguments(message) -%}
                 {%- endif %}
+                {%- if dataType != "byte[]" %}
                 var eventDataTest = new {{ dataType }}Tests();
                 var eventDataInstance = eventDataTest.CreateInstance();
                 await _producer.Send{{ pascal_message_name }}Async(_fixture.TopicName, eventDataInstance
@@ -185,7 +204,7 @@ namespace {{ project_name | pascal }}.Test
                 {%- endif -%}
                 );
                 {%- else %}
-                await _producer.Send{{ pascal_message_name }}Async(_fixture.TopicName, new object()
+                await _producer.Send{{ pascal_message_name }}Async(_fixture.TopicName, new byte[0]
                 {%- if uriargs -%}
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}: "test"
@@ -193,6 +212,9 @@ namespace {{ project_name | pascal }}.Test
                 {%- endif -%}
                 );
                 {%- endif %}
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
+                Assert.True(Task.WaitAll([tcs.Task], 1000));
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
                 _logger.LogInformation("Test event sent");
             }
             catch (Exception ex)

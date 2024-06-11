@@ -184,7 +184,7 @@ using CloudNative.CloudEvents;
 {%- endif %}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
 {%- set pascalGroupName = messagegroup.id  | pascal %}
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
     public interface I{{ pascalGroupName | strip_namespace }}Dispatcher
     {

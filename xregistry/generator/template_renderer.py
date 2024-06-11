@@ -590,6 +590,7 @@ class TemplateRenderer:
         env.filters['strip_namespace'] = JinjaFilters.strip_namespace
         env.filters['namespace'] = JinjaFilters.namespace
         env.filters['namespace_dot'] = JinjaFilters.namespace_dot
+        env.filters['concat_namespace'] = JinjaFilters.concat_namespace
         env.filters['strip_dots'] = JinjaFilters.strip_dots
         env.filters['lstrip'] = JinjaFilters.lstrip
         env.filters['schema_type'] = lambda schema_ref, project_name, root, schema_format: SchemaUtils.schema_type(self.ctx, schema_ref, project_name, root, schema_format)

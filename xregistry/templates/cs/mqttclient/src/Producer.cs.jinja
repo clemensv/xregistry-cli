@@ -16,7 +16,7 @@ using MQTTnet.Client;
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
 {%- set pascalGroupName = messagegroup.id | pascal -%}
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
     {%- set class_name = (pascalGroupName | strip_namespace) + "Producer" %}
     /// <summary>
@@ -86,7 +86,7 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {%- set type_name = type_name | pascal %}
         {%- endif %}
         {%- else -%}
-        {%- set type_name = "object" %}
+        {%- set type_name = "byte[]" %}
         {%- endif -%}
         {%- if isCloudEvent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}

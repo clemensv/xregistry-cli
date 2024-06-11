@@ -190,7 +190,7 @@ using System.Threading.Tasks;
 using Confluent.Kafka;
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
 {%- set pascalGroupName = messagegroup.id  | pascal %}
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
    public interface I{{ pascalGroupName | strip_namespace }}KafkaDispatcher
    {

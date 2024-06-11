@@ -6,6 +6,15 @@ using MQTTnet.Packets;
 using MQTTnet.Protocol;
 {%- endmacro -%}
 
+{%- macro CloudEventsUsings() -%}
+using CloudNative.CloudEvents;
+using CloudEvent = CloudNative.CloudEvents.CloudEvent;
+using CloudNative.CloudEvents.Core;
+using CloudNative.CloudEvents.SystemTextJson;
+using CloudNative.CloudEvents.Protobuf;
+using CloudNative.CloudEvents.Avro;
+{%- endmacro -%}
+
 {%- macro EmitArguments(props) -%}
 {%- for propname, prop in props.items() %}
 {%- if propname != "user-properties" -%}
@@ -176,7 +185,7 @@ using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using System.Threading.Tasks;
 
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
     public interface I{{ pascalGroupName | strip_namespace }}MqttDispatcher
     {
@@ -193,4 +202,104 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
 }
 {%- endfor -%}
 {%- endif -%}
+{%- endmacro -%}
+
+{%- macro CloudEventsMethods() -%}
+private static string[] ceAttribs = ["specversion", "dataschema", "time", "source", "subject", "type", "id"];
+/// <summary>
+/// JSON formatter for CloudEvents.
+/// </summary>
+protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
+/// <summary>
+/// Protobuf formatter for CloudEvents.
+/// </summary>
+protected static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
+/// <summary>
+/// Avro formatter for CloudEvents.
+/// </summary>
+protected static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
+
+/// <summary>
+/// Checks if an MQTT message is a CloudEvent.
+/// </summary>
+/// <param name="message">The MQTT message.</param>
+/// <param name="key">The attribute key.</param>
+/// <returns>True if the message is a CloudEvent.</returns>
+protected string? GetCloudEventAttribute(MqttApplicationMessage message, string key)
+{
+    _logger.LogInformation($"Getting CloudEvent attribute {key}");
+    var property = message.UserProperties.FirstOrDefault(p => p.Name == key);
+    return property?.Value;
+} 
+
+/// <summary>
+/// Checks if an MQTT message is a CloudEvent.
+/// </summary>
+/// <param name="message">The MQTT message.</param>
+protected bool IsCloudEvent(MqttApplicationMessage message)
+{
+    _logger.LogInformation("Checking if Message is a CloudEvent.");
+    var contentType = message.ContentType;
+    return MimeUtilities.IsCloudEventsContentType(contentType) ||
+           message.UserProperties.Any(p => p.Name == "specversion");
+}
+
+/// <summary>
+/// Extracts a CloudEvent from an MQTT message.
+/// </summary>
+/// <param name="message">The MQTT message.</param>
+protected CloudEvent CloudEventFromMessage(MqttApplicationMessage message)
+{
+   try
+   {
+      _logger.LogInformation("Extracting CloudEvent from Message.");
+      CloudEventFormatter? formatter = null;
+      var contentType = message.ContentType?.Split(';')[0];
+      if (contentType != null && contentType.StartsWith("application/cloudevents"))
+      {
+         _logger.LogInformation($"Using structured mode for CloudEvent with content type {contentType}.");
+         formatter = contentType.EndsWith("+proto") ? protoFormatter : contentType.EndsWith("+avro") ? avroFormatter : jsonFormatter;
+         return formatter.DecodeStructuredModeMessage(message.PayloadSegment, new System.Net.Mime.ContentType(contentType), null);
+      }
+      else
+      {
+         _logger.LogInformation("Using binary mode for CloudEvent.");
+         var cloudEvent = new CloudEvent
+         {
+            Data = message.PayloadSegment != null ? message.PayloadSegment.ToArray():null,
+            DataContentType = contentType,
+         };
+         string? specVersion = GetCloudEventAttribute(message, "specversion");
+         if (specVersion != "1.0") throw new Exception("Unsupported CloudEvent specversion: " + specVersion);
+         string? dataSchema = GetCloudEventAttribute(message, "dataschema");         
+         if (dataSchema != null) cloudEvent.DataSchema = new Uri(dataSchema, UriKind.RelativeOrAbsolute);
+         string? time = GetCloudEventAttribute(message, "time");
+         if (time != null) cloudEvent.Time = DateTime.Parse(time);
+         string? source = GetCloudEventAttribute(message, "source");         
+         if (source != null) cloudEvent.Source = new Uri(source, UriKind.RelativeOrAbsolute);
+         string? subject = GetCloudEventAttribute(message, "subject");
+         if (subject != null) cloudEvent.Subject = subject;
+         string? type = GetCloudEventAttribute(message, "type");
+         if (type != null) cloudEvent.Type = type;
+         string? id = GetCloudEventAttribute(message, "id");
+         if (id != null) cloudEvent.Id = id;
+         foreach (var property in message.UserProperties)
+         {
+            var key = property.Name;
+            var attributeName = key.ToLower();
+            if (ceAttribs.Any(a=>a==attributeName))
+            {
+               continue;
+            }
+            cloudEvent[attributeName] = property.Value;
+         }
+         return cloudEvent;
+      }
+   }
+   catch (Exception e)
+   {
+      _logger.LogError(e, "Error extracting CloudEvent from Message.");
+      throw;
+   }
+}
 {%- endmacro -%}

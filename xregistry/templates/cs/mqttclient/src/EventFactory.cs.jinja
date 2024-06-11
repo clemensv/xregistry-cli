@@ -17,7 +17,7 @@ using MQTTnet.Packets;
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
 {%- set pascalGroupName = messagegroup.id | pascal -%}
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
     {%- set class_name = (pascalGroupName | strip_namespace) + "EventFactory" %}
     /// <summary>
@@ -25,7 +25,7 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
     /// </summary>
     public partial class {{ class_name }}
     {
-        private const string cePrefix = "ce_";
+        private const string cePrefix = "";
         private const string applicationOctetStream = "application/octet-stream";
         private delegate byte[] Serialize<T>(T data, string contentType);
         private static CloudEventFormatter defaultFormatter = new JsonEventFormatter();
@@ -70,13 +70,20 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         /// </summary>
         /// <typeparam name="T">The type of the message data.</typeparam>
         /// <param name="topicName">The topic name for the message.</param>
+        /// <param name="qos">The quality of service level for the message.</param>
+        /// <param name="retain">The retain flag for the message.</param>
+        /// <param name="payloadFormat">The payload format indicator for the message.</param>
+        /// <param name="messageExpiryInterval">The message expiry interval for the message.</param>
+        /// <param name="responseTopic">The response topic for the message.</param>
+        /// <param name="correlationData">The correlation data for the message.</param>
+        /// <param name="userProperties">The user properties for the message.</param>
         /// <param name="cloudEvent">The CloudEvent instance to use for the message.</param>
         /// <param name="data">The message data.</param>
         /// <param name="contentType">The content type of the message data.</param>
         /// <param name="bodySerializer">The serializer to use for the message data.</param>
         /// <param name="formatter">The CloudEvent formatter to use for the message.</param>
         /// <returns>A `MqttApplicationMessage` instance for the specified message.</returns>
-        private static MqttApplicationMessage CreateMessage<T>(string topicName, CloudEvent? cloudEvent, T data, string contentType, Serialize<T>? bodySerializer = null, CloudEventFormatter? formatter = null) where T : notnull
+        private static MqttApplicationMessage CreateMessage<T>(string topicName, int qos, bool retain, int payloadFormat, int messageExpiryInterval, string? responseTopic, byte[]? correlationData, List<(string, string)> userProperties, CloudEvent? cloudEvent, T data, string contentType, Serialize<T>? bodySerializer = null, CloudEventFormatter? formatter = null) where T : notnull
         {
             if (formatter == null)
             {
@@ -89,9 +96,32 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
                 var messageBuilder = new MqttApplicationMessageBuilder()
                     .WithTopic(topicName)
                     .WithPayload(eventPayload)
-                    .WithContentType(contentType);
+                    .WithQualityOfServiceLevel((MQTTnet.Protocol.MqttQualityOfServiceLevel)qos)
+                    .WithPayloadFormatIndicator((MQTTnet.Protocol.MqttPayloadFormatIndicator)payloadFormat)
+                    .WithMessageExpiryInterval((uint)messageExpiryInterval)
+                    .WithRetainFlag(retain);
+                if (!string.IsNullOrEmpty(responseTopic))
+                {
+                    messageBuilder = messageBuilder.WithResponseTopic(responseTopic);
+                }
+                if (correlationData != null && correlationData.Length > 0)
+                {
+                    messageBuilder = messageBuilder.WithCorrelationData(correlationData);
+                }
+                if (!string.IsNullOrEmpty(contentType))
+                {
+                    messageBuilder = messageBuilder.WithContentType(contentType);
+                }
+                if (userProperties != null)
+                {
+                    foreach (var prop in userProperties)
+                    {
+                        messageBuilder = messageBuilder.WithUserProperty(prop.Item1, prop.Item2);
+                    }
+                }                
                 if (cloudEvent != null)
                 {
+                    messageBuilder = messageBuilder.WithUserProperty(cePrefix + "specversion", "1.0");
                     foreach (var attr in cloudEvent.GetPopulatedAttributes())
                     {
                         string? attrValue = attr.Value?.ToString();
@@ -135,19 +165,19 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {% for id in messagegroup.messages -%}
         {%- set message = messagegroup.messages[id] -%}
         {%- set pascalDefinitionName = message.id | pascal %}
-        {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-        {%- set isMqtt = not isCloudEvent and message.format.lower().startswith("mqtt") %}
+        {%- set is_cloudevent = not message.format or message.format.lower().startswith("cloudevents") -%}
+        {%- set is_raw_mqtt = not is_cloudevent and message.format.lower().startswith("mqtt") %}
         {%- if message.schemaurl or message.schema -%}
         {%- set type_name = 'global::' + ((message.schemaurl if message.schemaurl else message.schema) | schema_type(project_name, root, message.schemaformat) | pascal) %}
         {%- if message.schemaformat.lower().startswith("jsonschema") %}
         {%- set type_name = type_name | pascal %}
         {%- endif %}
         {%- else -%}
-        {%- set type_name = "object" %}
+        {%- set type_name = "byte[]" %}
         {%- endif -%}
-        {%- if isCloudEvent %}
+        {%- if is_cloudevent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
-        {%- elif isMqtt %}
+        {%- elif is_raw_mqtt %}
         {%- set uriargs = mqtt.DeclareUriTemplateArguments(message) -%}
         {%- endif %}
         /// <summary>
@@ -165,7 +195,7 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {%- endfor %}
         {%- endif %}
         /// <param name="contentType">The desired content type of the message data.</param>
-        {%- if isCloudEvent %}
+        {%- if is_cloudevent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
         /// <returns>A `MqttApplicationMessage` instance for the {{ pascalDefinitionName }} message.</returns>
@@ -174,29 +204,52 @@ namespace {{ pascalGroupName | namespace(project_name) | pascal }}
         {%- if uriargs -%}
         {{- uriargs -}}
         {%- endif -%}
-        {%- if isCloudEvent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] -%}
+        {%- if is_cloudevent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] -%}
         , string contentType = "{{ message.metadata["datacontenttype"]["value"] }}"
         {%- else -%}
         , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
         {%- endif %}
-        {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
+        {%- if is_cloudevent %}, CloudEventFormatter? formatter = null{% endif %})
         {
-            {% if type_name != "object" %}
+            {%- set is_mqtt_message = message.binding and message.binding.startswith("MQTT") and message.message %}
+            {%- set qos = message.message['qos'] if is_mqtt_message else 0 %}
+            {%- set retain = message.message['retain'] if is_mqtt_message else false %}
+            {%- set topic_name = message.message['topic-name'] if is_mqtt_message else "" %}
+            {%- set payload_format = message.message['payload-format'] if is_mqtt_message else 0 %}
+            {%- set message_expiry_interval = message.message['message-expiry-interval'] if is_mqtt_message else 0 %}
+            {%- set response_topic = message.message['response-topic'] if is_mqtt_message else "" %}
+            {%- set correlation_data = message.message['correlation-data'] if is_mqtt_message else "null" %}
+            {%- set content_type = message.message['content-type'] if is_mqtt_message else "" %}
+            {%- set user_properties = message.message['user-properties'] if is_mqtt_message else [] %}
+            var userProperties = new List<(string, string)>
+            {%- if user_properties -%}
+            {
+                {%- for prop in props -%}
+                {{"(" + prop[0] + ", " + prop[1] + ")"}}, 
+                {%- endfor -%}
+            };
+            {%- else -%}
+            { };
+            {%- endif -%}
+            {%- if topic_name %}
+            topicName = string.IsNullOrEmpty(topicName)?"{{ topic_name }}":topicName+"/{{ topic_name }}";
+            {%- endif %}
+            {% if type_name != "byte[]" %}
             Serialize<{{ type_name }}>? bodySerializer = (formatter != null) ? null : ({{ type_name }} data, string contentType) => {
                 return data.ToByteArray(contentType);
             };
-            {%- if isCloudEvent %}
+            {%- if is_cloudevent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
-            return CreateMessage(topicName, cloudEvent, data, contentType, bodySerializer, formatter);
-            {%- elif isMqtt %}
-            return CreateMessage(topicName, null, data, contentType, bodySerializer, null);
+            return CreateMessage(topicName, {{ qos }}, {{ "true" if retain else "false" }}, {{ payload_format }}, {{ message_expiry_interval }}, "{{ response_topic }}", {{ correlation_data }}, {{ user_properties }}, cloudEvent, data, contentType, bodySerializer, formatter);
+            {%- elif is_raw_mqtt %}
+            return CreateMessage(topicName, {{ qos }}, {{ "true" if retain else "false" }}, {{ payload_format }}, {{ message_expiry_interval }}, "{{ response_topic }}", {{ correlation_data }}, {{ user_properties }}, null, data, contentType, bodySerializer, null);
             {%- endif %}
             {% else %}
-            {%- if isCloudEvent %}
+            {%- if is_cloudevent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
-            return CreateMessage(topicName, cloudEvent, data, contentType, null, formatter);
-            {%- elif isMqtt %}
-            return CreateMessage(topicName, null, data, contentType, null, null);
+            return CreateMessage(topicName, {{ qos }}, {{ "true" if retain else "false" }}, {{ payload_format }}, {{ message_expiry_interval }}, "{{ response_topic }}", {{ correlation_data }}, {{ user_properties }}, cloudEvent, data, contentType, null, formatter);
+            {%- elif is_raw_mqtt %}
+            return CreateMessage(topicName, {{ qos }}, {{ "true" if retain else "false" }}, {{ payload_format }}, {{ message_expiry_interval }}, "{{ response_topic }}", {{ correlation_data }}, {{ user_properties }}, null, data, contentType, null, null);
             {%- endif %}
             {% endif %}
         }
