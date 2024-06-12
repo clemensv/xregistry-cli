@@ -153,8 +153,10 @@ namespace {{ project_name | pascal }}
         }
     }
 
+    {% endfor %}
+
     {% set dispatcherBase = "global::"+( project_name | pascal )+".Tools.DispatcherBase" %}
-    public static class {{ class_name }}ProcessorExtensions
+    public static class {{ project_name | pascal }}ProcessorExtensions
     {
         private static readonly Dictionary<KafkaProcessor<byte[], byte[]>, List<{{ dispatcherBase }}>> Dispatchers =
             new Dictionary<KafkaProcessor<byte[], byte[]>, List<{{ dispatcherBase }}>>();
@@ -201,8 +203,6 @@ namespace {{ project_name | pascal }}
             }
         }
     }
-
-    {% endfor %}
 
     {%- if root.endpoints -%}
     {%- for endpoint_key in root.endpoints.keys() -%}

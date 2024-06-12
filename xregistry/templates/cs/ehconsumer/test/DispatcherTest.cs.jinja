@@ -171,11 +171,17 @@ namespace {{ project_name | pascal }}.Test
         }
     }
 
+    [CollectionDefinition("EventHubs emulator")]
+    public class {{ project_name | pascal }}CollectionFixture : ICollectionFixture<{{ project_name | pascal }}Fixture>
+    {
+    }
+
     {%- for messagegroup_key, messagegroup in messagegroups.items() %}
     {%- set pascal_group_name = messagegroup.id | pascal %}
     {%- set class_name = (pascal_group_name | strip_namespace) + "EventDispatcher" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"Tests" %}
-    public class {{ test_class_name }} : IClassFixture<{{ project_name | pascal }}Fixture>
+    [Collection("EventHubs emulator")]
+    public class {{ test_class_name }}
     {
         private readonly {{ project_name | pascal }}Fixture _fixture;
         private readonly ILogger _logger;
@@ -226,7 +232,7 @@ namespace {{ project_name | pascal }}.Test
                 var eventDataInstance = eventDataTest.CreateInstance();
                 var eventData = new EventData(new BinaryData(eventDataInstance.ToByteArray("application/json")));
                 {%- else %}
-                var eventData = new EventData(new BinaryData("")));
+                var eventData = new EventData(new BinaryData(""));
                 {%- endif %}
                 eventData.ContentType = "application/json";
                 eventData.Properties["cloudEvents_type"] = "{{ message.id }}";

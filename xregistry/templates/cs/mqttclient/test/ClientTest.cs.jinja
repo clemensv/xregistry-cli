@@ -126,7 +126,7 @@ namespace {{ project_name | pascal }}.Test
     }
 
     [CollectionDefinition("MQTT broker")]
-    public class {{ project_name | pascal }}FixtureCollection : ICollectionFixture<{{ project_name | pascal }}Fixture>
+    public class {{ project_name | pascal }}CollectionFixture : ICollectionFixture<{{ project_name | pascal }}Fixture>
     {
     }
 
@@ -137,7 +137,7 @@ namespace {{ project_name | pascal }}.Test
     
     {%- set producer_test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"ProducerTests" %}
     [Collection("MQTT broker")]
-    public class {{ producer_test_class_name }} : IClassFixture<{{ project_name | pascal }}Fixture>
+    public class {{ producer_test_class_name }} 
     {
         private readonly {{ project_name | pascal }}Fixture _fixture;
         private readonly ILogger _logger;

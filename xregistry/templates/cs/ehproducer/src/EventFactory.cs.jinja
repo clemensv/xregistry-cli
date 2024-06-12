@@ -121,7 +121,11 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
                 {
                     foreach (var attr in cloudEvent.GetPopulatedAttributes())
                     {
-                        eventData.Properties.Add(cePrefix + attr.Key.Name, attr.Value);
+                        var attrValue = (attr.Value is Uri) ? attr.Value.ToString() : attr.Value;
+                        if (attrValue != null)
+                        {
+                            eventData.Properties.Add(cePrefix + attr.Key.Name, attrValue);
+                        }
                     }
                 }
                 return eventData;
@@ -166,7 +170,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set type_name = type_name | pascal %}
         {%- endif %}
         {%- else -%}
-        {%- set type_name = "object" %}
+        {%- set type_name = "byte[]" %}
         {%- endif -%}
         {%- if isCloudEvent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
@@ -203,7 +207,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endif %}
         {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
         {
-            {% if type_name != "object" %}
+            {% if type_name != "byte[]" %}
             Serialize<{{ type_name }}>? bodySerializer = (formatter != null)?null:({{ type_name }} data, string contentType) => {
                 return data.ToByteArray(contentType);
             };

@@ -175,8 +175,10 @@ namespace {{ project_name | pascal }}
         }
     }
 
+    {% endfor %}    
+    
     {% set dispatcherBase = "global::"+( project_name | pascal )+".Tools.DispatcherBase" %}
-    public static class {{ class_name }}EventProcessorClientExtensions
+    public static class {{ project_name }}EventProcessorClientExtensions
     {
          private static readonly Dictionary<EventProcessorClient, List<{{ dispatcherBase }}>> Dispatchers =
             new Dictionary<EventProcessorClient, List<{{ dispatcherBase }}>>();
@@ -224,8 +226,6 @@ namespace {{ project_name | pascal }}
         }        
     }
 
-    {% endfor %}    
-    
     {%- if root.endpoints -%} 
     {%- for endpoint_key in root.endpoints.keys() -%}
     {%- set endpoint = root.endpoints[endpoint_key] -%}
@@ -241,7 +241,7 @@ namespace {{ project_name | pascal }}
     {%- set group = schema_object( root, uri ) -%}
     {%- if group %}
     {%- set groupname = group.id | pascal -%}
-    {{ groupname }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
+    global::{{ groupname | concat_namespace(project_name) }}.{{ groupname | strip_namespace }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
     {%- if not loop.last -%}, {%- endif -%}
     {%- endif %}
     {%- endfor %}

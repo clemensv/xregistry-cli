@@ -80,7 +80,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set type_name = type_name | pascal %}
         {%- endif %}
         {%- else -%}
-        {%- set type_name = "object" %}
+        {%- set type_name = "byte[]" %}
         {%- endif -%}
         {%- if isCloudEvent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}

@@ -112,11 +112,18 @@ namespace {{ project_name | pascal }}.Test
         }
     }
 
+    [CollectionDefinition("Kafka container")]
+    public class {{ project_name | pascal }}CollectionFixture : ICollectionFixture<{{ project_name | pascal }}Fixture>
+    {
+    }
+
+
     {%- for messagegroup_key, messagegroup in messagegroups.items() %}
     {%- set pascal_group_name = messagegroup.id | pascal %}
-    {%- set class_name = "global::" + ( project_name | pascal ) + '.' + (pascal_group_name) + "Producer" %}
+    {%- set class_name = "global::" + ( pascal_group_name | concat_namespace(project_name) | pascal ) + '.' + ( pascal_group_name | strip_namespace | pascal ) + "Producer" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"ProducerTests" %}
-    public class {{ test_class_name }} : IClassFixture<{{ project_name | pascal }}Fixture>
+    [Collection("Kafka container")]
+    public class {{ test_class_name }} 
     {
         private readonly {{ project_name | pascal }}Fixture _fixture;
         private readonly ILogger _logger;
@@ -146,14 +153,14 @@ namespace {{ project_name | pascal }}.Test
                 {%- if message.schemaurl or message.schema -%}
                 {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
                 {%- else -%}
-                {%- set dataType = "object" -%}
+                {%- set dataType = "byte[]" -%}
                 {%- endif %}
-                {%- if dataType != "object" %}
                 {%- if isCloudEvent %}
                 {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
                 {%- elif isKafka %}
                 {%- set uriargs = kafka.DeclareUriTemplateArguments(message) -%}
                 {%- endif %}
+                {%- if dataType != "byte[]" %}
                 var eventDataTest = new {{ dataType }}Tests();
                 var eventDataInstance = eventDataTest.CreateInstance();
                 await _producer.Send{{ pascal_message_name }}Async(eventDataInstance
@@ -164,7 +171,7 @@ namespace {{ project_name | pascal }}.Test
                 {%- endif -%}
                 );
                 {%- else %}
-                await _producer.Send{{ pascal_message_name }}Async(new object()
+                await _producer.Send{{ pascal_message_name }}Async(new byte[0]
                 {%- if uriargs -%}
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}: "test"
@@ -190,14 +197,14 @@ namespace {{ project_name | pascal }}.Test
                 {%- if message.schemaurl or message.schema -%}
                 {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
                 {%- else -%}
-                {%- set dataType = "object" -%}
+                {%- set dataType = "byte[]" -%}
                 {%- endif %}
-                {%- if dataType != "object" %}
                 {%- if isCloudEvent %}
                 {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
                 {%- elif isKafka %}
                 {%- set uriargs = kafka.DeclareUriTemplateArguments(message) -%}
                 {%- endif %}
+                {%- if dataType != "byte[]" %}
                 var eventDataTest = new {{ dataType }}Tests();
                 var eventDataInstances = new {{ dataType }}[10];
                 for (int i = 0; i < 10; i++)
@@ -212,7 +219,12 @@ namespace {{ project_name | pascal }}.Test
                 {%- endif -%}
                 );
                 {%- else %}
-                await _producer.Send{{ pascal_message_name }}BatchAsync(new object[10]
+                var eventDataInstances = new byte[10][];
+                for (int i = 0; i < 10; i++)
+                {
+                    eventDataInstances[i] = new byte[0];
+                }
+                await _producer.Send{{ pascal_message_name }}BatchAsync(eventDataInstances
                 {%- if uriargs -%}
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}:"test"

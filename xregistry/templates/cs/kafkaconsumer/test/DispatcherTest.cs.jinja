@@ -119,11 +119,17 @@ namespace {{ project_name | pascal }}.Test
 
     }
 
+    [CollectionDefinition("Kafka container")]
+    public class {{ project_name | pascal }}CollectionFixture : ICollectionFixture<{{ project_name | pascal }}Fixture>
+    {
+    }
+
     {%- for messagegroup_key, messagegroup in messagegroups.items() %}
     {%- set pascal_group_name = messagegroup.id | pascal %}
     {%- set class_name = (pascal_group_name | strip_namespace) + "EventDispatcher" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"Tests" %}
-    public class {{ test_class_name }} : IClassFixture<{{ project_name | pascal }}Fixture>
+    [Collection("Kafka container")]
+    public class {{ test_class_name }} 
     {
         private readonly {{ project_name | pascal }}Fixture _fixture;
         private readonly ILogger _logger;
