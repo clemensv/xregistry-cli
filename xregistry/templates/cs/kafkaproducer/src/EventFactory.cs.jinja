@@ -137,8 +137,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {% for id in messagegroup.messages -%}
         {%- set message = messagegroup.messages[id] -%}
         {%- set pascalDefinitionName = message.id | pascal %}
-        {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-        {%- set isKafka = not isCloudEvent and message.format.lower().startswith("kafka") %}
+        {%- set is_cloudevent = not message.format or message.format.lower().startswith("cloudevents") -%}
+        {%- set isKafka = not is_cloudevent and message.format.lower().startswith("kafka") %}
         {%- if message.schemaurl or message.schema -%}
         {%- set type_name = 'global::' + ((message.schemaurl if message.schemaurl else message.schema) | schema_type(project_name, root, message.schemaformat) | pascal) %}
         {%- if message.schemaformat.lower().startswith("jsonschema") %}
@@ -147,7 +147,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- else -%}
         {%- set type_name = "byte[]" %}
         {%- endif -%}
-        {%- if isCloudEvent %}
+        {%- if is_cloudevent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
         {%- elif isKafka %}
         {%- set uriargs = kafka.DeclareUriTemplateArguments(message) -%}
@@ -166,7 +166,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endfor %}
         {%- endif %}
         /// <param name="contentType">The desired content type of the message data.</param>
-        {%- if isCloudEvent %}
+        {%- if is_cloudevent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
         /// <returns>A `Message&lt;byte[], byte[]&gt;` instance for the {{ pascalDefinitionName }} message.</returns>
@@ -175,25 +175,25 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if uriargs -%}
         {{- uriargs -}}
         {%- endif -%}
-        {%- if isCloudEvent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] -%}
+        {%- if is_cloudevent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] -%}
         , string contentType = "{{ message.metadata["datacontenttype"]["value"] }}"
         {%- else -%}
         , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
         {%- endif %}
-        {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
+        {%- if is_cloudevent %}, CloudEventFormatter? formatter = null{% endif %})
         {
             {% if type_name != "byte[]" %}
             Serialize<{{ type_name }}>? bodySerializer = (formatter != null) ? null : ({{ type_name }} data, string contentType) => {
                 return data.ToByteArray(contentType);
             };
-            {%- if isCloudEvent %}
+            {%- if is_cloudevent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
             return CreateMessage(cloudEvent, data, contentType, bodySerializer, formatter);
             {%- elif isKafka %}
             return CreateMessage(null, data, contentType, bodySerializer, null);
             {%- endif %}
             {% else %}
-            {%- if isCloudEvent %}
+            {%- if is_cloudevent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
             return CreateMessage(cloudEvent, data, contentType, null, formatter);
             {%- elif isKafka %}

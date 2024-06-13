@@ -245,6 +245,7 @@ namespace {{ project_name | pascal }}
     {%- endif -%}
     {%- endif -%}
     {%- endfor -%}
+    {%- endif %}
 
     {%- set dispatcherBase = "global::"+( project_name | pascal )+".Tools.DispatcherBase" %}
     /// <summary>
@@ -307,5 +308,5 @@ namespace {{ project_name | pascal }}
             }
         }
     }
-    {% endif %}
+ 
 }

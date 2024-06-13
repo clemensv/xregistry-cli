@@ -597,7 +597,7 @@ class TemplateRenderer:
         env.filters['camel'] = JinjaFilters.camel
         env.filters['strip_invalid_identifier_characters'] = JinjaFilters.strip_invalid_identifier_characters
         env.filters['pad'] = JinjaFilters.pad
-        env.filters['to_yaml'] = JinjaFilters.to_yaml
+        env.filters['toyaml'] = JinjaFilters.to_yaml
         env.filters['proto'] = JinjaFilters.proto
         env.filters['exists'] = JinjaFilters.exists
         env.filters['existswithout'] = JinjaFilters.exists_without

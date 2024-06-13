@@ -124,10 +124,9 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
                     messageBuilder = messageBuilder.WithUserProperty(cePrefix + "specversion", "1.0");
                     foreach (var attr in cloudEvent.GetPopulatedAttributes())
                     {
-                        var attrValue = (attr.Value is Uri) ? attr.Value.ToString() : attr.Value;
-                        if (attrValue != null)
+                        if (attr.Value != null)
                         {
-                            messageBuilder = messageBuilder.WithUserProperty(cePrefix + attr.Key.Name, attrValue);
+                            messageBuilder = messageBuilder.WithUserProperty(cePrefix + attr.Key.Name, attr.Value.ToString());
                         }
                     }
                 }
