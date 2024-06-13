@@ -19,6 +19,9 @@
 {%- macro DeclareCloudNativeCloudEvent(variable, message) -%}
 CloudEvent {{ variable }} = new CloudEvent()
 {
+{%- if "type" not in message.metadata %}
+    Type = "{{ message.id }}",
+{%- endif %}
 {%- for attrname in message.metadata -%}
 {%- set attribute = message.metadata[attrname] -%}
 {%- if attrname in ["datacontenttype"] %}
