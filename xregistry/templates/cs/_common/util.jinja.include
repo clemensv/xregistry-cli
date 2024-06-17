@@ -10,3 +10,39 @@ global::{{ (message.schemaurl if message.schemaurl else message.schema) | schema
 byte[]
 {%- endif %} 
 {%- endmacro -%}
+
+{% macro EndpointCredentialClasses() %}
+public class EndpointCredential
+{
+}
+
+public class PlainEndpointCredential : EndpointCredential
+{
+    public PlainEndpointCredential(string clientId, string clientSecret)
+    {
+        ClientId = clientId;
+        ClientSecret = clientSecret;
+    }
+    public string ClientId { get; }
+    public string ClientSecret { get; }
+}
+
+public class TokenEndpointCredential : EndpointCredential
+{
+    Func<Task<string>> _tokenProvider;
+    TokenEndpointCredential(Func<Task<string>> tokenProvider)
+    {
+        _tokenProvider = tokenProvider;
+    }        
+    public Task<string> GetTokenAsync() => _tokenProvider();
+}
+
+public class HeaderEndpointCredential : EndpointCredential
+{
+    public HeaderEndpointCredential(Dictionary<string, string> headers)
+    {
+        Headers = headers;
+    }
+    public Dictionary<string, string> Headers { get; }
+}
+{% endmacro %}

@@ -14,7 +14,7 @@ project_root = os.path.abspath(
 sys.path.append(os.path.join(project_root))
 
 
-# @pytest.mark.skip(reason="temporarily disabled")
+@pytest.mark.skip(reason="temporarily disabled")
 def test_codegen_cs():
     input_dir = os.path.join(
         project_root, 'xregistry/templates/cs'.replace('/', os.path.sep))

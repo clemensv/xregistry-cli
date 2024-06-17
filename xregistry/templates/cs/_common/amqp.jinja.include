@@ -1,5 +1,7 @@
 {#- AMQP macros -#}
 
+{%- import "util.jinja.include" as util -%}
+
 {%- macro isAmqp(message) -%}
 {%- if message.binding and message.binding.lower().startswith("amqp") -%}
 true
@@ -106,13 +108,13 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
 {%- set pascalGroupName = messagegroup.id  | pascal %}
-{%- if withType -%}global::{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id  | strip_namespace | camel }}AmqpDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- if withType -%}global::{{ pascalGroupName | concat_namespace(project_name) | pascal }}.I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id  | strip_namespace | camel }}AmqpDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectField(project_name,messagegroup) -%}
 {%- set handlerName=(messagegroup.id | strip_namespace | camel)+"AmqpDispatcher" -%}
-{%- set handlerType=(messagegroup.id | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" %}
+{%- set handlerType=(messagegroup.id | concat_namespace(project_name) | pascal)+".I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" %}
 {{ handlerType }} {{ handlerName }};
 {%- endmacro -%}
 
@@ -125,7 +127,7 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- macro DeclareDispatchObjectConstructor(project_name, class_name, messagegroup, args, body) -%}
 public {{ class_name }}({%- if args %}{{ args }}, {%- endif -%}
     {%- set handlerName=(messagegroup.id | strip_namespace | camel)+"AmqpDispatcher" -%}
-    {%- set handlerType=(messagegroup.id | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    {%- set handlerType=(messagegroup.id | concat_namespace(project_name) | pascal)+".I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
 {
     this.{{ handlerName }} = {{ handlerName }};
@@ -135,18 +137,12 @@ public {{ class_name }}({%- if args %}{{ args }}, {%- endif -%}
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
-{%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
-{%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
-{{ handlerType }} {{ handlerName }};
-{%- endfor %}
 
 public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
     {%- set pascalGroupName = messagegroup.id  | pascal -%} 
     {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
-    {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | concat_namespace(project_name) | pascal)+".I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
@@ -154,7 +150,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {% for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
     {%- set pascalGroupName = messagegroup.id  | pascal %}
     {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
-    {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | concat_namespace(project_name) | pascal)+".I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
     this.{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
     {{ body | indent(4) }}
@@ -162,23 +158,24 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(root, message, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
 var messageSubject = {{ message }}.Properties.Subject;
 switch (messageSubject)
 {
    {% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
-   {% for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
-   {% set pascalDefinitionName = message.id | pascal %}
-   case "{{ message.id }}":
+   {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
+   {%- set message_body_type = util.body_type(project_name, root, message) %}
+   {%- set pascalDefinitionName = id | pascal %}
+   case "{{ id }}":
          if ( this.{{ handlerName }} != null )
          {
-            await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
-               {%- if message.schemaurl or message.schema -%}
-            global::{{ (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
+            await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async(amqpMessage,
+            {%- if message_body_type != "byte[]" -%}
+            {{ message_body_type }}.FromData(amqpMessage.Body, amqpMessage.Properties.ContentType)
             {%- else -%}
-            {{ message }}.Data
+            amqpMessage.Data
             {%- endif %});
             break;
          }
@@ -207,11 +204,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
    {
       {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
       {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
-      {%- if message.schemaurl or message.schema -%}
-      {%- set dataType = 'global::' + ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
-      {%- else -%}
-      {%- set dataType = "object" -%}
-      {%- endif %}   
+      {%- set dataType = util.body_type(project_name, root, message) %}
       Task On{{ pascalDefinitionName | strip_namespace }}Async(Message amqpMessage, {{ dataType }} data);
       {%- endfor %}
    }

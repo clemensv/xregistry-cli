@@ -32,8 +32,7 @@ namespace {{ project_name | pascal }}
         {%- if uses_cloudevents_message %}
         {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
         {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "AmqpConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchCloudEventAsync += DispatchCloudEventAsync;") | indent(8) }}
-        {%- endif %}
-        {%- if uses_amqp_message %}
+        {%- elif uses_amqp_message %}
         {{ amqp.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
         {{ amqp.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "AmqpConsumer endpoint", "this.endpoint = endpoint;\nthis.endpoint.DispatchMessageAsync += DispatchMessageAsync;") | indent(8) }}
         {%- endif %}
@@ -53,9 +52,7 @@ namespace {{ project_name | pascal }}
                 log.LogError(ex, "Error dispatching message");
             }
         }
-        {%- endif %}
-
-        {%- if uses_amqp_message %}
+        {%- elif uses_amqp_message %}
         public async Task DispatchMessageAsync( Amqp.Message amqpMessage, ILogger log)
         {
             try 
