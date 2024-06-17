@@ -1,5 +1,6 @@
 {%- import "cloudevents.jinja.include" as cloudEvents %}
 {%- import "kafka.jinja.include" as kafka %}
+{%- import "util.jinja.include" as util %}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_ce_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_kafka_message = (root | exists( "binding", "kafka" )) %}
@@ -144,6 +145,7 @@ namespace {{ project_name | pascal }}.Test
 
         {%- for id, message in messagegroup.messages.items() %}
         {%- set pascal_message_name = message.id | strip_namespace | pascal %}
+        {%- set message_body_type = util.body_type(project_name, root, message) -%}
         [Fact]
         public async Task Test{{ pascal_message_name }}Message()
         {
@@ -155,11 +157,21 @@ namespace {{ project_name | pascal }}.Test
 
                 dispatcher.{{ pascal_message_name }}Async += (message, cloudEvent, messageObj) =>
                 {
-                    _logger.LogInformation("{{ pascal_message_name }} message received");
-                    Assert.NotNull(message);
-                    Assert.NotNull(cloudEvent);
-                    Assert.NotNull(messageObj);
-                    messageReceived.SetResult(true);
+                    try
+                    {
+                        _logger.LogInformation("{{ pascal_message_name }} message received");
+                        Assert.NotNull(message);
+                        Assert.NotNull(cloudEvent);
+                        {%- if message_body_type != "byte[]" %}
+                        Assert.NotNull(messageObj);
+                        {%- endif %}
+                        messageReceived.SetResult(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "An error occurred during {{ pascal_message_name }} message processing");
+                        messageReceived.SetResult(false);
+                    }
                     return Task.CompletedTask;
                 };
 
@@ -176,15 +188,8 @@ namespace {{ project_name | pascal }}.Test
 
                 var producerConfig = new ProducerConfig { BootstrapServers = _fixture.KafkaBootstrapServers };
                 using var producer = new ProducerBuilder<byte[], byte[]>(producerConfig).Build();
-
-                
-                {%- if message.schemaurl or message.schema -%}
-                {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
-                {%- else -%}
-                {%- set dataType = "object" -%}
-                {%- endif %}
-                {%- if dataType != "object" %}
-                var eventDataTest = new {{ dataType }}Tests();
+                {%- if message_body_type != "byte[]" %}
+                var eventDataTest = new {{ message_body_type }}Tests();
                 var eventDataInstance = eventDataTest.CreateInstance();
                 var eventData = eventDataInstance.ToByteArray("application/json");
                 {%- else %}

@@ -1,0 +1,121 @@
+{%- set messagegroups = root.messagegroups -%}
+{%- set function_name = project_name | pascal -%}
+{%- set function_class_name = function_name + "Function" -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "servicebus.jinja.include" as servicebus -%}
+{%- import "util.jinja.include" as util %}
+
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Azure.Messaging.ServiceBus;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+using NUnit.Framework;
+
+namespace {{ project_name | pascal }}.Tests
+{
+    [TestFixture]
+    public class {{ function_class_name  }}Tests
+    {
+        private {{ function_class_name }} _{{ function_class_name | camel }};
+        private Mock<ILoggerFactory> loggerFactoryMock;
+        private Mock<ILogger<{{ function_class_name }}>> loggerMock;
+        {{ cloudEvents.DeclareDispatchObjectMocks( project_name, messagegroups ) | indent(8) }}
+
+        [SetUp]
+        public void Setup()
+        {
+            loggerFactoryMock = new Mock<ILoggerFactory>();
+            loggerMock = new Mock<ILogger<{{ function_class_name }}>>();
+            loggerFactoryMock.Setup(x => x.CreateLogger(typeof({{ function_class_name }}).FullName)).Returns(loggerMock.Object);
+            {{ cloudEvents.SetupDispatchObjectMocks( project_name, messagegroups ) | indent(12) }}
+            
+            _{{ function_class_name | camel }} = new {{ function_class_name }}(
+                loggerFactoryMock.Object,
+                {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+                _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Object{% if not loop.last %},
+                {% endif -%}
+                {%- endfor -%});
+        }
+
+        [Test]
+        public async Task Run_WithNoMessages_ShouldNotInvokeAnyDispatcherMethods()
+        {
+            // Arrange
+            var message = ServiceBusModelFactory.ServiceBusReceivedMessage(
+                properties: new Dictionary<string, object>
+                {
+                    {"cloudEvents_specversion", "1.0"},
+                    {"cloudEvents_type", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}
+                }
+            );
+
+            // Act
+            await _{{ function_class_name | camel }}.Run(message, loggerMock.Object);
+
+            // Assert
+            {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+            {%- for id, message in messagegroup.messages.items() -%}
+            {%- if message.format.startswith("CloudEvents") -%}  
+            {%- set pascal_message_name = message.id | pascal %}
+            {%- set message_body_type = util.body_type(project_name, root, message) %}
+            _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Verify(
+                {% if message.schemaurl or message.schema -%}
+                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type }}>()),
+                {%- else %}
+                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<object>()),
+                {%- endif %}                
+                Times.Never
+            );
+            {%- endif -%}
+            {%- endfor -%}
+            {%- endfor -%}
+        }
+
+        {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+        {%- for id, message in messagegroup.messages.items() -%}
+        {%- if message.format.startswith("CloudEvents") -%}     
+        {%- set pascal_message_name = message.id | pascal %}
+        [Test]
+        public async Task Run_With{{ message.id | strip_namespace | pascal }}_ShouldInvoke{{ messagegroup_key | strip_namespace | pascal }}DispatcherOn{{ message.id | strip_namespace | pascal }}Async()
+        {
+            {%- set message_body_type = util.body_type(project_name, root, message) -%}
+            {%- if message_body_type != "byte[]" %}
+            var eventDataTest = new {{ message_body_type }}Tests();
+            var eventDataInstance = eventDataTest.CreateInstance();
+            var message = ServiceBusModelFactory.ServiceBusReceivedMessage(
+                body: new BinaryData(eventDataInstance.ToByteArray("application/json")),
+                contentType: "application/json",
+                properties: new Dictionary<string, object>
+                {
+                    {"cloudEvents_specversion", "1.0"},
+                    {"cloudEvents_type", "{{ message.id }}"}
+                }
+            );
+            {%- else %}
+            var message = ServiceBusModelFactory.ServiceBusReceivedMessage(
+                body: new BinaryData(""),
+                contentType: "application/json",
+                properties: new Dictionary<string, object>
+                {
+                    {"cloudEvents:specversion", "1.0"},
+                    {"cloudEvents_type", "{{ message.id }}"}
+                }
+            );
+            {%- endif %}
+            await _{{ function_class_name | camel }}.Run(message, loggerMock.Object);
+            _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Verify(
+                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type if message_body_type != "byte[]" else "BinaryData" }}>()),
+                Times.Once
+            );
+        }
+        {%- endif -%}
+        {%- endfor -%}        
+        {%- endfor -%}
+    }
+}

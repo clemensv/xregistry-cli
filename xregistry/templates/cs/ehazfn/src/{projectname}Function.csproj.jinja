@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AzureFunctionsVersion>v4</AzureFunctionsVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+   <ItemGroup>
+    <ProjectReference Include="..\..\{{project_name}}_data\src\{{project_name|pascal}}.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    {{- dependency( 'cs','net80', 'Azure.Core.Amqp') }}
+    {{- dependency( 'cs','net80', 'Azure.Messaging.EventHubs') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Avro') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Protobuf') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="host.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="local.settings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+</Project>

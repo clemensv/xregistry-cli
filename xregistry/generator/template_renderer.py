@@ -8,6 +8,8 @@ import os
 import re
 import tempfile
 import uuid
+import xml.etree.ElementTree as ET
+import toml
 from typing import Any, Dict, List, Optional, Union
 
 import avrotize
@@ -577,6 +579,84 @@ class TemplateRenderer:
         except TemplateRuntimeError as err:
             logger.error("%s", err)
             exit(1)
+            
+    @staticmethod
+    def dependency(language: str, runtime_version:str, dependency_name:str):
+        """Get the dependency string for a given language, runtime version, and dependency name."""
+        # Define the path to the master project file based on the language and runtime version
+        if language == 'cs':
+            master_project_path = os.path.join(os.path.dirname(__file__), f'../dependencies/cs/{runtime_version}/dependencies.csproj')
+        elif language == 'py':
+            master_project_path = os.path.join(os.path.dirname(__file__), f'../dependencies/python/{runtime_version}/pyproject.toml')
+        elif language == 'ts':
+            master_project_path = os.path.join(os.path.dirname(__file__), f'../dependencies/typescript/{runtime_version}/package.json')
+        elif language == 'java':
+            master_project_path = os.path.join(os.path.dirname(__file__), f'../dependencies/java/{runtime_version}/pom.xml')
+        else:
+            raise ValueError(f"Unsupported language: {language}")
+
+        if language == 'cs':
+            triedadd = False
+            while True:
+                # Find the desired dependency
+                tree = ET.parse(master_project_path)
+                root = tree.getroot()
+                for package in root.findall(".//PackageReference"):
+                    if package.get('Include') == dependency_name:
+                        # Convert the XML element back to string including its children
+                        dependency_str = ET.tostring(package, encoding='unicode')
+                        return dependency_str
+                if not triedadd:
+                    os.system(f"dotnet add {master_project_path} package {dependency_name}")
+                    triedadd = True
+                else:
+                    raise ValueError(f"Dependency '{dependency_name}' not found in runtime version '{runtime_version}' for language '{language}'.")
+
+        elif language == 'py':
+            # Parse the pyproject.toml file
+            with open(master_project_path, 'r') as file:
+                pyproject_data = toml.load(file)
+
+            # Find the desired dependency
+            dependencies = pyproject_data.get('tool', {}).get('poetry', {}).get('dependencies', {})
+            if dependency_name in dependencies:
+                version = dependencies[dependency_name]
+                dependency_str = f"{dependency_name} = \"{version}\""
+                return dependency_str
+
+            # If the dependency is not found, raise an error
+            raise ValueError(f"Dependency '{dependency_name}' not found in runtime version '{runtime_version}' for language '{language}'.")
+
+        elif language == 'ts':
+            # Parse the package.json file
+            with open(master_project_path, 'r') as file:
+                package_data = json.load(file)
+
+            # Find the desired dependency
+            dependencies = package_data.get('dependencies', {})
+            if dependency_name in dependencies:
+                version = dependencies[dependency_name]
+                dependency_str = f"\"{dependency_name}\": \"{version}\""
+                return dependency_str
+
+            # If the dependency is not found, raise an error
+            raise ValueError(f"Dependency '{dependency_name}' not found in runtime version '{runtime_version}' for language '{language}'.")
+
+        elif language == 'java':
+            # Parse the pom.xml file
+            tree = ET.parse(master_project_path)
+            root = tree.getroot()
+
+            # Find the desired dependency
+            for dependency in root.findall(".//dependency"):
+                artifact_id = dependency.find('artifactId')
+                if artifact_id is not None and artifact_id.text == dependency_name:
+                    # Convert the XML element back to string including its children
+                    dependency_str = ET.tostring(dependency, encoding='unicode')
+                    return dependency_str
+
+            # If the dependency is not found, raise an error
+            raise ValueError(f"Dependency '{dependency_name}' not found in runtime version '{runtime_version}' for language '{language}'.")
 
     def setup_jinja_env(self, template_dirs: List[str]) -> jinja2.Environment:
         """Create the Jinja environment and load extensions."""
@@ -613,6 +693,7 @@ class TemplateRenderer:
         env.globals['geturlpath'] = URLUtils.get_url_path
         env.globals['geturlport'] = URLUtils.get_url_port
         env.globals['geturlscheme'] = URLUtils.get_url_scheme
+        env.globals['dependency'] = self.dependency
         return env
 
     def is_proto_doc(self, docroot: JsonNode) -> bool:

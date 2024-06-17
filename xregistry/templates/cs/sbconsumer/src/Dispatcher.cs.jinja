@@ -1,5 +1,7 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "servicebus.jinja.include" as servicebus -%}
+{%- import "util.jinja.include" as util %}
+{%- import "amqp.jinja.include" as amqp %}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
@@ -39,20 +41,16 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         
         {%- endif %}
         {%- for id, message in messagegroup.messages.items() -%}
-        {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
-        {%- if message.schemaurl or message.schema -%}
-        {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
-        {%- else -%}
-        {%- set dataType = "object" -%}
-        {%- endif %}
+        {%- set pascal_message_name = message.id | strip_namespace | pascal -%}
+        {%- set message_body_type = util.body_type(project_name, root, message) -%}
         {%- if message.description %}   
         /// <summary>
         /// {{ message.description }}
         /// </summary>
         {%- endif -%}
-        {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) -%}
-        {%- set isAmqp = (message | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
-        public event Func<ServiceBusReceivedMessage, {%if isCloudEvent%}CloudEvent?, {%endif%}{{dataType}}?, Task>? {{ pascalDefinitionName | strip_namespace }}Async;
+        {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+        {%- set isAmqp = amqp.isAmqp(message) %}
+        public event Func<ServiceBusReceivedMessage, {%if isCloudEvent%}CloudEvent?, {%endif%}{{message_body_type}}?, Task>? {{ pascal_message_name | strip_namespace }}Async;
         {%- endfor %}
 
         public async Task ProcessMessageAsync(ProcessMessageEventArgs messageArgs)
@@ -80,19 +78,19 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             switch (cloudEventType)
             {
                 {% for id, message in messagegroup.messages.items() -%}
-                {%- set pascalDefinitionName = message.id | pascal %}
-                {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) -%}
-                {%- if message.schemaurl or message.schema -%}
-                {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
-                {%- else -%}
-                {%- set dataType = "object" -%}
-                {%- endif %}
+                {%- set pascal_message_name = message.id | pascal %}
+                {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+                {%- set message_body_type = util.body_type(project_name, root, message) -%}
                 case "{{ message.id }}":
-                    if ({{ pascalDefinitionName | strip_namespace }}Async != null && cloudEvent.Data != null) 
+                    if ({{ pascal_message_name | strip_namespace }}Async != null && cloudEvent.Data != null) 
                         {
-                            await Task.WhenAll(Array.ConvertAll({{ pascalDefinitionName | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
+                            await Task.WhenAll(Array.ConvertAll({{ pascal_message_name | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
                             {%- if isCloudEvent %}cloudEvent, {%- endif -%}
-                            {%- if dataType != "object" -%}{{ dataType }}.FromData(cloudEvent.Data, cloudEvent.DataContentType){%- else -%}cloudEvent.Data{%- endif %})??Task.CompletedTask)));
+                            {%- if message_body_type != "byte[]" -%}
+                            {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)
+                            {%- else -%}
+                            cloudEvent.Data is BinaryData binaryData ? binaryData.ToArray() : null
+                            {%- endif %})??Task.CompletedTask)));
                         }
                         break;
                 {%- endfor %}
@@ -109,19 +107,18 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             switch (messageSubject)
             {
             {% for id, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) -%}
-            {%- set pascalDefinitionName = message.id | pascal %}
-            {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) -%}
-            {%- if message.schemaurl or message.schema -%}
-            {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
-            {%- else -%}
-            {%- set dataType = "object" -%}
-            {%- endif %}
+            {%- set pascal_message_name = message.id | pascal %}
+            {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+            {%- set message_body_type = util.body_type(project_name, root, message) -%}
                 case "{{ message.id }}":
-                        if ({{ pascalDefinitionName | strip_namespace }}Async != null) 
+                        if ({{ pascal_message_name | strip_namespace }}Async != null) 
                         {
-                            await Task.WhenAll(Array.ConvertAll({{ pascalDefinitionName | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
-                        {%- if isCloudEvent%}null, {% endif %}
-                        {%- if dataType != "object" -%}{{ dataType }}.FromData(eventData.Body, eventData.ContentType){%- else -%} {{ message }}.Data{%- endif %})??Task.CompletedTask)));
+                            await Task.WhenAll(Array.ConvertAll({{ pascal_message_name | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
+                            {%- if isCloudEvent%}null, {% endif %}
+                            {%- if message_body_type != "byte[]" -%}
+                            {{ message_body_type }}.FromData(eventData.Body, eventData.ContentType)
+                            {%- else -%} 
+                            {{ message }}.Data{%- endif %}))));
                         }
                         break;
             {%- endfor %}

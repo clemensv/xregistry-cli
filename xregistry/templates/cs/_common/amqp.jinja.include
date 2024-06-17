@@ -1,5 +1,11 @@
 {#- AMQP macros -#}
 
+{%- macro isAmqp(message) -%}
+{%- if message.binding and message.binding.lower().startswith("amqp") -%}
+true
+{%- endif -%}
+{%- endmacro -%}
+
 {%- macro AmqpNetLiteHeaders() -%}
 using Amqp;
 using Amqp.Framing;

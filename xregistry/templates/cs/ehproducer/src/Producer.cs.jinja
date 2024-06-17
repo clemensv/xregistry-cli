@@ -1,5 +1,6 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
@@ -111,24 +112,17 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 
         {% for id in messagegroup.messages -%}
         {%- set message = messagegroup.messages[id] -%}
-        {%- set pascalDefinitionName = message.id | pascal %}
-        {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-        {%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
-        {%- if message.schemaurl or message.schema -%}
-        {%- set type_name = 'global::' + ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal )  %}
-        {%- if message.schemaformat.lower().startswith("jsonschema") %}
-        {%- set type_name = type_name | pascal %}
-        {%- endif %}
-        {%- else -%}
-        {%- set type_name = "byte[]" %}
-        {%- endif -%}
+        {%- set pascal_message_name = message.id | pascal %}
+        {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+        {%- set isAmqp = amqp.isAmqp(message) %}
+        {%- set type_name = util.body_type(project_name, root, message) %}
         {%- if isCloudEvent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
         {%- elif isAmqp %}
         {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
         {%- endif %}
         /// <summary>
-        /// Publish the `{{ pascalDefinitionName }}` event
+        /// Publish the `{{ pascal_message_name }}` event
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -144,8 +138,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if isCloudEvent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
-        /// <returns>An `EventData` instance for the {{ pascalDefinitionName }} message.</returns>
-        public Task Send{{ pascalDefinitionName | strip_namespace }}Async(
+        /// <returns>An `EventData` instance for the {{ pascal_message_name }} message.</returns>
+        public Task Send{{ pascal_message_name | strip_namespace }}Async(
         {{ type_name }} data
         {%- if uriargs -%}
         {{- uriargs -}}
@@ -157,7 +151,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endif %}
         {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
         {
-            var eventData = {{pascalGroupName | strip_namespace}}EventFactory.Create{{ pascalDefinitionName | strip_namespace }}Event(data,
+            var eventData = {{pascalGroupName | strip_namespace}}EventFactory.Create{{ pascal_message_name | strip_namespace }}Event(data,
                 {%- if uriargs %}
                 {%- for arg in uriargs.split(',') if arg.strip() %}
                 {%- set splitarg = arg.strip().split(' ')%}
@@ -171,7 +165,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         }
 
         /// <summary>
-        /// Send a batch of `{{ pascalDefinitionName }}` events
+        /// Send a batch of `{{ pascal_message_name }}` events
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -188,7 +182,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
         /// <returns>Task object</returns>
-        public async Task Send{{ pascalDefinitionName | strip_namespace }}BatchAsync(
+        public async Task Send{{ pascal_message_name | strip_namespace }}BatchAsync(
         {{ type_name }}[] data
         {%- if uriargs -%}
         {{- uriargs -}}
@@ -203,14 +197,14 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             var batch = await this.Client.CreateBatchAsync();
             foreach( var record in data )
             {
-                var eventData = {{pascalGroupName | strip_namespace}}EventFactory.Create{{ pascalDefinitionName | strip_namespace }}Event(record, 
+                var eventData = {{pascalGroupName | strip_namespace}}EventFactory.Create{{ pascal_message_name | strip_namespace }}Event(record, 
                 {%- if uriargs %}
                 {%- for arg in uriargs.split(',') if arg.strip() %}
                 {%- set splitarg = arg.strip().split(' ')%}
                 {{- splitarg[1] -}},
                 {%- endfor -%}
                 {%- endif -%}
-                contentType, formatter);
+                contentType{%- if isCloudEvent %}, formatter{% endif %});
                 if ( !batch.TryAdd(eventData))
                 {
                     await this.Client.SendAsync(batch);

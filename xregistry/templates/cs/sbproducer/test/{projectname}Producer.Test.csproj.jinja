@@ -7,22 +7,22 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit" Version="2.8.1" />
+    {{- dependency( 'cs','net80', 'xunit') }}
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1">
     <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
-    <PackageReference Include="Testcontainers" Version="3.8.0" />
-    <PackageReference Include="Testcontainers.Azurite" Version="3.8.0" />
-    <PackageReference Include="CloudNative.CloudEvents" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.7.1" />
-    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.17.4" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+    {{- dependency( 'cs','net80', 'Microsoft.NET.Test.Sdk') }}
+    {{- dependency( 'cs','net80', 'Testcontainers') }}
+    {{- dependency( 'cs','net80', 'Testcontainers.Azurite') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Protobuf') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Avro') }}
+    {{- dependency( 'cs','net80', 'Azure.Messaging.ServiceBus') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging.Console') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging.Debug') }}
     <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
   </ItemGroup>
 

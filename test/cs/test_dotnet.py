@@ -57,195 +57,242 @@ def run_dotnet_test(xreg_file: str, output_dir: str, projectname: str, style: st
 
 def test_ehproducer_contoso_erp_cs():
     """ Test the EventHub producer for Contoso ERP. """
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "ehproducer")
 
 
 def test_ehproducer_fabrikam_motorsports_cs():
     """ Test the EventHub producer for Fabrikam Motorsports."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "ehproducer")
 
 
 def test_ehproducer_inkjet_cs():
     """ Test the EventHub producer for Inkjet."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "ehproducer")
 
 
 def test_ehproducer_lightbulb_cs():
     """ Test the EventHub producer for Lightbulb. """
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(
             project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "ehproducer")
-
+        
+def test_ehproducer_lightbulb_amqp_cs():
+    """ Test the EventHub producer for Lightbulb. """
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(
+            project_root, "test/xreg/lightbulb-amqp.xreg.json"), tmpdirname, "TestProject", "ehproducer")
 
 def test_ehconsumer_contoso_erp_cs():
     """ Test the EventHub consumer for Contoso ERP."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "ehconsumer")
 
 
 def test_ehconsumer_fabrikam_motorsports_cs():
     """ Test the EventHub consumer for Fabrikam Motorsports."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "ehconsumer")
 
 
 def test_ehconsumer_inkjet_cs():
     """ Test the EventHub consumer for Inkjet."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "ehconsumer")
 
 
 def test_ehconsumer_lightbulb_cs():
     """ Test the EventHub consumer for Lightbulb."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(
             project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "ehconsumer")
 
 
 def test_kafkaproducer_contoso_erp_cs():
     """ Test the Kafka producer for Contoso ERP."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "kafkaproducer")
 
 
 def test_kafkaproducer_fabrikam_motorsports_cs():
     """ Test the Kafka producer for Fabrikam Motorsports."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "kafkaproducer")
 
 
 def test_kafkaproducer_inkjet_cs():
     """ Test the Kafka producer for Inkjet."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "kafkaproducer")
 
 
 def test_kafkaproducer_lightbulb_cs():
     """ Test the Kafka producer for Lightbulb."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
                         tmpdirname, "TestProject", "kafkaproducer")
 
 
 def test_kafkaconsumer_contoso_erp_cs():
     """ Test the Kafka consumer for Contoso ERP."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "kafkaconsumer")
 
 
 def test_kafkaconsumer_fabrikam_motorsports_cs():
     """ Test the Kafka consumer for Fabrikam Motorsports."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "kafkaconsumer")
 
 
 def test_kafkaconsumer_inkjet_cs():
     """ Test the Kafka consumer for Inkjet."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "kafkaconsumer")
 
 
 def test_kafkaconsumer_lightbulb_cs():
     """ Test the Kafka consumer for Lightbulb."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
                         tmpdirname, "TestProject", "kafkaconsumer")
 
 
 def test_mqttclient_contoso_erp_cs():
     """ Test the MQTT client for Contoso ERP."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "mqttclient")
 
 
 def test_mqttclient_fabrikam_motorsports_cs():
     """ Test the MQTT client for Fabrikam Motorsports."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "mqttclient")
 
 
 def test_mqttclient_inkjet_cs():
     """ Test the MQTT client for Inkjet."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "mqttclient")
 
 
 def test_mqttclient_lightbulb_cs():
     """ Test the MQTT client for Lightbulb."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(
             project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "mqttclient")
 
 
 def test_sbproducer_contoso_erp_cs():
     """ Test the Service Bus producer for Contoso ERP."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "sbproducer")
 
 
 def test_sbproducer_fabrikam_motorsports_cs():
     """ Test the Service Bus producer for Fabrikam Motorsports."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "sbproducer")
 
 
 def test_sbproducer_inkjet_cs():
     """ Test the Service Bus producer for Inkjet."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "sbproducer")
 
 
 def test_sbproducer_lightbulb_cs():
     """ Test the Service Bus producer for Lightbulb."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(
             project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "sbproducer")
 
 
 def test_sbconsumer_contoso_erp_cs():
     """ Test the Service Bus consumer for Contoso ERP."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "sbconsumer")
 
 
 def test_sbconsumer_fabrikam_motorsports_cs():
     """ Test the Service Bus consumer for Fabrikam Motorsports."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "sbconsumer")
 
 
 def test_sbconsumer_inkjet_cs():
     """ Test the Service Bus consumer for Inkjet."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
             '/', os.sep)), tmpdirname, "TestProject", "sbconsumer")
 
 
 def test_sbconsumer_lightbulb_cs():
     """ Test the Service Bus consumer for Lightbulb."""
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        run_dotnet_test(os.path.join(
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(
             project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "sbconsumer")
+
+def test_sbazfn_contoso_erp_cs():
+    """ Test the Azure Function for Contoso ERP."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "TestProject", "sbazfn")
+        
+def test_sbazfn_fabrikam_motorsports_cs():
+    """ Test the Azure Function for Fabrikam Motorsports."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "TestProject", "sbazfn")
+        
+def test_sbazfn_inkjet_cs():
+    """ Test the Azure Function for Inkjet."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "TestProject", "sbazfn")
+        
+def test_sbazfn_lightbulb_cs():
+    """ Test the Azure Function for Lightbulb."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(
+            project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "sbazfn")
+        
+def test_ehazfn_contoso_erp_cs():
+    """ Test the Azure Function for Contoso ERP."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "TestProject", "ehazfn")
+        
+def test_ehazfn_fabrikam_motorsports_cs():
+    """ Test the Azure Function for Fabrikam Motorsports."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "TestProject", "ehazfn")
+        
+def test_ehazfn_inkjet_cs():
+    """ Test the Azure Function for Inkjet."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "TestProject", "ehazfn")

@@ -84,26 +84,21 @@ namespace {{ project_name | pascal }}
         {% endif %}
 
         {% for id in messagegroup.messages -%}
-        {%- set definition = messagegroup.messages[id] -%}
-        {%- set pascalDefinitionName = definition.id | pascal %}
-        {%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
+        {%- set message = messagegroup.messages[id] -%}
+        {%- set pascal_message_name = message.id | pascal %}
+        {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
         {%- if isCloudEvent %}
-        {%- if definition.description %}
+        {%- if message.description %}
         /// <summary>
-        /// {{ definition.description }}
+        /// {{ message.description }}
         /// </summary>
         {%- endif %}
-        public async Task Send{{ pascalDefinitionName | strip_namespace }}Async(
-        {%- if definition.schemaurl or definition.schema -%}
-        global::{%- set type_name = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root,definition.schemaformat) | pascal %}
-        {%- else -%}
-        {%- set type_name = "object" %}
-        {%- endif -%}
-        {{ type_name }} data
-        {{- cloudEvents.DeclareUriTemplateArguments(definition) -}},
+        public async Task Send{{ pascal_message_name | strip_namespace }}Async(
+        {{ util.body_type(project_name, root, message) }} data,
+        {{- cloudEvents.DeclareUriTemplateArguments(message) -}},
         string contentType = System.Net.Mime.MediaTypeNames.Application.Json)
         {
-            {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", definition) | indent(12) }}
+            {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
             cloudEvent.Data = data;
             await eventGridPublisherClient.SendCloudNativeCloudEventAsync(cloudEvent);
         }

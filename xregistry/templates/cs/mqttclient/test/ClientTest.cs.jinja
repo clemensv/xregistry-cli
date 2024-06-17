@@ -1,5 +1,6 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "mqtt.jinja.include" as mqtt -%}
+{%- import "util.jinja.include" as util %}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists("format", "cloudevents")) %}
 {%- set uses_mqtt_message = (root | exists("binding", "mqtt")) %}
@@ -169,7 +170,7 @@ namespace {{ project_name | pascal }}.Test
 
         {%- for id, message in messagegroup.messages.items() %}
         {%- set pascal_message_name = message.id | strip_namespace | pascal %}
-        {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+        {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isMqtt = not isCloudEvent and message.format.lower().startswith("mqtt") %}
         [Fact]
         public async Task Test{{ pascal_message_name }}Message()
@@ -177,12 +178,8 @@ namespace {{ project_name | pascal }}.Test
             _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
             try
             {   
-                {%- if message.schemaurl or message.schema -%}
-                {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
-                {%- else -%}
-                {%- set dataType = "byte[]" -%}
-                {%- endif %}
-                var tcs = new TaskCompletionSource<{{ dataType }}>();
+                {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                var tcs = new TaskCompletionSource<{{ message_body_type }}>();
                 _dispatcher.{{ pascal_message_name }}Async += (mqtt, ce, data) =>
                 {
                     tcs.SetResult(data);
@@ -193,8 +190,8 @@ namespace {{ project_name | pascal }}.Test
                 {%- elif isMqtt %}
                 {%- set uriargs = mqtt.DeclareUriTemplateArguments(message) -%}
                 {%- endif %}
-                {%- if dataType != "byte[]" %}
-                var eventDataTest = new {{ dataType }}Tests();
+                {%- if message_body_type != "byte[]" %}
+                var eventDataTest = new {{ message_body_type }}Tests();
                 var eventDataInstance = eventDataTest.CreateInstance();
                 await _producer.Send{{ pascal_message_name }}Async(_fixture.TopicName, eventDataInstance
                 {%- if uriargs -%}

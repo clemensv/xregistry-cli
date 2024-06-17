@@ -1,5 +1,6 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
@@ -23,10 +24,14 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
     /// </summary>
     public partial class {{ class_name }}
     {
+        {%- if uses_cloudevents_message %}
         private const string cePrefix = "cloudEvents_";
-        private const string applicationOctetStream = "application/octet-stream";
-        private delegate byte[] Serialize<T>(T data, string contentType);
         private static CloudEventFormatter defaultFormatter = new JsonEventFormatter();
+        private const string applicationOctetStream = "application/octet-stream";
+        {%- endif %}
+        
+        private delegate byte[] Serialize<T>(T data, string contentType);
+        
         {%- if root.endpoints -%} 
         {%- for endpoint_key in root.endpoints.keys() -%}
         {%- set endpoint = root.endpoints[endpoint_key] -%}
@@ -99,37 +104,50 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         /// Create an `EventData` instance for the specified message.
         /// </summary>
         /// <typeparam name="T">The type of the message data.</typeparam>
+        {%- if uses_cloudevents_message %}
         /// <param name="cloudEvent">The CloudEvent instance to use for the message.</param>
+        {%- endif %}
         /// <param name="data">The message data.</param>
         /// <param name="contentType">The content type of the message data.</param>
         /// <param name="bodySerializer">The serializer to use for the message data.</param>
+        {%- if uses_cloudevents_message %}
         /// <param name="formatter">The CloudEvent formatter to use for the message.</param>
+        {%- endif %}
         /// <returns>An `EventData` instance for the specified message.</returns>
-        private static EventData CreateEventData<T>(CloudEvent? cloudEvent, T data, string contentType, Serialize<T>? bodySerializer = null, CloudEventFormatter? formatter = null) where T : notnull
+        private static EventData CreateEventData<T>({% if uses_cloudevents_message %}CloudEvent? cloudEvent, {% endif -%}T data, string contentType, Serialize<T>? bodySerializer = null{% if uses_cloudevents_message %}, CloudEventFormatter? formatter = null{% endif %}) where T : notnull
         {
+            {%- set extraindent = 0 %}
+            {%- if uses_cloudevents_message %}
+            {%- set extraindent = 4 %}
             if (formatter == null)
             {
-                bool isRawBytes = typeof(T) == typeof(byte[]);
-                if (bodySerializer == null && !isRawBytes)
+            {%- endif %}
+            {%- filter indent(extraindent) %}
+            bool isRawBytes = typeof(T) == typeof(byte[]);
+            if (bodySerializer == null && !isRawBytes)
+            {
+                throw new ArgumentNullException(nameof(bodySerializer));
+            }
+            var eventPayload = bodySerializer == null ? (byte[])(object)data : bodySerializer(data, contentType);
+            EventData eventData = new EventData(eventPayload);
+            eventData.ContentType = contentType;
+            {%- if uses_cloudevents_message %}
+            if (cloudEvent != null)
+            {
+                foreach (var attr in cloudEvent.GetPopulatedAttributes())
                 {
-                    throw new ArgumentNullException(nameof(bodySerializer));
-                }
-                var eventPayload = bodySerializer == null ? (byte[])(object)data : bodySerializer(data, contentType);
-                EventData eventData = new EventData(eventPayload);
-                eventData.ContentType = contentType;
-                if (cloudEvent != null)
-                {
-                    foreach (var attr in cloudEvent.GetPopulatedAttributes())
+                    var attrValue = (attr.Value is Uri) ? attr.Value.ToString() : attr.Value;
+                    if (attrValue != null)
                     {
-                        var attrValue = (attr.Value is Uri) ? attr.Value.ToString() : attr.Value;
-                        if (attrValue != null)
-                        {
-                            eventData.Properties.Add(cePrefix + attr.Key.Name, attrValue);
-                        }
+                        eventData.Properties.Add(cePrefix + attr.Key.Name, attrValue);
                     }
                 }
-                return eventData;
             }
+            {%- endif %}
+            return eventData;
+            {%- endfilter %}
+            {%- if uses_cloudevents_message %}
+            }            
             else
             {
                 if (cloudEvent == null)
@@ -157,28 +175,23 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
                 };
                 return eventData;
             }
+            {%- endif %}
         }
 
         {% for id in messagegroup.messages -%}
         {%- set message = messagegroup.messages[id] -%}
-        {%- set pascalDefinitionName = message.id | pascal %}
-        {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-        {%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
-        {%- if message.schemaurl or message.schema -%}
-        {%- set type_name = 'global::' + ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal )  %}
-        {%- if message.schemaformat.lower().startswith("jsonschema") %}
-        {%- set type_name = type_name | pascal %}
-        {%- endif %}
-        {%- else -%}
-        {%- set type_name = "byte[]" %}
-        {%- endif -%}
+        {%- set pascal_message_name = message.id | pascal %}
+        {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+        {%- set isAmqp = amqp.isAmqp(message) %}
+        {%- if isAmqp or isCloudEvent %}
+        {%- set type_name = util.body_type(project_name, root, message) %}
         {%- if isCloudEvent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
         {%- elif isAmqp %}
         {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
         {%- endif %}
         /// <summary>
-        /// Create an `EventData` instance for the `{{ pascalDefinitionName }}` event
+        /// Create an `EventData` instance for the `{{ pascal_message_name }}` event
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -194,9 +207,9 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if isCloudEvent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
-        /// <returns>An `EventData` instance for the {{ pascalDefinitionName }} message.</returns>
-        public static EventData Create{{ pascalDefinitionName | strip_namespace }}Event(
-        {{ type_name }} data
+        /// <returns>An `EventData` instance for the {{ pascal_message_name }} message.</returns>
+        public static EventData Create{{ pascal_message_name | strip_namespace }}Event(
+        {{- type_name }} data
         {%- if uriargs -%}
         {{- uriargs -}}
         {%- endif -%}
@@ -208,25 +221,25 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
         {
             {% if type_name != "byte[]" %}
-            Serialize<{{ type_name }}>? bodySerializer = (formatter != null)?null:({{ type_name }} data, string contentType) => {
+            Serialize<{{ type_name }}>? bodySerializer = {%- if isCloudEvent %}(formatter != null)?null:{%-endif-%}({{ type_name }} data, string contentType) => {
                 return data.ToByteArray(contentType);
             };
             {%- if isCloudEvent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
             return CreateEventData(cloudEvent, data, contentType, bodySerializer, formatter);
             {%- elif isAmqp %}
-            return CreateEventData(null, data, contentType, bodySerializer, null);
+            return CreateEventData(data, contentType, bodySerializer);
             {%- endif %}
             {% else %}
             {%- if isCloudEvent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
             return CreateEventData(cloudEvent, data, contentType, null, formatter);
             {%- elif isAmqp %}
-            return CreateEventData(null, data, contentType, null, null);
+            return CreateEventData(data, contentType, null);
             {%- endif %}
-            {% endif %}
-            
+            {%- endif %}            
         }
+        {%- endif %}
         {% endfor %}
     }
 }

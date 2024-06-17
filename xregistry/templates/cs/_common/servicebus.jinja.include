@@ -196,6 +196,7 @@ using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
 {%- endmacro -%}
 
 {%- macro CloudEventsMethods() -%}
+private static string[] ceAttribs = ["specversion", "dataschema", "time", "source", "subject", "type", "id"];
 protected const string amqpCloudEventPrefix1 = "cloudEvents_";
 protected const string amqpCloudEventPrefix2 = "cloudEvents:";
 protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
@@ -248,6 +249,10 @@ protected CloudEvent CloudEventFromServiceBusMessage(ServiceBusReceivedMessage s
             if (key.StartsWith(amqpCloudEventPrefix1) || key.StartsWith(amqpCloudEventPrefix2))
             {
                var attributeName = key.Substring(amqpCloudEventPrefix1.Length);
+               if (ceAttribs.Any(a=>a==attributeName))
+               {
+                  continue;
+               }
                cloudEvent[attributeName] = serviceBusMessage.ApplicationProperties[key] as string;
             }
          }

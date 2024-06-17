@@ -1,5 +1,6 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "mqtt.jinja.include" as mqtt -%}
+{%- import "util.jinja.include" as util %}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists("format", "cloudevents")) %}
 {%- set uses_mqtt_message = (root | exists("binding", "mqtt")) %}
@@ -163,24 +164,17 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 
         {% for id in messagegroup.messages -%}
         {%- set message = messagegroup.messages[id] -%}
-        {%- set pascalDefinitionName = message.id | pascal %}
+        {%- set pascal_message_name = message.id | pascal %}
         {%- set is_cloudevent = not message.format or message.format.lower().startswith("cloudevents") -%}
         {%- set is_raw_mqtt = not is_cloudevent and message.format.lower().startswith("mqtt") %}
-        {%- if message.schemaurl or message.schema -%}
-        {%- set type_name = 'global::' + ((message.schemaurl if message.schemaurl else message.schema) | schema_type(project_name, root, message.schemaformat) | pascal) %}
-        {%- if message.schemaformat.lower().startswith("jsonschema") %}
-        {%- set type_name = type_name | pascal %}
-        {%- endif %}
-        {%- else -%}
-        {%- set type_name = "byte[]" %}
-        {%- endif -%}
+        {%- set type_name = util.body_type(project_name, root, message) -%}
         {%- if is_cloudevent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
         {%- elif is_raw_mqtt %}
         {%- set uriargs = mqtt.DeclareUriTemplateArguments(message) -%}
         {%- endif %}
         /// <summary>
-        /// Create a `MqttApplicationMessage` instance for the `{{ pascalDefinitionName }}` event
+        /// Create a `MqttApplicationMessage` instance for the `{{ pascal_message_name }}` event
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -197,8 +191,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if is_cloudevent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
-        /// <returns>A `MqttApplicationMessage` instance for the {{ pascalDefinitionName }} message.</returns>
-        public static MqttApplicationMessage Create{{ pascalDefinitionName | strip_namespace }}Message(string topicName,
+        /// <returns>A `MqttApplicationMessage` instance for the {{ pascal_message_name }} message.</returns>
+        public static MqttApplicationMessage Create{{ pascal_message_name | strip_namespace }}Message(string topicName,
         {{ type_name }} data
         {%- if uriargs -%}
         {{- uriargs -}}

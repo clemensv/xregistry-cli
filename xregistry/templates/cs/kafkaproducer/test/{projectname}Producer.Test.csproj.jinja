@@ -7,23 +7,23 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit" Version="2.8.1" />
+    {{- dependency( 'cs','net80', 'xunit') }}
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1">
     <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
-    <PackageReference Include="Testcontainers" Version="3.8.0" />
-    <PackageReference Include="Testcontainers.Kafka" Version="3.8.0" />
-    <PackageReference Include="CloudNative.CloudEvents" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.7.1" />
-    <PackageReference Include="Confluent.Kafka" Version="2.4.0" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.20.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+    {{- dependency( 'cs','net80', 'Microsoft.NET.Test.Sdk') }}
+    {{- dependency( 'cs','net80', 'Testcontainers') }}
+    {{- dependency( 'cs','net80', 'Testcontainers.Kafka') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Protobuf') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Avro') }}
+    {{- dependency( 'cs','net80', 'Confluent.Kafka') }}
+    {{- dependency( 'cs','net80', 'Azure.Storage.Blobs') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging.Console') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging.Debug') }}
     <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
   </ItemGroup>
 

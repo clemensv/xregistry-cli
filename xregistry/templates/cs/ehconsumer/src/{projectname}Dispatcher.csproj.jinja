@@ -14,13 +14,13 @@
     <ProjectReference Include="..\..\{{project_name}}_data\src\{{project_name|pascal}}.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CloudNative.CloudEvents" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.7.1" />
-    <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.7.1" />
-    <PackageReference Include="Azure.Messaging.EventHubs.Processor" Version="5.11.3" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.20.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Protobuf') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Avro') }}
+    {{- dependency( 'cs','net80', 'Azure.Messaging.EventHubs.Processor') }}
+    {{- dependency( 'cs','net80', 'Azure.Storage.Blobs') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
     <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
   </ItemGroup>
   
