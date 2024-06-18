@@ -8,6 +8,18 @@ true
 {%- endif -%}
 {%- endmacro -%}
 
+{%- macro usesAmqpBinding(root) %}
+{%- if (root.messagegroups | exists( "binding", "amqp" )) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro usesAmqpEndpoint(root) %}
+{%- if (root.endpoints | exists( "protocol", "amqp" )) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
 {%- macro AmqpNetLiteHeaders() -%}
 using Amqp;
 using Amqp.Framing;

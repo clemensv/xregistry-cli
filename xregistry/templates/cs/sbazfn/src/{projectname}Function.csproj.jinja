@@ -1,5 +1,3 @@
-{%- set uses_protobuf = uses_protobuf | default(true) -%}
-{%- set uses_avro = uses_avro | default(true) -%}
 {%- macro dep(name) -%}{{- dependency( 'cs', 'net80', name) -}}{%- endmacro -%}
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -30,5 +28,4 @@
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
   </ItemGroup>
-
 </Project>

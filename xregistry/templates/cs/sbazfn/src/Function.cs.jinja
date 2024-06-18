@@ -2,6 +2,8 @@
 {%- set function_name = project_name | pascal -%}
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "servicebus.jinja.include" as servicebus -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
 
 using System;
 using System.Collections.Generic;

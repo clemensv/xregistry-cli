@@ -1,8 +1,3 @@
-{%- set uses_protobuf = uses_protobuf | default(true) -%}
-{%- set uses_avro = uses_avro or (root.schemagroups | exists( "format", "avro" )) or (root | exists( "schemaformat", "avro" )) -%}
-{%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
-{%- set uses_amqp_endpoint = (root | exists("protocol", "amqp" )) %}
-
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -10,12 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-  </PropertyGroup>
-  {%- if uses_protobuf %}
-  <ItemGroup>
-    <Protobuf Include="**\*.proto" GrpcServices="None" />
-  </ItemGroup>
-  {%- endif %}
+  </PropertyGroup>  
   <ItemGroup>
     <ProjectReference Include="..\..\{{project_name}}_data\src\{{project_name}}.csproj" />
   </ItemGroup>
@@ -25,18 +15,7 @@
     {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Avro') }}
     {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Protobuf') }}
     {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
-    {{- dependency( 'cs','net80', 'MQTTnet') }}
-    {%- if uses_protobuf %}
-    {{- dependency( 'cs','net80', 'Google.Protobuf') }}
-    <PackageReference Include="Grpc.Tools" Version="2.50.0">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    {%- endif %}
-    <PackageReference Include="System.Memory.Data" Version="8.0.0"></PackageReference>
-    {%- if uses_avro %}
-    {{- dependency( 'cs','net80', 'Apache.Avro') }}
-    {%- endif %}
-  </ItemGroup>
-  
+    {{- dependency( 'cs','net80', 'MQTTnet') }}    
+    {{- dependency( 'cs','net80', 'System.Memory.Data') }}    
+  </ItemGroup>  
 </Project>

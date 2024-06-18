@@ -6,6 +6,21 @@ true
 {%- endif -%}
 {%- endmacro %}
 
+{%- macro usesCloudEvents(root) %}
+{%- if (root.messagegroups | exists( "format", "cloudevents" )) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro CloudEventsUsings() %}
+using CloudEvents;
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.SystemTextJson;
+using CloudNative.CloudEvents.Protobuf;
+using CloudNative.CloudEvents.Amqp;
+using CloudNative.CloudEvents.Avro;
+{% endmacro %}
+
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
 {%- for attrname in message.metadata if attrname not in ["datacontenttype", "dataschema"] -%}

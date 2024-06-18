@@ -3,7 +3,8 @@
 {%- set function_class_name = function_name + "Function" -%}
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "servicebus.jinja.include" as servicebus -%}
-{%- import "util.jinja.include" as util %}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
 
 #pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.

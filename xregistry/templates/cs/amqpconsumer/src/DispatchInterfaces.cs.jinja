@@ -1,0 +1,10 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+{%- if cloudEvents.usesCloudEvents(root) %}
+{{ cloudEvents.DeclareDispatchInterfaces( project_name, root) }}
+{%- endif %}
+{%- if amqp.usesAmqpBinding(root) %}
+{{ amqp.DeclareDispatchInterfaces( project_name, root) }}
+{%- endif %}

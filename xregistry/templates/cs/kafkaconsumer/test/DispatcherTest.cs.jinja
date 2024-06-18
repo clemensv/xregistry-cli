@@ -1,6 +1,7 @@
 {%- import "cloudevents.jinja.include" as cloudEvents %}
 {%- import "kafka.jinja.include" as kafka %}
-{%- import "util.jinja.include" as util %}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_ce_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_kafka_message = (root | exists( "binding", "kafka" )) %}
