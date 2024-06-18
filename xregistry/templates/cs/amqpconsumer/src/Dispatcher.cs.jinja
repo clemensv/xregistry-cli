@@ -1,0 +1,187 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = cloudEvents.usesCloudEvents(root) %}
+{%- set uses_amqp_message = amqp.usesAmqpBinding(root) %}
+{%- set uses_amqp_endpoint = amqp.usesAmqpEndpoint(root) %}
+{%- set function_name = project_name | pascal -%}
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Linq;
+using System.Text.RegularExpressions;
+
+{%- if uses_cloudevents_message %}
+{{ cloudEvents.CloudEventsUsings() }}
+{%- endif %}
+{{ amqp.AmqpNetLiteHeaders() }}
+using Microsoft.Extensions.Logging;
+
+namespace {{ project_name | pascal }}
+{
+    {% for messagegroup_key, messagegroup in messagegroups.items() -%}
+    {%- set pascalGroupName = messagegroup.id | pascal -%}
+    {%- set class_name = (pascalGroupName | strip_namespace) + "EventConsumer" %}
+    public class {{ class_name }} : {{project_name | pascal}}.Tools.DispatcherBase
+    {
+        private readonly AmqpConsumer _endpoint;
+
+        {%- for id, message in messagegroup.messages.items() -%}
+        {%- set pascal_message_name = message.id | strip_dots | pascal -%}
+        {%- set message_body_type = util.body_type(project_name, root, message) %}
+        {%- if cloudEvents.isCloudEvent(message) %}
+        public event Func<CloudEvent, {{ message_body_type }}?, Task>? {{ pascal_message_name }}Async;
+        {%- else %}
+        public event Func<Message, {{ message_body_type }}?, Task>? {{ pascal_message_name }}Async;
+        {%- endif %}
+        {%- endfor %}
+        public event Func<Message, Task>? UnhandledMessageAsync;
+
+        public {{ class_name }}(AmqpConsumer endpoint, ILoggerFactory logger)
+            : base(logger)
+        {
+            _endpoint = endpoint;
+            {% if uses_amqp_message %}
+            _endpoint.DispatchMessageAsync += async (message, log) => await DispatchMessageAsync(message);
+            {%- endif %}
+            {%- if uses_cloudevents_message %}
+            _endpoint.DispatchCloudEventAsync += async (cloudEvent, log) => await DispatchCloudEventAsync(cloudEvent);
+            {%- endif %}
+        }
+
+        public Task StartAsync() => _endpoint.StartAsync();
+        public Task StopAsync() => _endpoint.StopAsync();
+
+        {%- if uses_cloudevents_message %}
+        private async Task<bool> DispatchCloudEventAsync(CloudEvent cloudEvent)
+        {
+            var cloudEventType = cloudEvent.Type;
+            _logger.LogInformation($"Dispatching CloudEvent of type {cloudEventType}");
+            switch (cloudEventType)
+            {
+                {% for id, message in messagegroup.messages.items() -%}
+                {%- set pascal_message_name = message.id | strip_dots | pascal -%}
+                {%- set message_body_type = util.body_type(project_name, root, message) %}
+                case "{{ message.id }}":
+                    if ({{ pascal_message_name }}Async != null)
+                    {
+                        var tasks = new List<Task>();
+                        foreach (var handler in {{ pascal_message_name }}Async.GetInvocationList())
+                        {
+                            tasks.Add((Task)(handler.DynamicInvoke(
+                                cloudEvent,
+                                {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType))));
+                        }
+                        await Task.WhenAll(tasks);
+                    }
+                    return true;
+                {% endfor %}
+                default:
+                    return false;
+            }
+        }
+        {%- endif %}
+
+        {%- if uses_amqp_message %}
+        private async Task DispatchMessageAsync(Message amqpMessage)
+        {
+            var messageSubject = amqpMessage.ApplicationProperties["subject"]?.ToString();
+            _logger.LogInformation($"Dispatching message with subject {messageSubject}");
+            switch (messageSubject)
+            {
+                {% for id, message in messagegroup.messages.items() -%}
+                {%- set pascal_message_name = message.id | strip_dots | pascal -%}
+                {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                case "{{ message.id }}":
+                    if ({{ pascal_message_name }}Async != null)
+                    {
+                        var tasks = new List<Task>();
+                        foreach (var handler in {{ pascal_message_name }}Async.GetInvocationList())
+                        {
+                            tasks.Add((Task)(handler.DynamicInvoke(
+                                amqpMessage,
+                                {{ message_body_type }}.FromData(amqpMessage.Body, amqpMessage.Properties.ContentType))));
+                        }
+                        await Task.WhenAll(tasks);
+                    }
+                    return;
+                {% endfor %}
+                default:
+                    if (UnhandledMessageAsync != null)
+                    {
+                        await UnhandledMessageAsync(amqpMessage);
+                    }
+                    break;
+            }
+        }
+        {%- endif %}
+
+        internal override async Task<bool> ProcessMessageAsync(Message message)
+        {
+            try
+            {
+                {%- if uses_cloudevents_message %}
+                if (IsCloudEvent(message))
+                {
+                    var cloudEvent = CloudEventFromMessage(message);
+                    await DispatchCloudEventAsync(cloudEvent);
+                    return true;
+                }
+                {%- endif %}
+                {% if uses_amqp_message %}
+                await DispatchMessageAsync(message);
+                {%- endif %}
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing message");
+                await ProcessErrorAsync(ex);
+                return false;
+            }
+        }
+
+        public void Dispose()
+        {
+            _endpoint.Dispose();
+        }
+
+        {%- if root.endpoints -%}
+        {%- for endpoint_key in root.endpoints.keys() -%}
+        {%- set endpoint = root.endpoints[endpoint_key] -%}
+        {%- if endpoint.usage == "consumer" -%}
+        {%- set protocol = endpoint.config.protocol | lower -%}
+        {%- set options = endpoint.config.options -%}
+        {%- set endpoints = endpoint.config.endpoints %}
+        {%- set isCloudEvent = endpoint.format and endpoint.format.lower().startswith("cloudevents") -%}
+        {%- set isAmqp = endpoint.binding and endpoint.binding.lower().startswith("amqp") %}
+
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger<{{ class_name }}> logger, EndpointCredential credential
+        {%- if uses_cloudevents_message %}, {{ cloudEvents.DeclareDispatchObjectsArgs(project_name, messagegroups, true) }} {%- endif %}
+        {%- if uses_amqp_message %}, {{ amqp.DeclareDispatchObjectsArgs(project_name, messagegroups, true) }} {%- endif %})
+        {
+            var options = new Dictionary<string, string>
+            {
+                {%- for key, value in options.items() %}
+                { "{{ key }}", "{{ value }}" }{%- if not loop.last %}, {% endif %}
+                {%- endfor %}
+            };
+
+            var endpoints = new List<Uri>
+            {
+                {%- for epo in endpoints %}
+                new Uri("{{ epo.uri }}"){%- if not loop.last %}, {% endif %}
+                {%- endfor %}
+            };
+
+            var endpoint = new AmqpConsumer(logger, credential, options, endpoints);
+            return new {{ class_name }}(endpoint, logger);
+        }
+        {%- endif %}
+        {%- endfor %}
+        {%- endif %}
+    }
+    {% endfor %}
+}

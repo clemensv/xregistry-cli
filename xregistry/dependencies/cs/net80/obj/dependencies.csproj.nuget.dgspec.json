@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj": {}
+    "C:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj": {}
   },
   "projects": {
-    "c:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj": {
+    "C:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj",
+        "projectUniqueName": "C:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj",
         "projectName": "dependencies",
-        "projectPath": "c:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj",
+        "projectPath": "C:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj",
         "packagesPath": "C:\\Users\\clemensv\\.nuget\\packages\\",
-        "outputPath": "c:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\obj\\",
+        "outputPath": "C:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -153,6 +153,10 @@
             "Testcontainers": {
               "target": "Package",
               "version": "[3.8.0, )"
+            },
+            "Testcontainers.ActiveMq": {
+              "target": "Package",
+              "version": "[3.9.0, )"
             },
             "Testcontainers.Azurite": {
               "target": "Package",

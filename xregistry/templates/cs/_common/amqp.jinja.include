@@ -224,3 +224,86 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {%- endfor -%}
 {%- endif -%}
 {%- endmacro -%}
+
+{%- macro CloudEventsMethods() -%}
+private static string[] ceAttribs = { "specversion", "dataschema", "time", "source", "subject", "type", "id" };
+protected const string amqpCloudEventPrefix1 = "cloudEvents_";
+protected const string amqpCloudEventPrefix2 = "cloudEvents:";
+protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
+protected static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
+protected static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
+
+protected string? GetCloudEventAttribute(Message amqpMessage, string key)
+{
+    if (amqpMessage.ApplicationProperties.Map.TryGetValue(amqpCloudEventPrefix1 + key, out var value) ||
+        amqpMessage.ApplicationProperties.Map.TryGetValue(amqpCloudEventPrefix2 + key, out value))
+    {
+        return value as string;
+    }
+    return null;
+}
+
+protected CloudEvent CloudEventFromMessage(Message amqpMessage)
+{
+    CloudEventFormatter? formatter = null;
+    var contentType = amqpMessage.Properties.ContentType?.ToString().Split(';')[0];
+    if (contentType != null && contentType.StartsWith("application/cloudevents"))
+    {
+        formatter = contentType.EndsWith("+proto") ? protoFormatter :
+                    contentType.EndsWith("+avro") ? avroFormatter : jsonFormatter;
+         if (amqpMessage.Body is Amqp.Framing.Data bytes)
+         {
+            return formatter.DecodeStructuredModeMessage(bytes.Binary, new System.Net.Mime.ContentType(contentType), null);
+         }
+         else
+         {
+            throw new Exception("Unsupported CloudEvent body type: " + amqpMessage.Body.GetType().Name);
+         }
+    }
+    else
+    {
+        var bytes = amqpMessage.Body as Amqp.Framing.Data;
+        if ( bytes == null )
+        {
+            throw new Exception("Unsupported CloudEvent body type: " + amqpMessage.Body.GetType().Name);
+        }
+        var cloudEvent = new CloudEvent()
+        {
+            Data = bytes,
+            DataContentType = contentType,
+        };
+        string? specVersion = GetCloudEventAttribute(amqpMessage, "specversion");
+        if (specVersion != "1.0") throw new Exception("Unsupported CloudEvent specversion: " + specVersion);
+        string? dataSchema = GetCloudEventAttribute(amqpMessage, "dataschema");
+        string? time = GetCloudEventAttribute(amqpMessage, "time");
+        string? source = GetCloudEventAttribute(amqpMessage, "source");
+        string? subject = GetCloudEventAttribute(amqpMessage, "subject");
+        string? type = GetCloudEventAttribute(amqpMessage, "type");
+        string? id = GetCloudEventAttribute(amqpMessage, "id");
+        if (dataSchema != null) cloudEvent.DataSchema = new Uri(dataSchema);
+        if (time != null) cloudEvent.Time = DateTime.Parse(time);
+        if (source != null) cloudEvent.Source = new Uri(source);
+        if (subject != null) cloudEvent.Subject = subject;
+        if (type != null) cloudEvent.Type = type;
+        if (id != null) cloudEvent.Id = id;
+        foreach (var key in amqpMessage.ApplicationProperties.Map.Keys)
+        {
+            if (key.ToString().StartsWith(amqpCloudEventPrefix1) || key.ToString().StartsWith(amqpCloudEventPrefix2))
+            {
+                var attributeName = key.ToString().Substring(amqpCloudEventPrefix1.Length);
+                if (ceAttribs.Any(a => a == attributeName))
+                {
+                    continue;
+                }
+                cloudEvent[attributeName] = amqpMessage.ApplicationProperties.Map[key] as string;
+            }
+        }
+        return cloudEvent;
+    }
+}
+
+public static bool IsCloudEvent(Message amqpMessage) =>
+    MimeUtilities.IsCloudEventsContentType(amqpMessage.Properties.ContentType) ||
+    amqpMessage.ApplicationProperties.Map.ContainsKey(amqpCloudEventPrefix1) ||
+    amqpMessage.ApplicationProperties.Map.ContainsKey(amqpCloudEventPrefix2);
+{%- endmacro -%}

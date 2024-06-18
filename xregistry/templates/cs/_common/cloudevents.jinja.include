@@ -13,8 +13,8 @@ true
 {%- endmacro %}
 
 {%- macro CloudEventsUsings() %}
-using CloudEvents;
 using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.Core;
 using CloudNative.CloudEvents.SystemTextJson;
 using CloudNative.CloudEvents.Protobuf;
 using CloudNative.CloudEvents.Amqp;

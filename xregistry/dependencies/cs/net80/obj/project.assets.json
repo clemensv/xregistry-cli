@@ -2209,6 +2209,22 @@
           }
         }
       },
+      "Testcontainers.ActiveMq/3.9.0": {
+        "type": "package",
+        "dependencies": {
+          "Testcontainers": "3.9.0"
+        },
+        "compile": {
+          "lib/net8.0/Testcontainers.ActiveMq.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/Testcontainers.ActiveMq.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Testcontainers.Azurite/3.8.0": {
         "type": "package",
         "dependencies": {
@@ -6066,6 +6082,29 @@
         "testcontainers.nuspec"
       ]
     },
+    "Testcontainers.ActiveMq/3.9.0": {
+      "sha512": "egw6z/h9Wo70JtWnqC64/vNA+dSMpJ+BDTPP9eeFsGQGnbvBRJL+QGnGiarRTaIA+WBXh+kKZuTxJuwYqhHjCw==",
+      "type": "package",
+      "path": "testcontainers.activemq/3.9.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE",
+        "README.md",
+        "docs/banner.png",
+        "docs/logo.png",
+        "lib/net6.0/Testcontainers.ActiveMq.dll",
+        "lib/net6.0/Testcontainers.ActiveMq.xml",
+        "lib/net8.0/Testcontainers.ActiveMq.dll",
+        "lib/net8.0/Testcontainers.ActiveMq.xml",
+        "lib/netstandard2.0/Testcontainers.ActiveMq.dll",
+        "lib/netstandard2.0/Testcontainers.ActiveMq.xml",
+        "lib/netstandard2.1/Testcontainers.ActiveMq.dll",
+        "lib/netstandard2.1/Testcontainers.ActiveMq.xml",
+        "testcontainers.activemq.3.9.0.nupkg.sha512",
+        "testcontainers.activemq.nuspec"
+      ]
+    },
     "Testcontainers.Azurite/3.8.0": {
       "sha512": "r8ISavLJ5a+agU/wDHpR4ybCbvZIaKQEcXsSXvot+9TQXZFcRZ0LdbI2t6gjmMkF29IETlEb/Tsf365DOTNACg==",
       "type": "package",
@@ -6293,6 +6332,7 @@
       "Moq >= 4.20.70",
       "System.Memory.Data >= 8.0.0",
       "Testcontainers >= 3.8.0",
+      "Testcontainers.ActiveMq >= 3.9.0",
       "Testcontainers.Azurite >= 3.8.0",
       "Testcontainers.Kafka >= 3.8.0",
       "xunit >= 2.8.1",
@@ -6306,11 +6346,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj",
+      "projectUniqueName": "C:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj",
       "projectName": "dependencies",
-      "projectPath": "c:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj",
+      "projectPath": "C:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\dependencies.csproj",
       "packagesPath": "C:\\Users\\clemensv\\.nuget\\packages\\",
-      "outputPath": "c:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\obj\\",
+      "outputPath": "C:\\git\\cedisco-codegen\\xregistry\\dependencies\\cs\\net80\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -6453,6 +6493,10 @@
             "target": "Package",
             "version": "[3.8.0, )"
           },
+          "Testcontainers.ActiveMq": {
+            "target": "Package",
+            "version": "[3.9.0, )"
+          },
           "Testcontainers.Azurite": {
             "target": "Package",
             "version": "[3.8.0, )"
@@ -6491,5 +6535,16 @@
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.300/PortableRuntimeIdentifierGraph.json"
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1605",
+      "level": "Error",
+      "message": "Warning As Error: Detected package downgrade: Testcontainers from 3.9.0 to 3.8.0. Reference the package directly from the project to select a different version. \r\n dependencies -> Testcontainers.ActiveMq 3.9.0 -> Testcontainers (>= 3.9.0) \r\n dependencies -> Testcontainers (>= 3.8.0)",
+      "libraryId": "Testcontainers",
+      "targetGraphs": [
+        "net8.0"
+      ]
+    }
+  ]
 }

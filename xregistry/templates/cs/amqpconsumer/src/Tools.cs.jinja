@@ -1,0 +1,98 @@
+{%- import "util.jinja.include" as util -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{{ util.CommonFileHeader() }}
+
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+#nullable enable
+
+using System;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Amqp;
+
+{%- if uses_cloudevents_message %}
+{{ cloudEvents.CloudEventsUsings() }}
+{%- endif %}
+
+namespace {{ project_name | pascal }}
+{
+    namespace Tools
+    {
+        public abstract class DispatcherBase
+        {
+            protected readonly ILogger _logger;             
+            public event Func<Exception, Task>? ErrorAsync;
+
+            protected DispatcherBase(ILoggerFactory loggerFactory)
+            {
+                _logger = loggerFactory != null ? loggerFactory.CreateLogger(GetType()) : new LoggerFactory().CreateLogger(GetType());
+            }
+
+            /// <summary>
+            /// Processes a message from the AMQP endpoint
+            /// </summary>
+            internal abstract Task<bool> ProcessMessageAsync(Message message);
+            
+            internal virtual Task ProcessErrorAsync(Exception error)
+            {
+                if (ErrorAsync != null)
+                {
+                    return Task.WhenAll(Array.ConvertAll(ErrorAsync.GetInvocationList(), e => (Task)(e.DynamicInvoke(error)??Task.CompletedTask)));
+                }
+                return Task.CompletedTask;
+            }
+            {%- if uses_cloudevents_message %}
+            {{ amqp.CloudEventsMethods() | indent(12) }}
+            {%- endif %}
+        }
+    
+        public static class {{ project_name | pascal }}ProcessorExtensions
+        {
+            private static readonly Dictionary<AmqpConsumer, List<DispatcherBase>> Dispatchers = new Dictionary<AmqpConsumer, List<DispatcherBase>>();
+
+            public static void Attach(this AmqpConsumer consumer, DispatcherBase dispatcher)
+            {
+                if (!Dispatchers.ContainsKey(consumer))
+                {
+                    Dispatchers[consumer] = new List<DispatcherBase>();
+                    consumer.DispatchMessageAsync += async (message, logger) => await ProcessMessageAsync(consumer, message);
+                }
+                Dispatchers[consumer].Add(dispatcher);
+            }
+
+            public static void Detach(this AmqpConsumer consumer, DispatcherBase dispatcher)
+            {
+                if (Dispatchers.ContainsKey(consumer))
+                {
+                    Dispatchers[consumer].Remove(dispatcher);
+                    if (Dispatchers[consumer].Count == 0)
+                    {
+                        Dispatchers.Remove(consumer);
+                    }
+                }
+            }
+
+            private static async Task ProcessMessageAsync(AmqpConsumer consumer, Message message)
+            {
+                foreach (var dispatcher in Dispatchers[consumer])
+                {
+                    if (await dispatcher.ProcessMessageAsync(message))
+                    {
+                        return;
+                    }
+                }
+            }
+
+            private static async Task ProcessErrorAsync(AmqpConsumer consumer, Exception error)
+            {
+                foreach (var dispatcher in Dispatchers[consumer])
+                {
+                    await dispatcher.ProcessErrorAsync(error);
+                }
+            }
+        }
+    }
+}
