@@ -10,7 +10,7 @@ Dispatcher module for processing events from Azure Event Hubs.
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_amqp_message = (root | exists( "binding", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
-{%- set function_name = project_name | pascal -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
 import asyncio
 from typing import Awaitable, Callable
 from azure.eventhub import EventData

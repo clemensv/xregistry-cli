@@ -246,7 +246,7 @@ namespace {{ project_name | pascal }}
     /// <summary>
     /// Extensions for the MqttSubscriber class to attach and detach dispatchers.
     /// </summary>
-    public static class {{ project_name | pascal }}SubscriberExtensions
+    public static class {{ project_name | pascal | strip_dots }}SubscriberExtensions
     {
         private static readonly Dictionary<MqttSubscriber, List<{{ dispatcherBase }}>> Dispatchers =
             new Dictionary<MqttSubscriber, List<{{ dispatcherBase }}>>();

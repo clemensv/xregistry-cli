@@ -6,6 +6,7 @@ import os
 import subprocess
 import shutil
 import time
+import tempfile
 
 import pytest
 
@@ -14,17 +15,19 @@ project_root = os.path.abspath(
 sys.path.append(os.path.join(project_root))
 
 
-@pytest.mark.skip(reason="temporarily disabled")
 def test_codegen_cs():
+    """    
+    This does a basic test of the code generation for all the styles in the cs template.    
+    """
     input_dir = os.path.join(
         project_root, 'xregistry/templates/cs'.replace('/', os.path.sep))
     # loop through all dirs in the input directory that have no leading underscore in their name
     for dir_name in os.listdir(input_dir):
-        if os.path.exists(os.path.join(project_root, f'tmp/test/cs/{dir_name}/'.replace('/', os.path.sep))):
+        if os.path.exists(os.path.join(tempfile.gettempdir(), f'tmp/test/cs/{dir_name}/'.replace('/', os.path.sep))):
             shutil.rmtree(os.path.join(
-                project_root, f'tmp/test/cs/{dir_name}/'.replace('/', os.path.sep)), ignore_errors=True)
+                tempfile.gettempdir(), f'tmp/test/cs/{dir_name}/'.replace('/', os.path.sep)), ignore_errors=True)
         output_dir = os.path.join(
-            project_root, f'tmp/test/cs/{dir_name}'.replace('/', os.path.sep))
+            tempfile.gettempdir(), f'tmp/test/cs/{dir_name}'.replace('/', os.path.sep))
         if not dir_name.startswith('_') and os.path.isdir(os.path.join(input_dir, dir_name)):
             # generate the code for each directory
             sys.argv = ['xregistry', 'generate',
@@ -47,11 +50,11 @@ def test_codegen_py():
         project_root, 'xregistry/templates/py'.replace('/', os.path.sep))
     # loop through all dirs in the input directory that have no leading underscore in their name
     for dir_name in os.listdir(input_dir):
-        if os.path.exists(os.path.join(project_root, f'tmp/test/py/{dir_name}/'.replace('/', os.path.sep))):
+        if os.path.exists(os.path.join(tempfile.gettempdir(), f'tmp/test/py/{dir_name}/'.replace('/', os.path.sep))):
             shutil.rmtree(os.path.join(
-                project_root, f'tmp/test/py/{dir_name}/'.replace('/', os.path.sep)), ignore_errors=True)
+                tempfile.gettempdir(), f'tmp/test/py/{dir_name}/'.replace('/', os.path.sep)), ignore_errors=True)
         output_dir = os.path.join(
-            project_root, f'tmp/test/py/{dir_name}'.replace('/', os.path.sep))
+            tempfile.gettempdir(), f'tmp/test/py/{dir_name}'.replace('/', os.path.sep))
         if not dir_name.startswith('_') and os.path.isdir(os.path.join(input_dir, dir_name)):
             # generate the code for each directory
             sys.argv = ['xregistry', 'generate',
@@ -64,6 +67,7 @@ def test_codegen_py():
             assert xregistry.cli() == 0
 
 
+@pytest.mark.skip(reason="temporarily disabled")
 def test_codegen_java():
     # check whether maven is installed
     if subprocess.check_call("mvn -v", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True) != 0:

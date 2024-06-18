@@ -1,6 +1,6 @@
 {%- set messagegroups = root.messagegroups -%}
-{%- set function_name = project_name | pascal -%}
-{%- set function_class_name = function_name + "Function" -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
+{%- set function_class_name = (project_name | pascal)+"."+((project_name | pascal | strip_namespace)+"Function") -%}
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "eventhubs.jinja.include" as eventhubs -%}
 {%- import "util.jinja.include" as util -%}
@@ -21,23 +21,25 @@ using NUnit.Framework;
 namespace {{ project_name | pascal }}.Tests
 {
     [TestFixture]
-    public class {{ function_class_name  }}Tests
+    public class {{ function_class_name | strip_dots }}Tests
     {
-        private {{ function_class_name }} _{{ function_class_name | camel }};
+        {%- set function_class_field = "_"+(function_class_name | pascal | strip_dots | camel) %}
+        {%- set function_class_ref = "global::"+ function_class_name %}
+        private {{ function_class_ref }} {{ function_class_field }};
         private Mock<ILoggerFactory> loggerFactoryMock;
-        private Mock<ILogger<{{ function_class_name }}>> loggerMock;
+        private Mock<ILogger<{{ function_class_ref }}>> loggerMock;
         {{ cloudEvents.DeclareDispatchObjectMocks( project_name, messagegroups ) | indent(8) }}
 
         [SetUp]
         public void Setup()
         {
             loggerFactoryMock = new Mock<ILoggerFactory>();
-            loggerMock = new Mock<ILogger<{{ function_class_name }}>>();
-            loggerFactoryMock.Setup(x => x.CreateLogger(typeof({{ function_class_name }}).FullName)).Returns(loggerMock.Object);
+            loggerMock = new Mock<ILogger<{{ function_class_ref }}>>();
+            loggerFactoryMock.Setup(x => x.CreateLogger(typeof({{ function_class_ref }}).FullName)).Returns(loggerMock.Object);
             {{ cloudEvents.SetupDispatchObjectMocks( project_name, messagegroups ) | indent(12) }}
             
 
-            _{{ function_class_name | camel }} = new {{ function_class_name }}(
+            {{ function_class_field }} = new {{ function_class_ref }}(
                 loggerFactoryMock.Object,
                 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
                 _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Object{% if not loop.last %},
@@ -52,7 +54,7 @@ namespace {{ project_name | pascal }}.Tests
             var events = new EventData[0];
 
             // Act
-            await _{{ function_class_name | camel }}.Run(events, loggerMock.Object);
+            await {{ function_class_field }}.Run(events, loggerMock.Object);
 
             // Assert
             {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
@@ -87,7 +89,7 @@ namespace {{ project_name | pascal }}.Tests
             eventData.Properties.Add("cloudEvents_type", "{{ message.id }}");
             eventData.ContentType = "application/json";
             var events = new[] { eventData };
-            await _{{ function_class_name | camel }}.Run(events, loggerMock.Object);
+            await {{ function_class_field }}.Run(events, loggerMock.Object);
             _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Verify(
                 x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type if message_body_type != "byte[]" else "BinaryData" }}>()),
                 Times.Once

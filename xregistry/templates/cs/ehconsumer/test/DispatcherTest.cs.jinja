@@ -39,7 +39,7 @@ using {{ project_name | pascal }}.{{ pascal_group_name | pascal  }};
 
 namespace {{ project_name | pascal }}.Test
 {
-    public class {{ project_name | pascal }}Fixture : IAsyncLifetime
+    public class {{ project_name | pascal | strip_dots}}Fixture : IAsyncLifetime
     {
         public AzuriteContainer? AzuriteContainer { get; protected set; }
         public IContainer? EmulatorContainer { get; protected set; }
@@ -81,13 +81,13 @@ namespace {{ project_name | pascal }}.Test
                       }
                     }";
 
-        public {{ project_name | pascal }}Fixture()
+        public {{ project_name | pascal | strip_dots}}Fixture()
         {
             _loggerFactory = LoggerFactory.Create(builder =>
             {
                 builder.AddDebug().AddConsole();
             });
-            _logger = _loggerFactory.CreateLogger<{{ project_name | pascal }}Fixture>();
+            _logger = _loggerFactory.CreateLogger<{{ project_name | pascal | strip_dots}}Fixture>();
         }
 
         public async Task InitializeAsync()
@@ -173,7 +173,7 @@ namespace {{ project_name | pascal }}.Test
     }
 
     [CollectionDefinition("EventHubs emulator")]
-    public class {{ project_name | pascal }}CollectionFixture : ICollectionFixture<{{ project_name | pascal }}Fixture>
+    public class {{ project_name | pascal | strip_dots}}CollectionFixture : ICollectionFixture<{{ project_name | pascal | strip_dots}}Fixture>
     {
     }
 
@@ -184,10 +184,10 @@ namespace {{ project_name | pascal }}.Test
     [Collection("EventHubs emulator")]
     public class {{ test_class_name }}
     {
-        private readonly {{ project_name | pascal }}Fixture _fixture;
+        private readonly {{ project_name | pascal | strip_dots}}Fixture _fixture;
         private readonly ILogger _logger;
 
-        public {{ test_class_name }}({{ project_name | pascal }}Fixture fixture)
+        public {{ test_class_name }}({{ project_name | pascal | strip_dots}}Fixture fixture)
         {
             _fixture = fixture;
             _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();

@@ -2,7 +2,7 @@
 {%- import "util.jinja.include" as util -%}
 {{ util.CommonFileHeader() }}
 {%- set messagegroups = root.messagegroups -%}
-{%- set function_name = project_name | pascal -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
 using Azure.Messaging;
 using System.Collections.Generic;
 using System.Threading.Tasks;

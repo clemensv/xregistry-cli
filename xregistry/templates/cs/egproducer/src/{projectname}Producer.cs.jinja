@@ -96,7 +96,7 @@ namespace {{ project_name | pascal }}
         /// </summary>
         {%- endif %}
         public async Task Send{{ pascal_message_name | strip_namespace }}Async(
-        {{ util.body_type(project_name, root, message) }} data,
+        {{ util.body_type(project_name, root, message) }} data
         {{- cloudEvents.DeclareUriTemplateArguments(message) -}},
         string contentType = System.Net.Mime.MediaTypeNames.Application.Json)
         {

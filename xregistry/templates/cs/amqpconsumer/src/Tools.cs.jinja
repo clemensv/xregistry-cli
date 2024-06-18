@@ -49,7 +49,7 @@ namespace {{ project_name | pascal }}
             {%- endif %}
         }
     
-        public static class {{ project_name | pascal }}ProcessorExtensions
+        public static class ProcessorExtensions
         {
             private static readonly Dictionary<AmqpConsumer, List<DispatcherBase>> Dispatchers = new Dictionary<AmqpConsumer, List<DispatcherBase>>();
 

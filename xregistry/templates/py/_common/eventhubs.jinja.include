@@ -163,7 +163,7 @@ if func:
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
-{%- set function_name = project_name | pascal %}
+{%- set function_name = project_name | pascal | strip_dots %}
 import asyncio
 from azure.eventhub import EventData
 {% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}

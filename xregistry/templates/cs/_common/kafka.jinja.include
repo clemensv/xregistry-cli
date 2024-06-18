@@ -185,7 +185,7 @@ switch (messageSubject)
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "kafka" ) %}
-{%- set function_name = project_name | pascal %}
+{%- set function_name = project_name | pascal | strip_dots %}
 using System.Threading.Tasks;
 using Confluent.Kafka;
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}

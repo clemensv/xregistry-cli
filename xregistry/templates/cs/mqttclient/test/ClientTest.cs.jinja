@@ -35,7 +35,7 @@ using CloudNative.CloudEvents.SystemTextJson;
 
 namespace {{ project_name | pascal }}.Test
 {
-    public class {{ project_name | pascal }}Fixture : IAsyncLifetime
+    public class {{ project_name | pascal | strip_dots}}Fixture : IAsyncLifetime
     {
         public IContainer? MosquittoContainerInstance { get; protected set; }
         public string? MosquittoBrokerHost { get; protected set; }
@@ -56,13 +56,13 @@ namespace {{ project_name | pascal }}.Test
             }
         }
 
-        public {{ project_name | pascal }}Fixture()
+        public {{ project_name | pascal | strip_dots}}Fixture()
         {
             _loggerFactory = LoggerFactory.Create(builder =>
             {
                 builder.AddDebug().AddConsole();
             });
-            _logger = _loggerFactory.CreateLogger<{{ project_name | pascal }}Fixture>();
+            _logger = _loggerFactory.CreateLogger<{{ project_name | pascal | strip_dots}}Fixture>();
         }
 
         private string? mosquittoConfigFilePath = null;
@@ -128,7 +128,7 @@ namespace {{ project_name | pascal }}.Test
     }
 
     [CollectionDefinition("MQTT broker")]
-    public class {{ project_name | pascal }}CollectionFixture : ICollectionFixture<{{ project_name | pascal }}Fixture>
+    public class {{ project_name | pascal | strip_dots}}CollectionFixture : ICollectionFixture<{{ project_name | pascal | strip_dots}}Fixture>
     {
     }
 
@@ -141,13 +141,13 @@ namespace {{ project_name | pascal }}.Test
     [Collection("MQTT broker")]
     public class {{ producer_test_class_name }} 
     {
-        private readonly {{ project_name | pascal }}Fixture _fixture;
+        private readonly {{ project_name | pascal | strip_dots}}Fixture _fixture;
         private readonly ILogger _logger;
         private readonly {{ producer_class_name }} _producer;
         private readonly {{ dispatcher_class_name }} _dispatcher;
         private readonly MqttSubscriber _subscriber;
 
-        public {{ producer_test_class_name }}({{ project_name | pascal }}Fixture fixture)
+        public {{ producer_test_class_name }}({{ project_name | pascal | strip_dots }}Fixture fixture)
         {
             _fixture = fixture;
             _logger = _fixture.GetLoggerFactory().CreateLogger<{{ producer_test_class_name }}>();

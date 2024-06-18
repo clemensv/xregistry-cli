@@ -6,7 +6,7 @@
 {%- set uses_cloudevents_message = cloudEvents.usesCloudEvents(root) %}
 {%- set uses_amqp_message = amqp.usesAmqpBinding(root) %}
 {%- set uses_amqp_endpoint = amqp.usesAmqpEndpoint(root) %}
-{%- set function_name = project_name | pascal -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -24,7 +24,7 @@ namespace {{ project_name | pascal }}
     {% for messagegroup_key, messagegroup in messagegroups.items() -%}
     {%- set pascalGroupName = messagegroup.id | pascal -%}
     {%- set class_name = (pascalGroupName | strip_namespace) + "EventConsumer" %}
-    public class {{ class_name }} : {{project_name | pascal}}.Tools.DispatcherBase
+    public class {{ class_name }} : {{project_name | pascal }}.Tools.DispatcherBase
     {
         private readonly AmqpConsumer _endpoint;
 
@@ -70,9 +70,13 @@ namespace {{ project_name | pascal }}
                         var tasks = new List<Task>();
                         foreach (var handler in {{ pascal_message_name }}Async.GetInvocationList())
                         {
+                            {%- if message_body_type != "byte[]" -%}
                             tasks.Add((Task)(handler.DynamicInvoke(
                                 cloudEvent,
                                 {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType))));
+                            {%- else -%}
+                            tasks.Add((Task)(handler.DynamicInvoke(cloudEvent, cloudEvent.Data)));
+                            {%- endif -%}
                         }
                         await Task.WhenAll(tasks);
                     }
@@ -100,9 +104,13 @@ namespace {{ project_name | pascal }}
                         var tasks = new List<Task>();
                         foreach (var handler in {{ pascal_message_name }}Async.GetInvocationList())
                         {
+                            {%- if message_body_type != "byte[]" -%}
                             tasks.Add((Task)(handler.DynamicInvoke(
                                 amqpMessage,
                                 {{ message_body_type }}.FromData(amqpMessage.Body, amqpMessage.Properties.ContentType))));
+                            {%- else -%}
+                            tasks.Add((Task)(handler.DynamicInvoke(amqpMessage, amqpMessage.Body)));
+                            {%- endif -%}
                         }
                         await Task.WhenAll(tasks);
                     }
@@ -158,9 +166,7 @@ namespace {{ project_name | pascal }}
         {%- set isCloudEvent = endpoint.format and endpoint.format.lower().startswith("cloudevents") -%}
         {%- set isAmqp = endpoint.binding and endpoint.binding.lower().startswith("amqp") %}
 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger<{{ class_name }}> logger, EndpointCredential credential
-        {%- if uses_cloudevents_message %}, {{ cloudEvents.DeclareDispatchObjectsArgs(project_name, messagegroups, true) }} {%- endif %}
-        {%- if uses_amqp_message %}, {{ amqp.DeclareDispatchObjectsArgs(project_name, messagegroups, true) }} {%- endif %})
+        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(EndpointCredential credential, ILoggerFactory? loggerFactory)
         {
             var options = new Dictionary<string, string>
             {
@@ -176,8 +182,8 @@ namespace {{ project_name | pascal }}
                 {%- endfor %}
             };
 
-            var endpoint = new AmqpConsumer(logger, credential, options, endpoints);
-            return new {{ class_name }}(endpoint, logger);
+            var endpoint = new AmqpConsumer(credential, endpoints.FirstOrDefault(), options, loggerFactory);
+            return new {{ class_name }}(endpoint, loggerFactory);
         }
         {%- endif %}
         {%- endfor %}

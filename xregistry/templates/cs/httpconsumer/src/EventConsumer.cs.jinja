@@ -4,7 +4,7 @@
 
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set function_name = project_name | pascal -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;

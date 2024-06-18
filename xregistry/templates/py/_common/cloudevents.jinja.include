@@ -129,7 +129,7 @@ if func:
 {%- macro DeclareDispatchInterfaces(project_name, root, use_azure_messaging=False) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("format", "cloudevents" ) %}
-{%- set function_name = project_name | pascal -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
 import asyncio
 {%- if use_azure_messaging %}
 from azure.eventhub import EventData

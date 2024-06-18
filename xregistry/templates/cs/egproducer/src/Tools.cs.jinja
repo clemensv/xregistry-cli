@@ -37,10 +37,10 @@ namespace {{ project_name | pascal }}
                 CloudEventsMode.Binary => null,
                 CloudEventsMode.StructuredJson => new JsonEventFormatter(),
                 CloudEventsMode.StructuredProto => new ProtobufEventFormatter(),
-                CloudEventsMode.StructuredAvro => new AvroEventFormatter(),
+                CloudEventsMode.StructuredAvro => new global::CloudNative.CloudEvents.Avro.AvroEventFormatter(),
                 CloudEventsMode.StructuredJsonGzip => new JsonEventFormatter(),  // Assuming JsonEventFormatter handles gzip
                 CloudEventsMode.StructuredProtoGzip => new ProtobufEventFormatter(),  // Assuming ProtobufEventFormatter handles gzip
-                CloudEventsMode.StructuredAvroGzip => new AvroEventFormatter(),  // Assuming AvroEventFormatter handles gzip
+                CloudEventsMode.StructuredAvroGzip => new global::CloudNative.CloudEvents.Avro.AvroEventFormatter(),  // Assuming AvroEventFormatter handles gzip
                 _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
             };
         }

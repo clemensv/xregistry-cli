@@ -165,7 +165,7 @@ namespace {{ project_name | pascal }}
     {% endfor %}
 
     {% set dispatcherBase = "global::"+( project_name | pascal )+".Tools.DispatcherBase" %}
-    public static class {{ project_name | pascal }}ProcessorExtensions
+    public static class {{ project_name | pascal | strip_dots}}ProcessorExtensions
     {
         private static readonly Dictionary<KafkaProcessor<byte[], byte[]>, List<{{ dispatcherBase }}>> Dispatchers =
             new Dictionary<KafkaProcessor<byte[], byte[]>, List<{{ dispatcherBase }}>>();

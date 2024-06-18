@@ -6,10 +6,10 @@ from xregistry.cli import logger
 class ContextStacksManager:
     """Manager for handling context stacks and dictionaries."""
 
-    def __init__(self) -> None:
+    def __init__(self, current_dir: str) -> None:
         self.context_stacks: Dict[str, List[Any]] = {}
         self.context_dict: Dict[str, Any] = {}
-        self.current_dir: str = ""
+        self.current_dir: str = current_dir
         logger.debug("Initialized ContextManager")
 
     def push(self, value: Any, stack_name: str) -> str:

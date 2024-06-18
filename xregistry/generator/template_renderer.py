@@ -61,6 +61,8 @@ class TemplateRenderer:
 
         self.template_args["project_data_dir"] = project_data_dir
         self.template_args["project_dir"] = project_dir
+        
+        self.ctx.set_current_dir(project_dir)
 
         pt = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
         code_template_dir = os.path.join(pt, "templates", self.language, self.style)

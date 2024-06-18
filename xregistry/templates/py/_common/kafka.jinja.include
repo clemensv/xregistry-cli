@@ -160,7 +160,7 @@ if func:
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "kafka" ) %}
-{%- set function_name = project_name | pascal %}
+{%- set function_name = project_name | pascal | strip_dots %}
 import asyncio
 from confluent_kafka import Message
 {% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}

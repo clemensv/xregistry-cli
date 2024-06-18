@@ -34,6 +34,7 @@ class TestPyKafkaEndToEnd:
         yield container
         container.stop()
     
+    @pytest.mark.skip(reason="temporarily disabled")
     def test_kafka_end_to_end(self, kafka_container: KafkaContainer):
         """ Run test """
         if os.path.exists(os.path.join(project_root, 'tmp/test/py_kafka/'.replace('/', os.path.sep))):

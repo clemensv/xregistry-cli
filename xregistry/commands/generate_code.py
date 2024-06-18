@@ -25,14 +25,13 @@ def generate_code(args: Any) -> int:
             key, value = arg.split("=", 1)
             template_args[key] = value
 
-    generator_context = GeneratorContext()
+    generator_context = GeneratorContext(args.output_dir)
 
     for _ in range(0, 2):
         SchemaUtils.schema_files_collected = set()
         generator_context.loader.reset_schemas_handled()
         SchemaUtils.schema_references_collected = set()
         generator_context.loader.set_current_url(None)
-        context_manager = ContextStacksManager()
 
         try:
             if validate(args.definitions_file, headers, False) != 0:
@@ -53,8 +52,8 @@ def generate_code(args: Any) -> int:
                 )
                 renderer.generate()
 
-            if context_manager.stack("files"):
-                for file, content in context_manager.stack("files"):
+            if generator_context.stacks.stack("files"):
+                for file, content in generator_context.stacks.stack("files"):
                     with open(file, "w", encoding='utf-8') as f:
                         f.write(content)
 
