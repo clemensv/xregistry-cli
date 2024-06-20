@@ -5,7 +5,6 @@
 from typing import Any, Dict, List, Union
 from xregistry.cli import logger
 from xregistry.generator.generator_context import GeneratorContext
-from xregistry.generator.context_stacks_manager import ContextStacksManager
 from xregistry.generator.schema_utils import SchemaUtils
 from xregistry.generator.template_renderer import TemplateRenderer
 from .validate_definitions import validate

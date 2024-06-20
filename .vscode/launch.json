@@ -15,7 +15,7 @@
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\compact\\cloudevent-avro-embedded.json --projectname Sample --language cs --style ehproducer --output c:\\temp\\outp\\cs12"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\fabrikam-motorsports.xreg.json --projectname Sample --language cs --style ehconsumer --output c:\\temp\\outp\\cs13"
       //"args": "generate --projectname ContosoErp --definitions C:\\git\\cedisco-codegen\\test\\xreg\\contoso-erp.xreg.json --output c:\\temp\\contoso\\ehazfn --style ehazfn --language cs"
-      "args": "generate --projectname ContosoErp --definitions C:\\git\\cedisco-codegen\\test\\xreg\\lightbulb-amqp.xreg.json --output c:\\temp\\lbamqp1 --style amqpconsumer --language cs"
+      "args": "generate --projectname Lightbulb --definitions C:\\git\\cedisco-codegen\\test\\xreg\\lightbulb.xreg.json --output c:\\users\\clemensv\\demo\\pyehc --style ehconsumer --language py"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\separate-schema\\cloudevent-avro-separate.json --projectname Sample --language cs --style amqpproducer --output c:\\temp\\outp\\cs1"
       //"args": "generate --style ehproducer --language cs --definitions C:\\temp\\kusto\\avro-avsc.xreg.json  --projectname Test --output c:\\temp\\outp\\SoccerTest"
       //"args": "generate --style kafkaproducer --language py --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\lightbulb.xreg.json  --projectname lightbulb-py-producer --output c:\\temp\\lightbulb-py-prod"

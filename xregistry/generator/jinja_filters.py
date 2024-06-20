@@ -147,6 +147,38 @@ class JinjaFilters:
         return camels
 
     @staticmethod
+    def dotdash(string: str) -> str:
+        """Replace dots with dashes in a string."""
+        logger.debug("Converting string: %s to dot-dash notation", string)
+        if not string:
+            return string
+        return string.replace('.', '-')
+    
+    @staticmethod
+    def dashdot(string: str) -> str:
+        """Replaces dashes with dots in a string."""
+        logger.debug("Converting string: %s to dash-dot notation", string)
+        if not string:
+            return string
+        return string.replace('-', '.')
+    
+    @staticmethod
+    def dotunderscore(string: str) -> str:
+        """Replace dots with underscores in a string."""
+        logger.debug("Converting string: %s to dot-underscore notation", string)
+        if not string:
+            return string
+        return string.replace('.', '_')
+    
+    @staticmethod
+    def underscoredot(string: str) -> str:
+        """Replace underscores with dots in a string."""
+        logger.debug("Converting string: %s to underscore-dot notation", string)
+        if not string:
+            return string
+        return string.replace('_', '.')
+    
+    @staticmethod
     def pad(string: str, length: int) -> str:
         """Left-justify pad a string with spaces to the specified length."""
         logger.debug("Padding string: %s to length: %d", string, length)

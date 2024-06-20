@@ -1,0 +1,7 @@
+.PHONY: build install
+
+build:
+{{'\t'}}@python scripts/build.py
+
+install:
+{{'\t'}}poetry install --only main -C {{ main_project_name }}

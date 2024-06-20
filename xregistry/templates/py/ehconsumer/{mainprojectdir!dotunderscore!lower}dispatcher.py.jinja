@@ -1,4 +1,3 @@
-
 """
 Dispatcher module for processing events from Azure Event Hubs.
 """
@@ -11,11 +10,13 @@ Dispatcher module for processing events from Azure Event Hubs.
 {%- set uses_plain_amqp_message = (root | exists( "binding", "amqp" )) %}
 {%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
+
 import asyncio
-from typing import Awaitable, Callable
-from azure.eventhub import EventData
+from typing import Awaitable, Callable, Iterable, cast
+from azure.eventhub.amqp import AmqpMessageBodyType
 from azure.eventhub.aio import EventHubConsumerClient
-from azure.storage.blob.aio import BlobServiceClient
+from azure.eventhub import EventData, PartitionContext
+from azure.eventhub.extensions.checkpointstoreblobaio import BlobCheckpointStore
 from cloudevents.http import from_http, CloudEvent
 
 {%- set messagegroups = root.messagegroups %}
@@ -24,7 +25,7 @@ from cloudevents.http import from_http, CloudEvent
 {%- set messagegroup = messagegroups[messagegroup_key] -%}
 {%- for id in messagegroup.messages -%}
 {%- set definition = messagegroup.messages[id] %}
-{%- set type_name = util.DeclareDataType( '', root, definition ) %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, definition ) %}
 {%- if type_name != "object" %}
 {%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
 {%- if import_statement not in imports %}
@@ -43,7 +44,22 @@ class DispatcherBase:
     AMQP_CLOUDEVENT_PREFIX2 = "cloudEvents:"
 
     @staticmethod
-    def _get_cloud_event_attribute(event_data, key):
+    def _strkey(key: str | bytes) -> str:
+        """
+        Converts a key to a string.
+
+        Args:
+            key: The key to convert.
+
+        Returns:
+            The key as a string.
+        """
+        if isinstance(key, bytes):
+            return key.decode('utf-8')
+        return key
+
+    @staticmethod
+    def _get_cloud_event_attribute(event_data: EventData, key: str):
         """
         Retrieves a CloudEvent attribute from the event data.
 
@@ -53,11 +69,13 @@ class DispatcherBase:
 
         Returns:
             The attribute value or None if not found.
-        """
-        return event_data.properties.get(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1 + key) or event_data.properties.get(DispatcherBase.AMQP_CLOUDEVENT_PREFIX2 + key)
+        """        
+        
+        return event_data.properties.get((DispatcherBase.AMQP_CLOUDEVENT_PREFIX1 + key).encode('utf-8')) or \
+               event_data.properties.get((DispatcherBase.AMQP_CLOUDEVENT_PREFIX2 + key).encode('utf-8'))
 
     @staticmethod
-    def _is_cloud_event(event_data):
+    def _is_cloud_event(event_data: EventData):
         """
         Checks if the event data is a CloudEvent.
 
@@ -68,10 +86,10 @@ class DispatcherBase:
             True if the event data is a CloudEvent, False otherwise.
         """
         return event_data.content_type and 'application/cloudevents' in event_data.content_type or \
-               any(key.startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1) or key.startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX2) for key in event_data.properties)
+               any(DispatcherBase._strkey(key).startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1) or DispatcherBase._strkey(key).startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX2) for key in event_data.properties)
 
     @staticmethod
-    def _cloud_event_from_event_data(event_data):
+    def _cloud_event_from_event_data(event_data: EventData):
         """
         Converts event data to a CloudEvent.
 
@@ -82,12 +100,50 @@ class DispatcherBase:
             A CloudEvent object.
         """
         headers = {
-            "Content-Type": event_data.content_type
+            "datacontenttype": event_data.content_type
         }
-        for key, value in event_data.properties.items():
+        for key_, value in event_data.properties.items():
+            key = DispatcherBase._strkey(key_)
             if key.startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1) or key.startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX2):
-                headers[key[len(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1):]] = value
-        return from_http(event_data.body_as_str(), headers)
+                headers[key[len(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1):]] = DispatcherBase._strkey(value)
+        
+        if event_data.body_type == AmqpMessageBodyType.DATA:
+            if isinstance(event_data.body, Iterable):
+                return CloudEvent(attributes=headers, data=b''.join(event_data.body))
+            else:
+                return CloudEvent(attributes=headers, data=cast(bytes,event_data.body))
+        elif event_data.body_type == AmqpMessageBodyType.VALUE:
+            return CloudEvent(attributes=headers, data=event_data.body)
+        else:
+            raise NotImplementedError("CloudEvent with Sequence or Value body type is not supported")
+        
+
+class EventProcessorRunner:
+    def __init__(self, client, dispatcher):
+        self.client = client
+        self.dispatcher = dispatcher
+        self.receive_task = None
+
+    async def __aenter__(self):
+        await self.start()
+        
+    async def start(self):
+        self.receive_task = asyncio.create_task(
+            self.client.receive(on_event=self.dispatcher._process_event, starting_position="-1")
+        )
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.cancel()
+
+    async def cancel(self):
+        if self.receive_task:
+            self.receive_task.cancel()
+            try:
+                await self.receive_task
+            except asyncio.CancelledError:
+                pass
+        await self.client.close()
 
 {% for messagegroup_key, messagegroup in messagegroups.items() %}
 {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
@@ -99,9 +155,6 @@ class {{ class_name }}(DispatcherBase):
     """
     Dispatcher for {{ pascalGroupName }} events.
     """
-    {%- if (messagegroup | exists( "format", "cloudevents" )) %}
-
-    {%- endif %}
     {%- for id, message in messagegroup.messages.items() %}
     {%- set definitionName = message.id | strip_namespace %}
     {%- if message.schemaurl or message.schema %}
@@ -114,29 +167,35 @@ class {{ class_name }}(DispatcherBase):
     {%- endif %}
     {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
     {%- set isAmqp = (message | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
-    {{ definitionName | strip_namespace }}_async: Callable[[EventData, CloudEvent, {{ dataType | strip_namespace }}], Awaitable[None]] = lambda event, cloud_event,  {{ dataType | strip_namespace }}: None
+    {{ definitionName | strip_namespace }}_async: Callable[[PartitionContext, EventData, CloudEvent, {{ dataType | strip_namespace }}], Awaitable[None]] = lambda event, cloud_event,  {{ dataType | strip_namespace }}: Awaitable[None]
 
     {%- endfor %}
 
-    async def process_event(self, event):
+    async def _process_event(self, partition_context, event):
         """
         Processes an incoming event.
 
         Args:
+            partition_context: The partition context.
             event: The event data to process.
         """
         if self._is_cloud_event(event):
             cloud_event = self._cloud_event_from_event_data(event)
-            await self._dispatch_cloud_event(event, cloud_event)
+            await self._dispatch_cloud_event(partition_context, event, cloud_event)
             return
         if event:
-            await self._dispatch_event_data(event)
+            await self._dispatch_event_data(partition_context, event)
 
-    async def dispatch_cloud_event(self, event, cloud_event):
+        # Update the checkpoint so that the program doesn't read the events
+        # that it has already read when you run it next time.
+        await partition_context.update_checkpoint(event)
+
+    async def _dispatch_cloud_event(self, partition_context, event, cloud_event):
         """
         Dispatches a CloudEvent to the appropriate handler.
 
         Args:
+            partition_context: The partition context.
             event: The original event data.
             cloud_event: The CloudEvent object.
         """
@@ -150,7 +209,7 @@ class {{ class_name }}(DispatcherBase):
             {%- else %}
             {%- set dataType = "object" %}
             {%- endif %}
-            "{{ message.id }}": lambda: self.{{ definitionName | strip_namespace }}_async(event, cloud_event,
+            "{{ message.id }}": lambda: self.{{ definitionName | strip_namespace }}_async(partition_context, event, cloud_event,
             {%- if dataType != "object" %}
                 {{ dataType | strip_namespace }}.from_data(cloud_event.data, cloud_event["datacontenttype"])
             {%- else %}
@@ -165,11 +224,12 @@ class {{ class_name }}(DispatcherBase):
         if func:
             await func()
 
-    async def dispatch_event_data(self, event):
+    async def _dispatch_event_data(self, partition_context, event):
         """
         Dispatches an AMQP event to the appropriate handler.
 
         Args:
+            partition_context: The partition context.
             event: The event data to dispatch.
         """
         message_subject = event.raw_amqp_message.properties.subject
@@ -182,7 +242,7 @@ class {{ class_name }}(DispatcherBase):
             {%- else %}
             {%- set dataType = "object" %}
             {%- endif %}
-            "{{ message.id }}": lambda: self.{{ definitionName | strip_namespace }}_async(event,
+            "{{ message.id }}": lambda: self.{{ definitionName | strip_namespace }}_async(partition_context, event,
             {%- if isCloudEvent %}None, {%- endif %}
             {%- if dataType != "object" %}
             {{ dataType }}.from_data(event.body_as_str(), event.content_type)
@@ -198,8 +258,7 @@ class {{ class_name }}(DispatcherBase):
         if func:
             await func()
 
-    @staticmethod
-    def create_event_processor_client(consumer_group_name, connection_str, blob_conn_str, checkpoint_container, dispatcher):
+    def create_processor_from_connection_strings(self, consumer_group_name:str, connection_str:str, eventhub_name:str, blob_conn_str:str, checkpoint_container:str) -> EventProcessorRunner:
         """
         Creates an EventProcessorClient.
 
@@ -208,21 +267,55 @@ class {{ class_name }}(DispatcherBase):
             connection_str: The connection string for the Event Hub.
             blob_conn_str: The connection string for the Blob Storage.
             checkpoint_container: The container name for checkpoints.
-            dispatcher: The dispatcher instance to handle events.
 
         Returns:
-            An EventHubConsumerClient instance.
+            An EventProcessorRunner instance.
         """
-        blob_service_client = BlobServiceClient.from_connection_string(blob_conn_str)
-        container_client = blob_service_client.get_container_client(checkpoint_container)
+        checkpoint_store = BlobCheckpointStore.from_connection_string(
+            blob_conn_str, checkpoint_container
+        )
+
+        # Create a consumer client for the event hub.
         client = EventHubConsumerClient.from_connection_string(
             connection_str,
-            consumer_group_name,
-            eventhub_name=dispatcher,
-            checkpoint_store=container_client
+            consumer_group=consumer_group_name,
+            eventhub_name=eventhub_name,
+            checkpoint_store=checkpoint_store,
         )
-        client.receive(on_event=dispatcher.process_event)
-        return client
+        # Create and start the receive loop task
+        return EventProcessorRunner(client, self)
+
+    def create_processor(self, consumer_group_name:str, eventhubs_fully_qualified_namespace:str, eventhub_name:str, blob_account_url:str, blob_container_name:str, credential) -> EventProcessorRunner:
+        """
+        Creates an EventProcessorClient.
+
+        Args:
+            consumer_group_name: The consumer group name.
+            eventhubs_endpoint: The Event Hubs endpoint.
+            eventhub_name: The Event Hub name.
+            blob_storage_endpoint: The Blob Storage endpoint.
+            blob_container_name: The container name for checkpoints.
+            credential: The credential to use for authentication.
+
+        Returns:
+            An EventProcessorRunner instance.
+        """
+        checkpoint_store = BlobCheckpointStore(
+            blob_account_url=blob_account_url,
+            container_name=blob_container_name,
+            credential=credential,
+        )
+        # Create a consumer client for the event hub.
+        client = EventHubConsumerClient(
+            fully_qualified_namespace=eventhubs_fully_qualified_namespace,
+            eventhub_name=eventhub_name,
+            consumer_group=consumer_group_name,
+            checkpoint_store=checkpoint_store,
+            credential=credential
+        )
+        return EventProcessorRunner(client, self)
+
+    
 
 {% endfor %}
 
@@ -282,8 +375,8 @@ await asyncio.gather(*tasks)
         fully_qualified_namespace=fully_qualified_namespace,
         eventhub_name=eventhub_name
     )
-    client.receive(on_event=lambda event: {{ MessageGroupHooks("event") }})
-    return client
+    receive_task = asyncio.create_task(client.receive(on_event=lambda event: {{ MessageGroupHooks("event") }}, starting_position="-1"))
+    return EventProcessorRunner(client, receive_task)
 {%- endmacro %}
 
 class {{ class_name }}EventProcessorFactory:
@@ -292,7 +385,7 @@ class {{ class_name }}EventProcessorFactory:
     """
 
     @staticmethod
-    def create_event_processor_client_for_{{ endpoint_key | pascal | strip_namespace }}(consumer_group_name, connection_str, blob_conn_str, checkpoint_container, {{ MessageGroupArgs() }}):
+    async def create_event_processor_client_for_{{ endpoint_key | pascal | strip_namespace }}(consumer_group_name, connection_str, blob_conn_str, checkpoint_container, {{ MessageGroupArgs() }}):
         """
         Creates an EventProcessorClient for {{ endpoint_key }}.
 
@@ -304,9 +397,9 @@ class {{ class_name }}EventProcessorFactory:
             {{ MessageGroupArgs() }}: Dispatchers for message groups.
 
         Returns:
-            An EventHubConsumerClient instance.
+            An EventProcessorRunner instance.
         """
-        return {{ createforbody(class_name, endpoints, options) }}
+        return await {{ createforbody(class_name, endpoints, options) }}
 
 {%- endif %}
 {%- endif %}
