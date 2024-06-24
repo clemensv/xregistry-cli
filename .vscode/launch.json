@@ -6,7 +6,7 @@
   "configurations": [
     {
       "name": "Python: Code Generator C# EH",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",

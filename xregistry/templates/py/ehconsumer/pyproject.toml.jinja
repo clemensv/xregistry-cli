@@ -4,10 +4,10 @@ description = "A Kafka event consumer using CloudEvents"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
 version = "0.1.0"  # Placeholder version, dynamic versioning can be handled with plugins
-packages = [{include = "{{main_project_name}}"}]
+packages = [{include = "{{main_project_name}}", from = "src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.11"
+python = "<4.0,>=3.11"
 {{data_project_name|replace("_","-")}} = { path = "../{{data_project_name}}", develop = true }
 azure-eventhub = ">=5.12.1"
 azure-storage-blob = ">=12.20.0"

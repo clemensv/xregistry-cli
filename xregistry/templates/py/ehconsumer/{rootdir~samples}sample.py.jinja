@@ -1,0 +1,135 @@
+{%- set messagegroups = root.messagegroups %}
+"""
+
+{%- filter wordwrap(80) %}
+This is sample code to consume events from Azure Event Hubs with the
+dispatcher client{%- if messagegroups|length > 1 -%}s{% endif %} contained in this project.
+
+There is a handler for each defined event type. The handler is a function that takes the following parameters:
+- partition_context: The context of the partition.
+- event: The event data.
+- cloud_event: The CloudEvent data.
+- event_data: The event data.
+
+Handlers are registered with the dispatcher client{%- if messagegroups|length > 1 -%} associated with their respective message group{% endif %}. A "dispatcher" is a class that inspects incoming events and routes them to the appropriate handler based on the event type.
+
+{%- if messagegroups|length == 1 -%}
+The main function creates a dispatcher client and registers the handlers for the events in the message group. Then it creates an event processor and starts it.
+
+The event processor will call the appropriate handler for each event received.
+{%- else -%}
+The main function creates a dispatcher client for each message group and registers the handlers for the events in the message group. Then it creates an event processor and adds the dispatcher clients to it.
+
+The event processor will call the appropriate handler for each event received.
+{%- endif %}
+
+This sample uses "passwordless" mode for authentication via the DefaultAzureCredential class, which means that the credential is automatically selected based on the environment. For more information, see https://aka.ms/azsdk/python/identity/defaultazurecredential.
+
+The script either reads the configuration from the command line or uses the environment variables. The following environment variables are recognized:
+
+- CONSUMER_GROUP_NAME: The EventHub consumer group name.
+- FULLY_QUALIFIED_NAMESPACE: The fully qualified EventHub namespace.
+- EVENTHUB_NAME: The EventHub name.
+- BLOB_ACCOUNT_URL: The Blob account URL.
+- CHECKPOINT_CONTAINER: The Blob container name.
+
+Alternatively, you can pass the configuration as command-line arguments.
+
+python sample.py --consumer-group <consumer_group_name> --fully-qualified-namespace <fully_qualified_namespace> --eventhub-name <eventhub_name> --blob-account-url <blob_account_url> --checkpoint-container <checkpoint_container>
+
+The main function waits for a signal (Press Ctrl+C) to stop the event processor.
+{%- endfilter %}
+"""
+
+import argparse
+import asyncio
+import os
+import signal
+from azure.identity.aio import DefaultAzureCredential
+
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+from {{main_project_name}}.dispatcher import {{class_name}}
+{%- for id, message in messagegroup.messages.items() %}
+
+async def handle_{{ message.id | dotunderscore | snake }}(partition_context, event, cloud_event, {{ message.id | dotunderscore | snake }}_event_data):
+    """ Handles the {{ message.id }} event """
+    print(f"{{ message.id }}: { {{- message.id | dotunderscore | snake -}}_event_data.asdict()}")
+    await partition_context.update_checkpoint(event)
+{%- endfor %}
+{%- endfor %}
+
+async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, blob_account_url, checkpoint_container):
+    """ Main function to consume events from Azure EventHub """
+    {%- if messagegroups|length == 1 -%}
+    {%- set messagegroups = root.messagegroups %}
+    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    {%- set pascalGroupName = messagegroup.id | pascal %}
+    {%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+    dispatcher = {{ class_name }}()
+    {%- for id, message in messagegroup.messages.items() %}
+    dispatcher.{{ message.id | dotunderscore | snake }}_async = handle_{{ message.id | dotunderscore | snake }}
+    {%- endfor %}
+    {%- endfor %}
+    async with dispatcher.create_processor(
+            consumer_group_name,
+            fully_qualified_namespace,
+            eventhub_name,
+            blob_account_url,
+            checkpoint_container,
+            DefaultAzureCredential(),
+        ) as processor_runner:
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+            loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+            await stop_event.wait()
+    {%- else -%}
+    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    {%- set pascalGroupName = messagegroup.id | pascal %}
+    {%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+    {{messagegroup.id | dotunderscore | snake}}_dispatcher = {{ class_name }}()
+    {%- for id, message in messagegroup.messages.items() %}
+    {{messagegroup.id | dotunderscore | snake}}_dispatcher.{{ message.id | dotunderscore | snake }}_async = {{ message.id | dotunderscore | snake }}_event
+    {%- endfor %}
+    {%- endfor %}
+    event_processor = EventStreamProcessor.create(
+        consumer_group_name,
+        fully_qualified_namespace,
+        eventhub_name,
+        blob_account_url,
+        checkpoint_container,
+        DefaultAzureCredential(),
+    )
+    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    {%- set pascalGroupName = messagegroup.id | pascal %}
+    {%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+    event_processor.add_dispatcher({{messagegroup.id | dotunderscore | snake}}_dispatcher)
+    {%- endfor %}
+    async with event_processor:
+        stop_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+        loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+        await stop_event.wait()
+    {%- endif %}
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Azure EventHub Consumer")
+    parser.add_argument('--consumer-group', default=os.getenv('CONSUMER_GROUP_NAME', 'your_consumer_group'), help='EventHub consumer group name', required=True)
+    parser.add_argument('--fully-qualified-namespace', default=os.getenv('FULLY_QUALIFIED_NAMESPACE', 'your_fully_qualified_namespace'), help='The fully qualified EventHub namespace', required=True)
+    parser.add_argument('--eventhub-name', default=os.getenv('EVENTHUB_NAME', 'your_eventhub_name'), help='The EventHub name', required=True)
+    parser.add_argument('--blob-account-url', default=os.getenv('BLOB_ACCOUNT_URL', 'your_blob_account_url'), help='The Blob account URL', required=True)
+    parser.add_argument('--checkpoint-container', default=os.getenv('CHECKPOINT_CONTAINER', 'your_checkpoint_container'), help='The Blob container name', required=True)
+
+    args = parser.parse_args()
+
+    asyncio.run(main(
+        args.consumer_group,
+        args.fully_qualified_namespace,
+        args.eventhub_name,
+        args.blob_account_url,
+        args.checkpoint_container
+    ))

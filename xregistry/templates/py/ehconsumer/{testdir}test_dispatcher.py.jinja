@@ -13,8 +13,9 @@ import logging
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}')))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/tests')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}/src')))
 
 import tempfile
 import pytest
@@ -26,7 +27,14 @@ from testcontainers.core.network import Network
 from testcontainers.azurite import AzuriteContainer
 from testcontainers.core.waiting_utils import wait_for_logs
 
-from {{ main_project_name }}.dispatcher import LumenEventDispatcher
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+from {{main_project_name}}.dispatcher import {{class_name}}
+{%- for id, message in messagegroup.messages.items() %}
+from test_{{ data_project_name | dotunderscore}}_{{ message.id | dotunderscore | lower}}eventdata import Test_{{ message.id | pascal | strip_namespace }}EventData
+{%- endfor %}
+{%- endfor %}
 
 @pytest.fixture(scope="module")
 async def event_hub_emulator():
@@ -76,7 +84,7 @@ async def event_hub_emulator():
             config_file.flush()
             config_file.close()
             config_file_path = config_file.name
-            
+
             try:
                 with DockerContainer("mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest") \
                         .with_volume_mapping(config_file_path, "/Eventhubs_Emulator/ConfigFiles/Config.json") \
@@ -93,7 +101,7 @@ async def event_hub_emulator():
                         print(stdoutlog)
                         print(stderrlog)
                         raise e
-                        
+
                     event_hub_connection_str = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;EntityPath=eh1;"
                     blob_storage_connection_str = azurite_container.get_connection_string()
 
@@ -106,7 +114,7 @@ async def event_hub_emulator():
                     }
             finally:
                 os.unlink(config_file_path)
-                
+
 {%- for messagegroup_key, messagegroup in messagegroups.items() %}
 {%- set pascalGroupName = messagegroup.id | pascal %}
 {%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
@@ -126,7 +134,7 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
         azure_logger = logging.getLogger('azure')
         azure_logger.setLevel(logging.DEBUG)
         logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
-   
+
     async for emulator in event_hub_emulator:
         event_hub_conn_str = emulator["event_hub_connection_str"]
         blob_storage_conn_str = emulator["blob_storage_connection_str"]
@@ -134,19 +142,23 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
         dispatcher = {{ class_name }}()
 
         future = asyncio.Future()
-        dispatcher.{{ message_id }}_async = lambda *args, **kwargs: future.set_result(None)
+        async def set_future(_cx, _e, _ce, data):
+            future.set_result(data)
+
+        dispatcher.{{ message_id | dotunderscore | snake }}_async = set_future
 
         async with BlobServiceClientAsync.from_connection_string(blob_storage_conn_str) as blob_service_client:
             container_client = blob_service_client.get_container_client("eventhub-checkpoints")
             await container_client.create_container()
+            await blob_service_client.close()
 
         async with dispatcher.create_processor_from_connection_strings(
             "$Default", event_hub_conn_str, "eh1", 
             blob_storage_conn_str, "eventhub-checkpoints") as processor:
-            
+
             producer = EventHubProducerClient.from_connection_string(event_hub_conn_str, eventhub_name="eh1")
             event_data_batch = await producer.create_batch()
-            event_data = EventData('{"data": "test"}')
+            event_data = EventData(Test_{{ message.id | pascal | strip_namespace }}EventData.create_instance().to_byte_array("application/json"))
             event_data.content_type = "application/json"
             event_data.properties = {
                 "cloudEvents_type": "Fabrikam.Lumen.TurnedOn",
@@ -156,8 +168,8 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
             }
             event_data_batch.add(event_data)
             await producer.send_batch(event_data_batch)
-
             await asyncio.wait_for(future, timeout=5)
+            await producer.close()
 
 {% endfor %}
 {% endfor %}

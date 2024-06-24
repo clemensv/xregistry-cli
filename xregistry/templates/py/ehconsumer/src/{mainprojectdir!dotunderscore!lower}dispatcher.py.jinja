@@ -12,7 +12,7 @@ Dispatcher module for processing events from Azure Event Hubs.
 {%- set function_name = project_name | pascal | strip_dots -%}
 
 import asyncio
-from typing import Awaitable, Callable, Iterable, cast
+from typing import Awaitable, Callable, Iterable, List, cast
 from azure.eventhub.amqp import AmqpMessageBodyType
 from azure.eventhub.aio import EventHubConsumerClient
 from azure.eventhub import EventData, PartitionContext
@@ -36,7 +36,7 @@ from cloudevents.http import from_http, CloudEvent
 {%- endfor %}
 {%- endfor %}
 
-class DispatcherBase:
+class _DispatcherBase:
     """
     Base class for dispatching events. Handles CloudEvent detection and conversion.
     """
@@ -58,6 +58,10 @@ class DispatcherBase:
             return key.decode('utf-8')
         return key
 
+    async def _unhandled_event(self, _cx, _e, _ce, de ):
+        """ Default event handler """
+        await asyncio.sleep(0)
+
     @staticmethod
     def _get_cloud_event_attribute(event_data: EventData, key: str):
         """
@@ -69,10 +73,10 @@ class DispatcherBase:
 
         Returns:
             The attribute value or None if not found.
-        """        
-        
-        return event_data.properties.get((DispatcherBase.AMQP_CLOUDEVENT_PREFIX1 + key).encode('utf-8')) or \
-               event_data.properties.get((DispatcherBase.AMQP_CLOUDEVENT_PREFIX2 + key).encode('utf-8'))
+        """
+
+        return event_data.properties.get((_DispatcherBase.AMQP_CLOUDEVENT_PREFIX1 + key).encode('utf-8')) or \
+               event_data.properties.get((_DispatcherBase.AMQP_CLOUDEVENT_PREFIX2 + key).encode('utf-8'))
 
     @staticmethod
     def _is_cloud_event(event_data: EventData):
@@ -86,7 +90,7 @@ class DispatcherBase:
             True if the event data is a CloudEvent, False otherwise.
         """
         return event_data.content_type and 'application/cloudevents' in event_data.content_type or \
-               any(DispatcherBase._strkey(key).startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1) or DispatcherBase._strkey(key).startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX2) for key in event_data.properties)
+               any(_DispatcherBase._strkey(key).startswith(_DispatcherBase.AMQP_CLOUDEVENT_PREFIX1) or _DispatcherBase._strkey(key).startswith(_DispatcherBase.AMQP_CLOUDEVENT_PREFIX2) for key in event_data.properties)
 
     @staticmethod
     def _cloud_event_from_event_data(event_data: EventData):
@@ -103,10 +107,10 @@ class DispatcherBase:
             "datacontenttype": event_data.content_type
         }
         for key_, value in event_data.properties.items():
-            key = DispatcherBase._strkey(key_)
-            if key.startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1) or key.startswith(DispatcherBase.AMQP_CLOUDEVENT_PREFIX2):
-                headers[key[len(DispatcherBase.AMQP_CLOUDEVENT_PREFIX1):]] = DispatcherBase._strkey(value)
-        
+            key = _DispatcherBase._strkey(key_)
+            if key.startswith(_DispatcherBase.AMQP_CLOUDEVENT_PREFIX1) or key.startswith(_DispatcherBase.AMQP_CLOUDEVENT_PREFIX2):
+                headers[key[len(_DispatcherBase.AMQP_CLOUDEVENT_PREFIX1):]] = _DispatcherBase._strkey(value)
+
         if event_data.body_type == AmqpMessageBodyType.DATA:
             if isinstance(event_data.body, Iterable):
                 return CloudEvent(attributes=headers, data=b''.join(event_data.body))
@@ -116,27 +120,46 @@ class DispatcherBase:
             return CloudEvent(attributes=headers, data=event_data.body)
         else:
             raise NotImplementedError("CloudEvent with Sequence or Value body type is not supported")
-        
+
 
 class EventProcessorRunner:
-    def __init__(self, client, dispatcher):
+    """ Event Processor Runner """
+    def __init__(self, client: EventHubConsumerClient):
         self.client = client
-        self.dispatcher = dispatcher
+        self.dispatchers: List[_DispatcherBase] = []
         self.receive_task = None
 
     async def __aenter__(self):
+        """ Enter the context """
         await self.start()
-        
+
+    def add_dispatcher(self, dispatcher: _DispatcherBase):
+        """ Add a dispatcher to the runner """
+        self.dispatchers.append(dispatcher)
+
+    def remove_dispatcher(self, dispatcher: _DispatcherBase):
+        """ Remove a dispatcher from the runner """
+        self.dispatchers.remove(dispatcher)
+
+    async def _process_event(self, partition_context, event):
+        """ Process an event """
+        for dispatcher in iter(self.dispatchers):
+            await dispatcher._process_event(partition_context, event)
+
     async def start(self):
+        """ Start the event processor """
+        # pylint: disable=protected-access
         self.receive_task = asyncio.create_task(
-            self.client.receive(on_event=self.dispatcher._process_event, starting_position="-1")
+            self.client.receive(on_event=self._process_event, starting_position="-1")
         )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """ Exit the context """
         await self.cancel()
 
     async def cancel(self):
+        """ Cancel the event processor """
         if self.receive_task:
             self.receive_task.cancel()
             try:
@@ -145,120 +168,8 @@ class EventProcessorRunner:
                 pass
         await self.client.close()
 
-{% for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
-{%- set uses_plain_amqp_message = (messagegroup | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_namespace )+"EventDispatcher" %}
-
-class {{ class_name }}(DispatcherBase):
-    """
-    Dispatcher for {{ pascalGroupName }} events.
-    """
-    {%- for id, message in messagegroup.messages.items() %}
-    {%- set definitionName = message.id | strip_namespace %}
-    {%- if message.schemaurl or message.schema %}
-    {%- set dataType = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
-    {%- else %}
-    {%- set dataType = "object" %}
-    {%- endif %}
-    {%- if message.description %}
-    # {{ message.description }}
-    {%- endif %}
-    {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
-    {%- set isAmqp = (message | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
-    {{ definitionName | strip_namespace }}_async: Callable[[PartitionContext, EventData, CloudEvent, {{ dataType | strip_namespace }}], Awaitable[None]] = lambda event, cloud_event,  {{ dataType | strip_namespace }}: Awaitable[None]
-
-    {%- endfor %}
-
-    async def _process_event(self, partition_context, event):
-        """
-        Processes an incoming event.
-
-        Args:
-            partition_context: The partition context.
-            event: The event data to process.
-        """
-        if self._is_cloud_event(event):
-            cloud_event = self._cloud_event_from_event_data(event)
-            await self._dispatch_cloud_event(partition_context, event, cloud_event)
-            return
-        if event:
-            await self._dispatch_event_data(partition_context, event)
-
-        # Update the checkpoint so that the program doesn't read the events
-        # that it has already read when you run it next time.
-        await partition_context.update_checkpoint(event)
-
-    async def _dispatch_cloud_event(self, partition_context, event, cloud_event):
-        """
-        Dispatches a CloudEvent to the appropriate handler.
-
-        Args:
-            partition_context: The partition context.
-            event: The original event data.
-            cloud_event: The CloudEvent object.
-        """
-        cloud_event_type = cloud_event['type']
-        switcher = {
-            {%- for id, message in messagegroup.messages.items() %}
-            {%- set definitionName = message.id %}
-            {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
-            {%- if message.schemaurl or message.schema %}
-            {%- set dataType = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
-            {%- else %}
-            {%- set dataType = "object" %}
-            {%- endif %}
-            "{{ message.id }}": lambda: self.{{ definitionName | strip_namespace }}_async(partition_context, event, cloud_event,
-            {%- if dataType != "object" %}
-                {{ dataType | strip_namespace }}.from_data(cloud_event.data, cloud_event["datacontenttype"])
-            {%- else %}
-            cloud_event.data
-            {%- endif %})
-            {%- if not loop.last %}
-            ,
-            {%- endif %}
-            {%- endfor %}
-        }
-        func = switcher.get(cloud_event_type, lambda: None)
-        if func:
-            await func()
-
-    async def _dispatch_event_data(self, partition_context, event):
-        """
-        Dispatches an AMQP event to the appropriate handler.
-
-        Args:
-            partition_context: The partition context.
-            event: The event data to dispatch.
-        """
-        message_subject = event.raw_amqp_message.properties.subject
-        switcher = {
-            {%- for id, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) %}
-            {%- set definitionName = message.id %}
-            {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
-            {%- if message.schemaurl or message.schema %}
-            {%- set dataType = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
-            {%- else %}
-            {%- set dataType = "object" %}
-            {%- endif %}
-            "{{ message.id }}": lambda: self.{{ definitionName | strip_namespace }}_async(partition_context, event,
-            {%- if isCloudEvent %}None, {%- endif %}
-            {%- if dataType != "object" %}
-            {{ dataType }}.from_data(event.body_as_str(), event.content_type)
-            {%- else %}
-            event.body_as_str()
-            {%- endif %})
-            {%- if not loop.last %}
-            ,
-            {%- endif %}
-            {%- endfor %}
-        }
-        func = switcher.get(message_subject, lambda: None)
-        if func:
-            await func()
-
-    def create_processor_from_connection_strings(self, consumer_group_name:str, connection_str:str, eventhub_name:str, blob_conn_str:str, checkpoint_container:str) -> EventProcessorRunner:
+    @classmethod
+    def create_from_connection_strings(cls, consumer_group_name:str, connection_str:str, eventhub_name:str, blob_conn_str:str, checkpoint_container:str) -> 'EventProcessorRunner':
         """
         Creates an EventProcessorClient.
 
@@ -283,9 +194,10 @@ class {{ class_name }}(DispatcherBase):
             checkpoint_store=checkpoint_store,
         )
         # Create and start the receive loop task
-        return EventProcessorRunner(client, self)
+        return cls(client)
 
-    def create_processor(self, consumer_group_name:str, eventhubs_fully_qualified_namespace:str, eventhub_name:str, blob_account_url:str, blob_container_name:str, credential) -> EventProcessorRunner:
+    @classmethod
+    def create(cls, consumer_group_name:str, eventhubs_fully_qualified_namespace:str, eventhub_name:str, blob_account_url:str, blob_container_name:str, credential) -> 'EventProcessorRunner':
         """
         Creates an EventProcessorClient.
 
@@ -313,9 +225,140 @@ class {{ class_name }}(DispatcherBase):
             checkpoint_store=checkpoint_store,
             credential=credential
         )
-        return EventProcessorRunner(client, self)
+        return cls(client)
 
+{% for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
+{%- set uses_plain_amqp_message = (messagegroup | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_namespace )+"EventDispatcher" %}
+
+class {{ class_name }}(_DispatcherBase):
+    """
+    Dispatcher for {{ pascalGroupName }} events.
+    """
+    def __init__(self):
+        {%- for id, message in messagegroup.messages.items() %}
+        {%- set message_id = message.id %}
+        {%- if message.schemaurl or message.schema %}
+        {%- set data_type = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+        {%- else %}
+        {%- set data_type = "object" %}
+        {%- endif %}
+        {%- if message.description %}
+        # {{ message.description }}
+        {%- endif %}
+        {%- set is_cloudevent = (message | exists( "format", "cloudevents" )) %}
+        {%- set isAmqp = (message | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
+        self.{{ message_id | dotunderscore | snake }}_async: Callable[[PartitionContext, EventData, CloudEvent, {{ data_type | strip_namespace }}], Awaitable[None]] = self._unhandled_event
+
+    {%- endfor %}
+
+    async def _process_event(self, partition_context, event):
+        """
+        Processes an incoming event.
+
+        Args:
+            partition_context: The partition context.
+            event: The event data to process.
+        """
+        {%- if uses_cloudevents_message %}
+        if self._is_cloud_event(event):
+            cloud_event = self._cloud_event_from_event_data(event)
+            await self._dispatch_cloud_event(partition_context, event, cloud_event)
+            return
+        {%-endif %}
+        {%- if uses_plain_amqp_message %}
+        if event:
+            await self._dispatch_event_data(partition_context, event)
+        {%- endif %}
+        # Update the checkpoint so that the program doesn't read the events
+        # that it has already read when you run it next time.
+        await partition_context.update_checkpoint(event)
+
+    {%- if uses_cloudevents_message %}
+    async def _dispatch_cloud_event(self, partition_context, event, cloud_event):
+        """
+        Dispatches a CloudEvent to the appropriate handler.
+
+        Args:
+            partition_context: The partition context.
+            event: The original event data.
+            cloud_event: The CloudEvent object.
+        """
+        cloud_event_type = cloud_event['type']
+        switcher = {
+            {%- for id, message in messagegroup.messages.items() %}
+            {%- set message_id = message.id %}
+            {%- set is_cloudevent = (message | exists( "format", "cloudevents" )) %}
+            {%- if message.schemaurl or message.schema %}
+            {%- set data_type = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+            {%- else %}
+            {%- set data_type = "object" %}
+            {%- endif %}
+            "{{ message.id }}": lambda: self.{{ message_id | dotunderscore | snake }}_async(partition_context, event, cloud_event,
+            {%- if data_type != "object" %}
+                {{ data_type | strip_namespace }}.from_data(cloud_event.data, cloud_event["datacontenttype"])
+            {%- else %}
+            cloud_event.data
+            {%- endif %})
+            {%- if not loop.last %}
+            ,
+            {%- endif %}
+            {%- endfor %}
+        }
+        func = switcher.get(cloud_event_type, lambda: None)
+        if func:
+            await func()
+    {%- endif %}
     
+    {%- if uses_plain_amqp_message %}
+    async def _dispatch_event_data(self, partition_context, event):
+        """
+        Dispatches an AMQP event to the appropriate handler.
+
+        Args:
+            partition_context: The partition context.
+            event: The event data to dispatch.
+        """
+        message_subject = event.raw_amqp_message.properties.subject
+        switcher = {
+            {%- for id, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) %}
+            {%- set message_id = message.id %}
+            {%- if message.schemaurl or message.schema %}
+            {%- set data_type = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+            {%- else %}
+            {%- set data_type = "object" %}
+            {%- endif %}
+            "{{ message.id }}": lambda: self.{{ message_id | strip_namespace }}_async(partition_context, event,
+            {%- if data_type != "object" %}
+            {{ data_type }}.from_data(event.body_as_str(), event.content_type)
+            {%- else %}
+            event.body_as_str()
+            {%- endif %})
+            {%- if not loop.last %}
+            ,
+            {%- endif %}
+            {%- endfor %}
+        }
+        func = switcher.get(message_subject, lambda: None)
+        if func:
+            await func()
+    {%- endif %}
+
+    def create_processor(self, consumer_group_name:str, eventhubs_fully_qualified_namespace:str, eventhub_name:str, blob_account_url:str, blob_container_name:str, credential) -> EventProcessorRunner:
+        """ Create an EventProcessorRunner """
+        runner = EventProcessorRunner.create(consumer_group_name, eventhubs_fully_qualified_namespace, eventhub_name, blob_account_url, blob_container_name, credential)
+        runner.add_dispatcher(self)
+        return runner
+
+    def create_processor_from_connection_strings(self, consumer_group_name:str, connection_str:str, eventhub_name:str, blob_conn_str:str, checkpoint_container:str) -> EventProcessorRunner:
+        """ Create an EventProcessorRunner """
+        runner = EventProcessorRunner.create_from_connection_strings(consumer_group_name, connection_str, eventhub_name, blob_conn_str, checkpoint_container)
+        runner.add_dispatcher(self)
+        return runner
+
+
 
 {% endfor %}
 
