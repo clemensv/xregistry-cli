@@ -1,0 +1,10 @@
+.PHONY: build install
+
+build:
+{{'\t'}}@python scripts/build.py
+
+install:
+{{'\t'}}pip install ./{{ main_project_name }}
+
+test: install
+{{'\t'}}pytest ./{{ main_project_name }}/tests ./{{ data_project_name }}/tests

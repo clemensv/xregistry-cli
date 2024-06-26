@@ -1,33 +1,29 @@
-[build-system]
-build-backend = "flit_scm:buildapi"
-requires = ["flit_core>=3.2", "flit_scm", "wheel"]
-
-[project]
-name = "{{project_name}}"
-dynamic = ["version"]
-authors = [
-    { name = "Your Name", email = "your.email@example.com" }
-]
-description = "A Kafka event consumer using CloudEvents"
+[tool.poetry]
+name = "{{main_project_name|replace("_","-")}}"
+description = "{{main_project_name}} Azure Event Hubs consumer library"
+authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
-]
-dependencies = [
-    "azure-eventhub>=5.11.7",
-    "cloudevents>=1.5.0"
-]
+version = "0.1.0"  # Placeholder version, dynamic versioning can be handled with plugins
+packages = [{include = "{{main_project_name}}", from = "src"}]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=6.2",
-    "flake8>=3.9.2",
-    "pylint>=2.8.3",
-    "mypy>=0.812"
-]
+[tool.poetry.dependencies]
+python = "<4.0,>=3.11"
+{{data_project_name|replace("_","-")}} = { path = "../{{data_project_name}}", develop = true }
+azure-eventhub = ">=5.12.1"
+azure-storage-blob = ">=12.20.0"
+azure-eventhub-checkpointstoreblob-aio = ">=1.1.4"
+azure-identity = ">=1.17.0"
+cloudevents = ">=1.10.1"
 
-[tool.setuptools_scm]
-write_to = "{{project_name}}/_version.py"
+[tool.poetry.dev-dependencies]
+pytest = ">=8.2.2"
+flake8 = ">=7.1.0"
+pylint = ">=3.2.3"
+mypy = ">=1.10.0"
+testcontainers = ">=4.5.1"
+pytest-asyncio = ">=0.23.7"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+

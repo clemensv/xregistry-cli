@@ -1,0 +1,137 @@
+{%- set messagegroups = root.messagegroups %}
+"""
+
+{%- filter wordwrap(80) %}
+This is sample code to consume events from Apache Kafka with the
+dispatcher client{%- if messagegroups|length > 1 -%}s{% endif %} contained in this project.
+
+There is a handler for each defined event type. The handler is a function that takes the following parameters:
+- record: The Kafka record.
+- cloud_event: The CloudEvent data.
+- event_data: The event data.
+
+Handlers are registered with the dispatcher client{%- if messagegroups|length > 1 -%} associated with their respective message group{% endif %}. A "dispatcher" is a class that inspects incoming events and routes them to the appropriate handler based on the event type.
+
+{%- if messagegroups|length == 1 -%}
+The main function creates a dispatcher client and registers the handlers for the events in the message group. Then it creates an event processor and starts it.
+
+The event processor will call the appropriate handler for each event received.
+{%- else -%}
+The main function creates a dispatcher client for each message group and registers the handlers for the events in the message group. Then it creates an event processor and adds the dispatcher clients to it.
+
+The event processor will call the appropriate handler for each event received.
+{%- endif %}
+
+This sample uses a Kafka cluster with the necessary topics and configurations. The script reads the configuration from the command line or uses the environment variables. The following environment variables are recognized:
+
+- BOOTSTRAP_SERVERS: The Kafka bootstrap servers.
+- GROUP_ID: The Kafka consumer group ID.
+- TOPICS: The Kafka topics to subscribe to.
+
+Alternatively, you can pass the configuration as command-line arguments.
+
+python sample.py --bootstrap-servers <bootstrap_servers> --group-id <group_id> --topics <topics>
+
+The main function waits for a signal (Press Ctrl+C) to stop the event processor.
+{%- endfilter %}
+"""
+
+import argparse
+import asyncio
+import os
+import signal
+from confluent_kafka import Consumer, KafkaError, KafkaException
+
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+from {{main_project_name}}.dispatcher import {{class_name}}
+{%- for id, message in messagegroup.messages.items() %}
+
+async def handle_{{ message.id | dotunderscore | snake }}(record, cloud_event, {{ message.id | dotunderscore | snake }}_event_data):
+    """ Handles the {{ message.id }} event """
+    print(f"{{ message.id }}: { {{- message.id | dotunderscore | snake -}}_event_data.asdict()}")
+    await some_processing_function(record, cloud_event, {{ message.id | dotunderscore | snake }}_event_data)
+{%- endfor %}
+{%- endfor %}
+
+async def main(bootstrap_servers, group_id, topics):
+    """ Main function to consume events from Kafka """
+    {%- if messagegroups|length == 1 -%}
+    {%- set messagegroups = root.messagegroups %}
+    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    {%- set pascalGroupName = messagegroup.id | pascal %}
+    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+    dispatcher = {{ class_name }}()
+    {%- for id, message in messagegroup.messages.items() %}
+    dispatcher.{{ message.id | dotunderscore | snake }}_async = handle_{{ message.id | dotunderscore | snake }}
+    {%- endfor %}
+    {%- endfor %}
+    consumer = Consumer({
+        'bootstrap.servers': bootstrap_servers,
+        'group.id': group_id,
+        'auto.offset.reset': 'earliest'
+    })
+
+    consumer.subscribe(topics.split(','))
+
+    try:
+        while True:
+            msg = consumer.poll(timeout=1.0)
+            if msg is None:
+                continue
+            if msg.error():
+                if msg.error().code() == KafkaError._PARTITION_EOF:
+                    continue
+                else:
+                    raise KafkaException(msg.error())
+            await dispatcher._process_event(msg)
+    finally:
+        consumer.close()
+    {%- else -%}
+    consumers = []
+    for topic in topics.split(','):
+        consumer = Consumer({
+            'bootstrap.servers': bootstrap_servers,
+            'group.id': group_id,
+            'auto.offset.reset': 'earliest'
+        })
+        consumer.subscribe([topic])
+        consumers.append(consumer)
+
+    try:
+        while True:
+            for consumer in consumers:
+                msg = consumer.poll(timeout=1.0)
+                if msg is None:
+                    continue
+                if msg.error():
+                    if msg.error().code() == KafkaError._PARTITION_EOF:
+                        continue
+                    else:
+                        raise KafkaException(msg.error())
+                {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+                {%- set pascalGroupName = messagegroup.id | pascal %}
+                {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+                {{messagegroup.id | dotunderscore | snake}}_dispatcher = {{ class_name }}()
+                await {{messagegroup.id | dotunderscore | snake}}_dispatcher._process_event(msg)
+                {%- endfor %}
+    finally:
+        for consumer in consumers:
+            consumer.close()
+    {%- endif %}
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Kafka Consumer")
+    parser.add_argument('--bootstrap-servers', default=os.getenv('BOOTSTRAP_SERVERS', 'your_bootstrap_servers'), help='Kafka bootstrap servers', required=True)
+    parser.add_argument('--group-id', default=os.getenv('GROUP_ID', 'your_group_id'), help='Kafka consumer group ID', required=True)
+    parser.add_argument('--topics', default=os.getenv('TOPICS', 'your_topics'), help='Kafka topics to subscribe to', required=True)
+
+    args = parser.parse_args()
+
+    asyncio.run(main(
+        args.bootstrap_servers,
+        args.group_id,
+        args.topics
+    ))

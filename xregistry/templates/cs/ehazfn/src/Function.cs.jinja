@@ -1,0 +1,35 @@
+{%- set messagegroups = root.messagegroups -%}
+{%- set function_name = project_name | pascal -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "eventhubs.jinja.include" as eventhubs -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+using Azure.Messaging.EventHubs;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+
+{{ eventhubs.CloudEventsUsings() }}
+
+namespace {{ project_name | pascal }}
+{
+    {%- set class_name = (project_name | pascal | strip_namespace)+"Function" %}
+    public class {{ class_name }}
+    {
+        ILogger<{{class_name}}> _logger;
+        {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "ILoggerFactory? loggerFactory", "_logger = loggerFactory?.CreateLogger<"+ class_name +">()??new LoggerFactory().CreateLogger<"+ class_name +">();") | indent(8) }}
+        {{ eventhubs.CloudEventsMethods() | indent(8) }}
+
+        public virtual async Task Run(EventData [] events, ILogger log)
+        {
+            foreach(var ev in events)
+            {
+                var cloudEvent = CloudEventFromEventData(ev);
+                {{ cloudEvents.DispatchToDispatchObjects( project_name, data_project_name, root, "cloudEvent", messagegroups, "log" ) | indent(16) }}
+            }
+        }
+    }
+}

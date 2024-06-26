@@ -1,4 +1,6 @@
 {
     "description" : "C# Azure Function with Azure Service Bus trigger",
-    "priority" : 2
+    "priority" : 2,
+    "main_project_name" : "{project_name|pascal}ServiceBusFunction",
+    "data_project_name" : "{project_name|pascal}Data"
 }

@@ -123,7 +123,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(root, message, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(project_name, data_project_name, root, message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
 var messageSubject = {{ message }}.Subject;
 switch (messageSubject)
@@ -137,7 +137,7 @@ switch (messageSubject)
          {
             await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
             {%- if message.schemaurl or message.schema -%}
-            global::{{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Body, {{ message }}.ContentType)
+            global::{{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Body, {{ message }}.ContentType)
             {%- else -%}
             {{ message }}.Data
             {%- endif %});
@@ -153,22 +153,22 @@ switch (messageSubject)
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- macro DeclareDispatchInterfaces(project_name, data_project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
-{%- set function_name = project_name | pascal -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
 {%- set pascalGroupName = messagegroup.id  | pascal %}
 using System.Threading.Tasks;
 
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
    public interface I{{ pascalGroupName | strip_namespace }}ServiceBusDispatcher
    {
       {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
       {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
       {%- if message.schemaurl or message.schema -%}
-      {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
+      {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
       {%- else -%}
       {%- set dataType = "object" -%}
       {%- endif %}
@@ -196,6 +196,7 @@ using AvroEventFormatter = CloudNative.CloudEvents.Avro.AvroEventFormatter;
 {%- endmacro -%}
 
 {%- macro CloudEventsMethods() -%}
+private static string[] ceAttribs = ["specversion", "dataschema", "time", "source", "subject", "type", "id"];
 protected const string amqpCloudEventPrefix1 = "cloudEvents_";
 protected const string amqpCloudEventPrefix2 = "cloudEvents:";
 protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
@@ -248,6 +249,10 @@ protected CloudEvent CloudEventFromServiceBusMessage(ServiceBusReceivedMessage s
             if (key.StartsWith(amqpCloudEventPrefix1) || key.StartsWith(amqpCloudEventPrefix2))
             {
                var attributeName = key.Substring(amqpCloudEventPrefix1.Length);
+               if (ceAttribs.Any(a=>a==attributeName))
+               {
+                  continue;
+               }
                cloudEvent[attributeName] = serviceBusMessage.ApplicationProperties[key] as string;
             }
          }

@@ -1,0 +1,24 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+{%- set messagegroups = root.messagegroups -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
+using Azure.Messaging;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+
+namespace {{ project_name | pascal }}
+{
+    {%- set class_name = (project_name | pascal | strip_dots)+"Base" %}
+    public class {{ class_name }}
+    {
+        {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "", "") | indent(8) }}
+        
+        public async Task Run(CloudEvent cloudEvent, ILogger log)
+        {
+            {{ cloudEvents.DispatchToDispatchObjects( project_name, data_project_name, root, "cloudEvent", messagegroups, "log" ) | indent(12) }}
+        }
+    }
+}

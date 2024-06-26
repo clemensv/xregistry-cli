@@ -1,0 +1,122 @@
+{%- import "util.include.jinja" as util -%}
+# pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, redefined-outer-name, missing-class-docstring
+
+import asyncio
+import logging
+import os
+import sys
+import datetime
+from typing import Optional
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/tests')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}/src')))
+
+import tempfile
+import pytest
+from confluent_kafka import Producer, Consumer, KafkaException, Message
+from confluent_kafka.admin import AdminClient, NewTopic
+from cloudevents.abstract import CloudEvent
+from cloudevents.kafka import from_binary, from_structured, KafkaMessage
+from testcontainers.kafka import KafkaContainer
+
+{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+from {{main_project_name}}.producer import {{class_name}}
+{%- for id, message in messagegroup.messages.items() %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+from test_{{ type_name | dotunderscore | lower}} import Test_{{ type_name | pascal | strip_namespace }}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+@pytest.fixture(scope="module")
+def kafka_emulator():
+    with KafkaContainer() as kafka:
+        admin_client = AdminClient({'bootstrap.servers': kafka.get_bootstrap_server()})
+        topic_list = [
+            NewTopic("test_topic", num_partitions=1, replication_factor=1)
+        ]
+        admin_client.create_topics(topic_list)
+
+        yield {
+            "bootstrap_servers": kafka.get_bootstrap_server(),
+            "topic": "test_topic",
+        }
+
+def parse_cloudevent(msg: Message) -> CloudEvent:
+    headers_dict: Dict[str, bytes] = {header[0]: header[1] for header in msg.headers()}
+    message = KafkaMessage(headers=headers_dict, key=msg.key(), value=msg.value())
+    if message.headers and 'content-type' in message.headers:
+        content_type = message.headers['content-type'].decode()
+        if content_type.startswith('application/cloudevents'):
+            ce = from_structured(message)
+            if 'datacontenttype' not in ce:
+                ce['datacontenttype'] = 'application/json'
+        else:
+            ce = from_binary(message)
+            ce['datacontenttype'] = message.headers['content-type'].decode()
+    else:
+        ce = from_binary(message)
+        ce['datacontenttype'] = 'application/json'
+    return ce
+
+{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+{%- for id, message in messagegroup.messages.items() %}
+{%- set message_id = id | pascal | strip_dots | strip_namespace %}
+{%- set test_function_name = "test_" + pascalGroupName | lower | replace(" ", "_") + "_" + message_id | lower | replace(" ", "_") %}
+
+@pytest.mark.asyncio
+async def {{ test_function_name | dotunderscore }}(kafka_emulator):
+    """Test the {{ message_id }} event from the {{ pascalGroupName }} message group"""
+
+    bootstrap_servers = kafka_emulator["bootstrap_servers"]
+    topic = kafka_emulator["topic"]
+
+    producer = Producer({'bootstrap.servers': bootstrap_servers})
+    consumer = Consumer({
+        'bootstrap.servers': bootstrap_servers,
+        'group.id': 'test_group',
+        'auto.offset.reset': 'earliest'
+    })
+    consumer.subscribe([topic])
+
+    async def on_event():
+        while True:
+            msg = consumer.poll(1.0)
+            if msg is None:
+                continue
+            cloudevent = parse_cloudevent(msg)
+            if cloudevent['type'] == "{{ message.id }}":
+                return True
+
+    kafka_producer = Producer({'bootstrap.servers': bootstrap_servers})
+    producer_instance = {{ class_name }}(kafka_producer, topic, 'binary')
+    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+    {%- if type_name != "object" %}
+    event_data = Test_{{ type_name | pascal | strip_namespace }}.create_instance()
+    {%- else %}
+    event_data = {}
+    {%- endif %}
+    await producer_instance.send_{{ message.id | dotunderscore | snake }}(
+        {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+            _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
+        {%- endfor -%}
+        {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
+        {%- endfor -%}
+        data = event_data
+        {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+            , _{{ attrname }} = ''
+        {%- endfor -%}
+    )
+
+    assert await asyncio.wait_for(on_event(), timeout=10)
+    consumer.close()
+
+{%- endfor %}
+{%- endfor %}

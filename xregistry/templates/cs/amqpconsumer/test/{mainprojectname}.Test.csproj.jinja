@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    {{- dependency( 'cs','net80', 'xunit') }}
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1">
+    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    {{- dependency( 'cs','net80', 'Microsoft.NET.Test.Sdk') }}
+    {{- dependency( 'cs','net80', 'Testcontainers') }}
+    {{- dependency( 'cs','net80', 'Testcontainers.ActiveMq') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Protobuf') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Avro') }}
+    {{- dependency( 'cs','net80', 'AMQPNetLite') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Amqp') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging.Console') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging.Debug') }}
+    {{- dependency( 'cs','net80', 'System.Memory.Data') }}
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\{{ main_project_name | pascal }}.csproj" />
+    <ProjectReference Include="..\..\{{ data_project_name }}\test\{{data_project_name | pascal}}.Test.csproj" />
+  </ItemGroup>
+
+</Project>

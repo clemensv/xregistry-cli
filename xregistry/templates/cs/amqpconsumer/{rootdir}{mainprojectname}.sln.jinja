@@ -1,0 +1,49 @@
+{%- set slnguid = uuid() -%}
+{%- set slnguid2 = uuid() -%}
+{%- set slnguid3 =uuid() -%}
+{%- set slnguid4 = uuid() -%}
+{%- set slnguid5 = uuid() -%}
+{%- set slnguid6 = uuid() -%}
+{%- set slnguid7 = uuid() -%}
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.002.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{ {{-slnguid5-}} }") = "{{main_project_name}}", "{{main_project_name}}\src\{{ main_project_name  | pascal }}.csproj", "{ {{-slnguid3-}} }"
+EndProject
+Project("{ {{-slnguid5-}} }") = "{{main_project_name}}.Test", "{{main_project_name}}\test\{{main_project_name}}.Test.csproj", "{ {{-slnguid4-}} }"
+EndProject
+Project("{ {{-slnguid5-}} }") = "{{ data_project_name }}", "{{ data_project_name }}\src\{{data_project_name | pascal}}.csproj", "{ {{-slnguid6-}} }"
+EndProject
+Project("{ {{-slnguid5-}} }") = "{{ data_project_name | pascal }}.Test", "{{ data_project_name }}\test\{{data_project_name | pascal}}.Test.csproj", "{ {{-slnguid7-}} }"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ {{-slnguid3-}} }.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ {{-slnguid3-}} }.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ {{-slnguid3-}} }.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ {{-slnguid3-}} }.Release|Any CPU.Build.0 = Release|Any CPU
+		{ {{-slnguid4-}} }.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ {{-slnguid4-}} }.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ {{-slnguid4-}} }.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ {{-slnguid4-}} }.Release|Any CPU.Build.0 = Release|Any CPU
+		{ {{-slnguid6-}} }.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ {{-slnguid6-}} }.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ {{-slnguid6-}} }.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ {{-slnguid6-}} }.Release|Any CPU.Build.0 = Release|Any CPU
+		{ {{-slnguid7-}} }.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ {{-slnguid7-}} }.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ {{-slnguid7-}} }.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ {{-slnguid7-}} }.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = { {{- uuid() -}} }
+	EndGlobalSection
+EndGlobal

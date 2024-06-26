@@ -1,4 +1,7 @@
 {
     "description" : "C# Azure Event Hubs consumer",
-    "priority" : 1
+    "priority" : 1,
+    "main_project_name" : "{project_name|pascal}EventHubsConsumer",
+    "data_project_name" : "{project_name|pascal}Data",
+    "src_layout" : false
 }

@@ -1,0 +1,6 @@
+{
+    "description" : "C# MQTT Client",
+    "priority" : 1,
+    "main_project_name" : "{project_name|pascal}MqttClient",
+    "data_project_name" : "{project_name|pascal}Data"
+}

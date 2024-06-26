@@ -1,0 +1,60 @@
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.Avro;
+using CloudNative.CloudEvents.Protobuf;
+using CloudNative.CloudEvents.SystemTextJson;
+using System;
+
+namespace {{ project_name | pascal }}
+{
+    public enum CloudEventsMode
+    {
+        Binary,
+        StructuredJson,
+        StructuredProto,
+        StructuredAvro,
+        StructuredJsonGzip,
+        StructuredProtoGzip,
+        StructuredAvroGzip
+    }
+
+    public enum ContentEncodingMode
+    {
+        Json,
+        Avro,
+        JsonGzip,
+        AvroGzip
+    }
+
+    internal static class Tools
+    {
+        internal static CloudEventFormatter GetFormatter(CloudEventsMode mode)
+        {
+            return mode switch
+            {
+                CloudEventsMode.Binary => null,
+                CloudEventsMode.StructuredJson => new JsonEventFormatter(),
+                CloudEventsMode.StructuredProto => new ProtobufEventFormatter(),
+                CloudEventsMode.StructuredAvro => new global::CloudNative.CloudEvents.Avro.AvroEventFormatter(),
+                CloudEventsMode.StructuredJsonGzip => new JsonEventFormatter(),  // Assuming JsonEventFormatter handles gzip
+                CloudEventsMode.StructuredProtoGzip => new ProtobufEventFormatter(),  // Assuming ProtobufEventFormatter handles gzip
+                CloudEventsMode.StructuredAvroGzip => new global::CloudNative.CloudEvents.Avro.AvroEventFormatter(),  // Assuming AvroEventFormatter handles gzip
+                _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
+            };
+        }
+
+        internal static string GetContentType(ContentEncodingMode encodingMode)
+        {
+            return encodingMode switch
+            {
+                ContentEncodingMode.Json => "application/json",
+                ContentEncodingMode.Avro => "application/avro",
+                ContentEncodingMode.JsonGzip => "application/json+gzip",
+                ContentEncodingMode.AvroGzip => "application/avro+gzip",
+                _ => throw new ArgumentOutOfRangeException(nameof(encodingMode), encodingMode, null)
+            };
+        }
+    }
+}

@@ -97,9 +97,13 @@ switcher = {
     {%- endif %}
     {%- endfor %}
 }
-func = switcher.get(cloud_event_type, lambda: {{ logger }}.error(f"Unsupported CloudEvent type {cloud_event_type}"))
+func = switcher.get(cloud_event_type, None)
 if func:
     await func()
+{%- if logger %}
+else:
+    {{ logger }}.error(f"Unsupported CloudEvent type {cloud_event_type}")
+{%- endif %}
 {%- endmacro -%}
 
 {%- macro DispatchToDispatchObjects(project_name, root, cloudEvent, messagegroups, logger) -%}
@@ -120,16 +124,20 @@ switcher = {
     {%- endfor %}
     {%- endfor %}
 }
-func = switcher.get(cloud_event_type, lambda: {{ logger }}.error(f"Unsupported CloudEvent type {cloud_event_type}"))
+func = switcher.get(cloud_event_type, None)
 if func:
     await func()
+{%- if logger %}
+else:
+    {{ logger }}.error(f"Unsupported CloudEvent type {cloud_event_type}")
+{%- endif %}
 {%- endif -%}
 {%- endmacro -%}
 
 {%- macro DeclareDispatchInterfaces(project_name, root, use_azure_messaging=False) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("format", "cloudevents" ) %}
-{%- set function_name = project_name | pascal -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
 import asyncio
 {%- if use_azure_messaging %}
 from azure.eventhub import EventData

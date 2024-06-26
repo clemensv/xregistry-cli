@@ -1,0 +1,129 @@
+{%- set messagegroups = root.messagegroups %}
+{%- filter wordwrap(80) %}
+# {{ project_name | capitalize }} Apache Kafka Consumer SDK for Python
+
+This is the {{ project_name | capitalize }} Apache Kafka Consumer SDK for Python. It was generated from the xRegistry CLI tool based on message catalog definitions for {% for messagegroup_key, _ in messagegroups.items() %}"{{ messagegroup_key }}"{%- if not loop.last %}, {% endif %}{%- endfor %}.
+
+## Quick Install
+
+To get started quickly, the main package can be installed with the `install.sh` script (or `install.bat` on Windows) in the root of the repository.
+
+### Contents
+
+The repository contains two projects.
+* The `{{project_name}}_kafka_consumer` project is the main project that contains the Kafka consumer client code.
+* The `{{ data_project_name }}` project contains the data classes for the event payload data.
+
+The classes defined in `{{project_name}}_kafka_consumer` are documented in the project [README](./{{project_name}}_kafka_consumer/README.md).
+
+The `{{project_name}}_kafka_consumer` project depends on the `{{ data_project_name }}` project.
+
+If you want to install the consumer project, you can run the following command:
+
+```bash
+pip install ./{{project_name}}_kafka_consumer
+```
+
+This will install both packages. If you only want to install the data project, you can run the following command:
+
+```bash
+pip install ./{{ data_project_name }}
+```
+
+## Build and Test
+
+The SDK comes with a full test suite for the data classes and the dispatchers that uses the `pytest` framework and Docker containers to run the tests.
+
+If you have Docker installed and if you have `make`, you can run the tests with the following command:
+
+```bash
+make test
+```
+
+If you don't have `make` installed, you can run the following commands:
+
+```bash
+pip install ./{{main_project_name}}
+pytest ./{{main_project_name}}/tests ./{{data_project_name}}/tests
+```
+
+## Usage
+
+The sample code in [samples/sample.py](samples/sample.py) demonstrates how to use the Kafka consumer client to receive messages from a Kafka topic.
+
+In your code, you create handler functions for each message type that you want to process. The handler functions are called when a message of that type is received. Example:
+
+```python
+{%- set messagegroup_key, messagegroup = messagegroups.items()|first %}
+{%- set id, message = messagegroup.messages.items()|first %}
+async def handle_{{ message.id | dotunderscore | snake }}(record, cloud_event, {{ message.id | dotunderscore | snake }}_event_data):
+    """ Handles the {{ message.id }} event """
+    print(f"{{ message.id }}: { {{- message.id | dotunderscore | snake -}}_event_data.asdict()}")
+    await some_processing_function(record, cloud_event, {{ message.id | dotunderscore | snake }}_event_data)
+```
+
+The handler functions are then assigned to the event dispatcher for the message group. The event dispatcher is responsible for calling the appropriate handler function when a message is received. Example:
+
+```python
+{%- set messagegroup_key, messagegroup = messagegroups.items()|first %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+{{messagegroup.id | dotunderscore | snake}}_dispatcher = {{ class_name }}()
+{%- set id, message = messagegroup.messages.items()|first %}
+{{messagegroup.id | dotunderscore | snake}}_dispatcher.{{ message.id | dotunderscore | snake }}_async = {{ message.id | dotunderscore | snake }}_event
+```
+
+{% if messagegroups|length == 1 -%}
+You can then create an event processor directly from the event dispatcher. The event processor is responsible for receiving messages from the Kafka topic and will hand them to the dispatcher for processing.
+
+The required parameters for the `create_processor` method are:
+* `bootstrap_servers`: The Kafka bootstrap servers.
+* `group_id`: The consumer group ID.
+* `topics`: The list of topics to subscribe to.
+
+The example below shows how to create an event processor and then wait for a signal to stop the processor:
+
+```python
+async with dispatcher.create_processor(
+            bootstrap_servers,
+            group_id,
+            topics,
+        ) as processor_runner:
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+            loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+            await stop_event.wait()
+```
+
+{%- else -%}
+You can create an event processor and add the event dispatcher to it. The event processor is responsible for receiving messages from the Kafka topic and will hand them to the dispatcher for processing.
+
+The required parameters for the `create` method are:
+* `bootstrap_servers`: The Kafka bootstrap servers.
+* `group_id`: The consumer group ID.
+* `topics`: The list of topics to subscribe to.
+
+The example below shows how to create an event processor and then wait for a signal to stop the processor:
+
+```python
+event_processor = EventStreamProcessor.create(
+    bootstrap_servers,
+    group_id,
+    topics,
+)
+
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+event_processor.add_dispatcher({{messagegroup.id | dotunderscore | snake}}_dispatcher)
+{%- endfor %}
+async with event_processor:
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+    loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+    await stop_event.wait()
+```
+{% endif %}
+{%- endfilter %}

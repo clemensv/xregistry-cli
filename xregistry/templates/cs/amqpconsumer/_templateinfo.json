@@ -1,4 +1,6 @@
 {
     "description" : "C# CloudEvents SDK AMQP endpoint consumer class",
-    "priority" : 1
+    "priority" : 1,
+    "main_project_name" : "{project_name|pascal}AmqpConsumer",
+    "data_project_name" : "{project_name|pascal}Data"
 }

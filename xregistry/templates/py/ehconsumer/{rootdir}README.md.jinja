@@ -1,0 +1,191 @@
+{%- set messagegroups = root.messagegroups %}
+{%- filter wordwrap(80) %}
+# {{ project_name | capitalize }} Azure Event Hubs Consumer SDK for Python
+
+This is the {{ project_name | capitalize }} Azure Event Hubs Consumer SDK for Python. It was generated from the xRegistry CLI tool
+based on message catalog definitions for {% for messagegroup_key, _ in messagegroups.items() %}"{{ messagegroup_key }}"{%- if not loop.last %}, {% endif %}{%- endfor %}.
+
+## Quick Install
+
+To get started quickly, the main package can be installed with the `install.sh`
+script (or `install.bat` on Windows) in the root of the repository.
+
+### Contents
+
+The repository contains two projects.
+* The `{{project_name}}_eventhubs_consumer` project is the main project that
+  contains the Event Hubs consumer client code.
+* The `{{ data_project_name }}` project contains the data classes for the event
+  payload data.
+
+The classes defined in `{{project_name}}_eventhubs_consumer` are documented
+in the project [README](./{{project_name}}_eventhubs_consumer/README.md).
+
+The `{{project_name}}_eventhubs_consumer` project depends on the
+`{{ data_project_name }}` project.
+
+If you want to install the consumer project, you can run the following command:
+
+```bash
+pip install ./{{project_name}}_eventhubs_consumer
+```
+
+This will install both packages. If you only want to install the data project,
+you can run the following command:
+
+```bash
+pip install ./{{ data_project_name }}
+```
+
+## Build and Test
+
+The SDK comes with a full test suite for the data classes and the dispatchers
+that uses the `pytest` framework and Docker containers to run the tests.
+
+If you have Docker installed and if you have `make`, you can run the tests with
+the following command:
+
+```bash
+make test
+```
+
+If you don't have `make` installed, you can run the following commands:
+
+```bash
+pip install ./{{main_project_name}}
+pytest ./{{main_project_name}}/tests ./{{data_project_name}}/tests
+```
+
+## Usage
+
+The sample code in [samples/sample.py](samples/sample.py) demonstrates how to
+use the Event Hubs consumer client to receive messages from an Event Hub.
+
+In your code, you create handler functions for each message type that you want
+to process. The handler functions are called when a message of that type is
+received. Example:
+
+```python
+{%- set messagegroup_key, messagegroup = messagegroups.items()|first %}
+{%- set id, message = messagegroup.messages.items()|first %}
+async def handle_{{ message.id | dotunderscore | snake }}(partition_context, event, cloud_event, {{ message.id | dotunderscore | snake }}_event_data):
+    """ Handles the {{ message.id }} event """
+    print(f"{{ message.id }}: { {{- message.id | dotunderscore | snake -}}_event_data.asdict()}")
+    await partition_context.update_checkpoint(event)
+```
+
+The handler functions are then assigned to the event dispatcher for the message
+group. The event dispatcher is responsible for calling the appropriate handler
+function when a message is received. Example:
+
+```python
+{%- set messagegroup_key, messagegroup = messagegroups.items()|first %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+{{messagegroup.id | dotunderscore | snake}}_dispatcher = {{ class_name }}()
+{%- set id, message = messagegroup.messages.items()|first %}
+{{messagegroup.id | dotunderscore | snake}}_dispatcher.{{ message.id | dotunderscore | snake }}_async = {{ message.id | dotunderscore | snake }}_event
+```
+
+{% if messagegroups|length == 1 -%}
+You can then create an event processor directly from the event dispatcher. The
+event processor is responsible for receiving messages from the Event Hub will
+hand them to the dispatcher for processing.
+
+The required parameters for the `create_processor` method are:
+* `consumer_group_name`: The name of the consumer group.
+* `fully_qualified_namespace`: The fully qualified namespace of the Event Hub.
+* `eventhub_name`: The name of the Event Hub.
+* `blob_account_url`: The URL of the Azure Storage account.
+* `checkpoint_container`: The name of the blob container to store checkpoints.
+* `credential`: The credential to use for authentication.
+
+The example below shows how to create an event processor and then wait for a
+signal to stop the processor:
+
+```python
+async with dispatcher.create_processor(
+            consumer_group_name,
+            fully_qualified_namespace,
+            eventhub_name,
+            blob_account_url,
+            checkpoint_container,
+            DefaultAzureCredential(),
+        ) as processor_runner:
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+            loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+            await stop_event.wait()
+```
+
+If you need use connection strings, you can use the `create_from_connection_string`
+method to create the event processor:
+
+```python
+async with dispatcher.create_from_connection_string(
+            consumer_group_name,
+            eventhubs_connection_string,
+            eventhub_name,
+            blob_account_connection_string,
+            checkpoint_container
+        ) as processor_runner:
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+            loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+            await stop_event.wait()
+```
+{%- else -%}
+You can create an event processor and add the event dispatcher to it. The event
+processor is responsible for receiving messages from the Event Hub and will
+hand them to the dispatcher for processing.
+
+The required parameters for the `create` method are:
+* `consumer_group_name`: The name of the consumer group.
+* `fully_qualified_namespace`: The fully qualified namespace of the Event Hub.
+* `eventhub_name`: The name of the Event Hub.
+* `blob_account_url`: The URL of the Azure Storage account.
+* `checkpoint_container`: The name of the blob container to store checkpoints.
+* `credential`: The credential to use for authentication.
+
+The example below shows how to create an event processor and then wait for a
+signal to stop the processor:
+
+```python
+event_processor = EventStreamProcessor.create(
+    consumer_group_name,
+    fully_qualified_namespace,
+    eventhub_name,
+    blob_account_url,
+    checkpoint_container,
+    DefaultAzureCredential(),
+)
+
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+event_processor.add_dispatcher({{messagegroup.id | dotunderscore | snake}}_dispatcher)
+{%- endfor %}
+async with event_processor:
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+    loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+    await stop_event.wait()
+```
+
+If you need use connection strings, you can use the `create_from_connection_string`
+method to create the event processor:
+
+```python
+event_processor = EventStreamProcessor.create_from_connection_string(
+    consumer_group_name,
+    eventhubs_connection_string,
+    eventhub_name,
+    blob_account_connection_string,
+    checkpoint_container
+)
+```
+{%- endif %}
+{%- endfilter %}

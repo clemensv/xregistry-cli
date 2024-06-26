@@ -1,0 +1,94 @@
+{%- import "util.include.jinja" as util -%}
+{%- set messagegroups = root.messagegroups %}
+"""
+
+{%- filter wordwrap(80) %}
+This is sample code to produce events to Apache Kafka with the producer clients contained in this project.
+
+There is a producer for each defined event type. The producer is a class that provides methods to create and send events to the Kafka topics.
+
+Producers are instantiated with the Kafka bootstrap servers and the topic to which they will send events.
+
+The main function initializes the producers and sends sample events to the Kafka topics.
+
+This sample uses a Kafka cluster with the necessary topics and configurations. The script reads the configuration from the command line or uses the environment variables. The following environment variables are recognized:
+
+- BOOTSTRAP_SERVERS: The Kafka bootstrap servers.
+- TOPICS: The Kafka topics to send events to.
+
+Alternatively, you can pass the configuration as command-line arguments.
+
+python sample.py --bootstrap-servers <bootstrap_servers> --topics <topics>
+{%- endfilter %}
+"""
+
+import argparse
+import os
+import asyncio
+from confluent_kafka import Producer
+from datetime import datetime
+
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+from {{main_project_name}}.producer import {{class_name}}
+{%- endfor %}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroup_key in messagegroups.keys() -%}
+{%- set messagegroup = messagegroups[messagegroup_key] -%}
+{%- for id in messagegroup.messages -%}
+{%- set definition = messagegroup.messages[id] %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, definition ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+async def main(producer_config, topics):
+    """ Main function to produce events to Kafka """
+    topic_list = topics.split(',')
+
+    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    {%- set pascalGroupName = messagegroup.id | pascal %}
+    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+    kafka_producer = Producer(json.loads(producer_config))
+    producer_instance = {{ class_name }}(producer, topic_list[0], 'binary')
+    {%- for id, message in messagegroup.messages.items() %}
+    {%- if type_name != "object" %}
+    event_data = {{ type_name | pascal | strip_namespace }}()
+    {%- else %}
+    event_data = {}
+    {%- endif %}
+    await producer_instance.send_{{ message.id | dotunderscore | lower }}(
+        {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+            _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
+        {%- endfor -%}
+        {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
+        {%- endfor -%}
+        data = event_data
+        {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+            , _{{ attrname }}: Optional[str] = ''
+        {%- endfor -%}
+    )
+    {%- endfor %}
+    {%- endfor %}
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Kafka Producer")
+    parser.add_argument('--producer-config', default=os.getenv('KAFKA_PRODUCER_CONFIG'), help='Kafka producer config (JSON)', required=True)
+    parser.add_argument('--topics', default=os.getenv('KAFKA_TOPICS'), help='Kafka topics to send events to', required=True)
+
+    args = parser.parse_args()
+
+    asyncio.run(main(
+        args.producer_config,
+        args.topics
+    ))

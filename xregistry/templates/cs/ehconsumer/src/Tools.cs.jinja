@@ -1,0 +1,50 @@
+{%- import "eventhubs.jinja.include" as eventhub %}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+
+#nullable enable
+
+using Azure;
+using Azure.Core;
+using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Processor;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Logging;
+{%- if uses_cloudevents_message %}
+{{ eventhub.CloudEventsUsings() }}
+{%- endif %}
+
+namespace {{ project_name | pascal }}
+{
+    namespace Tools
+    {
+        public abstract class DispatcherBase
+        {
+            protected readonly ILogger _logger;             
+            public event Func<ProcessErrorEventArgs, Task>? ErrorAsync;
+
+            protected DispatcherBase(ILogger logger)
+            {
+                _logger = logger;
+            }
+
+            /// <summary>
+            /// Processes an event from the Event Hub
+            /// </summary>
+            internal abstract Task<bool> ProcessEventAsync(ProcessEventArgs eventArgs);
+            
+            internal virtual Task ProcessErrorAsync(ProcessErrorEventArgs eventArgs)
+            {
+                if (ErrorAsync != null)
+                {
+                    return Task.WhenAll(Array.ConvertAll(ErrorAsync.GetInvocationList(), e => (Task)(e.DynamicInvoke(eventArgs)??Task.CompletedTask)));
+                }
+                return Task.CompletedTask;
+            }
+            {%- if uses_cloudevents_message %}
+            {{ eventhub.CloudEventsMethods() | indent(12) }}
+            {%- endif %}
+        }
+    } 
+}

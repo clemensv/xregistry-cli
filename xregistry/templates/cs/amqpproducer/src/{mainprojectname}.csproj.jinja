@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>10.0</LangVersion>
+    <ProjectName>{{project_name | pascal }}</ProjectName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\{{ data_project_name }}\src\{{data_project_name | pascal}}.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dependency( 'cs','net80', 'System.Memory.Data') }}
+    {{- dependency( 'cs','net80', 'AMQPNetLite') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Amqp') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
+  </ItemGroup>
+  
+</Project>

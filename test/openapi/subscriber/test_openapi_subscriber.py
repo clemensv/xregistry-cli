@@ -1,3 +1,5 @@
+"""Test the openapi subscriber generation."""
+
 import platform
 import sys
 import os
@@ -12,12 +14,13 @@ import xregistry
 # this test invokes the xregistry command line tool to generate a C# proxy and a consumer
 # and then builds the proxy and the consumer and runs a prepared test that integrates both
 def test_openapi_subscriber():
+    """Test the openapi subscriber generation."""
     # clean the output directory
     output_dir = os.path.join(project_root, 'tmp/test/openapi/openapi_subscriber/')
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     # generate the subscriber
-    sys.argv = ['xregistry', 'generate',  
+    sys.argv = ['xregistry', 'generate',
                 '--style', 'subscriber', 
                 '--language', 'openapi',
                 '--definitions', os.path.join(os.path.dirname(__file__), 'openapi_subscriber.xreg.json'),
@@ -25,6 +28,6 @@ def test_openapi_subscriber():
                 '--projectname', 'ContosoErpSubscriber']
     assert xregistry.cli() == 0
     # run dotnet build on the csproj here that references the generated files already
-    cmd = 'openapi-generator-cli validate -i ' + os.path.join(output_dir, "ContosoErpSubscriber.yml")
+    cmd = 'openapi-generator-cli validate -i ' + os.path.join(output_dir, "ContosoErpSubscriber/ContosoErpSubscriber.yml").replace('/', os.path.sep)
     subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
     

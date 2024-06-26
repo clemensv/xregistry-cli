@@ -119,7 +119,7 @@ components:
             bindingVersion: '0.1.0'
         {%- endif %}
         {%- if message.schemaurl %}
-            {%- if message.schemaurl.startswith('#') %}
+            {%- if message.schemaurl.startswith('#') or message.schemaurl.startswith('/') %}
               {%- set schemaObj = schema_object(root, message.schemaurl ) -%}
                 {%- if schemaObj.format is defined -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}

@@ -1,0 +1,327 @@
+{%- import "util.include.jinja" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{%- filter wordwrap(120) %}
+# {{ project_name | capitalize }} Event Dispatcher for Azure Event Hubs
+
+This module provides an event dispatcher for processing events from Azure Event Hubs. It supports both plain AMQP messages and CloudEvents.
+
+## Table of Contents
+1. [Overview](#overview)
+2. [Generated Event Dispatchers](#generated-event-dispatchers)
+    - {% for messagegroup_key, messagegroup in messagegroups.items() %}{{ (messagegroup.id | pascal | strip_dots ) + "EventDispatcher" }}{% if not loop.last %}, {% endif %}
+    {% endfor %}
+3. [Internals](#internals)
+    - [EventProcessorRunner](#eventprocessorrunner)
+    - [_DispatcherBase](#_dispatcherbase)
+
+## Overview
+
+This module defines an event processing framework for Azure Event Hubs,
+providing the necessary classes and methods to handle various types of events.
+It includes both plain AMQP messages and CloudEvents, offering a versatile
+solution for event-driven applications.
+
+
+## Generated Event Dispatchers
+
+{% for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
+{%- set uses_plain_amqp_message = (messagegroup | exists( "binding", "amqp" )) %}
+
+### {{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }}
+
+`{{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }}` handles events for the {{ messagegroup.id }} message group.
+
+#### Methods:
+
+##### `__init__`:
+
+```python
+__init__(self)-> None
+```
+
+Initializes the dispatcher.
+
+##### `create_processor`:
+
+```python
+create_processor(self, consumer_group_name: str, eventhubs_fully_qualified_namespace: str, eventhub_name: str, blob_account_url: str, blob_container_name: str, credential) -> EventProcessorRunner`
+```
+
+Creates an `EventProcessorRunner`.
+
+Args:
+- `consumer_group_name`: The name of the consumer group.
+- `eventhubs_fully_qualified_namespace`: The fully qualified namespace of the Event Hub.
+- `eventhub_name`: The name of the Event Hub.
+- `blob_account_url`: The URL of the Azure Storage account.
+- `blob_container_name`: The name of the blob container to store checkpoints.
+- `credential`: The credential to use for authentication.
+
+##### `create_processor_from_connection_strings`
+
+```python
+`create_processor_from_connection_strings(self, consumer_group_name: str, connection_str: str, eventhub_name: str, blob_conn_str: str, checkpoint_container: str) -> EventProcessorRunner`
+```
+
+Creates an `EventProcessorRunner` from connection strings.
+
+Args:
+- `consumer_group_name`: The name of the consumer group.
+- `connection_str`: The connection string for the Event Hub.
+- `eventhub_name`: The name of the Event Hub.
+- `blob_conn_str`: The connection string for the Azure Storage account.
+- `checkpoint_container`: The name of the blob container to store checkpoints.
+
+#### Event Handlers
+
+The {{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }} defines the following event handler hooks.
+
+{% for id, message in messagegroup.messages.items() %}
+{%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+##### `{{ message.id | dotunderscore | snake }}_async`
+
+```python
+{{ message.id | dotunderscore | snake }}_async:  Callable[[PartitionContext, EventData, CloudEvent, {{ data_type | strip_namespace }}], Awaitable[None]]
+```
+
+Asynchronous handler hook for `{{ message.id }}`: {% if message.description %}{{ message.description }}{%- endif %}
+
+The assigned handler must be a coroutine (`async def`) that accepts the following parameters:
+
+- `partition_context`: The partition context.
+- `event`: The event data.
+- `cloud_event`: The CloudEvent.
+- `data`: The event data of type `{{ data_type }}`.
+
+Example:
+
+```python
+async def {{ message.id | dotunderscore | snake }}_event(partition_context: PartitionContext, event: EventData, cloud_event: CloudEvent, data: {{ data_type | strip_namespace }}) -> None:
+    # Process the event data
+    await partition_context.update_checkpoint(event)
+```
+
+The handler functions is then assigned to the event dispatcher for the message group. The event dispatcher is responsible for calling the appropriate handler function when a message is received. Example:
+
+```python
+{{ messagegroup.id | dotunderscore | snake }}_dispatcher.{{ message.id | dotunderscore | snake }}_async = {{ message.id | dotunderscore | snake }}_event
+```
+
+{% endfor %}
+{% endfor %}
+
+## Internals
+
+### Dispatchers
+
+Dispatchers have the following protected methods:
+
+### Methods:
+
+##### `_process_event`
+
+```python
+_process_event(self, partition_context, event)
+```
+
+Processes an incoming event.
+
+Args:
+- `partition_context`: The partition context.
+- `event`: The event data.
+
+
+{%- if uses_cloudevents_message %}
+##### `_dispatch_cloud_event`
+
+```python
+_dispatch_cloud_event(self, partition_context, event, cloud_event)`
+```
+
+Dispatches a CloudEvent to the appropriate handler.
+
+Args:
+- `partition_context`: The partition context.
+- `event`: The event data.
+- `cloud_event`: The CloudEvent.
+
+{%- endif %}
+{%- if uses_plain_amqp_message %}
+##### `_dispatch_event_data`
+
+```python
+_dispatch_event_data(self, partition_context, event)`
+```
+
+Dispatches an AMQP event to the appropriate handler.
+
+Args:
+- `partition_context`: The partition context.
+- `event`: The event data.
+
+{%- endif %}
+
+### EventProcessorRunner
+
+`EventProcessorRunner` is responsible for managing the event processing loop and dispatching events to the appropriate handlers.
+
+#### Methods
+
+##### `__init__`
+
+```python
+__init__(client: EventHubConsumerClient)
+```
+
+Initializes the runner with an Event Hub consumer client.
+
+Args:
+- `client`: The Event Hub consumer client.
+
+#####  `__aenter__()`
+
+Enters the asynchronous context and starts the processor.
+
+#####  `__aexit__`
+
+```python
+__aexit__(exc_type, exc_val, exc_tb)
+```
+
+Exits the asynchronous context and stops the processor.
+
+Args:
+- `exc_type`: The exception type.
+- `exc_val`: The exception value.
+- `exc_tb`: The exception traceback.
+
+#####  `add_dispatcher`
+
+```python
+add_dispatcher(dispatcher: _DispatcherBase)
+```
+
+Adds a dispatcher to the runner.
+
+Args:
+- `dispatcher`: The dispatcher to add.
+
+#####  `remove_dispatcher`
+
+```python
+remove_dispatcher(dispatcher: _DispatcherBase)
+```
+
+Removes a dispatcher from the runner.
+
+Args:
+- `dispatcher`: The dispatcher to remove.
+
+#####  `start()`
+
+Starts the event processor
+
+#####  `cancel()`
+
+Cancels the event processing task.
+
+#####  `create_from_connection_strings`
+
+```python
+create_from_connection_strings(cls, consumer_group_name: str, connection_str: str, eventhub_name: str, blob_conn_str: str, checkpoint_container: str) -> 'EventProcessorRunner'
+```
+
+Creates a runner from connection strings.
+
+Args:
+- `consumer_group_name`: The name of the consumer group.
+- `connection_str`: The connection string for the Event Hub.
+- `eventhub_name`: The name of the Event Hub.
+- `blob_conn_str`: The connection string for the Azure Storage account.
+- `checkpoint_container`: The name of the blob container to store checkpoints.
+
+Returns:
+- An `EventProcessorRunner` instance.
+
+#####  `create`
+
+```python
+create(cls, consumer_group_name: str, eventhubs_fully_qualified_namespace: str, eventhub_name: str, blob_account_url: str, blob_container_name: str, credential) -> 'EventProcessorRunner'
+```
+
+Creates a runner from fully qualified namespace and credentials.
+
+Args:
+- `consumer_group_name`: The name of the consumer group.
+- `eventhubs_fully_qualified_namespace`: The fully qualified namespace of the Event Hub.
+- `eventhub_name`: The name of the Event Hub.
+- `blob_account_url`: The URL of the Azure Storage account.
+- `blob_container_name`: The name of the blob container to store checkpoints.
+- `credential`: The credential to use for authentication.
+
+Returns:
+- An `EventProcessorRunner` instance.
+
+
+### _DispatcherBase
+
+`_DispatcherBase` is a base class for event dispatchers, handling CloudEvent detection and conversion.
+
+#### Methods
+
+#####  `_strkey`
+
+```python
+_strkey(key: str | bytes) -> str
+```
+
+Converts a key to a string.
+
+Args:
+- `key`: The key to convert.
+
+#####  `_unhandled_event`
+
+```python
+_unhandled_event(self, _cx, _e, _ce, de)
+```
+
+Default event handler.
+
+#####  `_get_cloud_event_attribute`
+
+```python
+_get_cloud_event_attribute(event_data: EventData, key: str) -> Any
+```
+
+Retrieves a CloudEvent attribute from event data.
+
+Args:
+- `event_data`: The event data.
+- `key`: The attribute key.
+
+
+
+#####  `_is_cloud_event`
+
+```python
+_is_cloud_event(event_data: EventData) -> bool
+```
+
+Checks if the event data is a CloudEvent
+
+Args:
+- `event_data`: The event data.
+
+#####  `_cloud_event_from_event_data`:
+
+```python
+_cloud_event_from_event_data(event_data: EventData) -> CloudEvent
+```
+
+Converts event data to a CloudEvent.
+
+Args:
+- `event_data`: The event data.
+{% endfilter %}

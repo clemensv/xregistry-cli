@@ -1,0 +1,5 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{{ cloudEvents.DeclareDispatchInterfaces(project_name, data_project_name, root) }}

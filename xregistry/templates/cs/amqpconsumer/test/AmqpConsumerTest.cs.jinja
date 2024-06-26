@@ -1,0 +1,301 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+{%- set messagegroups = root.messagegroups %}
+
+#nullable enable
+
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Xunit;
+using Microsoft.Extensions.Logging;
+using Amqp;
+using Amqp.Framing;
+using Amqp.Types;
+using Testcontainers.ActiveMq;
+
+using {{ project_name | pascal }};
+
+namespace {{ project_name | pascal }}.Test
+{
+    public class {{ project_name |  pascal | strip_dots }}Fixture : IAsyncLifetime
+    {
+        private const string brokerXml = @"<?xml version='1.0'?>
+            <configuration xmlns=""urn:activemq""
+                        xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
+                        xmlns:xi=""http://www.w3.org/2001/XInclude""
+                        xsi:schemaLocation=""urn:activemq /schema/artemis-configuration.xsd"">
+
+            <core xmlns=""urn:activemq:core"" xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
+                    xsi:schemaLocation=""urn:activemq:core "">
+                <name>0.0.0.0</name>
+                <persistence-enabled>false</persistence-enabled>
+                <journal-type>NIO</journal-type>
+                <!-- should the broker detect dead locks and other issues -->
+                <critical-analyzer>true</critical-analyzer>
+                <critical-analyzer-timeout>120000</critical-analyzer-timeout>
+                <critical-analyzer-check-period>60000</critical-analyzer-check-period>
+                <critical-analyzer-policy>HALT</critical-analyzer-policy>
+                <page-sync-timeout>44000</page-sync-timeout>
+                <acceptors>
+                    <!-- Acceptor for every supported protocol -->
+                    <acceptor name=""artemis"">tcp://0.0.0.0:5660?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;amqpMinLargeMessageSize=102400;protocols=CORE,AMQP,STOMP,HORNETQ,MQTT,OPENWIRE;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;amqpDuplicateDetection=true</acceptor>
+                    <acceptor name=""amqp"">tcp://0.0.0.0:5672?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=AMQP;useEpoll=true;saslMechanisms=EXTERNAL,PLAIN,ANONYMOUS</acceptor>
+                </acceptors>
+                <broker-connections>
+                    <amqp-connection uri=""tcp://localhost:5672"" name=""receiver"" retry-interval=""100"">
+                        <!-- This will create one receiver for every queue matching this address expression -->
+                        <receiver address-match=""#""/>
+                    </amqp-connection>
+                </broker-connections>
+                <security-settings>
+                    <security-setting match=""#"">
+                        <permission type=""createNonDurableQueue"" roles=""guest""/>
+                        <permission type=""deleteNonDurableQueue"" roles=""guest""/>
+                        <permission type=""createDurableQueue"" roles=""guest""/>
+                        <permission type=""deleteDurableQueue"" roles=""guest""/>
+                        <permission type=""createAddress"" roles=""guest""/>
+                        <permission type=""deleteAddress"" roles=""guest""/>
+                        <permission type=""consume"" roles=""guest""/>
+                        <permission type=""browse"" roles=""guest""/>
+                        <permission type=""send"" roles=""guest""/>
+                        <permission type=""manage"" roles=""guest""/>
+                    </security-setting>
+                </security-settings>
+                <address-settings>
+                    <!-- if you define auto-create on certain queues, management has to be auto-create -->
+                    <address-setting match=""activemq.management#"">
+                        <dead-letter-address>DLQ</dead-letter-address>
+                        <expiry-address>ExpiryQueue</expiry-address>
+                        <redelivery-delay>0</redelivery-delay>
+                        <!-- with -1 only the global-max-size is in use for limiting -->
+                        <max-size-bytes>-1</max-size-bytes>
+                        <message-counter-history-day-limit>10</message-counter-history-day-limit>
+                        <address-full-policy>PAGE</address-full-policy>
+                        <auto-create-queues>true</auto-create-queues>
+                        <auto-create-addresses>true</auto-create-addresses>
+                    </address-setting>
+                    <!--default for catch all-->
+                    <address-setting match=""#"">
+                        <dead-letter-address>DLQ</dead-letter-address>
+                        <expiry-address>ExpiryQueue</expiry-address>
+                        <redelivery-delay>0</redelivery-delay>
+                        <!-- with -1 only the global-max-size is in use for limiting -->
+                        <max-size-bytes>-1</max-size-bytes>
+                        <message-counter-history-day-limit>10</message-counter-history-day-limit>
+                        <address-full-policy>PAGE</address-full-policy>
+                        <auto-create-queues>true</auto-create-queues>
+                        <auto-create-addresses>true</auto-create-addresses>
+                    </address-setting>
+                </address-settings>
+                <addresses>
+                    <address name=""exampleQueue"">
+                        <anycast>
+                        <queue name=""exampleQueue"" />
+                        </anycast>
+                    </address>
+                </addresses>
+            </core>
+            </configuration>";
+
+        public ArtemisContainer? ArtemisContainerInstance { get; protected set; }
+        public Uri? ArtemisBrokerUrl { get; protected set; }
+        private ILoggerFactory _loggerFactory;
+        private ILogger _logger;
+
+        public ILoggerFactory GetLoggerFactory()
+        {
+            return _loggerFactory;
+        }
+
+        public string QueueName 
+        {
+            get
+            {
+                return "exampleQueue";
+            }
+        }
+
+        public {{ project_name |  pascal | strip_dots }}Fixture()
+        {
+            _loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder.AddDebug().AddConsole();
+            });
+            _logger = _loggerFactory.CreateLogger<{{ project_name |  pascal | strip_dots }}Fixture>();
+        }
+
+        public async Task InitializeAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Initializing Artemis test fixture.");
+                var configFilePath = Path.GetTempFileName();
+                File.WriteAllText(configFilePath, brokerXml);
+
+                Amqp.Trace.TraceLevel = Amqp.TraceLevel.Frame;
+                Amqp.Trace.TraceListener = (l, f, a) => System.Diagnostics.Debug.WriteLine(f, a);
+                
+                ArtemisContainerInstance = new ArtemisBuilder()
+                        .WithBindMount(configFilePath, "/var/lib/artemis/etc-override/broker.xml")
+                        .WithPortBinding(5672, true)
+                        .WithUsername("guest")
+                        .WithPassword("guest")
+                        .Build();
+
+                await ArtemisContainerInstance.StartAsync();
+                _logger.LogDebug("Artemis container started.");
+                ArtemisBrokerUrl = new UriBuilder(ArtemisContainerInstance.GetBrokerAddress()){ Scheme = "amqp"}.Uri;
+                _logger.LogDebug($"Artemis broker URL: {ArtemisBrokerUrl}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during InitializeAsync");
+                throw;
+            }
+        }
+
+        public async Task DisposeAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Disposing Artemis test fixture.");
+                
+                if (ArtemisContainerInstance != null)
+                {
+                    await ArtemisContainerInstance.StopAsync();
+                    _logger.LogDebug("Artemis container stopped.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during DisposeAsync");
+            }
+        }
+
+    }
+
+    [CollectionDefinition("Artemis container")]
+    public class {{ project_name |  pascal | strip_dots }}CollectionFixture : ICollectionFixture<{{ project_name |  pascal | strip_dots }}Fixture>
+    {
+    }
+
+    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroup.id | pascal %}
+    {%- set class_name = (pascal_group_name | strip_namespace) + "EventConsumer" %}
+    {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"Tests" %}
+    [Collection("Artemis container")]
+    public class {{ test_class_name }} 
+    {
+        private readonly {{ project_name |  pascal | strip_dots }}Fixture _fixture;
+        private readonly ILogger _logger;
+
+        public {{ test_class_name }}({{ project_name |  pascal | strip_dots }}Fixture fixture)
+        {
+            _fixture = fixture;
+            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();
+        }
+
+#pragma warning disable CS8604 // init takes care of nullables 
+
+        {%- for id, message in messagegroup.messages.items() %}
+        {%- set pascal_message_name = message.id | strip_dots | pascal %}
+        {%- set message_body_type = util.body_type(data_project_name, root, message) %}
+        [Fact]
+        public async Task Test{{ pascal_message_name }}Message()
+        {
+            _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
+            try
+            {
+                var plainEndpointCredential = new PlainEndpointCredential("guest", "guest");
+                var consumer = new AmqpConsumer(plainEndpointCredential, new Uri(_fixture.ArtemisBrokerUrl, _fixture.QueueName));
+                var dispatcher = new {{ class_name }}(consumer, _fixture.GetLoggerFactory());
+                await dispatcher.StartAsync();
+                try
+                {
+                    var messageReceived = new TaskCompletionSource<bool>();
+                    dispatcher.{{ pascal_message_name }}Async += (amqpMessage, messageObj) =>
+                    {
+                        try
+                        {
+                            _logger.LogInformation("{{ pascal_message_name }} message received");
+                            Assert.NotNull(amqpMessage);
+                            Assert.NotNull(messageObj);
+                            messageReceived.SetResult(true);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "An error occurred during {{ pascal_message_name }} message processing");
+                            messageReceived.SetResult(false);
+                        }
+                        return Task.CompletedTask;
+                    };
+
+                    var factory = new ConnectionFactory();
+                    var address = new Address(_fixture.ArtemisBrokerUrl?.AbsoluteUri);
+                    var connection = await factory.CreateAsync(address);
+                    try 
+                    {
+                        var session = new Session(connection);
+                        try
+                        {
+                            var sender = new SenderLink(session, "sender-link", "/" + _fixture.QueueName);
+                            try
+                            {
+                                {%- if message_body_type != "byte[]" %}
+                                var eventDataTest = new {{ message_body_type }}Tests();
+                                var eventDataInstance = eventDataTest.CreateInstance();
+                                var eventData = eventDataInstance.ToByteArray("application/json");
+                                {%- else %}
+                                var eventData = System.Text.Encoding.UTF8.GetBytes("Test");
+                                {%- endif %}
+                                var amqpMessage = new Message();
+                                amqpMessage.BodySection = new Data { Binary = eventData };
+                                amqpMessage.Properties = new Properties() { 
+                                    MessageId = Guid.NewGuid().ToString(),
+                                    ContentType = "application/json"
+                                };
+                                amqpMessage.ApplicationProperties = new ApplicationProperties();
+                                amqpMessage.ApplicationProperties["cloudEvents:specversion"] = "1.0";
+                                amqpMessage.ApplicationProperties["cloudEvents:type"] = "{{ message.id }}";
+                                amqpMessage.ApplicationProperties["cloudEvents:id"] = Guid.NewGuid().ToString();
+                                amqpMessage.ApplicationProperties["cloudEvents:source"] = "urn:example-com:example-source";
+                                amqpMessage.ApplicationProperties["cloudEvents:time"] = DateTime.UtcNow.ToString("O");
+                                await sender.SendAsync(amqpMessage);
+                                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(10000));
+                                Assert.True(messageReceived.Task.IsCompleted, "The message was not received within the timeout period.");
+                                _logger.LogInformation("Message received validation completed");
+                            }
+                            finally
+                            {
+                                await sender.CloseAsync();
+                            }
+                        }
+                        finally
+                        {
+                            await session.CloseAsync();
+                        }
+                    }
+                    finally
+                    {
+                        await connection.CloseAsync();
+                    }
+                }
+                finally
+                {
+                    await dispatcher.StopAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during Test{{ pascal_message_name }}Message");
+                throw;
+            }
+        }
+
+        {%- endfor %}
+    }
+    {%- endfor %}
+}

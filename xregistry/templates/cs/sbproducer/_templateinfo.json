@@ -1,4 +1,6 @@
 {
     "description" : "Azure Service Bus producer class",
-    "priority" : 1
+    "priority" : 1,
+    "main_project_name" : "{project_name|pascal}ServiceBusProducer",
+    "data_project_name" : "{project_name|pascal}Data"
 }

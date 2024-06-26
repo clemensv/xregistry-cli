@@ -1,0 +1,35 @@
+{%- set messagegroups = root.messagegroups -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "servicebus.jinja.include" as servicebus -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Azure.Messaging;
+using Azure.Messaging.ServiceBus;
+using Microsoft.Extensions.Logging;
+
+{{ servicebus.CloudEventsUsings() }}
+
+namespace {{ project_name | pascal }}
+{
+    {%- set class_name = (project_name | pascal | strip_namespace)+"Function" %}
+    public class {{ class_name }}
+    {
+        ILogger<{{class_name}}> _logger;
+        {{ cloudEvents.DeclareDispatchObjectsFields( project_name, messagegroups ) | indent(8) }}
+        {{ cloudEvents.DeclareDispatchObjectsConstructor( project_name, class_name, messagegroups, "ILoggerFactory? loggerFactory", "_logger = loggerFactory?.CreateLogger<"+ class_name +">()??new LoggerFactory().CreateLogger<"+ class_name +">();") | indent(8) }} 
+
+        {{ servicebus.CloudEventsMethods()  | indent(8) }}
+
+        public async virtual Task Run(ServiceBusReceivedMessage message, ILogger log)
+        {
+            var cloudEvent = CloudEventFromServiceBusMessage(message);
+            {{ cloudEvents.DispatchToDispatchObjects( project_name, data_project_name, root, "cloudEvent", messagegroups, "log" ) | indent(12) }}
+        }
+    }
+}

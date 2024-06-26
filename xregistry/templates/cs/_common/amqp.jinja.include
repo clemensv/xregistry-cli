@@ -1,5 +1,25 @@
 {#- AMQP macros -#}
 
+{%- import "util.jinja.include" as util -%}
+
+{%- macro isAmqp(message) -%}
+{%- if message.binding and message.binding.lower().startswith("amqp") -%}
+true
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro usesAmqpBinding(root) %}
+{%- if (root.messagegroups | exists( "binding", "amqp" )) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro usesAmqpEndpoint(root) %}
+{%- if (root.endpoints | exists( "protocol", "amqp" )) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
 {%- macro AmqpNetLiteHeaders() -%}
 using Amqp;
 using Amqp.Framing;
@@ -100,13 +120,13 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
 {%- set pascalGroupName = messagegroup.id  | pascal %}
-{%- if withType -%}global::{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id  | strip_namespace | camel }}AmqpDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- if withType -%}global::{{ pascalGroupName | concat_namespace(project_name) | pascal }}.I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id  | strip_namespace | camel }}AmqpDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectField(project_name,messagegroup) -%}
 {%- set handlerName=(messagegroup.id | strip_namespace | camel)+"AmqpDispatcher" -%}
-{%- set handlerType=(messagegroup.id | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" %}
+{%- set handlerType=(messagegroup.id | concat_namespace(project_name) | pascal)+".I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" %}
 {{ handlerType }} {{ handlerName }};
 {%- endmacro -%}
 
@@ -119,7 +139,7 @@ Amqp.Message {{ variable }} = new Amqp.Message()
 {%- macro DeclareDispatchObjectConstructor(project_name, class_name, messagegroup, args, body) -%}
 public {{ class_name }}({%- if args %}{{ args }}, {%- endif -%}
     {%- set handlerName=(messagegroup.id | strip_namespace | camel)+"AmqpDispatcher" -%}
-    {%- set handlerType=(messagegroup.id | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    {%- set handlerType=(messagegroup.id | concat_namespace(project_name) | pascal)+".I"+(messagegroup.id | strip_namespace | pascal)+"AmqpDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
 {
     this.{{ handlerName }} = {{ handlerName }};
@@ -129,18 +149,12 @@ public {{ class_name }}({%- if args %}{{ args }}, {%- endif -%}
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
-{%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
-{%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
-{{ handlerType }} {{ handlerName }};
-{%- endfor %}
 
 public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
     {%- set pascalGroupName = messagegroup.id  | pascal -%} 
     {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
-    {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | concat_namespace(project_name) | pascal)+".I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
@@ -148,7 +162,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {% for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
     {%- set pascalGroupName = messagegroup.id  | pascal %}
     {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
-    {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    {%- set handlerType=(messagegroup.id  | concat_namespace(project_name) | pascal)+".I"+(messagegroup.id  | strip_namespace | pascal)+"AmqpDispatcher" -%}
     this.{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
     {{ body | indent(4) }}
@@ -156,23 +170,24 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(root, message, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(project_name, data_project_name, root, message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
 var messageSubject = {{ message }}.Properties.Subject;
 switch (messageSubject)
 {
    {% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
-   {% for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
-   {% set pascalDefinitionName = message.id | pascal %}
-   case "{{ message.id }}":
+   {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
+   {%- set message_body_type = util.body_type(data_project_name, root, message) %}
+   {%- set pascalDefinitionName = id | pascal %}
+   case "{{ id }}":
          if ( this.{{ handlerName }} != null )
          {
-            await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
-               {%- if message.schemaurl or message.schema -%}
-            global::{{ (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
+            await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async(amqpMessage,
+            {%- if message_body_type != "byte[]" -%}
+            {{ message_body_type }}.FromData(amqpMessage.Body, amqpMessage.Properties.ContentType)
             {%- else -%}
-            {{ message }}.Data
+            amqpMessage.Data
             {%- endif %});
             break;
          }
@@ -186,30 +201,109 @@ switch (messageSubject)
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- macro DeclareDispatchInterfaces(project_name, data_project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
-{%- set function_name = project_name | pascal -%}
+{%- set function_name = project_name | pascal | strip_dots -%}
 {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
 {%- set pascalGroupName = messagegroup.id  | pascal %}
 {{- AmqpNetLiteHeaders() }}
 using System.Threading.Tasks;
 
-namespace {{ pascalGroupName | namespace(project_name) | pascal }}
+namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 {
    public interface I{{ pascalGroupName | strip_namespace }}AmqpDispatcher
    {
       {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
       {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
-      {%- if message.schemaurl or message.schema -%}
-      {%- set dataType = 'global::' + ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
-      {%- else -%}
-      {%- set dataType = "object" -%}
-      {%- endif %}   
+      {%- set dataType = util.body_type(data_project_name, root, message) %}
       Task On{{ pascalDefinitionName | strip_namespace }}Async(Message amqpMessage, {{ dataType }} data);
       {%- endfor %}
    }
 }
 {%- endfor -%}
 {%- endif -%}
+{%- endmacro -%}
+
+{%- macro CloudEventsMethods() -%}
+private static string[] ceAttribs = { "specversion", "dataschema", "time", "source", "subject", "type", "id" };
+protected const string amqpCloudEventPrefix1 = "cloudEvents_";
+protected const string amqpCloudEventPrefix2 = "cloudEvents:";
+protected static readonly CloudEventFormatter jsonFormatter = new JsonEventFormatter();
+protected static readonly CloudEventFormatter protoFormatter = new ProtobufEventFormatter();
+protected static readonly CloudEventFormatter avroFormatter = new global::CloudNative.CloudEvents.Avro.AvroEventFormatter();
+
+protected string? GetCloudEventAttribute(Message amqpMessage, string key)
+{
+    if (amqpMessage.ApplicationProperties.Map.TryGetValue(amqpCloudEventPrefix1 + key, out var value) ||
+        amqpMessage.ApplicationProperties.Map.TryGetValue(amqpCloudEventPrefix2 + key, out value))
+    {
+        return value as string;
+    }
+    return null;
+}
+
+protected CloudEvent CloudEventFromMessage(Message amqpMessage)
+{
+    CloudEventFormatter? formatter = null;
+    var contentType = amqpMessage.Properties.ContentType?.ToString().Split(';')[0];
+    if (contentType != null && contentType.StartsWith("application/cloudevents"))
+    {
+        formatter = contentType.EndsWith("+proto") ? protoFormatter :
+                    contentType.EndsWith("+avro") ? avroFormatter : jsonFormatter;
+         if (amqpMessage.Body is Amqp.Framing.Data bytes)
+         {
+            return formatter.DecodeStructuredModeMessage(bytes.Binary, new System.Net.Mime.ContentType(contentType), null);
+         }
+         else
+         {
+            throw new Exception("Unsupported CloudEvent body type: " + amqpMessage.Body.GetType().Name);
+         }
+    }
+    else
+    {
+        var bytes = amqpMessage.Body as Amqp.Framing.Data;
+        if ( bytes == null )
+        {
+            throw new Exception("Unsupported CloudEvent body type: " + amqpMessage.Body.GetType().Name);
+        }
+        var cloudEvent = new CloudEvent()
+        {
+            Data = bytes,
+            DataContentType = contentType,
+        };
+        string? specVersion = GetCloudEventAttribute(amqpMessage, "specversion");
+        if (specVersion != "1.0") throw new Exception("Unsupported CloudEvent specversion: " + specVersion);
+        string? dataSchema = GetCloudEventAttribute(amqpMessage, "dataschema");
+        string? time = GetCloudEventAttribute(amqpMessage, "time");
+        string? source = GetCloudEventAttribute(amqpMessage, "source");
+        string? subject = GetCloudEventAttribute(amqpMessage, "subject");
+        string? type = GetCloudEventAttribute(amqpMessage, "type");
+        string? id = GetCloudEventAttribute(amqpMessage, "id");
+        if (dataSchema != null) cloudEvent.DataSchema = new Uri(dataSchema);
+        if (time != null) cloudEvent.Time = DateTime.Parse(time);
+        if (source != null) cloudEvent.Source = new Uri(source);
+        if (subject != null) cloudEvent.Subject = subject;
+        if (type != null) cloudEvent.Type = type;
+        if (id != null) cloudEvent.Id = id;
+        foreach (var key in amqpMessage.ApplicationProperties.Map.Keys)
+        {
+            if (key.ToString().StartsWith(amqpCloudEventPrefix1) || key.ToString().StartsWith(amqpCloudEventPrefix2))
+            {
+                var attributeName = key.ToString().Substring(amqpCloudEventPrefix1.Length);
+                if (ceAttribs.Any(a => a == attributeName))
+                {
+                    continue;
+                }
+                cloudEvent[attributeName] = amqpMessage.ApplicationProperties.Map[key] as string;
+            }
+        }
+        return cloudEvent;
+    }
+}
+
+public static bool IsCloudEvent(Message amqpMessage) =>
+    MimeUtilities.IsCloudEventsContentType(amqpMessage.Properties.ContentType) ||
+    amqpMessage.ApplicationProperties.Map.ContainsKey(amqpCloudEventPrefix1) ||
+    amqpMessage.ApplicationProperties.Map.ContainsKey(amqpCloudEventPrefix2);
 {%- endmacro -%}

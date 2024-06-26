@@ -1,0 +1,6 @@
+{
+    "description" : "Apache Kafka producer class",
+    "priority" : 1,
+    "main_project_name" : "{project_name|pascal}KafkaProducer",
+    "data_project_name" : "{project_name|pascal}Data"
+}
