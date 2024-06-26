@@ -1,300 +1,170 @@
-# CloudEvents Registry CLI
+# xRegistry CLI
 
-[![Python Test](https://github.com/clemensv/cedisco-codegen/actions/workflows/test.yml/badge.svg)](https://github.com/clemensv/cedisco-codegen/actions/workflows/test.yml)
-[![Python Release](https://github.com/clemensv/cedisco-codegen/actions/workflows/build.yml/badge.svg)](https://github.com/clemensv/cedisco-codegen/actions/workflows/build.yml)
-
+[![Python Test](https://github.com/clemensv/xregistry-cli/actions/workflows/test.yml/badge.svg)](https://github.com/clemensv/xregistry-cli/actions/workflows/test.yml)
+[![Python Release](https://github.com/clemensv/xregistry-cli/actions/workflows/build.yml/badge.svg)](https://github.com/clemensv/xregistry-cli/actions/workflows/build.yml)
 
 > **NOTE**: However finished this project might look, this is currently just a prototype.
 > **Do not use any of its output for any serious purpose at the moment.**
 
-This project is a command line client for the *CloudEvents Registry*.
+This project is a command line client for the xRegistry document format and API, with
+a focus on generating code artifacts from xRegistry definitions, especially message catalogs.
 
-* [Introduction](#introduction)
-* [Installation](#installation)
-* [Usage](#usage)
+## Table of Contents
 
+- [What is xRegistry?](#what-is-xregistry)
+- [xRegistry Message Catalogs](#xregistry-message-catalogs)
 
+## What is xRegistry?
 
-## Introduction
+The [xRegistry project](https://xregistry.io/) run by the CNCF Serverless WG
+defines a generic, extensible, and interoperable registry for metadata and
+metadata documents. In particular, it is designed to support registries that aid
+with the discovery and description of messaging and eventing endpoints and
+therefore has three built-in registries for (payload-)schemas, message
+definitions, and endpoints.
 
-CloudEvents Discovery is an API and a file format for describing messaging and
-eventing endpoints, groups of message definitions, and payload schemas. The
-formal specification for the foundational "CloudEvents Registry" is available at
-[https://github.com/cloudevents/spec/blob/main/registry/spec.md](https://github.com/cloudevents/spec/blob/main/registry/spec.md).
-The formal specification for the "CloudEvents Discovery" features layered onto
-the registry resides at
-[https://github.com/cloudevents/spec/blob/main/discovery/spec.md](https://github.com/cloudevents/spec/blob/main/discovery/spec.md).
+xRegistry defines both an API and a document format for managing metadata and
+one of its key characteristics is that the REST API and the document model are
+symmetrical. An HTTP endpoint path in the API corresponds to a JSON pointer path
+in the document model.
 
-The "registry" is an API or document store (like a repo) where metadata is organized. 
-"Discovery" using that registry for finding out about concrete metadata for messaging 
-and eventing objects. This project is a client for interacting with a CloudEvents registry that 
-can, as one feature, generate code from the discovery metadata held in the registry.
+All metadata resources are organized in groups, and each group can contain
+multiple resources. Some resources allow for maintaining multiple versions, as
+it is the case for schemas.
 
-A current, formal document schema for discovery documents (.json) is embedded in this
-project at [xregistry/schemas/xregistry_messaging_catalog.json](xregistry/schemas/xregistry_messaging_catalog.json). 
+The xRegistry API and document model is defined in the
+[xRegistry API specification](https://github.com/xregistry/spec).
 
-> The schema in this prototype reflects changes not yet merged into the formal 
-> spec docs in the CloudEvents project repo.
+## xRegistry Message Catalogs
 
-While the CloudEvents Registry emerged from the CNCF CloudEvents project and has
-been designed for enabling robust development of CloudEvents-based flows, the
-registry is not limited to CloudEvents. It can be used to describe any
-asynchronous messaging or eventing endpoint, including such that do not use
-CloudEvents at all. This repository even contains a few examples of such
-definitions for AMQP and MQTT based flows.
+xRegistry Message Catalogs are a set of registries that are built on top of
+xRegistry and are designed to support the discovery and description of messaging
+and eventing endpoints. The following catalogs are defined:
 
-The file format has the extension `.json` (from "discovery") and is a JSON
-file. The tooling can also handle YAML files with an equivalent structure with a
-`.json.yaml` extension. This CLI tool can be used to generate code from a
-`.json` file, or to validate a `.json` file against the formal specification.
+-   **Schema Catalog**: A registry for schemas that can be used to validate
+    messages.
+-   **Message Catalog**: A registry for message definitions that describe the
+    structure of messages. Messages can be defined as abstract, transport
+    neutral envelopes based on [CloudEvents](https://cloudevents.io) or as concrete
+    messages that are bound to a specific transport protocol, whereby AMQP, HTTP, MQTT,
+    and Apache Kafka are directly supported. Each message definition can associated
+    with a schema from the schema catalog for describing the message payload.
+-   **Endpoint Catalog**: A registry for endpoints that can be used to send or
+    receive messages. Each endpoint can be associated with one or more groups of
+    message definitions from the message catalog.
 
-### A .json file
+The three catalogs are designed to be used together, with the endpoint catalog
+referring to message definition groups and message definitions referring to schemas.
 
-A `.json` file is a JSON or YAML file that describes a set of messaging
-constructs. We will briefly describe the structure of a `.json` file here for
-context, but the formal specification is the authoritative source for the
-structure.
+You can study some examples of xRegistry Message Catalog documents in the
+samples directory of this repository:
 
-The top-level of a `.json` file declares the schema and version of the specification:
-
-```json
-{
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
-```
-
-The endpoints section describes *producer*, *consumer*, and/or *subscriber*
-endpoints, named for the communication path they realize. The example shows a
-producer endpoint that uses HTTP for publishing CloudEvents. The endpoint is
-configured to use the `Contoso.ERP.Events` group of message definitions, and the
-`CloudEvents/1.0` format.
-
-Any endpoint can be seen from different perspectives: For a *producer* endpoint, there
-is the application from which events originate and the destination to which
-events are sent. For a *consumer* endpoint, there is the application which
-handles events and the source from which events are retrieved. For a
-*subscriber* endpoint, there is the application which handles arriving events
-and the source which sends them. There might also be further perspectives such
-as pipeline stages for pre-/post-processing, etc.
-
-The endpoint configuration describes the communication channel to which these
-perspectives apply. A code generator can use this information to generate code
-for a specific perspective using different templates.
-
-```json
-    "endpoints" : {
-        "myendpoint" : {
-            "id" : "myendpoint",
-            "usage": "producer",
-            "config": {
-                "protocol": "HTTP",
-                "strict": false,
-                "endpoints": [
-                    "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
-                ]
-            },
-            "messagegroups": [
-                "#/messagegroups/Contoso.ERP.Events"
-            ],
-            "format" : "CloudEvents/1.0"
-        }
-    },
-```
-
-The messagegroups section describes groups of message definitions. The
-example shows a group of CloudEvents message definitions with just one entry.
-The message definition describes the CloudEvent message type
-`Contoso.ERP.Events.ReservationPlaced`, which is a CloudEvent with a `time`
-attribute, a `source` attribute, and a `data` attribute that refers to the
-`orderData` schema. The schema is defined in the `schemagroups` section below.
-
-```json
-
-    "messagegroups": {
-        "Contoso.ERP.Events": {
-            "id": "Contoso.ERP.Events",
-            "messages": {
-                "Contoso.ERP.Events.ReservationPlaced": {
-                    "id": "Contoso.ERP.Events.ReservationPlaced",
-                    "description": "A reservation has been placed",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                        "id": {
-                            "type": "string",
-                            "required": true
-                        },
-                        "type": {
-                            "type": "string",
-                            "value": "Contoso.ERP.Events.ReservationPlaced",
-                            "required": true
-                        },
-                        "time": {
-                            "type": "datetime",
-                            "required": true
-                        },
-                        "source": {
-                            "type": "uritemplate",
-                            "value": "/erp/orders",
-                            "required": true
-                        }
-                    },
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
-                }
-            }
-        }
-    },
-```
-
-The *schemagroups* section describes groups of schemas. The example shows a
-group of JSON schemas with just one entry having a single version. The schema is
-used by the message definition above. Note that the schema is defined in the
-same file in this example, but it could also be defined in a separate file and
-referenced by URL, with a "schemaurl" property replacing the "schema" property.
-
-```json
-    "schemagroups": {
-        "Contoso.ERP.Events": {
-            "id": "Contoso.ERP.Events",
-            "schemas": {
-                "orderData": {
-                                        "id": "orderData",
-                    "format": "JsonSchema/draft-07",
-                    "versions": {
-                        "1": {
-                            "id": "1",
-                            "format": "JsonSchema/draft-07",
-                            "schema": {
-                                "$schema": "http://json-schema.org/draft-07/schema",
-                                "type": "object",
-                                "properties": {
-                                    "orderId": {
-                                        "type": "string"
-                                    },
-                                    "customerId": {
-                                        "type": "string"
-                                    },
-                                    "total": {
-                                        "type": "number"
-                                    },
-                                    "items": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "productId": {
-                                                    "type": "string"
-                                                },
-                                                "quantity": {
-                                                    "type": "number"
-                                                },
-                                                "price": {
-                                                    "type": "number"
-                                                }
-}   }   }   }   }   }   }   }   }   }   }   }
-```
-
-The `samples` directory contains a set of sample definition files that can be
-used to test the tool and which also illustrate the format further.
-
-For instance, the following files are available:
-
-- [contoso-crm.json](samples/message-definitions/contoso-crm.json) is a set of fictional event definitions for a fictional CRM system.
-- [contoso-erp.json](samples/message-definitions/contoso-erp.json) is a set of fictional event definitions for a fictional ERP system.
-- [Microsoft.Storage.json](samples/message-definitions/Microsoft.Storage.json) is a set of event definitions for Azure Storage Blobs.
-- [minimal-avro.json](samples/message-definitions/minimal-avro.json) uses an embedded Apache Avro schema for its payloads.
-- [minimal-proto.json](samples/message-definitions/minimal-proto.json) uses an embedded Google Protocol Buffers schema for its payloads.
-- [mqtt-producer-endpoint.json](samples/protocols/mqtt-producer-endpoint.json) shows how to define an MQTT producer endpoint with the MQTT packet format (not CloudEvents)
-- [amqp-producer-endpoint.json](samples/protocols/amqp-producer-endpoint.json) shows how to define an AMQP producer endpoint with the AMQP message format (not CloudEvents)
-
-There are several other examples in the [samples](samples) directory.
-
-An extreme example that demonstrates the versatility of the format is a full
-declaration of the Eclipse Sparkplug B industrial protocol for MQTT, including
-schemas and message definitions, in a single file:
-[sparkplugb.json](samples/message-definitions/mqtt-sparkplugB.json).
-
-Mind that not all of these samples are compatible with all code generator
-templates and not all templates yet refuse to render for incompatible files and
-might therefore yield confusing output or cause the generator to fail. For
-instance, an HTTP producer template is generally not compatible with a file that
-contains an MQTT producer endpoint.
+-   [**Contoso ERP**](samples/message-definitions/contoso-erp.xreg.json): A
+    simple example of a message catalog for a fictional ERP system.
+-   [**Inkjet Printer**](samples/message-definitions/inkjet.xreg.json): A
+    fictitious group of events as they may be raised by an inkhet printer.
+-   [**Fabrikam Motorsports**](samples/message-definitions/fabrikam-motorsports.xreg.json):
+    An example for an event stream as it may be used in a motorsports telemetry
+    scenario.
+-   [**Vacuum Cleaner**](samples/message-definitions/vacuumcleaner.xreg.json):
+    A fictitious group of events as they may be raised by a vacuum cleaner.
 
 ## Installation
 
-The tool requires Python 3.10 or later. Until the tool is published in an official package source (*this is a prototype, remember?*), you can install the tool with pip directly from the repo:
+The tool requires Python 3.10 or later. Until the tool is published in an
+official package source (_this is a prototype, remember?_), you can install the
+tool with pip directly from the repo:
 
 ```
 pip install git+https://github.com/clemensv/cloudevents-registry-cli.git
 ```
 
-If you want to develop locally and/or run the included tests follow the instructions in [Development Environment](docs/development_environment.md).
+If you want to develop locally and/or run the included tests follow the
+instructions in [Development Environment](docs/development_environment.md).
 
 ## Usage
 
 The tool is invoked as `xregistry` and supports the following subcommands:
-- `xregistry generate`:  Generate code
-- `xregistry validate`:  Validate a definition
+
+- `xregistry generate`: Generate code
+- `xregistry validate`: Validate a definition
 - `xregistry list`: List available templates
 
 ### Generate
 
-The `generate` subcommand generates code from a definition file. The tool includes a set of built-in language/style template sets that can be enumerated with the [List](#list) command.
+The `generate` subcommand generates code from a definition file. The tool
+includes a set of built-in language/style template sets that can be enumerated
+with the [List](#list) command.
 
-The `generate` command takes the following options:	
+The `generate` command takes the following options:
 
-| Option | Description |
-| --- | --- |
-| `--projectname` | **Required** The project name (namespace name) for the generated code. |
-| `--language` | **Required**  The shorthand code of the language to use for the generated code, for instance "cs" for C# or "ts" for TypeScript/JavaScript. See [Languages](#languages-and-styles). |
-| `--style` | The code style. This selects one of the template sets available for the given language, for instance "producer". See [Styles](#languages-and-styles)|
-| `--output` | The directory where the generated code will be saved. The generator will overwrite existing files in this directory. |
-| `--definitions` | The path to a local file or a URL to a file containing CloudEvents Registry definitions. |
-| `--requestheaders` | Extra HTTP headers for HTTP requests to the given URL in the format `key=value`. |
-| `--templates` | Paths of extra directories containing custom templates See [Custom Templates]. |
-| `--template-args` | Extra template arguments to pass to the code generator in the form `key=value`. |
+| Option             | Description                                                                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--projectname`    | **Required** The project name (namespace name) for the generated code.                                                                                                             |
+| `--language`       | **Required** The shorthand code of the language to use for the generated code, for instance "cs" for C# or "ts" for TypeScript/JavaScript. See [Languages](#languages-and-styles). |
+| `--style`          | The code style. This selects one of the template sets available for the given language, for instance "producer". See [Styles](#languages-and-styles)                               |
+| `--output`         | The directory where the generated code will be saved. The generator will overwrite existing files in this directory.                                                               |
+| `--definitions`    | The path to a local file or a URL to a file containing CloudEvents Registry definitions.                                                                                           |
+| `--requestheaders` | Extra HTTP headers for HTTP requests to the given URL in the format `key=value`.                                                                                                   |
+| `--templates`      | Paths of extra directories containing custom templates See [Custom Templates].                                                                                                     |
+| `--template-args`  | Extra template arguments to pass to the code generator in the form `key=value`.                                                                                                    |
 
 #### Languages and Styles
 
 The tool supports the following languages and styles (as emitted by the `list` command):
 
 ```
+--languages options:
+styles:
 ├── asaql: Azure Stream Analytics
 │   ├── dispatch: Azure Stream Analytics: Dispatch to outputs by CloudEvent type
 │   └── dispatchpayload: Azure Stream Analytics: Dispatch to outputs by CloudEvent type
+├── py: Python 3.9+
+│   ├── ehconsumer: Python Event Hubs consumer class
+│   ├── ehproducer: Python Event Hubs producer class
+│   ├── kafkaconsumer: Python Apache Kafka consumer class
+│   ├── kafkaproducer: Python Event Hubs producer class
+│   └── producer: Python generic HTTP producer class
+├── ts: JavaScript/TypeScript
+│   └── producerhttp: JavaScript/TypeScript HTTP Producer
 ├── asyncapi: Async API 2.0
 │   └── producer: Async API 2.0 Producer/Publisher
-├── cs: C# / .NET 6.0+
-│   ├── azfunctioneventgrid: C# Azure Function with Azure Event Grid trigger
-│   ├── azfunctioneventhubs: C# Azure Function with Azure Event Hubs trigger
-│   ├── azfunctionhttp: C# Azure Function with HTTP trigger
-│   ├── azfunctionservicebus: C# Azure Function with Azure Service Bus trigger
-│   ├── consumer: C# CloudEvents SDK endpoint consumer class
-│   └── producer: C# CloudEvents SDK endpoint producer class
-├── java: Java 13+
-│   ├── consumer: Java CloudEvents SDK endpoint consumer class
-│   └── producer: Java CloudEvents SDK endpoint producer class
 ├── openapi: Open API 3.0
 │   ├── producer: Open API 3.0 Producer
 │   └── subscriber: Open API 3.0 Subscriber
-├── py: Python 3.9+
-│   └── <DirEntry 'producer'>
-└── ts: JavaScript/TypeScript
-    └── producerhttp: JavaScript/TypeScript HTTP Producer
+├── java: Java 21+
+│   ├── consumer: Java Experimental CloudEvents SDK endpoint consumer class
+│   └── producer: Java Experimental CloudEvents SDK endpoint producer class
+└── cs: C# / .NET 6.0+
+    ├── egazfn: C# Azure Function with Azure Event Grid trigger
+    ├── ehazfn: C# Azure Function with Azure Event Hubs trigger
+    ├── sbazfn: C# Azure Function with Azure Service Bus trigger
+    ├── amqpconsumer: C# CloudEvents SDK AMQP endpoint consumer class
+    ├── amqpproducer: C# CloudEvents SDK AMQP endpoint producer class
+    ├── egproducer: C# Azure Service Bus producer class
+    ├── ehconsumer: C# Azure Event Hubs consumer
+    ├── ehproducer: Azure Event Hubs producer class
+    ├── kafkaconsumer: C# Apache Kafka consumer
+    ├── kafkaproducer: Apache Kafka producer class
+    ├── mqttclient: C# MQTT Client
+    ├── sbconsumer: C# Azure Service Bus consumer
+    └── sbproducer: Azure Service Bus producer class
 ```
 
-Especially noteworthy might be the support for both AsyncAPI and OpenAPI. 
+Especially noteworthy might be the support for both AsyncAPI and OpenAPI.
 
 ##### OpenAPI
 
-The tool can generate AsyncAPI definitions for producer endpoints with: 
+The tool can generate AsyncAPI definitions for producer endpoints with:
+
 ```shell
 xregistry generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer
-``` 
+```
 
 This will yield a `MyProjectProducer/MyProjectProducer.yml' file that can be used to generate a
 producer client for the given endpoint.
 
-Similarly, the tool can generate OpenAPI definitions for subscriber endpoints with: 
+Similarly, the tool can generate OpenAPI definitions for subscriber endpoints with:
 
 ```shell
 xregistry generate --language=openapi --style=subscriber --projectname=MyProjectSubscriber --definitions=definitions.json --output=MyProjectSubscriber
@@ -306,7 +176,7 @@ with the CloudEvents Subscription API.
 
 ##### AsyncAPI
 
-The tool can generate AsyncAPI definitions with: 
+The tool can generate AsyncAPI definitions with:
 
 ```shell
 xregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer
@@ -334,10 +204,10 @@ The `validate` subcommand validates a definition file. The tool will report any 
 
 The `validate` command takes the following options:
 
-| Option | Description |
-| --- | --- |
-| `--definitions` | The path to a local file or a URL to a file containing CloudEvents Registry definitions. |
-| `--requestheaders` | Extra HTTP headers for HTTP requests to the given URL in the format `key=value`. |
+| Option             | Description                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| `--definitions`    | The path to a local file or a URL to a file containing xRegistry definitions. |
+| `--requestheaders` | Extra HTTP headers for HTTP requests to the given URL in the format `key=value`.         |
 
 ### List
 
