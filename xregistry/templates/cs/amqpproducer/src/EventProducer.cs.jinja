@@ -79,7 +79,7 @@ namespace {{ project_name | pascal }}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isAmqp = amqp.isAmqp(message) %}
         public async Task Send{{ pascal_message_name | strip_namespace }}Async(
-        {{- util.body_type(project_name, root, message) }} data    
+        {{- util.body_type(data_project_name, root, message) }} data    
         {%- if isCloudEvent -%}
         {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
         {%- elif isAmqp -%}

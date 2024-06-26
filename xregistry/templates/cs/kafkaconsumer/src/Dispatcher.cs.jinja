@@ -34,7 +34,7 @@ namespace {{ project_name | pascal }}
             {%- endif %}
             {%- for id, message in messagegroup.messages.items() -%}
             {%- set pascal_message_name = message.id | strip_namespace | pascal -%}
-            {%- set message_body_type = util.body_type(project_name, root, message) -%}
+            {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
             {%- if message.description %}
             /// <summary>
             /// {{ message.description }}
@@ -89,7 +89,7 @@ namespace {{ project_name | pascal }}
                     {% for id, message in messagegroup.messages.items() -%}
                     {%- set pascal_message_name = message.id | pascal %}
                     {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
-                    {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                    {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                     case "{{ message.id }}":
                         if ({{ pascal_message_name | strip_namespace }}Async != null)
                         {
@@ -127,7 +127,7 @@ namespace {{ project_name | pascal }}
                 {% for id, message in messagegroup.messages.items() if ((message | exists("binding", "kafka" )) and not (message | exists("format", "cloudevents" ))) -%}
                 {%- set pascal_message_name = message.id | pascal %}
                 {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
-                {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                     case "{{ message.id }}":
                         if ({{ pascal_message_name | strip_namespace }}Async != null)
                         {

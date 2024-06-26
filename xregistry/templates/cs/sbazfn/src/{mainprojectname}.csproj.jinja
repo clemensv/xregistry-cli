@@ -1,0 +1,31 @@
+{%- macro dep(name) -%}{{- dependency( 'cs', 'net80', name) -}}{%- endmacro -%}
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\{{ data_project_name }}\src\{{data_project_name | pascal}}.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    {{- dep( 'Azure.Core.Amqp') }}
+    {{- dep( 'Azure.Messaging.ServiceBus') }}
+    {{- dep( 'Microsoft.Azure.Functions.Worker') }}
+    {{- dep( 'Microsoft.Azure.Functions.Worker.Extensions.ServiceBus') }}
+    {{- dep( 'CloudNative.CloudEvents') }}
+    {{- dep( 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dep( 'CloudNative.CloudEvents.Avro') }}
+    {{- dep( 'CloudNative.CloudEvents.Protobuf') }}
+    {{- dep( 'Microsoft.Extensions.Logging') }}
+    {{- dep( 'System.Memory.Data') }}
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="host.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="local.settings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+</Project>

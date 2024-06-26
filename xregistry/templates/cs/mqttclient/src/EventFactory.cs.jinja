@@ -166,7 +166,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set pascal_message_name = message.id | pascal %}
         {%- set is_cloudevent = not message.format or message.format.lower().startswith("cloudevents") -%}
         {%- set is_raw_mqtt = not is_cloudevent and message.format.lower().startswith("mqtt") %}
-        {%- set type_name = util.body_type(project_name, root, message) -%}
+        {%- set type_name = util.body_type(data_project_name, root, message) -%}
         {%- if is_cloudevent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
         {%- elif is_raw_mqtt %}

@@ -1,4 +1,7 @@
 {
-    "description" : "Python Kafka producer class",
-    "priority" : 1
+    "description" : "Python Apache Kafka consumer class",
+    "priority" : 1,
+    "main_project_name" : "{project_name|dotunderscore|lower}_kafka_consumer",
+    "data_project_name" : "{project_name|dotunderscore|lower}_data",
+    "src_layout" : false
 }

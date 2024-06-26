@@ -49,9 +49,9 @@ from azure.identity.aio import DefaultAzureCredential
 
 {%- for messagegroup_key, messagegroup in messagegroups.items() %}
 {%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
 from {{main_project_name}}.dispatcher import {{class_name}}
-{%- for id, message in messagegroup.messages.items() %}
+{%- for id, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
 
 async def handle_{{ message.id | dotunderscore | snake }}(partition_context, event, cloud_event, {{ message.id | dotunderscore | snake }}_event_data):
     """ Handles the {{ message.id }} event """
@@ -66,9 +66,9 @@ async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, bl
     {%- set messagegroups = root.messagegroups %}
     {%- for messagegroup_key, messagegroup in messagegroups.items() %}
     {%- set pascalGroupName = messagegroup.id | pascal %}
-    {%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
     dispatcher = {{ class_name }}()
-    {%- for id, message in messagegroup.messages.items() %}
+    {%- for id, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
     dispatcher.{{ message.id | dotunderscore | snake }}_async = handle_{{ message.id | dotunderscore | snake }}
     {%- endfor %}
     {%- endfor %}
@@ -88,9 +88,9 @@ async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, bl
     {%- else -%}
     {%- for messagegroup_key, messagegroup in messagegroups.items() %}
     {%- set pascalGroupName = messagegroup.id | pascal %}
-    {%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
     {{messagegroup.id | dotunderscore | snake}}_dispatcher = {{ class_name }}()
-    {%- for id, message in messagegroup.messages.items() %}
+    {%- for id, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
     {{messagegroup.id | dotunderscore | snake}}_dispatcher.{{ message.id | dotunderscore | snake }}_async = {{ message.id | dotunderscore | snake }}_event
     {%- endfor %}
     {%- endfor %}
@@ -104,7 +104,7 @@ async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, bl
     )
     {%- for messagegroup_key, messagegroup in messagegroups.items() %}
     {%- set pascalGroupName = messagegroup.id | pascal %}
-    {%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
     event_processor.add_dispatcher({{messagegroup.id | dotunderscore | snake}}_dispatcher)
     {%- endfor %}
     async with event_processor:

@@ -30,7 +30,7 @@ namespace {{ project_name | pascal }}
 
         {%- for id, message in messagegroup.messages.items() -%}
         {%- set pascal_message_name = message.id | strip_dots | pascal -%}
-        {%- set message_body_type = util.body_type(project_name, root, message) %}
+        {%- set message_body_type = util.body_type(data_project_name, root, message) %}
         {%- if cloudEvents.isCloudEvent(message) %}
         public event Func<CloudEvent, {{ message_body_type }}?, Task>? {{ pascal_message_name }}Async;
         {%- else %}
@@ -63,7 +63,7 @@ namespace {{ project_name | pascal }}
             {
                 {% for id, message in messagegroup.messages.items() -%}
                 {%- set pascal_message_name = message.id | strip_dots | pascal -%}
-                {%- set message_body_type = util.body_type(project_name, root, message) %}
+                {%- set message_body_type = util.body_type(data_project_name, root, message) %}
                 case "{{ message.id }}":
                     if ({{ pascal_message_name }}Async != null)
                     {
@@ -97,7 +97,7 @@ namespace {{ project_name | pascal }}
             {
                 {% for id, message in messagegroup.messages.items() -%}
                 {%- set pascal_message_name = message.id | strip_dots | pascal -%}
-                {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                 case "{{ message.id }}":
                     if ({{ pascal_message_name }}Async != null)
                     {

@@ -128,9 +128,13 @@ switcher = {
     {%- endif %}
     {%- endfor %}
 }
-func = switcher.get(message_subject, lambda: {{ logger }}.error(f"Unsupported message subject {message_subject}"))
+func = switcher.get(message_subject, None)
 if func:
     await func()
+{%- if logger %}
+else:
+    {{ logger }}.error(f"Unsupported CloudEvent type {cloud_event_type}")
+{%- endif %}
 {%- endmacro -%}
 
 {%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
@@ -151,9 +155,13 @@ switcher = {
     {%- endfor %}
     {%- endfor %}
 }
-func = switcher.get(message_subject, lambda: {{ logger }}.error(f"Unsupported message subject {message_subject}"))
+func = switcher.get(message_subject, None)
 if func:
     await func()
+{%- if logger %}
+else:
+    {{ logger }}.error(f"Unsupported CloudEvent type {cloud_event_type}")
+{%- endif %}
 {%- endif -%}
 {%- endmacro -%}
 

@@ -15,14 +15,14 @@ script (or `install.bat` on Windows) in the root of the repository.
 The repository contains two projects.
 * The `{{project_name}}_eventhubs_consumer` project is the main project that
   contains the Event Hubs consumer client code.
-* The `{{project_name}}_data` project contains the data classes for the event
+* The `{{ data_project_name }}` project contains the data classes for the event
   payload data.
 
 The classes defined in `{{project_name}}_eventhubs_consumer` are documented
 in the project [README](./{{project_name}}_eventhubs_consumer/README.md).
 
 The `{{project_name}}_eventhubs_consumer` project depends on the
-`{{project_name}}_data` project.
+`{{ data_project_name }}` project.
 
 If you want to install the consumer project, you can run the following command:
 
@@ -34,7 +34,7 @@ This will install both packages. If you only want to install the data project,
 you can run the following command:
 
 ```bash
-pip install ./{{project_name}}_data
+pip install ./{{ data_project_name }}
 ```
 
 ## Build and Test
@@ -81,7 +81,7 @@ function when a message is received. Example:
 ```python
 {%- set messagegroup_key, messagegroup = messagegroups.items()|first %}
 {%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
 {{messagegroup.id | dotunderscore | snake}}_dispatcher = {{ class_name }}()
 {%- set id, message = messagegroup.messages.items()|first %}
 {{messagegroup.id | dotunderscore | snake}}_dispatcher.{{ message.id | dotunderscore | snake }}_async = {{ message.id | dotunderscore | snake }}_event
@@ -164,7 +164,7 @@ event_processor = EventStreamProcessor.create(
 
 {%- for messagegroup_key, messagegroup in messagegroups.items() %}
 {%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_namespace ) + "EventDispatcher" %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
 event_processor.add_dispatcher({{messagegroup.id | dotunderscore | snake}}_dispatcher)
 {%- endfor %}
 async with event_processor:

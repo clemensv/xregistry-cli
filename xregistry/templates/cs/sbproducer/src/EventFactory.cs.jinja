@@ -115,7 +115,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set pascal_message_name = message.id | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isAmqp = amqp.isAmqp(message) %}
-        {%- set type_name = util.body_type(project_name, root, message) %}
+        {%- set type_name = util.body_type(data_project_name, root, message) %}
         {%- if message.description %}
         /// <summary>
         /// {{ message.description }}

@@ -1,0 +1,102 @@
+{% import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "kafka.jinja.include" as kafka -%}
+{%- import "util.include.jinja" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_plain_kafka_message = (root | exists( "binding", "kafka" )) %}
+{%- set uses_kafka_endpoint = (root | exists( "protocol", "kafka" )) %}
+{%- set function_name = project_name | pascal | strip_dots -%}
+# pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, redefined-outer-name, missing-class-docstring
+
+import asyncio
+import logging
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/tests')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}/src')))
+
+import tempfile
+import pytest
+from kafka import KafkaProducer, KafkaConsumer
+from confluent_kafka.admin import AdminClient, NewTopic
+from testcontainers.kafka import KafkaContainer
+
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+from {{main_project_name}}.dispatcher import {{class_name}}
+{%- for id, message in messagegroup.messages.items() %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+from test_{{ type_name | dotunderscore | lower}} import Test_{{ type_name | pascal | strip_namespace }}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+@pytest.fixture(scope="module")
+async def kafka_emulator():
+    with KafkaContainer() as kafka:
+        connection = kafka.get_bootstrap_server()
+        admin_client = AdminClient({'bootstrap.servers': connection})
+        topic_list = [NewTopic("test_topic", num_partitions=1, replication_factor=1)]
+        admin_client.create_topics(topic_list)
+
+        yield {
+            "bootstrap_servers": connection
+        }
+
+{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+{%- set test_class_name = (project_name | pascal | strip_dots) + (pascalGroupName | strip_dots) + "Tests" %}
+
+{%- for id, message in messagegroup.messages.items() %}
+{%- set message_id = id | pascal | strip_dots | strip_namespace %}
+{%- set test_function_name = "test_" + pascalGroupName | lower | replace(" ", "_") + "_" + message_id | lower | replace(" ", "_") %}
+
+@pytest.mark.asyncio
+async def {{ test_function_name | dotunderscore }}(kafka_emulator):
+    """Test the {{ message_id }} message from the {{ pascalGroupName }} message group"""
+
+    # Turn on logging if running in debugger
+    if sys.gettrace() is not None:
+        logging.basicConfig(level=logging.DEBUG)
+        kafka_logger = logging.getLogger('kafka')
+        kafka_logger.setLevel(logging.DEBUG)
+        logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
+
+    async for emulator in kafka_emulator:
+        bootstrap_servers = emulator["bootstrap_servers"]
+
+        dispatcher = {{ class_name }}()
+
+        future = asyncio.Future()
+        async def set_future(consumer, record, cloud_event, data):
+            if not future.done():
+                future.set_result(data)
+
+        dispatcher.{{ message.id | dotunderscore | snake }}_async = set_future
+        async with dispatcher.create_consumer("test-group", bootstrap_servers, ["test_topic"]):
+            producer = KafkaProducer(
+                bootstrap_servers=bootstrap_servers
+            )
+            {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+            {%- if type_name != "object" %}
+            event_data = Test_{{ type_name | pascal | strip_namespace }}.create_instance().to_byte_array("application/json")
+            {%- else %}
+            event_data = {}
+            {%- endif %}
+            producer.send('test_topic', value=event_data, headers=[
+                ("ce_type", b"{{ message.id }}"),
+                ("ce_specversion", b"1.0"),
+                ("ce_source", b"/test"),
+                ("ce_id", b"test-id"),
+                ("content-type", b"application/json")
+            ])
+            producer.flush()
+            await asyncio.wait_for(future, timeout=5)
+
+{% endfor %}
+{% endfor %}

@@ -1,0 +1,116 @@
+{%- import "util.include.jinja" as util -%}
+
+# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
+import sys
+import typing
+from azure.eventhub import EventHubProducerClient, EventData
+from cloudevents.conversion import to_binary, to_structured
+from cloudevents.http import CloudEvent
+
+
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroup_key, messagegroup in messagegroups.items() -%}
+{%- for id, definition in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, definition ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+{%- for messagegroup_key, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroup.id.split('.') -%}
+{%- set groupName = parts | join('_') | lower %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots )+"EventProducer" %}
+
+class {{ class_name }}:
+    def __init__(self, producer: EventHubProducerClient, content_mode:typing.Literal['structured','binary']= 'structured'):
+        """
+        Initializes the EventHub producer
+
+        Args:
+            producer (EventHubProducerClient): The EventHub producer client
+            content_mode (typing.Literal['structured','binary']): The content mode to use for sending events
+        """
+        self.producer = producer
+        self.content_mode = content_mode
+
+    {% for id, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) -%}
+    {%- set definitionName = message.id | dotunderscore | snake %}
+    async def send_{{definitionName.split('.')[-1]}}(self,
+    {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+        _{{ attrname }}: str, {{ '' }}
+    {%- endfor -%}
+    {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} : str, {% endfor -%}
+    {%- endfor -%}
+    data: {{ util.DeclareDataType( project_name, root, message ) | strip_namespace -}}, content_type: str = "application/json"
+    {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+        , _{{ attrname }}: typing.Optional[str] = None
+    {%- endfor -%} ) -> None:
+        """
+        Sends the '{{ message.id }}' event to the EventHub
+
+        Args:
+        {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined %}
+            _{{ attrname }}(str) : {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+        {%- endfor -%}
+        {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" %}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+            _{{ placeholder | snake }}(str):  Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+            {%- endfor -%}
+        {%- endfor %}
+            data: ({{ util.DeclareDataType( project_name, root, message ) | strip_namespace -}}): The event data to be sent
+            content_type (str): The content type that the event data shall be sent with
+        {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined %}
+            _{{ attrname }}(typing.Optional[str]): {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+        {%- endfor %}
+        """
+
+        attributes = {
+        {%- for attrname, attribute in message.metadata.items() %}
+             "{{ attrname }}":
+            {%- if attribute.value -%}
+            "{{ attribute.value }}"
+            {%- if attribute.type == "uritemplate" -%}
+                {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+                {%- if phs -%}
+                .format(
+                {%- for placeholder in phs -%}
+                    {{ placeholder }} = _{{ placeholder | snake }}
+                {%- if not loop.last -%},{%- endif%}
+                {%- endfor -%}
+                )
+                {%- endif %}
+            {%- endif %}
+            {%- else -%}
+                _{{ attrname }}
+            {%- endif-%}
+            {%- if not loop.last -%},{%- endif %}
+        {%- endfor %}
+        }
+        attributes["datacontenttype"] = content_type
+        byte_data = data.to_byte_array(content_type)
+        event = CloudEvent(attributes, byte_data)
+        if self.content_mode == "structured":
+            headers, body = to_structured(event)
+        else:
+            headers, body = to_binary(event)
+        event_data = EventData(body)
+        if "Content-Type" in headers:
+            event_data.content_type = headers["Content-Type"]
+            del headers["Content-Type"]
+        for key, value in headers.items():
+            if key.lower().startswith("ce-"):
+                event_data.properties["cloudEvents_"+key[3:]] = value
+            else:
+                event_data.properties[key] = value
+        await self.producer.send_event(event_data)
+{% endfor %}
+{% endfor %}

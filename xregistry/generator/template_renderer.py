@@ -6,7 +6,6 @@ from ast import main
 import glob
 import json
 import os
-from pydoc import resolve
 import re
 import tempfile
 import uuid
@@ -44,14 +43,14 @@ class TemplateRenderer:
     """Renderer for templates."""
 
     def __init__(self, ctx: GeneratorContext, project_name: str, language: str, style: str, output_dir: str,
-                 definitions_file_arg: str, headers: Dict[str, str], template_dirs: List[str], template_args: Dict[str, Any],
+                 xreg_file_arg: str, headers: Dict[str, str], template_dirs: List[str], template_args: Dict[str, Any],
                  suppress_code_output: bool, suppress_schema_output: bool) -> None:
         self.ctx = ctx
         self.project_name = project_name
         self.language = language
         self.style = style
         self.output_dir = output_dir
-        self.definitions_file_arg = definitions_file_arg
+        self.xreg_file_arg = xreg_file_arg
         self.headers = headers
         self.template_dirs = template_dirs
         self.template_args = template_args
@@ -68,11 +67,11 @@ class TemplateRenderer:
 
     def generate(self) -> None:
         """Generate code and schemas from templates."""
-        definitions_file, docroot = self.ctx.loader.load(
-            self.definitions_file_arg, self.headers, self.style == "schema")
-        if not definitions_file or not docroot:
+        xreg_file, xregistry_document = self.ctx.loader.load(
+            self.xreg_file_arg, self.headers, self.style == "schema")
+        if not xreg_file or not xregistry_document:
             raise RuntimeError(
-                f"Definitions file not found or invalid {self.definitions_file_arg}")
+                f"Definitions file not found or invalid {self.xreg_file_arg}")
 
         pt = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
         code_template_dir = os.path.join(
@@ -126,9 +125,11 @@ class TemplateRenderer:
         code_env = self.setup_jinja_env(code_template_and_include_dirs)
         schema_env = self.setup_jinja_env(schema_template_dirs)
 
-        self.render_code_templates(self.project_name, self.main_project_name, self.data_project_name, self.style, project_dir, docroot,
+        #  render from code template directories
+        self.render_code_templates(self.project_name, self.main_project_name, self.data_project_name, self.style, project_dir, xregistry_document,
                                    code_template_dirs, code_env, False, self.template_args, self.suppress_code_output)
-        self.render_code_templates(self.project_name, self.main_project_name, self.data_project_name, self.style, project_data_dir, docroot,
+        # render from schema template directories
+        self.render_code_templates(self.project_name, self.main_project_name, self.data_project_name, self.style, project_data_dir, xregistry_document,
                                    schema_template_dirs, schema_env, False, self.template_args, self.suppress_schema_output)
 
         while not SchemaUtils.schema_references_collected.issubset(self.ctx.loader.get_schemas_handled()):
@@ -150,16 +151,16 @@ class TemplateRenderer:
                     if schema_reference.startswith("#"):
                         path_elements = schema_reference.split('/')
                         if path_elements[-2] == "versions":
-                            definitions_file = path_elements[-3]
+                            xreg_file = path_elements[-3]
                         else:
-                            definitions_file = path_elements[-1]
+                            xreg_file = path_elements[-1]
 
                         if not class_name:
-                            class_name = definitions_file
+                            class_name = xreg_file
 
                         try:
                             match = jsonpointer.resolve_pointer(
-                                docroot, schema_reference[1:])
+                                xregistry_document, schema_reference[1:])
                             if not match:
                                 continue
                             schema_root = match
@@ -172,12 +173,12 @@ class TemplateRenderer:
                         if '#' in schema_reference:
                             schema_reference, type_ref = schema_reference.split(
                                 "#")
-                        schema_reference, docroot = self.ctx.loader.load(
+                        schema_reference, xregistry_document = self.ctx.loader.load(
                             schema_reference, self.headers, True)
                         if type_ref:
                             try:
                                 match = jsonpointer.resolve_pointer(
-                                    docroot, type_ref)
+                                    xregistry_document, type_ref)
                                 if not match:
                                     continue
                                 schema_root = match
@@ -205,7 +206,7 @@ class TemplateRenderer:
                             parent_reference = schema_reference.rsplit(
                                 "/", 2)[0]
                             parent = jsonpointer.resolve_pointer(
-                                docroot, parent_reference[1:])
+                                xregistry_document, parent_reference[1:])
                             if parent and isinstance(parent, dict):
                                 prefix = parent.get("id", '')
                                 if not class_name.startswith(prefix):
@@ -225,13 +226,13 @@ class TemplateRenderer:
                             parent_reference = schema_reference.rsplit(
                                 "/", 1)[0]
                             parent = jsonpointer.resolve_pointer(
-                                docroot, parent_reference[1:])
+                                xregistry_document, parent_reference[1:])
                             if parent and isinstance(parent, dict) and not class_name:
                                 class_name = parent.get("id", class_name)
                             parent_reference = parent_reference.rsplit(
                                 "/", 2)[0]
                             parent = jsonpointer.resolve_pointer(
-                                docroot, parent_reference[1:])
+                                xregistry_document, parent_reference[1:])
                             if parent and isinstance(parent, dict):
                                 prefix = parent.get("id", '')
                                 if not class_name.startswith(prefix):
@@ -298,10 +299,8 @@ class TemplateRenderer:
                                         JinjaFilters.strip_namespace(class_name))
                                 )
                                 schema_format_short = "avro"
-                            avro_enabled = self.template_args.get(
-                                "avro-encoding", "false") == "true"
-                            json_enabled = self.template_args.get(
-                                "json-encoding", "true") == "true"
+                            avro_enabled = self.template_args.get("avro-encoding", "false") == "true" or schema_format_short == "avro"
+                            json_enabled = self.template_args.get("json-encoding", "true") == "true"
                             if self.language == "py":
                                 avrotize.convert_avro_schema_to_python(
                                     schema_root, project_data_dir, package_name=self.data_project_name,
@@ -330,7 +329,7 @@ class TemplateRenderer:
                         else:
                             self.render_schema_templates(
                                 schema_format_short, self.data_project_name, class_name, self.language,
-                                project_data_dir, definitions_file, schema_root, schema_template_dirs,
+                                project_data_dir, xreg_file, schema_root, schema_template_dirs,
                                 schema_env, self.template_args, self.suppress_schema_output
                             )
                         continue
@@ -339,7 +338,7 @@ class TemplateRenderer:
                                        schema_reference if schema_reference else '')
 
         self.render_code_templates(
-            self.project_name, self.main_project_name, self.data_project_name, self.style, project_dir, docroot,
+            self.project_name, self.main_project_name, self.data_project_name, self.style, project_dir, xregistry_document,
             code_template_dirs, code_env, True, self.template_args, self.suppress_code_output
         )
 
@@ -348,7 +347,7 @@ class TemplateRenderer:
         if self.style == "schema":
             self.render_schema_templates(
                 None, self.main_project_name, None, self.language,
-                project_dir, definitions_file, docroot, schema_template_dirs, schema_env,
+                project_dir, xreg_file, xregistry_document, schema_template_dirs, schema_env,
                 self.template_args, self.suppress_schema_output
             )
 
@@ -420,13 +419,13 @@ class TemplateRenderer:
 
     def render_code_templates(
             self, code_project_name: str, main_project_name: str, data_project_name: str,
-            style: str, output_dir: str, docroot: JsonNode,
+            style: str, output_dir: str, xregistry_document: JsonNode,
             code_template_dirs: List[str], env: jinja2.Environment, post_process: bool,
             template_args: Dict[str, Any], suppress_output: bool = False) -> None:
         """Render code templates."""
         logger.debug(
             "Rendering code templates for project: %s, style: %s", code_project_name, style)
-        if not isinstance(docroot, dict):
+        if not isinstance(xregistry_document, dict):
             raise RuntimeError("Document root is not a dictionary")
         class_name = None
         for template_dir in code_template_dirs:
@@ -441,7 +440,7 @@ class TemplateRenderer:
                         continue
 
                     template_path = relpath + "/" + file
-                    scope = docroot
+                    scope = xregistry_document
                     class_name = ''
 
                     file_dir = file_dir_base = os.path.join(
@@ -459,16 +458,20 @@ class TemplateRenderer:
                         logger.error("%s: (%s): %s", err.name, err.lineno, err)
                         exit(1)
 
-                    file_name_base = self.resolve_string(file_name_base, {"projectname", code_project_name})
+                    file_name_base = self.resolve_string(file_name_base, {
+                                                            "projectname": code_project_name,
+                                                            "mainprojectname": main_project_name,
+                                                            "dataprojectname": data_project_name,
+                                                        })
                     file_name = file_name_base
                     if file_name.startswith("{class"):
                         if isinstance(scope, dict) and "messagegroups" in scope:
-                            if "endpoints" in docroot:
-                                endpoints = docroot["endpoints"]
+                            if "endpoints" in xregistry_document:
+                                endpoints = xregistry_document["endpoints"]
                             else:
                                 endpoints = None
-                            if "schemagroups" in docroot:
-                                schemagroups = docroot["schemagroups"]
+                            if "schemagroups" in xregistry_document:
+                                schemagroups = xregistry_document["schemagroups"]
                             else:
                                 schemagroups = None
 
@@ -496,7 +499,7 @@ class TemplateRenderer:
                                     raise RuntimeError("Class name not found")
                                 if file_name_base.find("{classdir}") > -1:
                                     file_dir = os.path.join(file_dir_base, os.path.join(*package_name.split(".")).lower())
-                                    file_name = self.resolve_string(file_name_base, {"classdir", package_class_name })
+                                    file_name = self.resolve_string(file_name_base, {"classdir": package_class_name })
                                     class_name = f'{package_name}.{file_name.split(".")[0]}'
                                 else:
                                     file_name = self.resolve_string(file_name_base, {
@@ -530,31 +533,31 @@ class TemplateRenderer:
                         file_name = scope_parts[-1]
                     else:
                         file_dir = file_dir_base if not has_rootdir else self.output_dir
-                    
+
                     self.render_template(code_project_name, main_project_name, data_project_name,
                                          class_name, scope, file_dir,
                                          file_name, template, template_args, suppress_output)
 
     def render_schema_templates(
             self, schema_type: Optional[str], schema_project_name: str, class_name: Optional[str], language: str,
-            output_dir: str, definitions_file: str, docroot: JsonNode, schema_template_dirs: List[str],
+            output_dir: str, xreg_file: str, xregistry_document: JsonNode, schema_template_dirs: List[str],
             env: jinja2.Environment, template_args: Dict[str, Any], suppress_output: bool = False) -> None:
         """Render schema templates."""
 
-        scope = docroot
+        scope = xregistry_document
         if schema_type is None:
-            if self.is_proto_doc(docroot):
+            if self.is_proto_doc(xregistry_document):
                 schema_type = "proto"
-            elif isinstance(docroot, dict) and "type" in docroot and docroot["type"] == "record":
+            elif isinstance(xregistry_document, dict) and "type" in xregistry_document and xregistry_document["type"] == "record":
                 schema_type = "avro"
             else:
                 schema_type = "json"
 
         if schema_type == "proto":
             self.ctx.uses_protobuf = True
-            if isinstance(docroot, str) and self.is_proto_doc(docroot) and class_name:
+            if isinstance(xregistry_document, str) and self.is_proto_doc(xregistry_document) and class_name:
                 local_class_name = JinjaFilters.strip_namespace(class_name)
-                match = re.search(r"message[\s]+([\w]+)[\s]*{", docroot)
+                match = re.search(r"message[\s]+([\w]+)[\s]*{", xregistry_document)
                 found = False
                 if local_class_name and match:
                     for g in match.groups():
@@ -571,10 +574,10 @@ class TemplateRenderer:
                         f"Proto: Top-level message {class_name} not found in Proto schema")
         elif schema_type == "avro":
             self.ctx.uses_avro = True
-            if isinstance(docroot, dict) and "type" in docroot and docroot["type"] == "record":
+            if isinstance(xregistry_document, dict) and "type" in xregistry_document and xregistry_document["type"] == "record":
                 class_name = SchemaUtils.concat_namespace(
-                    str(docroot.get("namespace", "")), str(docroot["name"]))
-            elif isinstance(docroot, list):
+                    str(xregistry_document.get("namespace", "")), str(xregistry_document["name"]))
+            elif isinstance(xregistry_document, list):
                 if class_name:
                     cns = class_name.split(".", 1)
                     if len(cns) == 2:
@@ -583,7 +586,7 @@ class TemplateRenderer:
                     else:
                         ns = ""
                         cn = cns[0]
-                for record in docroot:
+                for record in xregistry_document:
                     if isinstance(record, dict) and "type" in record and record["type"] == "record" \
                             and "namespace" in record and "name" in record \
                             and str(record["name"]).lower() == cn and str(record["namespace"]).lower() == ns:
@@ -595,7 +598,7 @@ class TemplateRenderer:
 
         file_dir = file_dir_base = output_dir
         if class_name is None:
-            class_name = os.path.basename(definitions_file).split(".")[0]
+            class_name = os.path.basename(xreg_file).split(".")[0]
         for template_dir in schema_template_dirs:
             schema_files = glob.glob(
                 f"**/_{schema_type}.*.jinja", root_dir=template_dir, recursive=True)
@@ -617,10 +620,8 @@ class TemplateRenderer:
 
                 if file_name_base == language or file_name_base == "proto" or file_name_base == "avsc":
                     file_name_base = class_name + "." + file_name_base
-                file_name_base = file_name_base.replace(
-                    "{projectname}", schema_project_name)
-                file_name_base = file_name_base.replace(
-                    "{classname}", class_name)
+                file_name_base = file_name_base.replace("{projectname}", schema_project_name)
+                file_name_base = file_name_base.replace("{classname}", class_name)
 
                 file_name = file_name_base
                 if file_name_base.find("{classdir}") > -1:
@@ -686,20 +687,20 @@ class TemplateRenderer:
             exit(1)
 
     @staticmethod
-    def resolve_string(template, replacements):
+    def resolve_string(template: str, replacements: Dict[str, str]):
         """Resolve a string template with placeholders using the given replacements."""
         # Regex to find placeholders with optional filter using | or !
         pattern = re.compile(r'\{(\w+)((?:~\w+)*)(?:\s*([|!]\s*\w+\s*)*)\}')
-    
+
         # Function to replace match with the correct value
         def replace_match(match):
             var_name = match.group(1)
             suffix_chain = match.group(2)
             filter_chain = match.group(3)
-            
+
             # Initialize the value with the main variable's replacement
             if var_name in replacements:
-                value = replacements[var_name]                
+                value = replacements[var_name]
                 # Process suffixes
                 if suffix_chain:
                     suffixes = suffix_chain.split('~')[1:]  # Split by '~' and skip the first empty split
@@ -855,6 +856,6 @@ class TemplateRenderer:
         env.globals['dependency'] = self.dependency
         return env
 
-    def is_proto_doc(self, docroot: JsonNode) -> bool:
+    def is_proto_doc(self, xregistry_document: JsonNode) -> bool:
         """Check if the document is a proto document."""
-        return isinstance(docroot, str) and re.search(r"syntax[\s]*=[\s]*\"proto3\"", docroot) is not None
+        return isinstance(xregistry_document, str) and re.search(r"syntax[\s]*=[\s]*\"proto3\"", xregistry_document) is not None

@@ -210,7 +210,7 @@ namespace {{ project_name | pascal }}.Test
             _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
             try
             {   
-                {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                 {%- if isCloudEvent %}
                 {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
                 {%- elif isAmqp %}
@@ -250,7 +250,7 @@ namespace {{ project_name | pascal }}.Test
             _logger.LogInformation("Starting Test{{ pascal_message_name }}Batch");
             try
             {   
-                {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                 {%- if isCloudEvent %}
                 {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
                 {%- elif isAmqp %}

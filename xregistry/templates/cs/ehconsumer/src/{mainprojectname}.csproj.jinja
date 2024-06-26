@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ProjectName>{{project_name | pascal }}</ProjectName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\{{ data_project_name }}\src\{{data_project_name | pascal}}.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Protobuf') }}
+    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Avro') }}
+    {{- dependency( 'cs','net80', 'Azure.Messaging.EventHubs.Processor') }}
+    {{- dependency( 'cs','net80', 'Azure.Storage.Blobs') }}
+    {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
+    {{- dependency( 'cs','net80', 'System.Memory.Data') }}
+  </ItemGroup>
+  
+</Project>

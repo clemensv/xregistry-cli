@@ -122,7 +122,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObject(project_name, root, message, messagegroup, logger) -%}
+{%- macro DispatchToDispatchObject(project_name, data_project_name, root, message, messagegroup, logger) -%}
 var messageSubject = message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes() != null 
     ? Encoding.UTF8.GetString(message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes()) 
     : null;
@@ -150,7 +150,7 @@ switch (messageSubject)
 }
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(project_name, data_project_name, root, message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "kafka" ) %}
 var messageSubject = message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes() != null 
     ? Encoding.UTF8.GetString(message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes()) 
@@ -166,7 +166,7 @@ switch (messageSubject)
          {
             await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
                {%- if message.schemaurl or message.schema -%}
-            global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
+            global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
             {%- else -%}
             {{ message }}.Data
             {%- endif %});
@@ -182,7 +182,7 @@ switch (messageSubject)
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- macro DeclareDispatchInterfaces(project_name, data_project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "kafka" ) %}
 {%- set function_name = project_name | pascal | strip_dots %}
@@ -197,7 +197,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
       {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
       {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
       {%- if message.schemaurl or message.schema -%}
-      {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
+      {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
       {%- else -%}
       {%- set dataType = "object" -%}
       {%- endif %}

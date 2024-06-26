@@ -231,7 +231,7 @@ namespace {{ project_name | pascal }}.Test
 
                 var producerClient = new EventHubProducerClient(_fixture.EventHubConnectionString, "eh1");
                 using var eventBatch = await producerClient.CreateBatchAsync();
-                {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                 {%- if message_body_type != "byte[]" %}
                 var eventDataTest = new {{ message_body_type }}Tests();
                 var eventDataInstance = eventDataTest.CreateInstance();

@@ -18,7 +18,7 @@ namespace {{ project_name | pascal }}
         
         public async Task Run(CloudEvent cloudEvent, ILogger log)
         {
-            {{ cloudEvents.DispatchToDispatchObjects( project_name, root, "cloudEvent", messagegroups, "log" ) | indent(12) }}
+            {{ cloudEvents.DispatchToDispatchObjects( project_name, data_project_name, root, "cloudEvent", messagegroups, "log" ) | indent(12) }}
         }
     }
 }

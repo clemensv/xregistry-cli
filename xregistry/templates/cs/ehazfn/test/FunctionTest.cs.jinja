@@ -62,7 +62,7 @@ namespace {{ project_name | pascal }}.Tests
             {%- if message.format.startswith("CloudEvents") -%}  
             {%- set pascal_message_name = message.id | pascal %}
             _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Verify(
-                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ util.body_type(project_name, root, message) }}>()),
+                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ util.body_type(data_project_name, root, message) }}>()),
                 Times.Never
             );
             {%- endif -%}
@@ -74,7 +74,7 @@ namespace {{ project_name | pascal }}.Tests
         {%- for id, message in messagegroup.messages.items() -%}
         {%- if message.format.startswith("CloudEvents") -%}     
         {%- set pascal_message_name = message.id | pascal %}
-        {%- set message_body_type = util.body_type(project_name, root, message) -%}
+        {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
         [Test]
         public async Task Run_With{{ message.id | strip_namespace | pascal }}_ShouldInvoke{{ messagegroup_key | strip_namespace | pascal }}DispatcherOn{{ message.id | strip_namespace | pascal }}Async()
         {

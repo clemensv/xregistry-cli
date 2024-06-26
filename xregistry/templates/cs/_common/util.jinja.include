@@ -3,9 +3,9 @@
 {% endmacro %}
 
 
-{%- macro body_type(project_name, root, message) -%}
+{%- macro body_type(data_project_name, root, message) -%}
  {%- if message.schemaurl or message.schema -%}
-global::{{ (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}
+global::{{ (message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal }}
 {%- else -%}
 byte[]
 {%- endif %} 

@@ -1,0 +1,85 @@
+{%- set messagegroups = root.messagegroups %}
+{%- filter wordwrap(80) %}
+# {{ project_name | capitalize }} Azure Event Hubs Producer SDK for Python
+
+This is the {{ project_name | capitalize }} Azure Event Hubs Producer SDK for Python. It was generated from the xRegistry CLI tool
+based on message catalog definitions for {% for messagegroup_key, _ in messagegroups.items() %}"{{ messagegroup_key }}"{%- if not loop.last %}, {% endif %}{%- endfor %}.
+
+## Quick Install
+
+To get started quickly, the main package can be installed with the `install.sh`
+script (or `install.bat` on Windows) in the root of the repository.
+
+### Contents
+
+The repository contains two projects.
+* The `{{project_name}}_eventhubs_producer` project is the main project that
+  contains the Event Hubs producer client code.
+* The `{{ data_project_name }}` project contains the data classes for the event
+  payload data.
+
+The classes defined in `{{project_name}}_eventhubs_producer` are documented
+in the project [README](./{{project_name}}_eventhubs_producer/README.md).
+
+The `{{project_name}}_eventhubs_producer` project depends on the
+`{{ data_project_name }}` project.
+
+If you want to install the producer project, you can run the following command:
+
+```bash
+pip install ./{{project_name}}_eventhubs_producer
+```
+
+This will install both packages. If you only want to install the data project,
+you can run the following command:
+
+```bash
+pip install ./{{ data_project_name }}
+```
+
+## Build and Test
+
+The SDK comes with a full test suite for the data classes and the producers
+that uses the `pytest` framework and Docker containers to run the tests.
+
+If you have Docker installed and if you have `make`, you can run the tests with
+the following command:
+
+```bash
+make test
+```
+
+If you don't have `make` installed, you can run the following commands:
+
+```bash
+pip install ./{{main_project_name}}
+pytest ./{{main_project_name}}/tests ./{{data_project_name}}/tests
+```
+
+## Usage
+
+The sample code in [samples/sample.py](samples/sample.py) demonstrates how to
+use the Event Hubs producer client to send messages to an Event Hub.
+
+Event producers wrap the `EventHubProducerClient` and are responsible for
+constructing and sending messages to the Event Hub using that client. Multiple
+producers can be used concurrently with the same `EventHubProducerClient`.
+
+{%- set messagegroup_key, messagegroup = messagegroups.items()|first %}
+{%- set message_id, message = messagegroup.messages.items()|first %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+The required parameters for the generated `send` methods are:
+* `data`: The event data to be sent.
+* `content_type`: The content type that the event data shall be sent with.
+* additional parameters depend on the message catalog information.
+
+The example below shows how to create and send an event:
+
+```python
+producer = EventHubProducerClient.from_connection_string("your-connection-string", eventhub_name="your-eventhub-name")
+event_producer = {{ (messagegroup.id | pascal | strip_dots) + "EventProducer" }}(producer)
+data = {{ data_type | strip_namespace }}(...)  # Construct your event data here
+await event_producer.send_{{ message.id | dotunderscore | lower }}(data=data, content_type="application/json")
+```
+{%- endfilter %}

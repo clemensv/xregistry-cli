@@ -170,7 +170,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(project_name, data_project_name, root, message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
 var messageSubject = {{ message }}.Properties.Subject;
 switch (messageSubject)
@@ -178,7 +178,7 @@ switch (messageSubject)
    {% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"AmqpDispatcher" -%}
    {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
-   {%- set message_body_type = util.body_type(project_name, root, message) %}
+   {%- set message_body_type = util.body_type(data_project_name, root, message) %}
    {%- set pascalDefinitionName = id | pascal %}
    case "{{ id }}":
          if ( this.{{ handlerName }} != null )
@@ -201,7 +201,7 @@ switch (messageSubject)
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- macro DeclareDispatchInterfaces(project_name, data_project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "amqp" ) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
@@ -216,7 +216,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
    {
       {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
       {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
-      {%- set dataType = util.body_type(project_name, root, message) %}
+      {%- set dataType = util.body_type(data_project_name, root, message) %}
       Task On{{ pascalDefinitionName | strip_namespace }}Async(Message amqpMessage, {{ dataType }} data);
       {%- endfor %}
    }

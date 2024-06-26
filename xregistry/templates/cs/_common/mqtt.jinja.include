@@ -149,7 +149,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(root, message, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(project_name, data_project_name, root, message, messagegroups, logger) -%}
 {%- if messagegroups | exists("binding", "mqtt" ) %}
 Regex regex; 
 Match match; 
@@ -164,7 +164,7 @@ if (match.Success)
 {
    await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
    {%- if message.schemaurl or message.schema -%}
-   global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
+   global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
    {%- else -%}
    {{ message }}.Data
    {%- endif %}, match.Groups.Values.Where(g => g.Name != "0").ToDictionary(g => g.Name, g => g.Value));
@@ -174,7 +174,7 @@ if (match.Success)
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- macro DeclareDispatchInterfaces(project_name, data_project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "mqtt" ) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
@@ -192,7 +192,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- for id, message in messagegroup.messages.items() if ( message | exists("binding", "mqtt" )) -%}
         {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
         {%- if message.schemaurl or message.schema -%}
-        {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
+        {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   

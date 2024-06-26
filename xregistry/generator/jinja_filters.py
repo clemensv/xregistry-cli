@@ -121,7 +121,7 @@ class JinjaFilters:
             return '.'.join(JinjaFilters.snake(s) for s in strings)
         if not string:
             return string
-        return re.sub(r'(?<!^)(?<!_)(?=[A-Z])', '_', string).lower()
+        return re.sub(r'(?<!^)(?<![_[A-Z])(?=[A-Z])', '_', string).lower()
 
     @staticmethod
     def camel(string: str) -> str:

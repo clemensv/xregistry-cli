@@ -179,7 +179,7 @@ namespace {{ project_name | pascal }}.Test
             _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
             try
             {   
-                {%- set message_body_type = util.body_type(project_name, root, message) -%}
+                {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                 var tcs = new TaskCompletionSource<{{ message_body_type }}>();
                 _dispatcher.{{ pascal_message_name }}Async += (mqtt, ce, data) =>
                 {

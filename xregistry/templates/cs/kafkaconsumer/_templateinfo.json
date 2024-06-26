@@ -1,4 +1,6 @@
 {
-    "description" : "C# Azure Event Hubs consumer",
-    "priority" : 1
+    "description" : "C# Apache Kafka consumer",
+    "priority" : 1,
+    "main_project_name" : "{project_name|pascal}KafkaConsumer",
+    "data_project_name" : "{project_name|pascal}Data"
 }

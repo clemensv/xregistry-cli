@@ -1,0 +1,171 @@
+{%- import "util.include.jinja" as util -%}
+# pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, redefined-outer-name, missing-class-docstring
+
+import asyncio
+import logging
+import os
+import sys
+import datetime
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/tests')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}/src')))
+
+import tempfile
+import pytest
+from azure.eventhub import EventData
+from azure.eventhub.aio import EventHubConsumerClient, EventHubProducerClient
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.network import Network
+from testcontainers.azurite import AzuriteContainer
+from testcontainers.core.waiting_utils import wait_for_logs
+
+{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+from {{main_project_name}}.producer import {{class_name}}
+{%- for id, message in messagegroup.messages.items() %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+from test_{{ type_name | dotunderscore | lower}} import Test_{{ type_name | pascal | strip_namespace }}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+@pytest.fixture(scope="module")
+async def event_hub_emulator():
+    with Network() as network:
+        with AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:3.31.0") \
+                .with_command('azurite -l /data --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck --loose') \
+                .with_bind_ports(10000, 10000) \
+                .with_bind_ports(10001, 10001) \
+                .with_bind_ports(10002, 10002) \
+                .with_network(network) \
+                .with_network_aliases("azurite") as azurite_container:
+            try:
+                wait_for_logs(azurite_container, ".*Azurite Blob service is successfully", timeout=10)
+            except TimeoutError as e:
+                stdoutlog,stderrlog = azurite_container.get_logs()
+                print(stdoutlog)
+                print(stderrlog)
+                raise e
+            config_file = tempfile.NamedTemporaryFile(delete=False, mode='w')
+            config_content = '''
+            {
+            "UserConfig": {
+                "NamespaceConfig": [
+                {
+                    "Type": "EventHub",
+                    "Name": "emulatorNs1",
+                    "Entities": [
+                    {
+                        "Name": "eh1",
+                        "PartitionCount": "2",
+                        "ConsumerGroups": [
+                        {
+                            "Name": "cg1"
+                        }
+                        ]
+                    }
+                    ]
+                }
+                ], 
+                "LoggingConfig": {
+                "Type": "File"
+                }
+            }
+            }
+            '''
+            config_file.write(config_content)
+            config_file.flush()
+            config_file.close()
+            config_file_path = config_file.name
+
+            try:
+                with DockerContainer("mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest") \
+                        .with_volume_mapping(config_file_path, "/Eventhubs_Emulator/ConfigFiles/Config.json") \
+                        .with_bind_ports(5672, 5672) \
+                        .with_network(network) \
+                        .with_network_aliases("eventhubs-emulator") \
+                        .with_env("BLOB_SERVER", "azurite") \
+                        .with_env("METADATA_SERVER", "azurite") \
+                        .with_env("ACCEPT_EULA", "Y") as event_hubs_emulator_container:
+                    try:
+                        wait_for_logs(event_hubs_emulator_container, ".*Emulator is launching with config", timeout=10)
+                    except TimeoutError as e:
+                        stdoutlog,stderrlog = event_hubs_emulator_container.get_logs()
+                        print(stdoutlog)
+                        print(stderrlog)
+                        raise e
+
+                    event_hub_connection_str = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;EntityPath=eh1;"
+                    blob_storage_connection_str = azurite_container.get_connection_string()
+
+                    yield {
+                        "event_hub_connection_str": event_hub_connection_str,
+                        "blob_storage_connection_str": blob_storage_connection_str,
+                        "network": network,
+                        "azurite_container": azurite_container,
+                        "event_hubs_emulator_container": event_hubs_emulator_container
+                    }
+            finally:
+                os.unlink(config_file_path)
+
+{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
+{%- set pascalGroupName = messagegroup.id | pascal %}
+{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+{%- for id, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) %}
+{%- set message_id = id | pascal | strip_dots | strip_namespace %}
+{%- set test_function_name = "test_" + pascalGroupName | lower | replace(" ", "_") + "_" + message_id | lower | replace(" ", "_") %}
+
+@pytest.mark.asyncio
+async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
+    """Test the {{ message_id }} event from the {{ pascalGroupName }} message group"""
+
+    async for emulator in event_hub_emulator:
+        event_hub_conn_str = emulator["event_hub_connection_str"]
+
+        producer = EventHubProducerClient.from_connection_string(event_hub_conn_str, eventhub_name="eh1")
+        consumer = EventHubConsumerClient.from_connection_string(event_hub_conn_str, consumer_group="cg1", eventhub_name="eh1")
+
+        on_event_future = asyncio.Future()
+        async def on_event(partition_context, event):
+            try:
+                assert event.properties["cloudEvents_type".encode('utf-8')] == "{{ message.id }}".encode('utf-8')
+                await partition_context.update_checkpoint(event)
+                on_event_future.set_result(True)
+            except Exception as e:
+                on_event_future.set_exception(e)
+
+        receive_task = asyncio.create_task(consumer.receive(on_event, starting_position="-1"))
+        producer_instance = {{ class_name }}(producer, 'binary')
+        {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+        {%- if type_name != "object" %} 
+        event_data = Test_{{ type_name | pascal | strip_namespace }}.create_instance()
+        {%- else %}
+        event_data = {}
+        {%- endif %}
+        await producer_instance.send_{{ message.id | dotunderscore | snake }}(
+            {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+                _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
+            {%- endfor -%}
+            {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
+                {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
+            {%- endfor -%}
+            data = event_data
+            {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+                , _{{ attrname }} = ''
+            {%- endfor -%}
+        )
+
+        await asyncio.wait_for(on_event_future, timeout=10)
+        if receive_task:
+            receive_task.cancel()
+            try:
+                await receive_task
+            except asyncio.CancelledError:
+                pass
+        await producer.close()
+
+{%- endfor %}
+{%- endfor %}

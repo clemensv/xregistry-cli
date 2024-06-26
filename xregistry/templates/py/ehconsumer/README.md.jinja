@@ -1,3 +1,4 @@
+{%- import "util.include.jinja" as util -%}
 {%- set messagegroups = root.messagegroups %}
 {%- filter wordwrap(120) %}
 # {{ project_name | capitalize }} Event Dispatcher for Azure Event Hubs
@@ -7,7 +8,7 @@ This module provides an event dispatcher for processing events from Azure Event 
 ## Table of Contents
 1. [Overview](#overview)
 2. [Generated Event Dispatchers](#generated-event-dispatchers)
-    - {% for messagegroup_key, messagegroup in messagegroups.items() %}{{ (messagegroup.id | pascal) + "EventDispatcher" }}{% if not loop.last %}, {% endif %}
+    - {% for messagegroup_key, messagegroup in messagegroups.items() %}{{ (messagegroup.id | pascal | strip_dots ) + "EventDispatcher" }}{% if not loop.last %}, {% endif %}
     {% endfor %}
 3. [Internals](#internals)
     - [EventProcessorRunner](#eventprocessorrunner)
@@ -27,9 +28,9 @@ solution for event-driven applications.
 {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_amqp_message = (messagegroup | exists( "binding", "amqp" )) %}
 
-### {{ (messagegroup.id | pascal) + "EventDispatcher" }}
+### {{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }}
 
-`{{ (messagegroup.id | pascal) + "EventDispatcher" }}` handles events for the {{ messagegroup.id }} message group.
+`{{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }}` handles events for the {{ messagegroup.id }} message group.
 
 #### Methods:
 
@@ -74,14 +75,10 @@ Args:
 
 #### Event Handlers
 
-The {{ (messagegroup.id | pascal) + "EventDispatcher" }} defines the following event handler hooks.
+The {{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }} defines the following event handler hooks.
 
 {% for id, message in messagegroup.messages.items() %}
-{%- if message.schemaurl or message.schema %}
-{%- set data_type = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
-{%- else %}
-{%- set data_type = "object" %}
-{%- endif %}
+{%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
 ##### `{{ message.id | dotunderscore | snake }}_async`
 
 ```python

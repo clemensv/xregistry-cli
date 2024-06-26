@@ -164,7 +164,7 @@ public {{ class_name }}( {{ args }}{%- if args %}, {%- endif -%}
 {% endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObject(project_name, root, cloudEvent, messagegroup, logger) -%}
+{%- macro DispatchToDispatchObject(project_name, data_project_name, root, cloudEvent, messagegroup, logger) -%}
 var cloudEventType = {{ cloudEvent }}.Type;
 switch (cloudEventType)
 {
@@ -190,7 +190,7 @@ switch (cloudEventType)
 {%- endmacro -%}
 
 
-{%- macro DispatchToDispatchObjects(project_name, root, cloudEvent, messagegroups, logger) -%}
+{%- macro DispatchToDispatchObjects(project_name, data_project_name, root, cloudEvent, messagegroups, logger) -%}
 {%- if messagegroups | exists("format", "cloudevents" ) -%}
 var cloudEventType = {{ cloudEvent }}.Type;
 switch (cloudEventType)
@@ -203,7 +203,7 @@ switch (cloudEventType)
         {
             await this.{{ messagegroup.id  | strip_namespace | camel }}Dispatcher.On{{ pascalDefinitionName | strip_namespace }}Async({{ cloudEvent }},
             {%- if message.schemaurl or message.schema -%}
-            global::{{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.FromData({{ cloudEvent }}.Data, {{cloudEvent}}.DataContentType)
+            global::{{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal }}.FromData({{ cloudEvent }}.Data, {{cloudEvent}}.DataContentType)
             {%- else -%}
             {{ cloudEvent }}.Data
             {%- endif %});
@@ -219,7 +219,7 @@ switch (cloudEventType)
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterfaces(project_name, root, use_azure_messaging=false) -%}
+{%- macro DeclareDispatchInterfaces(project_name, data_project_name, root, use_azure_messaging=false) -%}
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("format", "cloudevents" ) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
@@ -238,7 +238,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- for id, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) -%}
         {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
         {%- if message.schemaurl or message.schema -%}
-        {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal) -%}
+        {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   
