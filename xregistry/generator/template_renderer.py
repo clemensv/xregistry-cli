@@ -131,7 +131,8 @@ class TemplateRenderer:
         # render from schema template directories
         self.render_code_templates(self.project_name, self.main_project_name, self.data_project_name, self.style, project_data_dir, xregistry_document,
                                    schema_template_dirs, schema_env, False, self.template_args, self.suppress_schema_output)
-
+        
+        avrotize_queue = []
         while not SchemaUtils.schema_references_collected.issubset(self.ctx.loader.get_schemas_handled()):
             for schema_reference in set(SchemaUtils.schema_references_collected):
                 if schema_reference not in self.ctx.loader.get_schemas_handled():
@@ -299,33 +300,7 @@ class TemplateRenderer:
                                         JinjaFilters.strip_namespace(class_name))
                                 )
                                 schema_format_short = "avro"
-                            avro_enabled = self.template_args.get("avro-encoding", "false") == "true" or schema_format_short == "avro"
-                            json_enabled = self.template_args.get("json-encoding", "true") == "true"
-                            if self.language == "py":
-                                avrotize.convert_avro_schema_to_python(
-                                    schema_root, project_data_dir, package_name=self.data_project_name,
-                                    dataclasses_json_annotation=json_enabled, avro_annotation=avro_enabled
-                                )
-                            elif self.language == "cs":
-                                avrotize.convert_avro_schema_to_csharp(
-                                    schema_root, project_data_dir, base_namespace=JinjaFilters.pascal(
-                                        self.data_project_name),
-                                    pascal_properties=True, system_text_json_annotation=json_enabled, avro_annotation=avro_enabled
-                                )
-                            elif self.language == "java":
-                                avrotize.convert_avro_schema_to_java(
-                                    schema_root, project_data_dir, package_name=self.data_project_name,
-                                    jackson_annotation=json_enabled, avro_annotation=avro_enabled
-                                )
-                            elif self.language == "js":
-                                avrotize.convert_avro_schema_to_javascript(
-                                    schema_root, project_data_dir, package_name=self.data_project_name, avro_annotation=avro_enabled
-                                )
-                            elif self.language == "ts":
-                                avrotize.convert_avro_schema_to_typescript(
-                                    schema_root, project_data_dir, package_name=self.data_project_name,
-                                    avro_annotation=avro_enabled, typedjson_annotation=json_enabled
-                                )
+                            avrotize_queue.append({ "schema_reference": schema_reference, "schema_root": schema_root, "class_name": class_name, "schema_format_short": schema_format_short })
                         else:
                             self.render_schema_templates(
                                 schema_format_short, self.data_project_name, class_name, self.language,
@@ -337,6 +312,44 @@ class TemplateRenderer:
                         logger.warning("Unable to find schema reference %s",
                                        schema_reference if schema_reference else '')
 
+        # process the avrotize queue into a single project
+        if len(avrotize_queue) > 0:
+            avro_enabled = self.template_args.get("avro-encoding", "false") == "true" or schema_format_short == any("avro" in a["schema_format_short"] for a in avrotize_queue)
+            json_enabled = self.template_args.get("json-encoding", "true") == "true"
+            merged_schema = []
+            for a in avrotize_queue:
+                if isinstance(a["schema_root"], list):
+                    merged_schema.extend(a["schema_root"])
+                else:
+                    merged_schema.append(a["schema_root"])
+            if len(merged_schema) == 1:
+                merged_schema = merged_schema[0]
+
+            if self.language == "py":
+                avrotize.convert_avro_schema_to_python(
+                    merged_schema, project_data_dir, package_name=self.data_project_name,
+                    dataclasses_json_annotation=json_enabled, avro_annotation=avro_enabled
+                )
+            elif self.language == "cs":
+                avrotize.convert_avro_schema_to_csharp(
+                    merged_schema, project_data_dir, base_namespace=JinjaFilters.pascal(
+                        self.data_project_name),
+                    pascal_properties=True, system_text_json_annotation=json_enabled, avro_annotation=avro_enabled
+                )
+            elif self.language == "java":
+                avrotize.convert_avro_schema_to_java(
+                    merged_schema, project_data_dir, package_name=self.data_project_name,
+                    jackson_annotation=json_enabled, avro_annotation=avro_enabled
+                )
+            elif self.language == "js":
+                avrotize.convert_avro_schema_to_javascript(
+                    merged_schema, project_data_dir, package_name=self.data_project_name, avro_annotation=avro_enabled
+                )
+            elif self.language == "ts":
+                avrotize.convert_avro_schema_to_typescript(
+                    merged_schema, project_data_dir, package_name=self.data_project_name,
+                    avro_annotation=avro_enabled, typedjson_annotation=json_enabled
+                )
         self.render_code_templates(
             self.project_name, self.main_project_name, self.data_project_name, self.style, project_dir, xregistry_document,
             code_template_dirs, code_env, True, self.template_args, self.suppress_code_output

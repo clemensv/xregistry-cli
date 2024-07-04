@@ -26,41 +26,37 @@ def generate_code(args: Any) -> int:
 
     generator_context = GeneratorContext(args.output_dir)
 
-    for _ in range(0, 2):
-        SchemaUtils.schema_files_collected = set()
-        generator_context.loader.reset_schemas_handled()
-        SchemaUtils.schema_references_collected = set()
-        generator_context.loader.set_current_url(None)
+    SchemaUtils.schema_files_collected = set()
+    generator_context.loader.reset_schemas_handled()
+    SchemaUtils.schema_references_collected = set()
+    generator_context.loader.set_current_url(None)
 
-        try:
-            if validate(args.definitions_file, headers, False) != 0:
-                return 1
+    try:
+        if validate(args.definitions_file, headers, False) != 0:
+            return 1
 
+        renderer = TemplateRenderer(generator_context,
+            args.project_name, args.language, args.style, args.output_dir,
+            args.definitions_file, headers, args.template_dirs, template_args,
+            suppress_code_output, suppress_schema_output
+        )
+        renderer.generate()
+
+        for schema in SchemaUtils.schema_files_collected:
             renderer = TemplateRenderer(generator_context,
                 args.project_name, args.language, args.style, args.output_dir,
-                args.definitions_file, headers, args.template_dirs, template_args,
+                schema, headers, args.template_dirs, template_args,
                 suppress_code_output, suppress_schema_output
             )
             renderer.generate()
 
-            for schema in SchemaUtils.schema_files_collected:
-                renderer = TemplateRenderer(generator_context,
-                    args.project_name, args.language, args.style, args.output_dir,
-                    schema, headers, args.template_dirs, template_args,
-                    suppress_code_output, suppress_schema_output
-                )
-                renderer.generate()
-
-            if generator_context.stacks.stack("files"):
-                for file, content in generator_context.stacks.stack("files"):
-                    with open(file, "w", encoding='utf-8') as f:
-                        f.write(content)
-
-            if not generator_context.uses_avro and not generator_context.uses_protobuf:
-                break
-        except SystemExit:
-            return 1
-        except Exception as err:
-            logger.error("%s", err)
-            raise err
+        if generator_context.stacks.stack("files"):
+            for file, content in generator_context.stacks.stack("files"):
+                with open(file, "w", encoding='utf-8') as f:
+                    f.write(content)
+    except SystemExit:
+        return 1
+    except Exception as err:
+        logger.error("%s", err)
+        raise err
     return 0

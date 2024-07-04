@@ -138,8 +138,9 @@ class SchemaUtils:
         if schema_format.startswith("avro"):
             if isinstance(schema_obj, dict) and "type" in schema_obj and schema_obj["type"] == "record":
                 ref = str(f"{schema_obj['namespace']}.{schema_obj['name']}" if "namespace" in schema_obj else schema_obj["name"])
-                if class_name and ref.lower() != class_name.lower():
-                    raise RuntimeError(f"Avro: Class name reference mismatch for top-level record object: {ref} != {class_name}")
+                #if class_name and ref.lower() != class_name.lower():
+                #    raise RuntimeError(f"Avro: Class name reference mismatch for top-level record object: {project_name}.{ref} != {project_name}.{class_name}")
+                #    return f"{project_name}.{class_name}"
                 return f"{project_name}.{ref}"
             elif isinstance(schema_obj, list):
                 if not class_name:

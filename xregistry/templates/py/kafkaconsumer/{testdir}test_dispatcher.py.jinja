@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 import tempfile
 import pytest
-from kafka import KafkaProducer, KafkaConsumer
+from confluent_kafka import Producer
 from confluent_kafka.admin import AdminClient, NewTopic
 from testcontainers.kafka import KafkaContainer
 
@@ -79,16 +79,16 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
 
         dispatcher.{{ message.id | dotunderscore | snake }}_async = set_future
         async with dispatcher.create_consumer("test-group", bootstrap_servers, ["test_topic"]):
-            producer = KafkaProducer(
-                bootstrap_servers=bootstrap_servers
-            )
+            producer = Producer({
+                "bootstrap.servers":bootstrap_servers
+            })
             {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
             {%- if type_name != "object" %}
             event_data = Test_{{ type_name | pascal | strip_namespace }}.create_instance().to_byte_array("application/json")
             {%- else %}
             event_data = {}
             {%- endif %}
-            producer.send('test_topic', value=event_data, headers=[
+            producer.produce(topic='test_topic', key=b'abc', value=event_data, headers=[
                 ("ce_type", b"{{ message.id }}"),
                 ("ce_specversion", b"1.0"),
                 ("ce_source", b"/test"),
