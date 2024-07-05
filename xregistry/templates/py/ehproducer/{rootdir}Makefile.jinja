@@ -1,11 +1,11 @@
 .PHONY: build install
 
 build:
-{{'\t'}}@python scripts/build.py
+{{'\t'}}pip install wheel
+{{'\t'}}pip wheel -w whl ./{{ data_project_name }} ./{{ main_project_name }}
 
-install:
-{{'\t'}}poetry install --no-root --with dev -C ./{{ main_project_name }}
-{{'\t'}}pip install ./{{ main_project_name }}
+install: build
+{{'\t'}}pip install ./{{ data_project_name }} ./{{ main_project_name }}
 
 test: install
 {{'\t'}}pytest ./{{ main_project_name }}/tests ./{{ data_project_name }}/tests

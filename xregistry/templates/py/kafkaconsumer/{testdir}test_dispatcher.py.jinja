@@ -78,7 +78,12 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
                 future.set_result(data)
 
         dispatcher.{{ message.id | dotunderscore | snake }}_async = set_future
-        async with dispatcher.create_consumer("test-group", bootstrap_servers, ["test_topic"]):
+        async with dispatcher.create_consumer({
+                    'bootstrap.servers': bootstrap_servers,
+                    'group.id': "test-group",
+                    'auto.offset.reset': 'earliest'
+                },
+                ["test_topic"]):
             producer = Producer({
                 "bootstrap.servers":bootstrap_servers
             })

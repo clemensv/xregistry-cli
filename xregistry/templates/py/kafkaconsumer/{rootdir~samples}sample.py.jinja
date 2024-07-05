@@ -1,3 +1,4 @@
+{%- import "util.include.jinja" as util -%}
 {%- set messagegroups = root.messagegroups %}
 """
 
@@ -39,20 +40,39 @@ The main function waits for a signal (Press Ctrl+C) to stop the event processor.
 import argparse
 import asyncio
 import os
-import signal
-from confluent_kafka import Consumer, KafkaError, KafkaException
+from confluent_kafka import Consumer, Message
+from cloudevents.abstract import CloudEvent
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+{% set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroup_key in messagegroups.keys() -%}
+{%- set messagegroup = messagegroups[messagegroup_key] -%}
+{%- for id in messagegroup.messages -%}
+{%- set definition = messagegroup.messages[id] %}
+{%- set type_name = util.DeclareDataType(data_project_name, root, definition) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+{% for messagegroup_key, messagegroup in messagegroups.items() %}
 {%- set pascalGroupName = messagegroup.id | pascal %}
 {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
 from {{main_project_name}}.dispatcher import {{class_name}}
-{%- for id, message in messagegroup.messages.items() %}
 
-async def handle_{{ message.id | dotunderscore | snake }}(record, cloud_event, {{ message.id | dotunderscore | snake }}_event_data):
+{% for id, message in messagegroup.messages.items() %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+async def handle_{{ message.id | dotunderscore | snake }}(dispatcher: {{class_name}}, record: Message, cloud_event: CloudEvent, {{ message.id | dotunderscore | snake }}_event_data: {{ type_name | strip_namespace }}):
     """ Handles the {{ message.id }} event """
-    print(f"{{ message.id }}: { {{- message.id | dotunderscore | snake -}}_event_data.asdict()}")
-    await some_processing_function(record, cloud_event, {{ message.id | dotunderscore | snake }}_event_data)
-{%- endfor %}
+    print(f"{{ message.id }}: { {{- message.id | dotunderscore | snake -}}_event_data.to_json()}")
+    # await some_processing_function(record, cloud_event, {{ message.id | dotunderscore | snake }}_event_data)
+
+{% endfor %}
 {%- endfor %}
 
 async def main(bootstrap_servers, group_id, topics):
@@ -67,27 +87,16 @@ async def main(bootstrap_servers, group_id, topics):
     dispatcher.{{ message.id | dotunderscore | snake }}_async = handle_{{ message.id | dotunderscore | snake }}
     {%- endfor %}
     {%- endfor %}
-    consumer = Consumer({
-        'bootstrap.servers': bootstrap_servers,
-        'group.id': group_id,
-        'auto.offset.reset': 'earliest'
-    })
-
-    consumer.subscribe(topics.split(','))
-
-    try:
-        while True:
-            msg = consumer.poll(timeout=1.0)
-            if msg is None:
-                continue
-            if msg.error():
-                if msg.error().code() == KafkaError._PARTITION_EOF:
-                    continue
-                else:
-                    raise KafkaException(msg.error())
-            await dispatcher._process_event(msg)
-    finally:
-        consumer.close()
+    consumer = Consumer()
+    async with dispatcher.create_consumer(
+                kafka_config={
+                    'bootstrap.servers': bootstrap_servers,
+                    'group.id': group_id,
+                    'auto.offset.reset': 'earliest'
+                },
+                topics=topics.split(',')):
+        # Terminate after 60 secs
+        await asyncio.sleep(60)
     {%- else -%}
     consumers = []
     for topic in topics.split(','):

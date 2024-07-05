@@ -3,12 +3,12 @@ name = "{{main_project_name|replace("_","-")}}"
 description = "{{main_project_name}} Apache Kafka consumer library"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
-version = "0.1.0"  # Placeholder version, dynamic versioning can be handled with plugins
+version = "{{ "0.1.0" if not package_version else package_version }}"  # Placeholder version, dynamic versioning can be handled with plugins
 packages = [{include = "{{main_project_name}}", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "<4.0,>=3.11"
-{{data_project_name|replace("_","-")}} = { path = "../{{data_project_name}}", develop = true }
+python = "<4.0,>=3.10"
+{{data_project_name|replace("_","-")}} = "*"
 confluent-kafka = ">=2.4.0"
 cloudevents = ">=1.10.1"
 

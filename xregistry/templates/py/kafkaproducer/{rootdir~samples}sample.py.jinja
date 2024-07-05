@@ -3,38 +3,44 @@
 """
 
 {%- filter wordwrap(80) %}
-This is sample code to produce events to Apache Kafka with the producer clients contained in this project.
+This is sample code to produce events to Apache Kafka with the producer clients
+contained in this project. You will still need to supply event data in the marked
+placews below before the program can be run.
 
-There is a producer for each defined event type. The producer is a class that provides methods to create and send events to the Kafka topics.
+The script gets the configuration from the command line or uses the environment
+variables. The following environment variables are recognized:
 
-Producers are instantiated with the Kafka bootstrap servers and the topic to which they will send events.
-
-The main function initializes the producers and sends sample events to the Kafka topics.
-
-This sample uses a Kafka cluster with the necessary topics and configurations. The script reads the configuration from the command line or uses the environment variables. The following environment variables are recognized:
-
-- BOOTSTRAP_SERVERS: The Kafka bootstrap servers.
-- TOPICS: The Kafka topics to send events to.
+- KAFKA_PRODUCER_CONFIG: The Kafka producer configuration.
+- KAFKA_TOPICS: The Kafka topics to send events to.
+- FABRIC_CONNECTION_STRING: A Microsoft Fabric or Azure Event Hubs connection string.
 
 Alternatively, you can pass the configuration as command-line arguments.
 
-python sample.py --bootstrap-servers <bootstrap_servers> --topics <topics>
+- `--producer-config`: The Kafka producer configuration.
+- `--topics`: The Kafka topics to send events to.
+- `-c` or `--connection-string`: The Microsoft Fabric or Azure Event Hubs connection string.
+
 {%- endfilter %}
 """
 
 import argparse
 import os
 import asyncio
-from confluent_kafka import Producer
+import json
+import uuid
+from typing import Optional
 from datetime import datetime
+from confluent_kafka import Producer as KafkaProducer
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
+# imports the producer clients for the message group(s)
+{% for messagegroup_key, messagegroup in messagegroups.items() %}
 {%- set pascalGroupName = messagegroup.id | pascal %}
 {%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
 from {{main_project_name}}.producer import {{class_name}}
 {%- endfor %}
 
-{%- set messagegroups = root.messagegroups %}
+# imports for the data classes for each event
+{% set messagegroups = root.messagegroups %}
 {%- set imports = [] %}
 {%- for messagegroup_key in messagegroups.keys() -%}
 {%- set messagegroup = messagegroups[messagegroup_key] -%}
@@ -51,44 +57,72 @@ from {{main_project_name}}.producer import {{class_name}}
 {%- endfor %}
 {%- endfor %}
 
-async def main(producer_config, topics):
-    """ Main function to produce events to Kafka """
-    topic_list = topics.split(',')
+async def main(connection_string: Optional[str], producer_config: Optional[str], topic: Optional[str]):
+    """
+    Main function to produce events to Apache Kafka
+
+    Args:
+        connection_string (Optional[str]): The Fabric connection string
+        producer_config (Optional[str]): The Kafka producer configuration
+        topic (Optional[str]): The Kafka topic to send events to
+    """
 
     {%- for messagegroup_key, messagegroup in messagegroups.items() %}
     {%- set pascalGroupName = messagegroup.id | pascal %}
     {%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
-    kafka_producer = Producer(json.loads(producer_config))
-    producer_instance = {{ class_name }}(producer, topic_list[0], 'binary')
+    if connection_string:
+        # use a connection string obtained for an Event Stream from the Microsoft Fabric portal
+        # or an Azure Event Hubs connection string
+        {{ class_name | snake }} = {{ class_name }}.from_connection_string(connection_string, topic, 'binary')
+    else:
+        # use a Kafka producer configuration provided as JSON text
+        kafka_producer = KafkaProducer(json.loads(producer_config))
+        {{ class_name | snake }} = {{ class_name }}(kafka_producer, topic, 'binary')
+
     {%- for id, message in messagegroup.messages.items() %}
+    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
     {%- if type_name != "object" %}
-    event_data = {{ type_name | pascal | strip_namespace }}()
+
+    # ---- {{ message.id }} ----
+    # TODO: Supply event data for the {{ message.id }} event
+    _{{ type_name | strip_namespace | snake }} = {{ type_name | pascal | strip_namespace }}()
     {%- else %}
-    event_data = {}
+    _{{ type_name | strip_namespace | snake }} = {}
     {%- endif %}
-    await producer_instance.send_{{ message.id | dotunderscore | lower }}(
+
+    # sends the '{{ message.id }}' event to Kafka topic.
+    await {{ class_name | snake }}.send_{{ message.id | dotunderscore | snake }}(
         {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
-            _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
+            {%- if attrname == 'time' -%}
+            _{{ attrname }} = datetime.now().isoformat(),
+            {%- elif attrname == 'id' -%}
+            _{{ attrname }} = str(uuid.uuid4()),
+            {%- else -%}
+            _{{ attrname }} = 'TODO:replace',
+            {%- endif %}
         {%- endfor -%}
         {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
-            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'TODO: replace me', {% endfor -%}
         {%- endfor -%}
-        data = event_data
+        data = _{{ type_name | strip_namespace | snake }}
         {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
-            , _{{ attrname }}: Optional[str] = ''
+            , _{{ attrname }} = ''
         {%- endfor -%}
     )
+    print(f"Sent '{{ message.id }}' event: {_{{ type_name | strip_namespace | snake }}.to_json()}")
     {%- endfor %}
     {%- endfor %}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kafka Producer")
-    parser.add_argument('--producer-config', default=os.getenv('KAFKA_PRODUCER_CONFIG'), help='Kafka producer config (JSON)', required=True)
-    parser.add_argument('--topics', default=os.getenv('KAFKA_TOPICS'), help='Kafka topics to send events to', required=True)
+    parser.add_argument('--producer-config', default=os.getenv('KAFKA_PRODUCER_CONFIG'), help='Kafka producer config (JSON)', required=False)
+    parser.add_argument('--topics', default=os.getenv('KAFKA_TOPICS'), help='Kafka topics to send events to', required=False)
+    parser.add_argument('-c|--connection-string', dest='connection_string', default=os.getenv('FABRIC_CONNECTION_STRING'), help='Fabric connection string', required=False)
 
     args = parser.parse_args()
 
     asyncio.run(main(
+        args.connection_string,
         args.producer_config,
         args.topics
     ))

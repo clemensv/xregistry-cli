@@ -13,10 +13,11 @@ Dispatcher module for processing events from Apache Kafka.
 {%- set uses_kafka_endpoint = (root | exists( "protocol", "kafka" )) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
 
+import logging
 import asyncio
 from asyncio.events import AbstractEventLoop
 import threading
-from typing import Awaitable, Callable, List, Dict
+from typing import Awaitable, Callable, List, Dict, Tuple
 from confluent_kafka import Consumer, KafkaException, Message
 from cloudevents.abstract import CloudEvent
 from cloudevents.kafka import from_binary, from_structured, KafkaMessage
@@ -86,17 +87,38 @@ class DispatcherBase:
             ce = from_binary(message)
             ce['datacontenttype'] = 'application/json'
         return ce
-
-    async def _unhandled_event_ce(self, _cx, _e, _ce, de ):
-        """ Default event handler """
-        await asyncio.sleep(0)
     {%- endif %}
 
-    {%- if uses_plain_kafka_message %}
-    async def _unhandled_event(self, _cx, _e, de ):
-        """ Default event handler """
-        await asyncio.sleep(0)
-    {%- endif %}
+    def parse_connection_string(self, connection_string: str) -> Tuple[Dict[str, str], str]:
+        """
+        Parse the connection string and extract bootstrap server, topic name, username, and password.
+
+        Args:
+            connection_string (str): The connection string.
+
+        Returns:
+            Tuple[Dict[str, str], str]: Kafka config, topic name
+        """
+        config_dict = {
+            'security.protocol': 'SASL_SSL',
+            'sasl.mechanisms': 'PLAIN',
+            'sasl.username': '$ConnectionString',
+            'sasl.password': connection_string.strip(),
+            'group.id': '$Default',
+            'auto.offset.reset': 'latest',
+            'enable.auto.commit': 'true'
+        }
+        kafka_topic = None
+        try:
+            for part in connection_string.split(';'):
+                if 'Endpoint' in part:
+                    config_dict['bootstrap.servers'] = part.split('=')[1].strip(
+                        '"').replace('sb://', '').replace('/', '')+':9093'
+                elif 'EntityPath' in part:
+                    kafka_topic = part.split('=')[1].strip('"')
+        except IndexError as e:
+            raise ValueError("Invalid connection string format") from e
+        return config_dict, kafka_topic
 
     class ConsumerManager:
         """ Manages a Kafka Consumer instance receive loop. """
@@ -110,6 +132,7 @@ class DispatcherBase:
             self.loop: asyncio.AbstractEventLoop | None = None
             self.thread: threading.Thread | None = None
             self.started_event = threading.Event()
+            self.logger = logging.getLogger(__name__)
 
         def __processing_loop(self, consumer, topics):
             """
@@ -137,7 +160,10 @@ class DispatcherBase:
                     if msg.error():
                         raise KafkaException(msg.error())
                     else:
-                        await self.dispatcher._process_message(consumer, msg)
+                        try:
+                            await self.dispatcher.process_message(consumer, msg)
+                        except Exception as e:
+                            logging.error(f"Error processing message: {e}")
             finally:
                 # Close down consumer to commit final offsets.
                 consumer.close()
@@ -167,7 +193,7 @@ class DispatcherBase:
             await asyncio.get_running_loop().run_in_executor(None, self.shutdown)
 
         @classmethod
-        def create_consumer_manager(cls, group_id, bootstrap_servers, dispatcher, topics):
+        def create_consumer_manager(cls, kafka_config, dispatcher, topics):
             """
             Creates a Kafka Consumer and a ConsumerManager instance.
 
@@ -180,14 +206,12 @@ class DispatcherBase:
             Returns:
                 A ConsumerManager instance.
             """
-            consumer = Consumer({
-                'bootstrap.servers': bootstrap_servers,
-                'group.id': group_id,
-                'auto.offset.reset': 'earliest'
-            })
+
+
+            consumer = Consumer(kafka_config)
             return cls(consumer, dispatcher, topics)
 
-    def create_consumer(self, group_id: str, bootstrap_servers: List[str], topics: List[str]) -> ConsumerManager:
+    def create_consumer(self, kafka_config, topics: List[str]) -> ConsumerManager:
         """
         Creates a Kafka Consumer.
 
@@ -199,7 +223,20 @@ class DispatcherBase:
         Returns:
             A ConsumerManager instance.
         """
-        return DispatcherBase.ConsumerManager.create_consumer_manager(group_id, bootstrap_servers, self, topics)
+        return DispatcherBase.ConsumerManager.create_consumer_manager(kafka_config, self, topics)
+
+    def create_consumer_from_connection_string(self, connection_string: str) -> ConsumerManager:
+        """
+        Creates a Kafka Consumer from a connection string.
+
+        Args:
+            connection_string: The connection string.
+
+        Returns:
+            A ConsumerManager instance.
+        """
+        kafka_config, kafka_topic = self.parse_connection_string(connection_string)
+        return DispatcherBase.ConsumerManager.create_consumer_manager(kafka_config, self, [kafka_topic])
 
 
 {% for messagegroup_key, messagegroup in messagegroups.items() %}
@@ -217,6 +254,18 @@ class {{ class_name }}(DispatcherBase):
         """ Initializes the {{ pascalGroupName }} dispatcher. """
         super().__init__()
 
+        {%- if uses_cloudevents_message %}
+        async def _unhandled_event_ce(_c, _m, _ce, _d ):
+            """ Default event handler """
+            pass
+        {%- endif %}
+
+        {%- if uses_plain_kafka_message %}
+        async def _unhandled_event(_c, _m, _d ):
+            """ Default event handler """
+            pass
+        {%- endif %}
+
         {%- for id, message in messagegroup.messages.items() %}
         {%- set dataType = util.DeclareDataType( data_project_name, root, message ) %}
         {%- set message_id = message.id %}
@@ -225,11 +274,10 @@ class {{ class_name }}(DispatcherBase):
         {%- endif %}
         {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
         {%- set isKafka = (message | existswithout( "binding", "kafka", "format", "cloudevents" )) %}
-        self.{{ message.id | dotunderscore | snake }}_async: Callable[[Consumer, Message, {% if isCloudEvent %}CloudEvent, {%endif%}{{ dataType | strip_namespace }}], Awaitable[None]] = lambda consumer, message, {% if isCloudEvent %}cloud_event, {% endif %}{{ dataType | strip_namespace }}:  self._unhandled_event{%if isCloudEvent%}_ce{%endif%}
+        self.{{ message.id | dotunderscore | snake }}_async: Callable[[Consumer, Message, {% if isCloudEvent %}CloudEvent, {%endif%}{{ dataType | strip_namespace }}], Awaitable[None]] = _unhandled_event{%if isCloudEvent%}_ce{%endif%}
+        {%- endfor %}
 
-    {%- endfor %}
-
-    async def _process_message(self, consumer: Consumer, msg: Message):
+    async def process_message(self, consumer: Consumer, msg: Message):
         """
         Processes an incoming message.
 
@@ -287,6 +335,7 @@ class {{ class_name }}(DispatcherBase):
         Args:
             message: The message to dispatch.
         """
+        
         message_subject = message.headers.get("subject")
         switcher = {
             {%- for id, message in messagegroup.messages.items() if ((message | exists("binding", "kafka" )) and not (message | exists("format", "cloudevents" ))) %}

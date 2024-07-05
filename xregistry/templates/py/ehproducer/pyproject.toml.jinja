@@ -3,12 +3,12 @@ name = "{{main_project_name|replace("_","-")}}"
 description = "{{project_name | capitalize}} Azure Event Hubs producer library"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
-version = "0.1.0"  # Placeholder version, dynamic versioning can be handled with plugins
+version = "{{ "0.1.0" if not package_version else package_version }}"  # Placeholder version, dynamic versioning can be handled with plugins
 packages = [{include = "{{main_project_name}}", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "<4.0,>=3.11"
-{{data_project_name|replace("_","-")}} = { path = "../{{data_project_name}}", develop = true }
+python = "<4.0,>=3.10"
+{{data_project_name|replace("_","-")}} = "*"
 azure-eventhub = ">=5.12.1"
 azure-identity = ">=1.17.0"
 cloudevents = ">=1.10.1"
