@@ -119,7 +119,7 @@ class {{ class_name }}:
         attributes["datacontenttype"] = content_type
         event = CloudEvent.create(attributes, data)
         if self.content_mode == "structured":
-            message = to_structured(event, data_marshaller=lambda x: {% if data_type != "object"%}x.to_json(){%else%}json.dumps(x){%endif%}, key_mapper=lambda x: self.__key_mapper(x, data, key_mapper))
+            message = to_structured(event, data_marshaller=lambda x: {% if data_type != "object"%}json.loads(x.to_json()){%else%}json.dumps(x){%endif%}, key_mapper=lambda x: self.__key_mapper(x, data, key_mapper))
             message.headers[b"content-type"] = b"application/cloudevents+json"
         else:
             content_type = "application/json"
