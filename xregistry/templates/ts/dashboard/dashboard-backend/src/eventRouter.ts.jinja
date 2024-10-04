@@ -1,0 +1,27 @@
+import { ClientManager } from './clientManager.js';
+import { CloudEventV1 } from 'cloudevents';
+import { ClientFilters } from './types.js';
+
+export class EventRouter {
+  private clientManager: ClientManager;
+
+  constructor(clientManager: ClientManager) {
+    this.clientManager = clientManager;
+  }
+
+  public routeEvents(events: CloudEventV1<any>[]) {
+    this.clientManager.getClients().forEach((client, clientId) => {
+      let matchingEvents = events.filter((event) => this.eventMatchesFilters(event, client.filters));
+      client.socket.emit('event', matchingEvents);
+    });
+  }
+
+  private eventMatchesFilters(event: CloudEventV1<any>, filters: ClientFilters[]): boolean {
+    return filters.some((filter) => {
+      const typeMatches = filter.type === event.type;
+      const subjectMatches = event.subject?.startsWith(filter.subjectPrefix || '') || !filter.subjectPrefix || !event.subject;
+      const sourceMatches = event.source?.startsWith(filter.sourcePrefix || '') || !filter.sourcePrefix || !event.source;
+      return typeMatches && subjectMatches && sourceMatches;
+    });
+  }
+}

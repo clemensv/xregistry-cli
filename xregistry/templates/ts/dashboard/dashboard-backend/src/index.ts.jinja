@@ -1,0 +1,103 @@
+// index.ts
+
+import express from 'express';
+import { Server as SocketIOServer } from 'socket.io';
+import http from 'http';
+import path from 'path';
+import cors from 'cors';
+import { KafkaConsumer } from './kafkaConsumer.js';
+import { ClientManager } from './clientManager.js';
+import { EventRouter } from './eventRouter.js';
+import { KqlClient } from './kqlClient.js';
+import { config, validateConfig } from './config.js'; // Configuration module
+import { createLogger, transports, format, Logger } from 'winston';
+
+
+validateConfig(config);
+
+// Create a logger instance
+const logger: Logger = createLogger({
+  level: 'info',
+  format: format.combine(format.timestamp(), format.simple()),
+  transports: [new transports.Console()],
+});
+
+const app = express();
+app.use(cors({ origin: '*' }));
+app.use(express.json());
+
+// Serve the frontend application (if any)
+app.use(express.static('public'));
+
+// Fallback route to serve index.html (if you're using a SPA)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Create HTTP server and Socket.IO server
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: '*',
+  },
+  perMessageDeflate: true
+});
+
+let kqlClient: KqlClient | null = null;
+
+if (!config.KQL_CONNECTION_STRING || !config.KQL_DATABASE_NAME) {
+  logger.warn('KQL connection string or database name is not defined. KQL client will not be initialized.');
+} else {
+  // Initialize KqlClient
+  kqlClient = new KqlClient(
+    config.KQL_CONNECTION_STRING,
+    config.KQL_DATABASE_NAME,
+    logger
+  );
+}
+
+const eventTypeTableMap = {
+{%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+{%- for message_id, message in messagegroup.messages.items() -%}
+{%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+{%- if isCloudEvent %}
+{%- if message.schemaurl or message.schema -%}
+{%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+'{{ message.metadata["type"]["value"] }}': '{{ dataType }}',
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+};
+
+// Initialize ClientManager
+const clientManager = new ClientManager(kqlClient, logger, eventTypeTableMap);
+
+// Initialize EventRouter
+const eventRouter = new EventRouter(clientManager);
+
+// Initialize KafkaConsumer
+const kafkaConsumer = new KafkaConsumer(eventRouter, logger);
+
+// Handle WebSocket connections
+io.on('connection', (socket) => {
+  const clientId = socket.handshake.query.clientId as string;
+  logger.info(`Client connected: ${clientId}`);
+
+  clientManager.addClient(clientId, socket);
+
+  socket.on('disconnect', () => {
+    logger.info(`Client disconnected: ${clientId}`);
+    clientManager.removeClient(clientId);
+  });
+});
+
+// Start the server
+server.listen(config.PORT, () => {
+  logger.info(`Server is running on port ${config.PORT}`);
+});
+
+// Start consuming Kafka events
+kafkaConsumer.start().catch((error) => {
+  logger.error(`Error starting Kafka consumer: ${error}`);
+});

@@ -1,0 +1,113 @@
+// kafkaConsumer.ts
+
+import {
+  Kafka,
+  Consumer,
+  EachMessagePayload,
+  ConsumerSubscribeTopics,
+  Admin,
+  KafkaMessage as KafkaJsMessage,
+  EachBatchPayload,
+} from 'kafkajs';
+import { config } from './config.js';
+import { EventRouter } from './eventRouter.js';
+import { CloudEventV1, KafkaMessage } from 'cloudevents';
+import { Logger } from 'winston';
+import { parseCloudEvent } from './cloudeventParser.js';
+
+export class KafkaConsumer {
+  private consumer: Consumer;
+  private admin: Admin;
+  private eventRouter: EventRouter;
+  private logger: Logger;
+
+  constructor(eventRouter: EventRouter, logger: Logger) {
+    this.eventRouter = eventRouter;
+    this.logger = logger;
+
+    const kafka = new Kafka({
+      clientId: 'my-app',
+      brokers: config.KAFKA_BROKERS.split(','),
+      ssl: config.KAFKA_SSL === 'true',
+      sasl:
+        config.KAFKA_USERNAME && config.KAFKA_PASSWORD
+          ? {
+            mechanism: 'plain',
+            username: config.KAFKA_USERNAME,
+            password: config.KAFKA_PASSWORD,
+          }
+          : undefined,
+    });
+
+    this.consumer = kafka.consumer({ groupId: config.CONSUMER_GROUP });
+    this.admin = kafka.admin();
+  }
+
+  public async start() {
+    try {
+      await this.consumer.connect();
+      this.logger.info('Kafka consumer connected');
+
+      const topics = [config.KAFKA_TOPIC];
+      const cst: ConsumerSubscribeTopics = { topics, fromBeginning: false };
+      await this.consumer.subscribe(cst);
+      this.logger.info(`Subscribed to topics: ${topics.join(', ')}`);
+
+      await this.consumer.run({
+        eachBatch: async (payload: EachBatchPayload) => {
+          let events: CloudEventV1<any>[] = [];
+          let topic = payload.batch.topic;
+          let partition = payload.batch.partition;
+          payload.batch.messages.forEach((message, num, batch) => {
+            try {
+              const msg: KafkaMessage = {
+                key: message.key ?? '',
+                timestamp: message.timestamp,
+                value: message.value,
+                body: message.value,
+                headers: Object.fromEntries(
+                  Object.entries(message.headers ?? {}).map(([key, value]) => [
+                    key,
+                    Array.isArray(value) ? value.map(v => v.toString()) : value?.toString()
+                  ])
+                )
+              };
+              const event = parseCloudEvent<any>(msg);
+              if (event) {
+                events.push(event);
+              } else {
+                this.logger.warn(
+                  `Failed to parse CloudEvent from message in topic ${topic}, partition ${partition}`
+                );
+              }
+            } catch (error) {
+              this.logger.error(
+                `Error processing message from topic ${topic}, partition ${partition}: ${error}`
+              );
+            }
+          });
+          if (events.length > 0) {
+            this.eventRouter.routeEvents(events);
+          }
+        }
+      });
+
+      // Fetch the latest offsets for each partition
+      const latestOffsets = await this.admin.fetchTopicOffsets(config.KAFKA_TOPIC);
+      for (const partition of latestOffsets) {
+        // Seek to the latest offset for the partition
+        this.consumer.seek({
+          topic: config.KAFKA_TOPIC,
+          partition: partition.partition,
+          offset: partition.high,
+        });
+      }
+      this.logger.info('Consumer skipped latest offsets');
+
+      this.logger.info('Kafka consumer is running');
+    } catch (error) {
+      this.logger.error(`Error starting Kafka consumer: ${error}`);
+      throw error;
+    }
+  }
+}

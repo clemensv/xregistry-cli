@@ -1,0 +1,63 @@
+import { Injectable } from '@angular/core';
+import { io } from 'socket.io-client';
+import { ClientFilters } from '../../../../dashboard-backend/src/types.js'; // Adjust the path accordingly
+import { environment } from '../../environments/environment';
+
+@Injectable({
+  providedIn: 'root',
+})
+export class SocketService {
+  private socket: any;
+  private clientId: string;
+  private cachedFilters: ClientFilters[] = [];
+
+  constructor() {
+    this.clientId = this.generateClientId();
+    this.socket = io(environment.backendUrl, {
+      query: { clientId: this.clientId },
+    });
+
+    this.socket.on('connect', () => {
+      this.reregisterCachedFilters();
+    });
+  }
+
+  public getSocket() {
+    return this.socket;
+  }
+
+  public registerFilter(filter: ClientFilters) {
+    this.cachedFilters.push(filter);
+    if (this.socket.connected) {
+      this.socket.emit('addFilter', [filter]);
+    }
+  }
+
+  public removeFilter(filter: ClientFilters) {
+    this.cachedFilters = this.cachedFilters.filter(f => f !== filter);
+    if (this.socket.connected) {
+      this.socket.emit('removeFilter', [filter]);
+    }
+  }
+
+  private generateClientId(): string {
+    return 'client-' + Math.random().toString(36).substr(2, 9);
+  }
+
+  private reregisterCachedFilters() {
+    this.cachedFilters.forEach(filter => {
+      this.socket.emit('addFilter', [filter]);
+    });
+  }
+  
+  public requestHistory(eventType: string, subjectPrefix?: string, sourcePrefix?: string, fromTime?: string, toTime?: string) {
+    const request = {
+      eventType,
+      subjectPrefix,
+      sourcePrefix,
+      fromTime,
+      toTime,
+    };
+    this.socket.emit('requestHistory', request);
+  }
+}

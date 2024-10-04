@@ -1,0 +1,48 @@
+import winston from 'winston';
+import { logLevel } from 'kafkajs';
+
+// Create Winston logger instance
+const appLogger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json(),
+    winston.format.printf(({ level, message, timestamp, ...meta }) => {
+      return `${timestamp} [${level.toUpperCase()}]: ${message} ${JSON.stringify(meta)}`;
+    })
+  ),
+  transports: [
+    new winston.transports.Console({ level: 'info' }),
+    new winston.transports.File({ filename: 'app.log' }),
+    new winston.transports.File({ filename: 'error.log', level: 'error' })
+  ]
+});
+
+// Function to map KafkaJS log levels to Winston log levels
+const toWinstonLogLevel = (kafkaLogLevel: logLevel) => {
+  switch (kafkaLogLevel) {
+    case logLevel.ERROR:
+      return 'error';
+    case logLevel.WARN:
+      return 'warn';
+    case logLevel.INFO:
+      return 'info';
+    case logLevel.DEBUG:
+      return 'debug';
+    default:
+      return 'info';
+  }
+};
+
+// Custom KafkaJS logger function to be passed to KafkaJS
+export const kafkaLogger = ({ level, log }: any) => {
+  const { message, ...extra } = log;
+  appLogger.log({
+    level: toWinstonLogLevel(level),
+    message: message,
+    extra: extra
+  });
+};
+
+// Export the logger instance to be used in your app
+export const logger = appLogger;

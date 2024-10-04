@@ -1,0 +1,111 @@
+// clientManager.ts
+
+import { Socket } from 'socket.io';
+import { ClientFilters } from './types.js';
+import { KqlClient } from './kqlClient.js';
+import { Logger } from 'winston';
+import { CloudEvent } from 'cloudevents';
+
+export class ClientManager {
+  private clients: Map<string, { socket: Socket; filters: ClientFilters[] }> = new Map();
+  private kqlClient: KqlClient|null;
+  private logger: Logger;
+  private eventTypeTableMap: { [key: string]: string };
+
+  constructor(kqlClient: KqlClient|null, logger: Logger, eventTypeTableMap: { [key: string]: string }) {
+    this.kqlClient = kqlClient;
+    this.logger = logger;
+    this.eventTypeTableMap = eventTypeTableMap;
+  }
+
+  public addClient(clientId: string, socket: Socket) {
+    this.clients.set(clientId, { socket, filters: [] });
+
+    // Handle requests for data stream segments
+    if (this.kqlClient) {
+      socket.on('requestHistory', async (request) => {
+        if (!this.kqlClient) {
+          return;
+        }
+        const { eventType, subjectPrefix, sourcePrefix, fromTime, toTime } = request;
+        this.logger.info(`Client ${clientId} requested history for event type ${eventType}`);
+
+        // Get the table name from the eventTypeTableMap
+        const tableName = this.eventTypeTableMap[eventType];
+        if (!tableName) {
+          this.logger.warn(`Table name not found for event type ${eventType}`);
+          socket.emit('historyError', { error: 'Table not found for event type' });
+          return;
+        }
+
+        // Build filters
+        const filters: { [key: string]: any } = {};
+        if (subjectPrefix) filters['___subject'] = subjectPrefix;
+        if (sourcePrefix) filters['___source'] = sourcePrefix;
+        if (fromTime && toTime) filters['___time'] = [new Date(fromTime), new Date(toTime)];
+        else if (fromTime) filters['___time'] = new Date(fromTime);
+
+        try {
+          await this.kqlClient.queryInChunks(tableName, filters, (rows) => {
+            let events = rows.map((row) => this.createCloudEventFromRow(row));
+            socket.emit('history', events);
+          });
+          // Indicate that the history is complete
+          socket.emit('historyComplete', { eventType });
+        } catch (error) {
+          this.logger.error(`Error querying Kusto: ${error}`);
+          socket.emit('historyError', { error: 'Error querying data' });
+        }
+      });
+    }
+    socket.on('addFilter', (filters:  ClientFilters[]) => {
+      this.addClientFilters(clientId, filters);
+    });
+    socket.on('removeFilter', (filters:  ClientFilters[]) => {
+      this.removeClientFilters(clientId, filters);
+    });
+    socket.on('disconnect', () => {
+      this.logger.info(`Client disconnected: ${clientId}`);
+      this.removeClient(clientId);
+    });
+  }
+
+  private createCloudEventFromRow(row: { [key: string]: any }): CloudEvent {
+    const cloudEvent: { [key: string]: any } = {};
+    const data: { [key: string]: any } = {};
+
+    for (const [key, value] of Object.entries(row)) {
+      if (key.startsWith('___')) {
+        const attributeName = key.substring(3); // Remove the '___' prefix
+        cloudEvent[attributeName] = value;
+      } else {
+        data[key] = value;
+      }
+    }
+
+    cloudEvent['data'] = data;
+    return new CloudEvent<any>(cloudEvent, false);
+  }
+
+  public removeClient(clientId: string) {
+    this.clients.delete(clientId);
+  }
+
+  public addClientFilters(clientId: string, filters: ClientFilters[]) {
+    const client = this.clients.get(clientId);
+    if (client) {
+      client.filters = [...client.filters, ...filters];
+    }
+  }
+
+  public removeClientFilters(clientId: string, filters: ClientFilters[]) {
+    const client = this.clients.get(clientId);
+    if (client) {
+      client.filters = client.filters.filter((f) => !filters.includes(f));
+    }
+  }
+
+  public getClients() {
+    return this.clients;
+  }
+}

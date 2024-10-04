@@ -128,6 +128,7 @@ class {{ class_name }}:
         self.producer.produce(self.topic, key=message.key, value=message.value, headers=message.headers)
         if flush_producer:
             self.producer.flush()
+{% endfor %}
 
     @classmethod
     def parse_connection_string(cls, connection_string: str) -> typing.Tuple[typing.Dict[str, str], str]:
@@ -177,5 +178,5 @@ class {{ class_name }}:
         if not topic_name:
             raise ValueError("Topic name not found in connection string")
         return cls(Producer(config), topic_name, content_mode)
-{% endfor %}
+
 {% endfor %}

@@ -1,0 +1,51 @@
+{
+  "name": "{{project_name|dotdash|lower}}-dashboard-frontend",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/animations": "^18.2.5",
+    "@angular/common": "^18.2.5",
+    "@angular/compiler": "^18.2.5",
+    "@angular/core": "^18.2.5",
+    "@angular/forms": "^18.2.5",
+    "@angular/platform-browser": "^18.2.5",
+    "@angular/platform-browser-dynamic": "^18.2.5",
+    "@angular/router": "^18.2.5",
+    "@types/d3": "7.4.3",
+    "d3": "7.9.0",
+    "dashboard-frontend": "file:",
+    "glob": "^11.0.0",
+    "{{project_name|dotunderscore|lower}}_data": "file:../{{project_name|dotunderscore|lower}}_data",
+    "rollup": "^4.22.4",
+    "rxjs": "^7.8.1",
+    "socket.io-client": "4.8.0",
+    "tslib": "^2.7.0",
+    "typedjson": "1.8.0",
+    "zone.js": "^0.14.10"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^18.2.5",
+    "@angular/build": "^18.2.5",
+    "@angular/cli": "^18.2.5",
+    "@angular/compiler-cli": "^18.2.5",
+    "@types/jasmine": "^5.1.4",
+    "jasmine-core": "5.3.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "2.2.1",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "2.1.0",
+    "rimraf": "^6.0.1",
+    "rollup": "4.22.4",
+    "typescript": "5.4.5",
+    "undici": "6.19.8",
+    "vite": "5.4.8"
+  }
+}

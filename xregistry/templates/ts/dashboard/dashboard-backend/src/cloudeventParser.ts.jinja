@@ -1,0 +1,12 @@
+import { CloudEventV1, Kafka, KafkaMessage } from 'cloudevents';
+
+export function parseCloudEvent<T=undefined>(message: KafkaMessage<T>): CloudEventV1<T> | null {
+  try {
+    message.headers['content-type'] = "application/cloudevents+json";
+    const event = Kafka.toEvent(message) as CloudEventV1<T>;
+    return event;
+  } catch (error) {
+    console.error('Failed to parse CloudEvent:', error);
+    return null;
+  }
+}

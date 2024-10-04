@@ -1,0 +1,54 @@
+import { Subject } from 'rxjs';
+import { SocketService } from './services/socket.service';
+import { Serializable, TypedJSON } from 'typedjson';
+import { CloudEvent } from 'cloudevents';
+
+export interface IEventStreamListener<T> {
+  Feed: Subject<T[]>;
+  close(): void;
+}
+
+export class EventStreamListener<T> implements IEventStreamListener<CloudEvent<T>> {
+  public Feed: Subject<CloudEvent<T>[]> = new Subject<CloudEvent<T>[]>();
+  public History: Subject<CloudEvent<T>[]> = new Subject<CloudEvent<T>[]>();
+  private socketService: SocketService;
+  private serializer: TypedJSON<T>;
+  private sourcePrefix: string;
+  private subjectPrefix: string;
+
+  constructor(public eventType: string, sourcePrefix: string, subjectPrefix: string, socketService: SocketService, serializer: TypedJSON<T>) {
+    this.serializer = serializer;
+    this.socketService = socketService;
+    this.sourcePrefix = sourcePrefix;
+    this.subjectPrefix = subjectPrefix;
+
+    // Listen for events
+    this.socketService.getSocket().on('event', (events: any[]) => {
+      this.Feed.next(events.map((event) => {
+        event.data = this.serializer.parse(event.data);
+        return event;
+      }));
+    });
+    this.socketService.getSocket().on('history', (historyEvents: any[]) => {
+      this.History.next(historyEvents.map((historyEvent) => {
+        historyEvent.data = this.serializer.parse(historyEvent.data);
+        return historyEvent;
+      }));
+    });
+
+    socketService.registerFilter({
+      type: this.eventType,
+      subjectPrefix: this.subjectPrefix,
+      sourcePrefix: this.sourcePrefix
+    });
+  }
+
+  public requestHistory(fromTime?: string, toTime?: string): void {
+    this.socketService.requestHistory(this.eventType, this.subjectPrefix, this.sourcePrefix, fromTime, toTime);
+  }
+
+  public close(): void {
+    this.socketService.getSocket().off('event');
+    this.socketService.getSocket().off('history');
+  }
+}

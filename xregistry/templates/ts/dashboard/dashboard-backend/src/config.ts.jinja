@@ -1,0 +1,36 @@
+// config.ts
+
+import dotenv from 'dotenv';
+
+dotenv.config(); // Load environment variables from .env file
+
+export const config = {
+  PORT: process.env.PORT || 3000,
+  KAFKA_SSL: process.env.KAFKA_SSL || 'true',
+  KAFKA_BROKERS: process.env.KAFKA_BROKERS || '',
+  KAFKA_TOPIC: process.env.KAFKA_TOPIC || '',
+  KAFKA_USERNAME: process.env.KAFKA_USERNAME || '',
+  KAFKA_PASSWORD: process.env.KAFKA_PASSWORD || '',
+  CONSUMER_GROUP: process.env.CONSUMER_GROUP || '',
+  KQL_CONNECTION_STRING: process.env.KQL_CONNECTION_STRING || '',
+  KQL_DATABASE_NAME: process.env.KQL_DATABASE_NAME || '',
+  // Add any other configurations as needed
+};
+
+// Validate configuration
+export function validateConfig(config: any) {
+  const requiredConfigs = [
+    'PORT',
+    'KAFKA_BROKERS',
+    'KAFKA_TOPIC',
+    'CONSUMER_GROUP'
+  ];
+
+  for (const key of requiredConfigs) {
+    if (!config[key]) {
+      throw new Error(`${key} is not defined`);
+    }
+  }
+
+  console.log(`Configuration: ${JSON.stringify(config, null, 2)}`);
+};

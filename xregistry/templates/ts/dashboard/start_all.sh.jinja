@@ -1,0 +1,17 @@
+#!/bin/bash
+# Script to start both backend and frontend
+
+echo "Starting both backend and frontend..."
+
+# Start backend
+cd dashboard-backend
+./start.sh &
+BACKEND_PID=$!
+
+# Start frontend
+cd ../dashboard-frontend
+./start.sh &
+FRONTEND_PID=$!
+
+# Wait for both processes
+wait $BACKEND_PID $FRONTEND_PID

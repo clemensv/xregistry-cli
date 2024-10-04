@@ -58,6 +58,7 @@ class TemplateRenderer:
         self.suppress_schema_output = suppress_schema_output
         self.templateinfo = {}
         self.data_project_name = f"{project_name}_data"
+        self.data_project_dir = self.data_project_name
         self.main_project_name = project_name
         self.src_layout = False
 
@@ -89,11 +90,14 @@ class TemplateRenderer:
                     self.main_project_name = self.resolve_string(self.templateinfo["main_project_name"], {"project_name": self.project_name})
                 if "data_project_name" in self.templateinfo:
                     self.data_project_name =  self.resolve_string(self.templateinfo["data_project_name"], {"project_name": self.project_name})
+                    self.data_project_dir = self.data_project_name
+                if "data_project_dir" in self.templateinfo:
+                    self.data_project_dir = self.resolve_string(self.templateinfo["data_project_dir"], {"project_name": self.project_name})
 
         solution_dir = os.path.join(self.output_dir)
         if self.src_layout:
             solution_dir = os.path.join(self.output_dir, "src")
-        project_data_dir = os.path.join(solution_dir, self.data_project_name)
+        project_data_dir = os.path.join(solution_dir, self.data_project_dir)
         project_dir = os.path.join(solution_dir, self.main_project_name)
 
         self.template_args["project_data_dir"] = project_data_dir

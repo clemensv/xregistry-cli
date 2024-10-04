@@ -1,0 +1,26 @@
+#!/bin/bash
+# Script to initialize environment and setup both backend and frontend
+
+echo "Initializing the environment..."
+
+# Setting up backend
+echo "Setting up the backend..."
+mkdir dashboard-backend
+cd dashboard-backend
+npm init -y
+
+echo "Installing backend dependencies..."
+npm install express socket.io kafkajs dotenv cloudevents pako
+npm install typescript ts-node @types/express @types/node @types/socket.io --save-dev
+
+echo "Initializing TypeScript configuration..."
+npx tsc --init
+cd ..
+
+# Setting up frontend
+echo "Setting up the frontend..."
+ng new dashboard-frontend --skip-install
+cd dashboard-frontend
+npm install socket.io-client typedjson d3 pako reflect-metadata
+
+echo "Environment initialized and both backend and frontend are ready."

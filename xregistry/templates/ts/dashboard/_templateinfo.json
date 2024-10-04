@@ -1,0 +1,8 @@
+{
+    "description" : "TypeScript/Angular Real-Time Dashboard for Microsoft Fabric",
+    "priority" : 1,
+    "main_project_name" : "{project_name|dotunderscore|lower}_dashboard",
+    "data_project_name" : "{project_name|dotunderscore|lower}_data",
+    "data_project_dir" : "{project_name|dotunderscore|lower}_dashboard/{project_name|dotunderscore|lower}_data",
+    "src_layout" : false
+}

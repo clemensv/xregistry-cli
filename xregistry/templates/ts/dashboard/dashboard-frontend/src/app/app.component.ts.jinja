@@ -1,0 +1,469 @@
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- if not uses_cloudevents_message %}
+{%- exit -%}
+{%- endif -%}
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { SocketService } from './services/socket.service';
+import { EventStreamListener } from './event-stream-listener';
+import { CloudEvent } from 'cloudevents';
+{% for messagegroup_key, messagegroup in messagegroups.items() -%}
+{%- set pascalGroupName = messagegroup.id  | pascal -%}
+import {
+{%- for id in messagegroup.messages -%}
+{%- set definition = messagegroup.messages[id] -%}
+{%- set pascalDefinitionName = definition.id | pascal %}
+{%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
+{%- if definition.schemaurl or definition.schema -%}
+{%- set dataType = ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | strip_namespace | pascal) %}
+{{- dataType | strip_namespace }}{% if not loop.last %},{% endif -%}
+{%- endif -%}
+{%- endfor -%}
+} from '{{project_name|dotunderscore|lower}}_data';
+{%- endfor %}
+import * as d3 from 'd3';
+import { TypedJSON } from 'typedjson';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.less'],
+})
+export class AppComponent implements OnInit, OnDestroy {
+  // Event listeners for each event type
+  {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+  {%- for message_id, message in messagegroup.messages.items() -%}
+  {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+  {%- if isCloudEvent %}
+  {%- if message.schemaurl or message.schema -%}
+  {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+  {{ dataType | strip_namespace | camel }}Listener: EventStreamListener<{{ dataType | strip_namespace | pascal}}>;
+  {%- endif %}
+  {%- endif %}
+  {%- endfor %}
+  {%- endfor %}
+
+  // Add other event listeners as needed
+  title = 'dashboard-frontend';
+  lastMessageType: string = '';
+  lastMessageTime: string = '';
+  messageRate: number = 0;
+
+  private messageTimestamps: number[] = [];
+
+  eventCounters: { [key: string]: number } = {
+    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+    {%- for message_id, message in messagegroup.messages.items() -%}
+    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- if isCloudEvent %}
+    '{{ message.metadata["type"]["value"] }}': 0{% if not loop.last %},{% endif %}
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+  };
+
+  eventCountsPerMinute: { [eventType: string]: { [minuteTimestamp: number]: number } } = {
+    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+    {%- for message_id, message in messagegroup.messages.items() -%}
+    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- if isCloudEvent %}
+    '{{ message.metadata["type"]["value"] }}': {}{% if not loop.last %},{% endif %}
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+  };
+
+  collectCountsPerMinute(event: CloudEvent<any>, eventType: string) {
+    if (!event || !event.time)
+      return;
+    const eventTime = new Date(event.time);
+      const minuteTimestamp = Math.floor(eventTime.getTime() / (60 * 1000)) * (60 * 1000);
+      if (!this.eventCountsPerMinute[eventType][minuteTimestamp]) {
+        this.eventCountsPerMinute[eventType][minuteTimestamp] = 0;
+      }
+      this.eventCountsPerMinute[eventType][minuteTimestamp] += 1;
+  };
+
+  collectLastMessage(event: CloudEvent<any>) {
+    if (!event || !event.data)
+      return;
+    this.lastMessageType = event.type;
+    this.lastMessageTime = event.time ?? new Date().toISOString();
+    if (event.time) {
+      const eventTimestamp = new Date(event.time).getTime();
+      const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+      if (eventTimestamp >= thirtyMinutesAgo) {
+        this.messageTimestamps.push(eventTimestamp);
+      }
+    }
+  }
+
+  handleFeedBatch(eventBatch: CloudEvent<any>[]) {
+      eventBatch.forEach(event => {
+        this.collectLastMessage(event);
+        this.collectCountsPerMinute(event, event.type);
+        this.eventCounters[event.type] += 1;
+      });
+      this.updateChart();
+  }
+
+  handleHistoryBatch(historyBatch: CloudEvent<any>[]) {
+    historyBatch.forEach(historyEvent => {
+      this.collectCountsPerMinute(historyEvent, historyEvent.type); 
+    });
+    this.updateChart();
+  }
+
+   constructor(private socketService: SocketService) {
+    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+    {%- for message_id, message in messagegroup.messages.items() -%}
+    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- if isCloudEvent %}
+    {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+    this.{{ dataType | strip_namespace | camel }}Listener = new EventStreamListener<{{ dataType | strip_namespace | pascal }}>(
+      '{{ message.metadata["type"]["value"] }}', '', '',
+      this.socketService, new TypedJSON({{ dataType | strip_namespace | pascal }})
+    );
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+
+    // Initialize listeners
+    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+    {%- for message_id, message in messagegroup.messages.items() -%}
+    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- if isCloudEvent %}
+    {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+    this.{{ dataType | strip_namespace | camel }}Listener.Feed.subscribe((eventBatch) => this.handleFeedBatch(eventBatch));
+    this.{{ dataType | strip_namespace | camel }}Listener.History.subscribe((h) => this.handleHistoryBatch(h));
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+  }
+
+  ngOnInit() {
+    this.createChart();
+    this.updateChart();
+    setInterval(() => this.calculateMessageRate(), 10000);
+
+    const startTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const endTime = new Date().toISOString();
+    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+    {%- for message_id, message in messagegroup.messages.items() -%}
+    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- if isCloudEvent %}
+    {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+    this.{{ dataType | strip_namespace | camel }}Listener.requestHistory(startTime, endTime);
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+  }
+
+  ngOnDestroy() {
+    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+    {%- for message_id, message in messagegroup.messages.items() -%}
+    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- if isCloudEvent %}
+    {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+    this.{{ dataType | strip_namespace | camel }}Listener.close();
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+  }
+
+
+  // Calculate the message rate based on the last second
+  private calculateMessageRate() {
+    const now = Date.now();
+    const tenSecondsAgo = now - 10000;
+
+    // Filter out old timestamps
+    this.messageTimestamps = this.messageTimestamps.filter(timestamp => timestamp > tenSecondsAgo);
+    // Calculate message rate as messages per second
+    this.messageRate = this.messageTimestamps.length / 10.0;
+    this.updateInfoBar();
+  }
+
+  private svg: any;
+  private barChartGroup: any;
+  private lineChartGroup: any;
+  private xBar: any;
+  private yBar: any;
+  private xLine: any;
+  private yLine: any;
+  private lineGenerator: any;
+  private color: any;
+  private margin = { top: 20, right: 20, bottom: 100, left: 60 };
+  private width!: number;
+  private height!: number;
+
+  private createChart() {
+    const container = d3.select('figure#chart');
+    const eventCounterKeys = Object.keys(this.eventCounters);
+
+    // Safely cast the container node to an HTMLElement
+    const containerElement = container.node() as HTMLElement;
+    if (!containerElement) return;  // Check if the container exists
+
+    const containerWidth = containerElement.getBoundingClientRect().width; // Get the width of the container
+    const aspectRatio = 0.5;  // Adjusted aspect ratio for two charts side by side (height is half of width)
+    const chartHeight = containerWidth * aspectRatio;  // Calculate height based on the aspect ratio
+
+    // Update the width and height based on container size
+    this.width = containerWidth - this.margin.left - this.margin.right;
+    this.height = chartHeight - this.margin.top - this.margin.bottom;
+
+    // Create the SVG element
+    this.svg = container
+      .append('svg')
+      .attr('width', '100%') // Make SVG take the full width of the container
+      .attr('height', chartHeight)  // Dynamically calculate height
+      .attr('viewBox', `0 0 ${containerWidth} ${chartHeight}`) // Define the viewBox for responsive behavior
+      .attr('preserveAspectRatio', 'xMinYMin meet');
+
+    const chartSeparation = 50; // 50px separation between charts
+    const halfWidth = (this.width - chartSeparation) / 2;
+
+    // Create groups for bar chart and line chart
+    this.barChartGroup = this.svg.append('g')
+      .attr('transform', `translate(${this.margin.left}, ${this.margin.top})`);
+
+    this.lineChartGroup = this.svg.append('g')
+      .attr('transform', `translate(${this.margin.left + halfWidth + chartSeparation}, ${this.margin.top})`);
+
+    // Set up the color scale
+    this.color = d3.scaleOrdinal()
+      .domain(eventCounterKeys)
+      .range(d3.schemeCategory10);
+
+    // Initialize bar chart scales
+    this.xBar = d3.scaleBand()
+      .domain(eventCounterKeys)
+      .range([0, halfWidth])
+      .padding(0.2);
+
+    this.yBar = d3.scaleLinear()
+      .domain([0, 10]) // Initial domain, will be updated
+      .range([this.height, 0]);
+
+    // Initialize line chart scales
+    const now = new Date();
+    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+
+    this.xLine = d3.scaleTime()
+      .domain([thirtyMinutesAgo, now])
+      .range([0, halfWidth]);
+
+    this.yLine = d3.scaleLinear()
+      .domain([0, 10]) // Initial domain, will be updated
+      .range([this.height, 0]);
+
+    // Add axes and labels to bar chart
+    this.barChartGroup.append('g')
+      .attr('transform', `translate(0, ${this.height})`)
+      .call(d3.axisBottom(this.xBar))
+      .selectAll('text')
+      .attr('transform', 'rotate(-45)')
+      .attr('text-anchor', 'end')
+      .attr('dx', '-0.5em')
+      .attr('dy', '0em')
+      .style('font-size', '65%'); 
+
+    this.barChartGroup.append('g')
+      .attr('class', 'grid')
+      .call(d3.axisLeft(this.yBar)
+        .tickSize(-halfWidth)
+        .tickFormat(d => `${d}`)
+      );
+
+    this.barChartGroup.append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('y', -this.margin.left + 45) // Adjusted to be closer to the axis
+      .attr('x', -this.height / 2)
+      .attr('dy', '-1em')
+      .attr('text-anchor', 'middle')
+      .text('Event Count');
+
+    // Add axes and labels to line chart
+    this.lineChartGroup.append('g')
+      .attr('transform', `translate(0, ${this.height})`)
+      .call(d3.axisBottom(this.xLine)
+        .tickFormat((domainValue: any, index: number) => d3.timeFormat('%H:%M')(domainValue as Date))
+      );
+
+    this.lineChartGroup.append('g')
+      .attr('class', 'grid')
+      .call(d3.axisLeft(this.yLine)
+        .tickSize(-halfWidth)
+        .tickFormat(d => `${d}`)
+      );
+
+    this.lineChartGroup.append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('y', -this.margin.left + 45) // Adjusted to be closer to the axis
+      .attr('x', -this.height / 2)
+      .attr('dy', '-1em')
+      .attr('text-anchor', 'middle')
+      .text('Events per Minute');
+
+    // Initialize line generator
+    this.lineGenerator = d3.line<{ time: Date; count: number }>()
+      .x(d => this.xLine(d.time))
+      .y(d => this.yLine(d.count))
+      .curve(d3.curveBasis); // For smooth curves
+
+    // Create initial bars
+    this.barChartGroup.selectAll('rect')
+      .data(eventCounterKeys)
+      .enter()
+      .append('rect')
+      .attr('x', (d: string) => this.xBar(d) as number)
+      .attr('y', this.yBar(0))
+      .attr('width', this.xBar.bandwidth())
+      .attr('height', this.height - this.yBar(0))
+      .attr('fill', (d: string) => this.color(d));
+  }
+
+  private updateInfoBar() {
+    document.getElementById('message-type-cell')!.innerHTML = `Message Type:<br>${this.lastMessageType}`;
+    const formattedTime = new Date(this.lastMessageTime).toLocaleString();
+    document.getElementById('message-time-cell')!.innerHTML = `Message Time:<br>${formattedTime}`;
+    document.getElementById('message-rate-cell')!.innerHTML = `Message Rate:<br>${this.messageRate} msg/sec`;
+  }
+
+  private pruneOldData() {
+    const now = Date.now();
+    const thirtyMinutesAgo = now - 30 * 60 * 1000;
+    for (const eventType in this.eventCountsPerMinute) {
+      const countsPerMinute = this.eventCountsPerMinute[eventType];
+      for (const timestampStr in countsPerMinute) {
+        const timestamp = parseInt(timestampStr);
+        if (timestamp < thirtyMinutesAgo) {
+          delete countsPerMinute[timestamp];
+        }
+      }
+    }
+  }
+
+  private updateChart() {
+    this.updateInfoBar();
+    this.pruneOldData();
+
+    const now = Date.now();
+    const tenMinutesAgo = now - 10 * 60 * 1000;
+
+    // Compute counts in the last 10 minutes
+    const eventCountersLast10Minutes: { [key: string]: number } = {};
+
+    for (const eventType in this.eventCountsPerMinute) {
+      eventCountersLast10Minutes[eventType] = 0;
+      const countsPerMinute = this.eventCountsPerMinute[eventType];
+      for (const timestampStr in countsPerMinute) {
+        const timestamp = parseInt(timestampStr);
+        if (timestamp >= tenMinutesAgo) {
+          eventCountersLast10Minutes[eventType] += countsPerMinute[timestamp];
+        }
+      }
+    }
+
+    // Prepare data for the bar chart using counts from the last 10 minutes
+    const data = Object.keys(eventCountersLast10Minutes).map(key => {
+      return { type: key, count: eventCountersLast10Minutes[key] };
+    });
+
+    // Update yBar scale domain based on data
+    this.yBar.domain([0, d3.max(data, d => d.count)! + 5]);
+
+    // Update the bars in bar chart
+    const bars = this.barChartGroup.selectAll('rect')
+      .data(data);
+
+    bars.enter()
+      .append('rect')
+      .merge(bars as any)
+      .transition()
+      .duration(500)
+      .attr('x', (d: any) => this.xBar(d.type) as number)
+      .attr('y', (d: any) => this.yBar(d.count))
+      .attr('width', this.xBar.bandwidth())
+      .attr('height', (d: any) => this.height - this.yBar(d.count))
+      .attr('fill', (d: any) => this.color(d.type));
+
+    bars.exit().remove();
+
+    // Update Y-axis for bar chart
+    this.barChartGroup.select('.grid')
+      .call(d3.axisLeft(this.yBar)
+        .tickSize(-this.xBar.range()[1])
+        .tickFormat(d => `${d}`)
+      );
+
+    // Prepare data for line chart
+    const thirtyMinutesAgo = new Date(now - 30 * 60 * 1000);
+
+    // Update xLine domain
+    this.xLine.domain([thirtyMinutesAgo, now]);
+
+    // Generate array of minute timestamps
+    const minuteTimestamps: Date[] = [];
+    for (let ts = thirtyMinutesAgo.getTime(); ts <= now; ts += 60 * 1000) {
+      minuteTimestamps.push(new Date(ts));
+    }
+
+    // Generate data for line chart
+    const lineData = Object.keys(this.eventCountsPerMinute).map(eventType => {
+      const countsPerMinute = this.eventCountsPerMinute[eventType];
+      const dataPoints = minuteTimestamps.map(time => {
+        const timestamp = Math.floor(time.getTime() / (60 * 1000)) * (60 * 1000);
+        const count = countsPerMinute[timestamp] || 0;
+        return { time, count };
+      });
+      return { eventType, dataPoints };
+    });
+
+    // Update yLine domain based on data
+    const maxY = d3.max(lineData, d => d3.max(d.dataPoints, p => p.count)) || 1;
+    this.yLine.domain([0, maxY]);
+
+    // Update the lines
+    const lines = this.lineChartGroup.selectAll('.line')
+      .data(lineData, (d: any) => d.eventType);
+
+    lines.enter()
+      .append('path')
+      .attr('class', 'line')
+      .merge(lines as any)
+      .transition()
+      .duration(500)
+      .attr('fill', 'none')
+      .attr('stroke', (d: any) => this.color(d.eventType))
+      .attr('stroke-width', 1.5)
+      .attr('d', (d: any) => this.lineGenerator(d.dataPoints));
+
+    lines.exit().remove();
+
+    // Update Y-axis for line chart (with labels)
+    this.lineChartGroup.select('.grid')
+      .call(d3.axisLeft(this.yLine)
+        .tickSize(-this.xLine.range()[1])
+        .tickFormat(d => `${d}`)
+      );
+
+    // Update X-axis for line chart with the remembered fix
+    this.lineChartGroup.select('g')
+      .call(d3.axisBottom(this.xLine)
+        .tickFormat((domainValue: any, index: number) => d3.timeFormat('%H:%M')(domainValue as Date))
+      );
+
+    // Update the counters at the bottom
+    // Update the counters at the bottom
+    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+    {%- for message_id, message in messagegroup.messages.items() -%}
+    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- if isCloudEvent %}
+    document.getElementById('{{ message.metadata["type"]["value"] | dotdash| lower}}-counter')!.innerHTML = `{{ message.metadata["type"]["value"] }}<br>${this.eventCounters['{{ message.metadata["type"]["value"] }}']}`;
+    {%- endif %}
+    {%- endfor %}
+    {%- endfor %}
+  }
+}

@@ -1,0 +1,192 @@
+/* Ensure font is loaded */
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap");
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f4f4f9;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    flex-direction: column;
+  }
+
+/* Heading styling */
+h1 {
+  font-family: "Roboto", sans-serif;
+  font-size: 2vw; /* Halved heading size */
+  font-weight: 700;
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 20px; /* Less margin to adjust for size */
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 5px;
+}
+
+/* Chart container */
+/* Chart container */
+figure#chart {
+    width: 100%;               /* Ensure it takes the full width of its container */
+    max-width: 1200px;         /* Define a reasonable maximum width */
+    height: auto;               /* Allow the height to be flexible */
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 10px;              /* Reduced padding */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px;        /* Space below the chart */
+    margin: 0 auto;             /* Center the container horizontally */
+    display: flex;              /* Flexbox to align the contents */
+    justify-content: center;    /* Center the contents inside the container */
+}
+
+
+
+/* Styling for the chart SVG */
+svg {
+    width: 100%;          /* Ensure SVG takes up full container width */
+    height: auto;         /* Make height responsive based on aspect ratio */
+    max-width: 100%;      /* Prevent the SVG from overflowing */
+    display: block;       /* Remove inline-block spacing issues */
+  }
+  
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: #d1d5db;
+    shape-rendering: crispEdges;
+  }
+  
+  .grid line {
+    stroke: #e0e0e0;
+    stroke-opacity: 0.7;
+    shape-rendering: crispEdges;
+  }
+  
+  .grid path {
+    stroke-width: 0;
+  }
+  
+  .axis text {
+    fill: #555;
+  }
+  
+  .bar {
+    fill: #3498db;
+    transition: fill 0.3s, height 0.3s ease-in-out;
+    &:hover {
+      fill: #2980b9;
+    }
+  }
+  
+  text {
+    fill: #333;
+    font-size: 0.75vw;
+  }
+  
+
+/* Info bar styling */
+#info-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 1200px;
+    padding: 5px; /* Reduced padding */
+    background-color: #f9fafb;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    margin-bottom: 10px; /* Reduced margin */
+    border: 1px solid #e5e7eb;
+    flex-wrap: wrap;
+    margin: 0 auto;
+  }
+  
+  .info-cell {
+    font-family: 'Roboto', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: #4b5563;
+    padding: 4px 8px; /* Reduced padding */
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    flex: 1 1 180px; /* Smaller width for compactness */
+    max-width: 300px;
+    text-align: center;
+    min-width: 180px; /* Ensure smaller minimum size */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 5px; /* Reduced margin */
+  }
+  
+  #message-rate-cell {
+    font-weight: 700;
+    font-size: 13px; /* Adjusted for emphasis */
+    color: #3498db;
+  }
+  
+  
+  /* Counters bar styling */
+/* Counters bar styling */
+#counters-bar {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+    max-width: 1200px; /* Adjusted to fit the screen width */
+    padding: 5px;
+    background-color: #f9fafb;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    margin-top: 10px;
+    border: 1px solid #e5e7eb;
+    gap: 8px; /* Smaller gap between counters */
+    margin: 0 auto;
+  }
+  
+  .counter {
+    flex: 1 1 80px; /* Smaller width for compactness */
+    font-family: 'Roboto', sans-serif;
+    text-align: center;
+    background-color: #fff;
+    margin: 3px; /* Reduced margin */
+    padding: 5px 8px; /* Reduced padding */
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    font-size: 12px; /* Smaller font size */
+    font-weight: 500;
+    color: #4b5563;
+    border: 1px solid #e5e7eb;
+    min-width: 80px;
+    height: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #info-bar, #counters-bar {
+        flex-direction: column; /* Stack items vertically on small screens */
+      }
+    
+      .info-cell, .counter {
+        flex: 1 1 100%; /* Full width on mobile */
+        max-width: 100%;
+      }
+    
+      .info-cell {
+        margin: 5px 0; /* Less margin on small screens */
+      }
+  h1 {
+    font-size: 3vw; /* Larger heading size for smaller screens */
+  }
+}

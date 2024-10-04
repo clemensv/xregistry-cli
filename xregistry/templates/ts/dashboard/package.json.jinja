@@ -1,0 +1,18 @@
+{
+  "name": "dashboard",
+  "version": "1.0.0",
+  "scripts": {
+    "bootstrap": "npm install",
+    "build": "npm run build --workspaces",
+    "start": "npm run start --workspace dashboard-backend"
+  },
+  "workspaces": [
+    "{{project_name|dotunderscore|lower}}_data",
+    "dashboard-frontend",
+    "dashboard-backend"
+  ],
+  "private": true,
+  "dependencies": {
+    "dashboard": "file:"
+  }
+}

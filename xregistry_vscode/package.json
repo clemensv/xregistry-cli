@@ -75,7 +75,8 @@
   },
   "dependencies": {
     "@vscode/webview-ui-toolkit": "^1.2.1",
-    "typescript": "4.7.4"
+    "typescript": "4.7.4",
+    "xregistry-vscode": "file:"
   },
   "devDependencies": {
     "@types/node": "^18.14.0",

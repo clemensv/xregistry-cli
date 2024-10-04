@@ -1,0 +1,17 @@
+<h1>Real-Time NOAA Events Dashboard</h1>
+<div id="info-bar" style="display: flex; justify-content: space-evenly; margin-top: 20px;">
+    <div class="info-cell" id="message-type-cell">Message Type: </div>
+    <div class="info-cell" id="message-time-cell">Message Time: </div>
+    <div class="info-cell" id="message-rate-cell">Message Rate: </div>
+</div>
+<figure id="chart"></figure>
+<div id="counters-bar" style="display: flex; justify-content: space-evenly; margin-top: 20px;">
+{%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
+{%- for message_id, message in messagegroup.messages.items() -%}
+{%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+{%- if isCloudEvent %}
+<div class="counter" id="{{ message.metadata["type"]["value"] | dotdash| lower}}-counter">{{ message.metadata["type"]["value"] }}: 0</div>
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+</div>
