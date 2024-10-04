@@ -51,6 +51,7 @@ def main():
     generate_parser.add_argument("--requestheaders", nargs="*", dest="headers", required=False,help="Extra HTTP headers in the format 'key=value'")
     generate_parser.add_argument("--templates", nargs="*", dest="template_dirs", required=False, help="Paths of extra directories containing custom templates")
     generate_parser.add_argument("--template-args", nargs="*", dest="template_args", required=False, help="Extra template arguments to pass to the code generator in the form 'key=value")
+    generate_parser.add_argument("--messagegroup", dest="messagegroup", required=False, help="Limit the generation to a specific message group")
 
     # specify the arguments for the validate command
     validate_parser.add_argument("--definitions", dest="definitions_file", required=True, help="The file or URL containing the definitions")

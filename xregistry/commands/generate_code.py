@@ -15,6 +15,7 @@ def generate_code(args: Any) -> int:
     """Generate code from the given arguments."""
     suppress_schema_output = args.no_schema
     suppress_code_output = args.no_code
+    messagegroup_filter = args.messagegroup
 
     headers = {header.split("=", 1)[0]: header.split("=", 1)[1] for header in args.headers} if args.headers else {}
 
@@ -24,7 +25,7 @@ def generate_code(args: Any) -> int:
             key, value = arg.split("=", 1)
             template_args[key] = value
 
-    generator_context = GeneratorContext(args.output_dir)
+    generator_context = GeneratorContext(args.output_dir, messagegroup_filter)
 
     SchemaUtils.schema_files_collected = set()
     generator_context.loader.reset_schemas_handled()
@@ -34,7 +35,7 @@ def generate_code(args: Any) -> int:
     try:
         if validate(args.definitions_file, headers, False) != 0:
             return 1
-
+        
         renderer = TemplateRenderer(generator_context,
             args.project_name, args.language, args.style, args.output_dir,
             args.definitions_file, headers, args.template_dirs, template_args,

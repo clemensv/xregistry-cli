@@ -1,0 +1,49 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Backend",
+      "type": "node",
+      "request": "launch",
+      "preLaunchTask": "tsc: build backend - tsconfig.json",
+      "program": "${workspaceFolder}/{{ main_project_name }}/dashboard-backend/src/index.ts",
+      "outFiles": ["${workspaceFolder}/{{ main_project_name }}/dashboard-backend/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"],
+      "sourceMaps": true,
+      "env": {
+        "PORT": "3000",
+        "KAFKA_BROKERS": "<<Replace with Kafka Bootstrap Server Address>>:9093",
+        "KAFKA_TOPIC": "<<Replace with Kafka Topic Name>>",
+        "CONSUMER_GROUP": "<<Replace with Kafka Consumer Group Name>>",
+        "KAFKA_USERNAME": "<<Replace with Kafka Username>>",
+        "KAFKA_PASSWORD": "<<Replace with Kafka Password>>",
+        "KQL_CONNECTION_STRING": "Data Source=<<Replace with Cluster URI>>;Fed=true",
+        "KQL_DATABASE_NAME": "<<Replace with Database Name>>"
+      },
+    },
+    {
+        "name": "ng serve",
+        "type": "msedge",
+        "request": "launch",
+        "preLaunchTask": "npm: start (dashboard-frontend)",
+        "url": "http://localhost:4200/#",
+        "webRoot": "${workspaceFolder}/{{ main_project_name }}/dashboard-frontend",
+        "sourceMapPathOverrides": {
+          "webpack:/*": "${webRoot}/*",
+          "/./*": "${webRoot}/*",
+          "/src/*": "${webRoot}/*",
+          "/*": "*",
+          "/./~/*": "${webRoot}/node_modules/*"
+        }
+      }
+  ],
+  "compounds": [
+    {
+      "name": "Launch Frontend and Backend",
+      "configurations": [
+        "Launch Backend",
+        "ng serve"
+      ]
+    }
+  ]
+}

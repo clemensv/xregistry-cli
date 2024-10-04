@@ -62,7 +62,7 @@ export class KqlClient {
         query += ` | where ${filterStrings.join(' and ')}`;
       }
 
-      query += ` | top 500 by ___tid asc | project-away ___tid`;
+      query += ` | top 10000 by ___tid asc | project-away ___tid`;
 
       this.logger.info(`Executing KQL Query: ${query}`);
 
@@ -78,6 +78,18 @@ export class KqlClient {
         if (rows.data.length === 0) {
           hasMoreData = false;
           break;
+        }
+        else if (rows.data.length  == 1) {
+          if (lastTime) {
+            const lastRow = rows.data[0];
+            const lastRowTime = new Date(lastRow['___time']);
+            const lastRowId = lastRow['___id'];
+            if (lastRowTime.getTime() === lastTime.getTime() && lastRowId === lastId) {
+              hasMoreData = false;
+              break;
+            }
+          }
+          hasMoreData = false;
         }
 
         onRows(rows.data.map((row: { [key: string]: any }) => row));

@@ -6,7 +6,8 @@ from xregistry.generator.xregistry_loader import XRegistryLoader
 
 class GeneratorContext:
     """Context for the code generator."""
-    def __init__(self, current_dir: str) -> None:
+    def __init__(self, current_dir: str, messagegroup_filter: str) -> None:
+        self.messagegroup_filter: str = messagegroup_filter
         self.uses_avro: bool = False
         self.uses_protobuf: bool = False
         self.current_dir: str = current_dir

@@ -5,6 +5,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import http from 'http';
 import path from 'path';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
 import { KafkaConsumer } from './kafkaConsumer.js';
 import { ClientManager } from './clientManager.js';
 import { EventRouter } from './eventRouter.js';
@@ -12,6 +13,7 @@ import { KqlClient } from './kqlClient.js';
 import { config, validateConfig } from './config.js'; // Configuration module
 import { createLogger, transports, format, Logger } from 'winston';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 validateConfig(config);
 

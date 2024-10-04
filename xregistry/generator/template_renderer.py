@@ -69,7 +69,7 @@ class TemplateRenderer:
     def generate(self) -> None:
         """Generate code and schemas from templates."""
         xreg_file, xregistry_document = self.ctx.loader.load(
-            self.xreg_file_arg, self.headers, self.style == "schema")
+            self.xreg_file_arg, self.headers, self.style == "schema", messagegroup_filter=self.ctx.messagegroup_filter)
         if not xreg_file or not xregistry_document:
             raise RuntimeError(
                 f"Definitions file not found or invalid {self.xreg_file_arg}")
@@ -179,7 +179,7 @@ class TemplateRenderer:
                             schema_reference, type_ref = schema_reference.split(
                                 "#")
                         schema_reference, xregistry_document = self.ctx.loader.load(
-                            schema_reference, self.headers, True)
+                            schema_reference, self.headers, True, messagegroup_filter=self.ctx.messagegroup_filter)
                         if type_ref:
                             try:
                                 match = jsonpointer.resolve_pointer(
@@ -707,7 +707,7 @@ class TemplateRenderer:
     def resolve_string(template: str, replacements: Dict[str, str]):
         """Resolve a string template with placeholders using the given replacements."""
         # Regex to find placeholders with optional filter using | or !
-        pattern = re.compile(r'\{(\w+)((?:~\w+)*)(?:\s*([|!]\s*\w+\s*)*)\}')
+        pattern = re.compile(r'\{(\w+)((?:~[\w\.]+)*)(?:\s*([|!]\s*\w+\s*)*)\}')
 
         # Function to replace match with the correct value
         def replace_match(match):

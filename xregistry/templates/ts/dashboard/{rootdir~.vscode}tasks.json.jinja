@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "tsc: build backend - tsconfig.json",
+      "type": "typescript",
+	  "tsconfig": "{{ main_project_name }}/dashboard-backend/tsconfig.json",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+	{
+		"label": "npm: start (dashboard-frontend)",
+		"type": "npm",
+		"script": "start",
+		"group": "build",
+		"isBackground": true,
+		"options": {
+		  "cwd": "${workspaceFolder}/{{ main_project_name }}/dashboard-frontend"
+		},
+		"problemMatcher": [
+		  {
+			"owner": "typescript",
+			"source": "ts",
+			"applyTo": "closedDocuments",
+			"fileLocation": ["relative", "${workspaceFolder}/{{ main_project_name }}/dashboard-frontend"],
+			"pattern": "$tsc",
+			"background": {
+			  "activeOnStart": true,
+			  "beginsPattern": ".*",
+			  "endsPattern": "Compiled successfully." // Ensures debugger starts after Angular finishes compiling
+			}
+		  }
+		]
+	  }
+  ]
+}

@@ -91,7 +91,7 @@ class XRegistryLoader:
         return definitions_file, docroot
 
 
-    def load(self, definitions_file: str, headers: dict, load_schema: bool = False, ignore_handled: bool = False) -> Tuple[str|None, JsonNode]:
+    def load(self, definitions_file: str, headers: dict, load_schema: bool = False, ignore_handled: bool = False, messagegroup_filter: str|None = None ) -> Tuple[str|None, JsonNode]:
         """ Load the definition file, which may be a JSON Schema """
         # for a CloudEvents message definition group, we
         # normalize the document to be a messagegroups doc
@@ -120,5 +120,21 @@ class XRegistryLoader:
                 _, subroot = self._load_core(docroot["endpointsurl"], headers)
                 docroot["endpoints"] = subroot
                 docroot["endpointsurl"] = None
+
+        if messagegroup_filter:
+            if isinstance(docroot, dict):
+                if "messagegroups" in docroot:
+                    if isinstance(docroot["messagegroups"], dict):
+                        if messagegroup_filter in docroot["messagegroups"]:
+                            docroot["messagegroups"] = {messagegroup_filter: docroot["messagegroups"][messagegroup_filter]}
+                    else:
+                        print("messagegroups is not a dict")
+                        return None, None
+                else:
+                    print("messagegroups not found in document")
+                    return None, None
+            else:
+                print("document is not a dict")
+                return None, None
 
         return definitions_file, docroot
