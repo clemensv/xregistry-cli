@@ -25,15 +25,27 @@ export class EventStreamListener<T> implements IEventStreamListener<CloudEvent<T
     // Listen for events
     this.socketService.getSocket().on('event', (events: any[]) => {
       this.Feed.next(events.map((event) => {
+        if (event.type !== this.eventType || (this.sourcePrefix && !event.source.startsWith(this.sourcePrefix)) || (this.subjectPrefix && !event.subject.startsWith(this.subjectPrefix))) {
+          return;
+        }
         event.data = this.serializer.parse(event.data);
         return event;
       }));
     });
     this.socketService.getSocket().on('history', (historyEvents: any[]) => {
       this.History.next(historyEvents.map((historyEvent) => {
+        if (historyEvent.type !== this.eventType || (this.sourcePrefix && !historyEvent.source.startsWith(this.sourcePrefix)) || (this.subjectPrefix && !historyEvent.subject.startsWith(this.subjectPrefix))) {
+          return;
+        }
         historyEvent.data = this.serializer.parse(historyEvent.data);
         return historyEvent;
       }));
+    });
+    this.socketService.getSocket().on('historyComplete', (event: any) => {
+      if (event.eventType != this.eventType) {
+        return;
+      }
+      this.History.complete();
     });
 
     socketService.registerFilter({
@@ -45,6 +57,9 @@ export class EventStreamListener<T> implements IEventStreamListener<CloudEvent<T
 
   public requestHistory(fromTime?: string, toTime?: string): void {
     this.socketService.requestHistory(this.eventType, this.subjectPrefix, this.sourcePrefix, fromTime, toTime);
+  }
+  public requestLatest(): void {
+    this.socketService.requestLatest(this.eventType, this.subjectPrefix, this.sourcePrefix);
   }
 
   public close(): void {

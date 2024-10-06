@@ -23,7 +23,8 @@ export class KqlClient {
   public async queryInChunks(
     tableName: string,
     filters: { [key: string]: any },
-    onRows: (rows: { [key: string]: any }[]) => void
+    onRows: (rows: { [key: string]: any }[]) => void,
+    chunkSize : number = 10000
   ): Promise<void> {
     let hasMoreData = true;
     let lastTime: Date | null = null;
@@ -62,7 +63,7 @@ export class KqlClient {
         query += ` | where ${filterStrings.join(' and ')}`;
       }
 
-      query += ` | top 10000 by ___tid asc | project-away ___tid`;
+      query += ` | top ${chunkSize} by ___tid asc | project-away ___tid`;
 
       this.logger.info(`Executing KQL Query: ${query}`);
 
@@ -75,24 +76,12 @@ export class KqlClient {
         const table = queryResults.primaryResults[0];
         const rows = table.toJSON();
 
-        if (rows.data.length === 0) {
+        onRows(rows.data.map((row: { [key: string]: any }) => row));
+
+        if (rows.data.length < chunkSize) {
           hasMoreData = false;
           break;
         }
-        else if (rows.data.length  == 1) {
-          if (lastTime) {
-            const lastRow = rows.data[0];
-            const lastRowTime = new Date(lastRow['___time']);
-            const lastRowId = lastRow['___id'];
-            if (lastRowTime.getTime() === lastTime.getTime() && lastRowId === lastId) {
-              hasMoreData = false;
-              break;
-            }
-          }
-          hasMoreData = false;
-        }
-
-        onRows(rows.data.map((row: { [key: string]: any }) => row));
 
         // Update lastTime and lastId for the next chunk
         const lastRow = rows.data[rows.data.length - 1];

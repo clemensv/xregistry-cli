@@ -60,4 +60,13 @@ export class SocketService {
     };
     this.socket.emit('requestHistory', request);
   }
+
+  public requestLatest(eventType: string, subjectPrefix?: string, sourcePrefix?: string) {
+    const request = {
+      eventType,
+      subjectPrefix,
+      sourcePrefix,
+    };
+    this.socket.emit('requestHistoryLatest', request);
+  }
 }
