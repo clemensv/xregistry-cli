@@ -5,6 +5,7 @@ import { ClientFilters } from './types.js';
 import { KqlClient } from './kqlClient.js';
 import { Logger } from 'winston';
 import { CloudEvent } from 'cloudevents';
+import e from 'express';
 
 export class ClientManager {
   private clients: Map<string, { socket: Socket; filters: ClientFilters[] }> = new Map();
@@ -52,7 +53,9 @@ export class ClientManager {
       try {
         await this.kqlClient.queryInChunks(tableName, filters, (rows) => {
           let events = rows.map((row) => this.createCloudEventFromRow(row));
-          socket.emit('history', events);
+          if (events.length > 0) {
+            socket.emit('history', events);
+          }
         });
         // Indicate that the history is complete
         socket.emit('historyComplete', { eventType });

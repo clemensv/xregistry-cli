@@ -15,7 +15,7 @@ import { createLogger, transports, format, Logger } from 'winston';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-validateConfig(config);
+const effectiveConfig = validateConfig(config);
 
 // Create a logger instance
 const logger: Logger = createLogger({
@@ -47,13 +47,13 @@ const io = new SocketIOServer(server, {
 
 let kqlClient: KqlClient | null = null;
 
-if (!config.KQL_CONNECTION_STRING || !config.KQL_DATABASE_NAME) {
+if (!effectiveConfig.KQL_CONNECTION_STRING || !effectiveConfig.KQL_DATABASE_NAME) {
   logger.warn('KQL connection string or database name is not defined. KQL client will not be initialized.');
 } else {
   // Initialize KqlClient
   kqlClient = new KqlClient(
-    config.KQL_CONNECTION_STRING,
-    config.KQL_DATABASE_NAME,
+    effectiveConfig.KQL_CONNECTION_STRING,
+    effectiveConfig.KQL_DATABASE_NAME,
     logger
   );
 }
@@ -64,7 +64,7 @@ const eventTypeTableMap = {
 {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
 {%- if isCloudEvent %}
 {%- if message.schemaurl or message.schema -%}
-{%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+{%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace ) %}
 '{{ message.metadata["type"]["value"] }}': '{{ dataType }}',
 {%- endif %}
 {%- endif %}
@@ -79,7 +79,7 @@ const clientManager = new ClientManager(kqlClient, logger, eventTypeTableMap);
 const eventRouter = new EventRouter(clientManager);
 
 // Initialize KafkaConsumer
-const kafkaConsumer = new KafkaConsumer(eventRouter, logger);
+const kafkaConsumer = new KafkaConsumer(eventRouter, effectiveConfig, logger);
 
 // Handle WebSocket connections
 io.on('connection', (socket) => {
@@ -95,8 +95,8 @@ io.on('connection', (socket) => {
 });
 
 // Start the server
-server.listen(config.PORT, () => {
-  logger.info(`Server is running on port ${config.PORT}`);
+server.listen(effectiveConfig.PORT, () => {
+  logger.info(`Server is running on port ${effectiveConfig.PORT}`);
 });
 
 // Start consuming Kafka events

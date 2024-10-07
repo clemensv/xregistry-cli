@@ -12,7 +12,9 @@ export class EventRouter {
   public routeEvents(events: CloudEventV1<any>[]) {
     this.clientManager.getClients().forEach((client, clientId) => {
       let matchingEvents = events.filter((event) => this.eventMatchesFilters(event, client.filters));
-      client.socket.emit('event', matchingEvents);
+      if ( matchingEvents.length > 0 ) {
+        client.socket.emit('event', matchingEvents);
+      }
     });
   }
 

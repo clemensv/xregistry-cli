@@ -1,69 +1,132 @@
-import { Subject } from 'rxjs';
+import { ReplaySubject } from 'rxjs';
 import { SocketService } from './services/socket.service';
 import { Serializable, TypedJSON } from 'typedjson';
 import { CloudEvent } from 'cloudevents';
 
-export interface IEventStreamListener<T> {
-  Feed: Subject<T[]>;
-  close(): void;
-}
-
-export class EventStreamListener<T> implements IEventStreamListener<CloudEvent<T>> {
-  public Feed: Subject<CloudEvent<T>[]> = new Subject<CloudEvent<T>[]>();
-  public History: Subject<CloudEvent<T>[]> = new Subject<CloudEvent<T>[]>();
+export class EventStreamListener<T> {
+  public Feed: ReplaySubject<CloudEvent<T>[]> = new ReplaySubject<CloudEvent<T>[]>();
   private socketService: SocketService;
   private serializer: TypedJSON<T>;
   private sourcePrefix: string;
   private subjectPrefix: string;
+  private handleFeedEventsCallback = (events: any[]) => this.handleFeedEvents(events);
 
   constructor(public eventType: string, sourcePrefix: string, subjectPrefix: string, socketService: SocketService, serializer: TypedJSON<T>) {
+    this.eventType = eventType;
     this.serializer = serializer;
     this.socketService = socketService;
     this.sourcePrefix = sourcePrefix;
     this.subjectPrefix = subjectPrefix;
+    this.setupFeed();
+  }
 
-    // Listen for events
-    this.socketService.getSocket().on('event', (events: any[]) => {
-      this.Feed.next(events.map((event) => {
-        if (event.type !== this.eventType || (this.sourcePrefix && !event.source.startsWith(this.sourcePrefix)) || (this.subjectPrefix && !event.subject.startsWith(this.subjectPrefix))) {
-          return;
-        }
+  private setupFeed() {
+    this.socketService.getSocket().on('event', this.handleFeedEventsCallback);
+    this.socketService.registerFilter({ type: this.eventType, sourcePrefix : this.sourcePrefix, subjectPrefix : this.subjectPrefix });
+  }
+
+  private handleFeedEvents(events: any[]) {
+    const eventBatch = events.map((event) => {
+      if (event.type === this.eventType && this.isValidEvent(event)) {
         event.data = this.serializer.parse(event.data);
         return event;
-      }));
-    });
-    this.socketService.getSocket().on('history', (historyEvents: any[]) => {
-      this.History.next(historyEvents.map((historyEvent) => {
-        if (historyEvent.type !== this.eventType || (this.sourcePrefix && !historyEvent.source.startsWith(this.sourcePrefix)) || (this.subjectPrefix && !historyEvent.subject.startsWith(this.subjectPrefix))) {
-          return;
-        }
-        historyEvent.data = this.serializer.parse(historyEvent.data);
-        return historyEvent;
-      }));
-    });
-    this.socketService.getSocket().on('historyComplete', (event: any) => {
-      if (event.eventType != this.eventType) {
-        return;
       }
-      this.History.complete();
-    });
+      return null;
+    }).filter(Boolean);
 
-    socketService.registerFilter({
-      type: this.eventType,
-      subjectPrefix: this.subjectPrefix,
-      sourcePrefix: this.sourcePrefix
+    if (eventBatch.length === 0) {
+      return;
+    }
+    // Push events into the Feed observable
+    this.Feed.next(eventBatch as CloudEvent<T>[]);
+  }
+
+  public async requestHistory(fromTime?: string, toTime?: string, callback?: (eventBatch: CloudEvent<T>[]) => void): Promise<EventStreamListener<T>> {
+    return new Promise((resolve, reject) => {
+      const request = {
+        eventType: this.eventType,
+        subjectPrefix: this.subjectPrefix,
+        sourcePrefix: this.sourcePrefix,
+        fromTime,
+        toTime,
+      };
+
+      const onHistory = (events: any[]) => {
+        const eventBatch = events.map((event) => {
+          if (event.type === this.eventType && this.isValidEvent(event)) {
+            event.data = this.serializer.parse(event.data);
+            return event;
+          }
+          return null;
+        }).filter(Boolean);
+
+        if (callback) {
+          callback(eventBatch as CloudEvent<T>[]);
+        }
+      };
+
+      const onHistoryComplete = (event: any) => {
+        if (event.eventType === this.eventType) {
+          this.socketService.getSocket().off('history', onHistory);
+          this.socketService.getSocket().off('historyComplete', onHistoryComplete);
+          resolve(this);
+        }
+      };
+
+      // Listen for history data and history completion
+      this.socketService.getSocket().on('history', onHistory);
+      this.socketService.getSocket().on('historyComplete', onHistoryComplete);
+
+      // Emit the request for history
+      this.socketService.requestHistory(this.eventType, this.subjectPrefix, this.sourcePrefix, fromTime, toTime);
     });
   }
 
-  public requestHistory(fromTime?: string, toTime?: string): void {
-    this.socketService.requestHistory(this.eventType, this.subjectPrefix, this.sourcePrefix, fromTime, toTime);
+  public async requestLatest(callback?: (eventBatch: CloudEvent<T>[]) => void): Promise<EventStreamListener<T>> {
+    return new Promise((resolve, reject) => {
+      const request = {
+        eventType: this.eventType,
+        subjectPrefix: this.subjectPrefix,
+        sourcePrefix: this.sourcePrefix
+      };
+
+      const onHistory = (events: any[]) => {
+        const eventBatch = events.map((event) => {
+          if (event.type === this.eventType && this.isValidEvent(event)) {
+            event.data = this.serializer.parse(event.data);
+            return event;
+          }
+          return null;
+        }).filter(Boolean);
+
+        if (callback) {
+          callback(eventBatch as CloudEvent<T>[]);
+        }
+      };
+
+      const onHistoryComplete = (event: any) => {
+        if (event.eventType === this.eventType) {
+          this.socketService.getSocket().off('history', onHistory);
+          this.socketService.getSocket().off('historyComplete', onHistoryComplete);
+          resolve(this);
+        }
+      };
+
+      // Listen for history data and history completion
+      this.socketService.getSocket().on('history', onHistory);
+      this.socketService.getSocket().on('historyComplete', onHistoryComplete);
+
+      // Emit the request for history
+      this.socketService.requestLatest(this.eventType, this.subjectPrefix, this.sourcePrefix);
+    });
   }
-  public requestLatest(): void {
-    this.socketService.requestLatest(this.eventType, this.subjectPrefix, this.sourcePrefix);
+
+  private isValidEvent(event: any): boolean {
+    return (!this.sourcePrefix || event.source.startsWith(this.sourcePrefix)) &&
+           (!this.subjectPrefix || event.subject.startsWith(this.subjectPrefix));
   }
 
   public close(): void {
-    this.socketService.getSocket().off('event');
-    this.socketService.getSocket().off('history');
+    this.socketService.getSocket().off('event', this.handleFeedEventsCallback);
   }
 }

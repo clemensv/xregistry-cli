@@ -9,7 +9,6 @@ import {
   KafkaMessage as KafkaJsMessage,
   EachBatchPayload,
 } from 'kafkajs';
-import { config } from './config.js';
 import { EventRouter } from './eventRouter.js';
 import { CloudEventV1, KafkaMessage } from 'cloudevents';
 import { Logger } from 'winston';
@@ -20,10 +19,12 @@ export class KafkaConsumer {
   private admin: Admin;
   private eventRouter: EventRouter;
   private logger: Logger;
+  private config: any;
 
-  constructor(eventRouter: EventRouter, logger: Logger) {
+  constructor(eventRouter: EventRouter, config: any, logger: Logger) {
     this.eventRouter = eventRouter;
     this.logger = logger;
+    this.config = config;
 
     const kafka = new Kafka({
       clientId: 'my-app',
@@ -48,7 +49,7 @@ export class KafkaConsumer {
       await this.consumer.connect();
       this.logger.info('Kafka consumer connected');
 
-      const topics = [config.KAFKA_TOPIC];
+      const topics = [this.config.KAFKA_TOPIC];
       const cst: ConsumerSubscribeTopics = { topics, fromBeginning: false };
       await this.consumer.subscribe(cst);
       this.logger.info(`Subscribed to topics: ${topics.join(', ')}`);
@@ -93,11 +94,11 @@ export class KafkaConsumer {
       });
 
       // Fetch the latest offsets for each partition
-      const latestOffsets = await this.admin.fetchTopicOffsets(config.KAFKA_TOPIC);
+      const latestOffsets = await this.admin.fetchTopicOffsets(this.config.KAFKA_TOPIC);
       for (const partition of latestOffsets) {
         // Seek to the latest offset for the partition
         this.consumer.seek({
-          topic: config.KAFKA_TOPIC,
+          topic: this.config.KAFKA_TOPIC,
           partition: partition.partition,
           offset: partition.high,
         });

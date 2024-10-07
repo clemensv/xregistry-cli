@@ -4,11 +4,13 @@ import { Client as KustoClient, KustoConnectionStringBuilder, ClientRequestPrope
 import { Logger } from 'winston';
 import { v4 as uuidv4 } from 'uuid';
 import { DefaultAzureCredential } from '@azure/identity';
+import { Sema } from 'async-sema';
 
 export class KqlClient {
   private client: KustoClient;
   private databaseName: string;
   private logger: Logger;
+  private semaphore: Sema = new Sema(1);
 
   constructor(connectionString: string, databaseName: string, logger: Logger) {
     const kcsb = KustoConnectionStringBuilder.withTokenCredential(
@@ -30,67 +32,73 @@ export class KqlClient {
     let lastTime: Date | null = null;
     let lastId: string | null = null;
 
-    while (hasMoreData) {
-      // Build the query with filters and pagination
-      let query = `${tableName} | extend ___tid=strcat(tostring(___time), ___id) `;
-      const filterStrings = [];
+    await this.semaphore.acquire();
+    try
+    {
+      while (hasMoreData) {
+        // Build the query with filters and pagination
+        let query = `${tableName} | extend ___tid=strcat(tostring(___time), ___id) `;
+        const filterStrings = [];
 
-      // Apply provided filters
-      for (const [key, value] of Object.entries(filters)) {
-        if (key === '___time') {
-          if (Array.isArray(value)) {
-            const [fromTime, toTime] = value;
-            filterStrings.push(
-              `strcmp( ___tid, "${fromTime.toISOString()}") >= 0 and strcmp(___tid, "${toTime.toISOString()}") <= 0`
-            );
+        // Apply provided filters
+        for (const [key, value] of Object.entries(filters)) {
+          if (key === '___time') {
+            if (Array.isArray(value)) {
+              const [fromTime, toTime] = value;
+              filterStrings.push(
+                `strcmp( ___tid, "${fromTime.toISOString()}") >= 0 and strcmp(___tid, "${toTime.toISOString()}") <= 0`
+              );
+            } else {
+              filterStrings.push(`strcmp(___tid,strcat(datetime("${value.toISOString()}"), ___id)) >= 0`);
+            }
+          } else if (typeof value === 'string') {
+            filterStrings.push(`${key} startswith "${value}"`);
           } else {
-            filterStrings.push(`strcmp(___tid,strcat(datetime("${value.toISOString()}"), ___id)) >= 0`);
+            filterStrings.push(`${key} == ${value}`);
           }
-        } else if (typeof value === 'string') {
-          filterStrings.push(`${key} startswith "${value}"`);
-        } else {
-          filterStrings.push(`${key} == ${value}`);
-        }
-      }
-
-      // Add pagination filters
-      if (lastTime) {
-        const timeFilter = `strcmp(___tid,strcat(datetime("${lastTime.toISOString()}"),___id)) > 0`;
-        filterStrings.push(timeFilter);
-      }
-
-      if (filterStrings.length > 0) {
-        query += ` | where ${filterStrings.join(' and ')}`;
-      }
-
-      query += ` | top ${chunkSize} by ___tid asc | project-away ___tid`;
-
-      this.logger.info(`Executing KQL Query: ${query}`);
-
-      try {
-        const queryResults = await this.client.execute(
-          this.databaseName,
-          query,
-          new ClientRequestProperties()
-        );
-        const table = queryResults.primaryResults[0];
-        const rows = table.toJSON();
-
-        onRows(rows.data.map((row: { [key: string]: any }) => row));
-
-        if (rows.data.length < chunkSize) {
-          hasMoreData = false;
-          break;
         }
 
-        // Update lastTime and lastId for the next chunk
-        const lastRow = rows.data[rows.data.length - 1];
-        lastTime = new Date(lastRow['___time']);
-        lastId = lastRow['___id'];
-      } catch (error) {
-        this.logger.error(`Error executing query: ${error}`);
-        throw error;
+        // Add pagination filters
+        if (lastTime) {
+          const timeFilter = `strcmp(___tid,strcat(datetime("${lastTime.toISOString()}"),___id)) > 0`;
+          filterStrings.push(timeFilter);
+        }
+
+        if (filterStrings.length > 0) {
+          query += ` | where ${filterStrings.join(' and ')}`;
+        }
+
+        query += ` | top ${chunkSize} by ___tid asc | project-away ___tid`;
+
+        this.logger.info(`Executing KQL Query: ${query}`);
+
+        try {
+          const queryResults = await this.client.execute(
+            this.databaseName,
+            query,
+            new ClientRequestProperties()
+          );
+          const table = queryResults.primaryResults[0];
+          const rows = table.toJSON();
+
+          onRows(rows.data.map((row: { [key: string]: any }) => row));
+
+          if (rows.data.length < chunkSize) {
+            hasMoreData = false;
+            break;
+          }
+
+          // Update lastTime and lastId for the next chunk
+          const lastRow = rows.data[rows.data.length - 1];
+          lastTime = new Date(lastRow['___time']);
+          lastId = lastRow['___id'];
+        } catch (error) {
+          this.logger.error(`Error executing query: ${error}`);
+          throw error;
+        }
       }
+    } finally {
+      this.semaphore.release();
     }
   }
 }

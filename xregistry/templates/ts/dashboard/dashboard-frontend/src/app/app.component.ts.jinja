@@ -37,7 +37,7 @@ export class AppComponent implements OnInit, OnDestroy {
   {%- if isCloudEvent %}
   {%- if message.schemaurl or message.schema -%}
   {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
-  {{ dataType | dotunderscore | camel }}Listener: EventStreamListener<{{ dataType | dotunderscore }}>;
+  {{ dataType | dotunderscore | camel }}Listener!: EventStreamListener<{{ dataType | dotunderscore }}>;
   {%- endif %}
   {%- endif %}
   {%- endfor %}
@@ -116,31 +116,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.updateChart();
   }
 
-   constructor(private socketService: SocketService) {
-    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
-    {%- for message_id, message in messagegroup.messages.items() -%}
-    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-    {%- if isCloudEvent %}
-    {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
-    this.{{ dataType | dotunderscore | camel }}Listener = new EventStreamListener<{{ dataType | dotunderscore}}>(
-      '{{ message.metadata["type"]["value"] }}', '', '',
-      this.socketService, new TypedJSON({{ dataType | dotunderscore }})
-    );
-    {%- endif %}
-    {%- endfor %}
-    {%- endfor %}
-
-    // Initialize listeners
-    {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
-    {%- for message_id, message in messagegroup.messages.items() -%}
-    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-    {%- if isCloudEvent %}
-    {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
-    this.{{ dataType | dotunderscore| camel }}Listener.Feed.subscribe((eventBatch) => this.handleFeedBatch(eventBatch));
-    this.{{ dataType | dotunderscore| camel }}Listener.History.subscribe((h) => this.handleHistoryBatch(h));
-    {%- endif %}
-    {%- endfor %}
-    {%- endfor %}
+  constructor(private socketService: SocketService) {
   }
 
   ngOnInit() {
@@ -155,7 +131,15 @@ export class AppComponent implements OnInit, OnDestroy {
     {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
     {%- if isCloudEvent %}
     {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
-    this.{{ dataType | dotunderscore | camel }}Listener.requestHistory(startTime, endTime);
+    this.{{ dataType | dotunderscore | camel }}Listener = new EventStreamListener<{{ dataType | dotunderscore}}>(
+      '{{ message.metadata["type"]["value"] }}', '', '',
+      this.socketService, new TypedJSON({{ dataType | dotunderscore }})
+    );
+    this.{{ dataType | dotunderscore | camel }}Listener
+      .requestHistory(startTime, endTime, (eventBatch) => this.handleHistoryBatch(eventBatch))
+      .then((l) => { 
+        l.Feed.subscribe((eventBatch) => this.handleFeedBatch(eventBatch)); 
+    });
     {%- endif %}
     {%- endfor %}
     {%- endfor %}

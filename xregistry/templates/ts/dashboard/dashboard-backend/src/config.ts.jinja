@@ -12,13 +12,35 @@ export const config = {
   KAFKA_USERNAME: process.env.KAFKA_USERNAME || '',
   KAFKA_PASSWORD: process.env.KAFKA_PASSWORD || '',
   CONSUMER_GROUP: process.env.CONSUMER_GROUP || '',
+  CONNECTION_STRING: process.env.CONNECTION_STRING || '',
   KQL_CONNECTION_STRING: process.env.KQL_CONNECTION_STRING || '',
   KQL_DATABASE_NAME: process.env.KQL_DATABASE_NAME || '',
-  // Add any other configurations as needed
 };
 
+
+export function parseConnectionString(connectionString: string): { [key: string]: string } {
+  const configDict: { [key: string]: string } = {
+    'KAFKA_USERNAME': '$ConnectionString',
+    'KAFKA_PASSWORD': connectionString.trim(),
+  };
+
+  try {
+    for (const part of connectionString.split(';')) {
+      if (part.includes('Endpoint')) {
+        configDict['KAFKA_BROKERS'] = part.split('=')[1].trim().replace('sb://', '').replace('/', '') + ':9093';
+      } else if (part.includes('EntityPath')) {
+        configDict['KAFKA_TOPIC'] = part.split('=')[1].trim();
+      }
+    }
+  } catch (e) {
+    throw new Error("Invalid connection string format");
+  }
+
+  return configDict;
+}
+
 // Validate configuration
-export function validateConfig(config: any) {
+export function validateConfig(config: any) : any {
   const requiredConfigs = [
     'PORT',
     'KAFKA_BROKERS',
@@ -26,11 +48,15 @@ export function validateConfig(config: any) {
     'CONSUMER_GROUP'
   ];
 
+  if (config.CONNECTION_STRING) {
+    const connectionStringConfig = parseConnectionString(config.CONNECTION_STRING);
+    config = { ...config, ...connectionStringConfig };
+  }
+
   for (const key of requiredConfigs) {
     if (!config[key]) {
       throw new Error(`${key} is not defined`);
     }
   }
-
-  console.log(`Configuration: ${JSON.stringify(config, null, 2)}`);
+  return config;
 };
