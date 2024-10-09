@@ -41,6 +41,7 @@ class ManifestSubcommands:
         """
         Save the current state of the manifest to the file.
         """
+        Path(self.filename).parent.mkdir(parents=True, exist_ok=True)
         with open(self.filename, 'w', encoding='utf-8') as file:
             json.dump(self.manifest, file, indent=4)
 

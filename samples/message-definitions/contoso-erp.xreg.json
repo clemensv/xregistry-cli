@@ -109,6 +109,62 @@
                 "#/messagegroups/Contoso.ERP.PurchasingEvents"
             ],
             "format": "CloudEvents/1.0"
+        },
+        "Contoso.ERP.Eventing.KafkaProducer": {
+            "channel": "mytopic",
+            "id": "Contoso.ERP.Eventing.KafkaProducer",
+            "usage": "producer",
+            "config": {
+                "protocol": "KAFKA",
+                "deployed": false,
+                "endpoints": [
+                    {
+                        "uri": "kafka://cediscoveryinterop.example.com:9093"
+                    }
+                ],
+                "options": {
+                    "topic": "mytopic",
+                    "partition": 0
+                }
+            },
+            "messagegroups": [
+                "#/messagegroups/Contoso.ERP.ReservationEvents",
+                "#/messagegroups/Contoso.ERP.PaymentEvents",
+                "#/messagegroups/Contoso.ERP.ShippingEvents",
+                "#/messagegroups/Contoso.ERP.InventoryEvents",
+                "#/messagegroups/Contoso.ERP.ProductEvents",
+                "#/messagegroups/Contoso.ERP.EmployeeEvents",
+                "#/messagegroups/Contoso.ERP.PurchasingEvents"
+            ],
+            "format": "CloudEvents/1.0"
+        },
+        "Contoso.ERP.Eventing.KafkaConsumer": {
+            "channel": "mytopic",
+            "id": "Contoso.ERP.Eventing.KafkaConsumer",
+            "usage": "consumer",
+            "config": {
+                "protocol": "KAFKA",
+                "deployed": false,
+                "endpoints": [
+                    {
+                        "uri": "kafka://cediscoveryinterop.example.com:9093"
+                    }
+                ],
+                "options": {
+                    "topic": "mytopic",
+                    "consumergroup": "mygroup"
+                }
+            },
+            "messagegroups": [
+                "#/messagegroups/Contoso.ERP.ReservationEvents",
+                "#/messagegroups/Contoso.ERP.PaymentEvents",
+                "#/messagegroups/Contoso.ERP.ShippingEvents",
+                "#/messagegroups/Contoso.ERP.InventoryEvents",
+                "#/messagegroups/Contoso.ERP.ProductEvents",
+                "#/messagegroups/Contoso.ERP.EmployeeEvents",
+                "#/messagegroups/Contoso.ERP.PurchasingEvents"
+            ],
+            "format": "CloudEvents/1.0"
         }
     },
     "messagegroups": {

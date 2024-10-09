@@ -13,6 +13,7 @@ info:
   
 defaultContentType: "application/cloudmessages+json"
 servers:
+{%- if root.endpoints %}
 {%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.config -%}
 {%- set options = endpoint.config.options -%}
 {%- set endpoints = endpoint.config.endpoints -%}
@@ -34,6 +35,9 @@ servers:
 {%- endif -%}
 {%- endfor -%}  
 {%- endfor %}
+{%- else %}
+      host: "http://localhost"
+{%- endif %}
 channels:
 {%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
   {{messagegroup.id | strip_dots }}:
@@ -44,6 +48,7 @@ channels:
       {{ message.id | strip_dots | pascal }}:
         $ref: "#/components/messages/{{ message.id | strip_dots | pascal }}"
     {%- endfor %}
+    {%- if root.endpoints %}
     {%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.messagegroups -%}
     {%- if loop.first %}
     servers:
@@ -52,6 +57,7 @@ channels:
       - $ref: "#/servers/{{ endpoint_key | strip_dots }}"
     {%- endfor -%}      
     {%- endfor -%}
+    {%- endif %}
 {%- endfor %}
 components:
   messages:
