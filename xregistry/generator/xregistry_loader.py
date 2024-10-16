@@ -2,13 +2,13 @@
 
 import json
 import os
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 import urllib.request
 import urllib.parse
 import urllib.error
 import yaml
 
-JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, None]
+JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, bool, None]
 
 class XRegistryLoader:
     """ Class to handle the loading of definitions """
@@ -121,6 +121,8 @@ class XRegistryLoader:
                 docroot["endpoints"] = subroot
                 docroot["endpointsurl"] = None
 
+        self.preprocess_messagegroups(docroot)
+
         if messagegroup_filter:
             if isinstance(docroot, dict):
                 if "messagegroups" in docroot:
@@ -138,3 +140,27 @@ class XRegistryLoader:
                 return None, None
 
         return definitions_file, docroot
+
+    def preprocess_messagegroups(self, xreg_doc: JsonNode):
+        if isinstance(xreg_doc, dict) and "messagegroups" in xreg_doc:
+            if isinstance(xreg_doc["messagegroups"], dict):
+                for group_name, group in xreg_doc["messagegroups"].items():
+                    if isinstance(group, dict) and "messages" in group:
+                        if isinstance(group["messages"], dict):
+                            for message_name, message in group["messages"].items():
+                                if isinstance(message, dict) and message.get("format") == "CloudEvents/1.0":
+                                    metadata: JsonNode = message.get("metadata", {})
+                                    if not isinstance(metadata, dict):
+                                        raise ValueError(f"Message '{message_name}' has invalid metadata")
+                                    required_fields = ["id", "time", "source", "type"]
+                                    for field in required_fields:
+                                        if field not in metadata.keys():
+                                            if field == "type":
+                                                raise ValueError(f"Message '{message_name}' is missing required 'type' attribute")
+                                            elif field == "source":
+                                                metadata[field] = {"required": True, "type": "uritemplate", "value": "{sourceuri}", "description": "The URI of the source of the event"}
+                                            elif field == "id":
+                                                metadata[field] = {"type": "string", "required": True, "description": "A unique identifier for the event"}
+                                            elif field == "time":
+                                                metadata[field] = {"type": "string", "required": True, "description": "A ISO8601 timestamp of when the event happened"}
+                                    message["metadata"] = metadata
