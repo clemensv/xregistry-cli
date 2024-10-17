@@ -67,22 +67,20 @@
                     "description": "Event for when the bulb's brightness changes",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
-                            "id": {
-                                "required": true
-                            },
-                            "type": {
-                                "value": "Fabrikam.Lumen.BrightnessChanged",
-                                "description": "Event raised when the bulb's brightness changes"
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "description": "source of the event",
-                                "value": "{tenantid}/{deviceid}"
-                            },
-                            "datacontenttype": {
-                                "value": "application/json"
-                            }
+                        "id": {
+                            "required": true
+                        },
+                        "type": {
+                            "value": "Fabrikam.Lumen.BrightnessChanged",
+                            "description": "Event raised when the bulb's brightness changes"
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "description": "source of the event",
+                            "value": "{tenantid}/{deviceid}"
+                        },
+                        "datacontenttype": {
+                            "value": "application/json"
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
@@ -93,25 +91,23 @@
                     "description": "Event for when the bulb's color changes",
                     "format": "CloudEvents/1.0",
                     "metadata": {
-                        "attributes": {
-                            "id": {
-                                "required": true
-                            },
-                            "type": {
-                                "value": "Fabrikam.Lumen.ColorChanged",
-                                "description": "Event raised when the bulb's color changes"
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "description": "source of the event",
-                                "value": "{tenantid}/{deviceid}"
-                            },
-                            "time": {
-                                "required": true
-                            },
-                            "datacontenttype": {
-                                "value": "application/json"
-                            }
+                        "id": {
+                            "required": true
+                        },
+                        "type": {
+                            "value": "Fabrikam.Lumen.ColorChanged",
+                            "description": "Event raised when the bulb's color changes"
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "description": "source of the event",
+                            "value": "{tenantid}/{deviceid}"
+                        },
+                        "time": {
+                            "required": true
+                        },
+                        "datacontenttype": {
+                            "value": "application/json"
                         }
                     },
                     "schemaformat": "Avro/1.11.1",

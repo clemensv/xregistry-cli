@@ -39,7 +39,7 @@ namespace {{ project_name | pascal }}
             {
                 if (ErrorAsync != null)
                 {
-                    return Task.WhenAll(Array.ConvertAll(ErrorAsync.GetInvocationList(), e => (Task)(e.DynamicInvoke(error)??Task.CompletedTask)));
+                    return Task.WhenAll(Array.ConvertAll(ErrorAsync.GetInvocationList(), e => (Task)(e?.DynamicInvoke(error)??Task.CompletedTask)));
                 }
                 return Task.CompletedTask;
             }
@@ -57,18 +57,18 @@ namespace {{ project_name | pascal }}
         private readonly IConsumer<TKey, TValue> _consumer;
         private readonly ILogger<KafkaProcessor<TKey, TValue>> _logger;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-        private Task _processingTask;
+        private Task? _processingTask;
         private string _topicName = string.Empty;
 
         /// <summary>
         /// Event that is raised when a message is processed.
         /// </summary>
-        public event Func<ConsumeResult<TKey, TValue>, Task> ProcessMessage;
+        public event Func<ConsumeResult<TKey, TValue>, Task>? ProcessMessage;
 
         /// <summary>
         /// Event that is raised when an error occurs.
         /// </summary>
-        public event Func<Exception, Task> ProcessError;
+        public event Func<Exception, Task>? ProcessError;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="KafkaProcessor{TKey, TValue}"/> class.
@@ -79,7 +79,7 @@ namespace {{ project_name | pascal }}
         public KafkaProcessor(
             IConsumer<TKey, TValue> consumer,
             string topicName,
-            ILoggerFactory loggerFactory = null)
+            ILoggerFactory? loggerFactory = null)
         {
             _consumer = consumer;
             _topicName = topicName;
@@ -103,7 +103,10 @@ namespace {{ project_name | pascal }}
         public async Task StopAsync()
         {
             _cancellationTokenSource.Cancel();
-            await _processingTask;
+            if ( _processingTask != null)
+            {
+                await _processingTask;
+            }
             _consumer.Close();
             _cancellationTokenSource = new CancellationTokenSource();
         }

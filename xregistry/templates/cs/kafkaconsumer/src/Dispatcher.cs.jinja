@@ -96,14 +96,19 @@ namespace {{ project_name | pascal }}
                             var tasks = new List<Task>();
                             foreach (var handler in {{ pascal_message_name | strip_namespace }}Async.GetInvocationList())
                             {
-                                tasks.Add((Task)(handler.DynamicInvoke(
+                                if ( handler == null ) continue;
+                                var t = (Task?)(handler.DynamicInvoke(
                                     messageArgs,
                                     cloudEvent,
                                     {%- if message_body_type != "byte[]" -%}
                                     {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)
                                     {%- else -%}
                                     cloudEvent.Data is BinaryData binaryData ? binaryData.ToArray() : null
-                                    {%- endif %})));
+                                    {%- endif %}));
+                                if (t != null)
+                                {
+                                    tasks.Add(t);
+                                }
                             }
                             await Task.WhenAll(tasks);
                         }
@@ -134,13 +139,18 @@ namespace {{ project_name | pascal }}
                             var tasks = new List<Task>();
                             foreach (var handler in {{ pascal_message_name | strip_namespace }}Async.GetInvocationList())
                             {
-                                tasks.Add((Task)(handler.DynamicInvoke(
+                                if ( handler == null ) continue;
+                                var t = (Task?)(handler.DynamicInvoke(
                                     messageArgs,
                                     {%- if message_body_type != "byte[]" -%}
                                     {{ message_body_type }}.FromData(messageArgs.Message.Value, messageArgs.Message.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString(messageArgs.Message.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
                                     {%- else -%}
                                     messageArgs.Message.Value
-                                    {%- endif %})));
+                                    {%- endif %}));
+                                if (t != null)
+                                {
+                                    tasks.Add(t);
+                                }
                             }
                             await Task.WhenAll(tasks);
                         }
@@ -228,28 +238,28 @@ namespace {{ project_name | pascal }}
     {%- set group = schema_object( root, uri ) -%}
     {%- if group %}
     {%- set groupname = group.id | pascal -%}
-    {{ groupname }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
+    global::{{ groupname | concat_namespace(project_name) | pascal }}.{{ groupname | strip_namespace }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
     {%- if not loop.last -%}, {%- endif -%}
     {%- endif %}
     {%- endfor %}
     {%- endmacro -%}
-    {%- macro MessageGroupHooks(arg) -%}
-    Task.WhenAll(
+    {%- macro MessageGroupHooks() -%}
     {%- for uri in messagegroupuris %}
     {%- set group = schema_object( root, uri ) -%}
     {% if group %}
     {%- set groupname = group.id | pascal -%}
-    {{- groupname | strip_namespace | camel }}Dispatcher != null?{{- groupname | strip_namespace | camel }}Dispatcher.ProcessMessageAsync({{ arg }}):Task.CompletedTask
-    {%- if not loop.last -%}, {%- endif -%}
-    {%- endif %}
+        if ({{ groupname | strip_namespace | camel }}Dispatcher != null)
+        {
+            processor.Attach( {{ groupname | strip_namespace | camel }}Dispatcher);
+        }
+    {% endif %}
     {%- endfor %}
-    )
     {%- endmacro -%}
     {%- macro createforbody(class_name, endpoints, options) -%}
         {%- set kafkatopic = geturlpath(endpoints[0].uri)[1:] -%}
         var consumer = new ConsumerBuilder<byte[], byte[]>(config).Build();
-        var processor = new KafkaProcessor<byte[], byte[]>(consumer, _loggerFactory);
-        processor.Attach(this);
+        var processor = new KafkaProcessor<byte[], byte[]>(consumer, topicName, _loggerFactory);
+        {{ MessageGroupHooks() }}
         return processor;
     {%- endmacro %}
 
@@ -258,7 +268,7 @@ namespace {{ project_name | pascal }}
         {%- set class_name = ( pascalGroupName | strip_namespace )+"KafkaProcessorFactory" %}
         public class {{ class_name }}
         {
-            public static KafkaProcessor<byte[], byte[]> CreateKafkaProcessorFor{{ endpoint_key | pascal | strip_namespace }}(ConsumerConfig config, {{ MessageGroupArgs() }})
+            public static KafkaProcessor<byte[], byte[]> CreateKafkaProcessorFor{{ endpoint_key | pascal | strip_namespace }}(string topicName, ConsumerConfig config, {{ MessageGroupArgs() }}, ILoggerFactory? _loggerFactory = null)
             {
                 {{ createforbody(class_name, endpoints, options) | indent(8) }}
             }

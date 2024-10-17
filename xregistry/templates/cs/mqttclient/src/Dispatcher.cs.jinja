@@ -188,7 +188,7 @@ namespace {{ project_name | pascal }}
     {%- set group = schema_object( root, uri ) -%}
     {%- if group %}
     {%- set groupname = group.id | pascal -%}
-    {{ groupname }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
+    global::{{ groupname | concat_namespace(project_name) | pascal }}.{{ groupname | strip_namespace }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
     {%- if not loop.last -%}, {%- endif -%}
     {%- endif %}
     {%- endfor %}

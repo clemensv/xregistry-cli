@@ -38,7 +38,7 @@ namespace {{ project_name | pascal }}
             {
                 if (ErrorAsync != null)
                 {
-                    return Task.WhenAll(Array.ConvertAll(ErrorAsync.GetInvocationList(), e => (Task)(e.DynamicInvoke(eventArgs)??Task.CompletedTask)));
+                    return Task.WhenAll(Array.ConvertAll(ErrorAsync.GetInvocationList(), e => (Task)(e?.DynamicInvoke(eventArgs)??Task.CompletedTask)));
                 }
                 return Task.CompletedTask;
             }

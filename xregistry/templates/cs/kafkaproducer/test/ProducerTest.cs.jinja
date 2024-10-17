@@ -142,7 +142,7 @@ namespace {{ project_name | pascal }}.Test
 
 #pragma warning disable CS8604 // init takes care of nullables 
 
-        {%- for id, message in messagegroup.messages.items() %}
+        {% for id, message in messagegroup.messages.items() %}
         {%- set pascal_message_name = message.id | strip_namespace | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isKafka = not isCloudEvent and message.format.lower().startswith("kafka") %}
