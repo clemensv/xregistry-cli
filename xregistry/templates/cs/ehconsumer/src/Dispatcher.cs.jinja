@@ -99,14 +99,19 @@ namespace {{ project_name | pascal }}
                             var tasks = new List<Task>();
                             foreach (var handler in {{ pascal_message_name | strip_namespace }}Async.GetInvocationList())
                             {
-                                tasks.Add((Task)(handler.DynamicInvoke(
+                                if ( handler == null ) continue;
+                                var t = (Task?)(handler.DynamicInvoke(
                                     eventData,
                                     cloudEvent,
                                     {%- if message_body_type != "byte[]" -%}
                                     {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)
                                     {%- else -%}
                                     cloudEvent.Data is BinaryData binaryData ? binaryData.ToArray() : null
-                                    {%- endif %})));
+                                    {%- endif %}));
+                                if (t != null)
+                                {
+                                    tasks.Add(t);
+                                }
                             }
                             await Task.WhenAll(tasks);
                         }
@@ -132,12 +137,17 @@ namespace {{ project_name | pascal }}
                             var tasks = new List<Task>();
                             foreach (var handler in {{ pascal_message_name | strip_namespace }}Async.GetInvocationList())
                             {
-                                tasks.Add((Task)(handler.DynamicInvoke(
+                                if ( handler == null ) continue;
+                                var t = (Task?)(handler.DynamicInvoke(
                                     eventData,
                                     {%- if message_body_type != "byte[]" -%}{{ message_body_type }}.FromData(eventData, eventData.ContentType)
                                     {%- else -%}
                                     eventData.Body.ToArray()
-                                    {%- endif %})));
+                                    {%- endif %}));
+                                if (t != null)
+                                {
+                                    tasks.Add(t);
+                                }
                             }
                             await Task.WhenAll(tasks);
                         }

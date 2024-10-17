@@ -288,9 +288,11 @@ protected CloudEvent CloudEventFromMessage(Message amqpMessage)
         if (id != null) cloudEvent.Id = id;
         foreach (var key in amqpMessage.ApplicationProperties.Map.Keys)
         {
-            if (key.ToString().StartsWith(amqpCloudEventPrefix1) || key.ToString().StartsWith(amqpCloudEventPrefix2))
+            if ( key == null ) continue;
+            var keyString = key.ToString()??string.Empty;
+            if (keyString.StartsWith(amqpCloudEventPrefix1) || keyString.StartsWith(amqpCloudEventPrefix2))
             {
-                var attributeName = key.ToString().Substring(amqpCloudEventPrefix1.Length);
+                var attributeName = keyString.Substring(amqpCloudEventPrefix1.Length);
                 if (ceAttribs.Any(a => a == attributeName))
                 {
                     continue;

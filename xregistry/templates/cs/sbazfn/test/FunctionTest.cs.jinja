@@ -36,7 +36,7 @@ namespace {{ project_name | pascal }}.Tests
         {
             loggerFactoryMock = new Mock<ILoggerFactory>();
             loggerMock = new Mock<ILogger<{{ function_class_ref }}>>();
-            loggerFactoryMock.Setup(x => x.CreateLogger(typeof({{ function_class_ref }}).FullName)).Returns(loggerMock.Object);
+            loggerFactoryMock.Setup(x => x.CreateLogger(typeof({{ function_class_ref }}).FullName!)).Returns(loggerMock.Object);
             {{ cloudEvents.SetupDispatchObjectMocks( project_name, messagegroups ) | indent(12) }}
             
             {{ function_class_field }} = new {{ function_class_ref }}(

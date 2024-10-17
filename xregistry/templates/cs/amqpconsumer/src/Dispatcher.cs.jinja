@@ -37,9 +37,14 @@ namespace {{ project_name | pascal }}
         public event Func<Message, {{ message_body_type }}?, Task>? {{ pascal_message_name }}Async;
         {%- endif %}
         {%- endfor %}
-        public event Func<Message, Task>? UnhandledMessageAsync;
-
-        public {{ class_name }}(AmqpConsumer endpoint, ILoggerFactory logger)
+        {%- if uses_amqp_message%}
+        public event Func<Message, Task>? UnhandledMessageAsync;   
+        {%- endif %}
+        {%- if uses_cloudevents_message%}
+        public event Func<CloudEvent, Task>? UnhandledEventAsync;
+        {%- endif %}
+        
+        public {{ class_name }}(AmqpConsumer endpoint, ILoggerFactory? logger)
             : base(logger)
         {
             _endpoint = endpoint;
@@ -70,12 +75,21 @@ namespace {{ project_name | pascal }}
                         var tasks = new List<Task>();
                         foreach (var handler in {{ pascal_message_name }}Async.GetInvocationList())
                         {
+                            if ( handler == null ) continue;
                             {%- if message_body_type != "byte[]" -%}
-                            tasks.Add((Task)(handler.DynamicInvoke(
+                            var t = (Task?)(handler.DynamicInvoke(
                                 cloudEvent,
-                                {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType))));
+                                {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)));
+                            if (t != null)
+                            {
+                                tasks.Add(t);
+                            }
                             {%- else -%}
-                            tasks.Add((Task)(handler.DynamicInvoke(cloudEvent, cloudEvent.Data)));
+                            var t = (Task?)(handler.DynamicInvoke(cloudEvent, cloudEvent.Data));
+                            if (t != null)
+                            {
+                                tasks.Add(t);
+                            }
                             {%- endif -%}
                         }
                         await Task.WhenAll(tasks);
@@ -83,6 +97,10 @@ namespace {{ project_name | pascal }}
                     return true;
                 {% endfor %}
                 default:
+                    if ( UnhandledEventAsync != null )
+                    {
+                        await UnhandledEventAsync(cloudEvent);
+                    }
                     return false;
             }
         }
@@ -104,12 +122,21 @@ namespace {{ project_name | pascal }}
                         var tasks = new List<Task>();
                         foreach (var handler in {{ pascal_message_name }}Async.GetInvocationList())
                         {
+                            if ( handler == null ) continue;
                             {%- if message_body_type != "byte[]" -%}
-                            tasks.Add((Task)(handler.DynamicInvoke(
+                            var t = (Task?)(handler.DynamicInvoke(
                                 amqpMessage,
-                                {{ message_body_type }}.FromData(amqpMessage.Body, amqpMessage.Properties.ContentType))));
+                                {{ message_body_type }}.FromData(amqpMessage.Body, amqpMessage.Properties.ContentType)));
+                            if (t != null)
+                            {
+                                tasks.Add(t);
+                            }
                             {%- else -%}
-                            tasks.Add((Task)(handler.DynamicInvoke(amqpMessage, amqpMessage.Body)));
+                            var t = (Task?)(handler.DynamicInvoke(amqpMessage, amqpMessage.Body));
+                            if (t != null)
+                            {
+                                tasks.Add(t);
+                            }
                             {%- endif -%}
                         }
                         await Task.WhenAll(tasks);
@@ -182,7 +209,7 @@ namespace {{ project_name | pascal }}
                 {%- endfor %}
             };
 
-            var endpoint = new AmqpConsumer(credential, endpoints.FirstOrDefault(), options, loggerFactory);
+            var endpoint = new AmqpConsumer(credential, endpoints.First(), options, loggerFactory);
             return new {{ class_name }}(endpoint, loggerFactory);
         }
         {%- endif %}

@@ -37,9 +37,13 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set options = endpoint.config.options -%}
         {%- set endpoints = endpoint.config.endpoints %}
         {%- macro createforbody(class_name, endpoints, options) -%}
+            if (bootstrapServers == null || bootstrapServers.Length == 0)
+            {
+                throw new ArgumentNullException(nameof(bootstrapServers));
+            }
             var config = new ProducerConfig
             {
-                BootstrapServers = endpoints?.FirstOrDefault()?.uri ?? throw new ArgumentNullException(nameof(bootstrapServers))
+                BootstrapServers = string.Join(",", bootstrapServers?.Select(uri => uri.AbsoluteUri))
             };
             return new ProducerBuilder<byte[], byte[]>(config).Build();
         {%- endmacro %}
@@ -47,8 +51,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         /// <summary>
         /// Create a new instance for the {{ endpoint_key }} endpoint.
         /// </summary>
-        /// <returns>A new instance of the `IProducer<byte[], byte[]>`.</returns>
-        public static IProducer<byte[], byte[]> CreateFor{{ endpoint_key | pascal | strip_namespace }}() 
+        /// <returns>A new instance of the IProducer&lt;byte[], byte[]&gt;.</returns>
+        public static IProducer<byte[], byte[]> CreateFor{{ endpoint_key | pascal | strip_namespace }}(Uri[] bootstrapServers) 
         {   
             {{ createforbody(class_name, endpoints, options) }}
         }

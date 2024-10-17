@@ -146,7 +146,7 @@ namespace {{ project_name | pascal }}.Test
 
         {%- for id, message in messagegroup.messages.items() %}
         {%- set pascal_message_name = message.id | strip_namespace | pascal %}
-        {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+        {%- set message_body_type = util.body_type(data_project_name, root, message) %}
         [Fact]
         public async Task Test{{ pascal_message_name }}Message()
         {

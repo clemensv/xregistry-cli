@@ -30,7 +30,7 @@ namespace {{ project_name | pascal }}
 
     internal static class Tools
     {
-        internal static CloudEventFormatter GetFormatter(CloudEventsMode mode)
+        internal static CloudEventFormatter? GetFormatter(CloudEventsMode mode)
         {
             return mode switch
             {
