@@ -5,8 +5,8 @@
 The `{{ project_name | pascal }}` library provides a robust and strongly-typed
 API for obtaining and processing events from Azure Event Hubs and Microsoft
 Fabric Event Streams custom output endpoints that are associated with {% for
-messagegroup_key, messagegroup in root.messagegroups.items() -%}
-`{{- messagegroup.id -}}`{%- if not loop.last -%}, {%- elif not loop.first -%},
+messagegroupid, messagegroup in root.messagegroups.items() -%}
+`{{- messagegroupid -}}`{%- if not loop.last -%}, {%- elif not loop.first -%},
 and {%- endif -%} {%- endfor %} message group{% if (root.messagegroups.items() |
 length) %}s{% endif %}.
 
@@ -77,21 +77,21 @@ only specific ones.
 
 Below is a list of events and how to subscribe to them:
 
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
-{%- set class_name = ( pascalGroupName | strip_namespace )+"EventDispatcher" %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid  | pascal %}
+{%- set class_name = ( groupname | strip_namespace )+"EventDispatcher" %}
 
-#### {{ pascalGroupName | pascal }} Events
+#### {{ groupname | pascal }} Events
 
-{%- for id, message in messagegroup.messages.items() %}
-{%- set pascalDefinitionName = message.id | strip_namespace | pascal %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | strip_namespace | pascal %}
 {%- if message.schemaurl or message.schema %}
 {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal) %}
 {%- else %}
 {%- set dataType = "object" %}
 {%- endif %}
 
-- **{{ pascalDefinitionName }}Async**: {{ message.description }}
+- **{{ messagename }}Async**: {{ message.description }}
 
   Arguments:
     - `eventData`: [`Azure.EventHubs.EventData`](): The Event Hubs event data.
@@ -101,7 +101,7 @@ Below is a list of events and how to subscribe to them:
     - `data`: [`{{ dataType | lstrip('global::')}}`](): The event data.
 
   ```csharp
-  dispatcher.{{ pascalDefinitionName }}Async += async (eventData, {{ 'cloudEvent, ' if message.format == 'CloudEvents/1.0' }}{{dataType}} data) =>
+  dispatcher.{{ messagename }}Async += async (eventData, {{ 'cloudEvent, ' if message.format == 'CloudEvents/1.0' }}{{dataType}} data) =>
   {
       // Your event handling logic here
   };

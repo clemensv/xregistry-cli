@@ -30,8 +30,8 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Networks;
 
 using {{ project_name | pascal }};
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascal_group_name = messagegroup.id | pascal %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set pascal_group_name = messagegroupid | pascal %}
 using {{ project_name | pascal }}.{{ pascal_group_name | pascal  }};
 {%- endfor %}
 {%- if uses_cloudevents_message %}
@@ -179,8 +179,8 @@ namespace {{ project_name | pascal }}.Test
     {
     }
 
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-    {%- set pascal_group_name = messagegroup.id | pascal %}
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroupid | pascal %}
     {%- set class_name = "global::" + (pascal_group_name | concat_namespace(project_name | pascal)) + "." + (pascal_group_name | strip_namespace) + "Producer" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"ProducerTests" %}
     [Collection("EventHubs emulator")]
@@ -200,14 +200,14 @@ namespace {{ project_name | pascal }}.Test
 
 #pragma warning disable CS8604 // init takes care of nullables 
 
-        {%- for id, message in messagegroup.messages.items() %}
-        {%- set pascal_message_name = message.id | strip_namespace | pascal %}
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_namespace | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isAmqp = amqp.isAmqp(message) %}
         [Fact]
-        public async Task Test{{ pascal_message_name }}Message()
+        public async Task Test{{ messagename }}Message()
         {
-            _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
+            _logger.LogInformation("Starting Test{{ messagename }}Message");
             try
             {   
                 {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
@@ -219,7 +219,7 @@ namespace {{ project_name | pascal }}.Test
                 {%- if message_body_type != "byte[]" %}
                 var eventDataTest = new {{ message_body_type }}Tests();
                 var eventDataInstance = eventDataTest.CreateInstance();
-                await _producer.Send{{ pascal_message_name }}Async(eventDataInstance
+                await _producer.Send{{ messagename }}Async(eventDataInstance
                 {%- if uriargs -%}
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}: "test"
@@ -227,7 +227,7 @@ namespace {{ project_name | pascal }}.Test
                 {%- endif -%}
                 );
                 {%- else %}
-                await _producer.Send{{ pascal_message_name }}Async(new byte[0]
+                await _producer.Send{{ messagename }}Async(new byte[0]
                 {%- if uriargs -%}
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}: "test"
@@ -239,15 +239,15 @@ namespace {{ project_name | pascal }}.Test
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred during Test{{ pascal_message_name }}Message");
+                _logger.LogError(ex, "An error occurred during Test{{ messagename }}Message");
                 throw;
             }
         }
 
         [Fact]
-        public async Task Test{{ pascal_message_name }}Batch()
+        public async Task Test{{ messagename }}Batch()
         {
-            _logger.LogInformation("Starting Test{{ pascal_message_name }}Batch");
+            _logger.LogInformation("Starting Test{{ messagename }}Batch");
             try
             {   
                 {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
@@ -263,7 +263,7 @@ namespace {{ project_name | pascal }}.Test
                 {
                     eventDataInstances[i] = eventDataTest.CreateInstance();
                 }
-                await _producer.Send{{ pascal_message_name }}BatchAsync(eventDataInstances
+                await _producer.Send{{ messagename }}BatchAsync(eventDataInstances
                 {%- if uriargs -%}
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}:"test"
@@ -276,7 +276,7 @@ namespace {{ project_name | pascal }}.Test
                 {
                     eventDataInstances[i] = new byte[0];
                 }
-                await _producer.Send{{ pascal_message_name }}BatchAsync(eventDataInstances
+                await _producer.Send{{ messagename }}BatchAsync(eventDataInstances
                 {%- if uriargs -%}
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}:"test"
@@ -288,7 +288,7 @@ namespace {{ project_name | pascal }}.Test
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred during Test{{ pascal_message_name }}Batch");
+                _logger.LogError(ex, "An error occurred during Test{{ messagename }}Batch");
                 throw;
             }
         }

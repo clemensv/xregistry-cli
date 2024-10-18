@@ -7,8 +7,7 @@ info:
   version: "1.0"
 {%- if root.endpoints %} 
 servers:
-{%- for endpoint_key in root.endpoints.keys() -%}
-{%- set endpoint = root.endpoints[endpoint_key] -%}
+{%- for endpointid, endpoint in root.endpoints.items() -%}
 {%- set protocol = endpoint.config.protocol | lower -%}
 {%- if endpoint.usage == "subscriber" and protocol == "http" -%}
 {%- set options = endpoint.config.options -%}
@@ -57,9 +56,9 @@ paths:
                     application/json:
                       schema:
                         oneOf:
-                          {%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
-                              {%- for eventkey, event in messagegroup.messages.items() %}
-                            - $ref: "#/components/schemas/{{ event.id }}"
+                          {%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
+                              {%- for messageid, message in messagegroup.messages.items() %}
+                            - $ref: "#/components/schemas/{{ messageid }}"	
                               {%- endfor -%}
                           {%- endfor %}
                 responses:
@@ -76,12 +75,12 @@ components:
        $ref: https://raw.githubusercontent.com/cloudevents/spec/main/subscriptions/subscriptions-openapi.yaml#/components/schemas/SubscriptionRequest
     Subscription:   
       $ref: https://raw.githubusercontent.com/cloudevents/spec/main/subscriptions/subscriptions-openapi.yaml#/components/schemas/Subscription
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
-  {%- for eventkey, event in messagegroup.messages.items() %}
-    {{ event.id }}:
+{%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
+  {%- for messageid, message in messagegroup.messages.items() %}
+    {{ messageid }}:
       type: "object"
       properties:
-        {%- for attributeKey, attribute in event.metadata.items() %}
+        {%- for attributeKey, attribute in message.metadata.items() %}
         "{{ attributeKey }}":
           {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
           type: "string"
@@ -112,17 +111,17 @@ components:
           {%- endif %}
       {%- endfor %}
         data:
-          {%- if event.schemaurl %}
-          {%- if event.schemaurl.startswith('#') %}
-          $ref: "#/components/schemas/{{ event.schemaurl[1:].split('/')[-3] | pascal }}.{{ event.schemaurl[1:].split('/')[-1] | pascal }}"
+          {%- if message.schemaurl %}
+          {%- if message.schemaurl.startswith('#') %}
+          $ref: "#/components/schemas/{{ message.schemaurl[1:].split('/')[-3] | pascal }}.{{ message.schemaurl[1:].split('/')[-1] | pascal }}"
           {%- else %}
-          $ref: "{{ event.schemaurl }}"
+          $ref: "{{ message.schemaurl }}"
           {%- endif %}
       {%- else %}
           type: "object"
       {%- endif %}
       required:
-      {%- for attributeKey, attribute in event.metadata.items() %}
+      {%- for attributeKey, attribute in message.metadata.items() %}
       {%- if attribute.required %}
         - "{{ attributeKey }}"
       {%- endif %}
@@ -130,11 +129,10 @@ components:
   {%- endfor -%}
 {%- endfor -%}
 {%- if root.schemagroups is defined -%}
-  {%- for schemagroupkey in root.schemagroups.keys() -%}
-  {%- if schemagroupkey != "type" -%}
-    {%- set schemagroup = root.schemagroups[schemagroupkey] -%}
-      {%- for schemakey, schema in schemagroup.schemas.items() -%}
-      {%- if schemakey != "type" -%}
+  {%- for schemagroupid, schemagroup in root.schemagroups.items() -%}
+  {%- if schemagroupid != "type" -%}
+      {%- for schemaid, schema in schemagroup.schemas.items() -%}
+      {%- if schemaid != "type" -%}
         {%- set ns = namespace(newest_schemaversion=null) -%}
         {%- for schemaversionid, schemaversion in schema.versions.items() -%}
             {%- if newest_schemaversion is not defined or schemaversionid > newest_schemaversion -%}
@@ -142,7 +140,7 @@ components:
             {%- endif -%}
         {%- endfor -%}
         {%- if ns.newest_schemaversion is defined %} 
-    {{ schemagroupkey | pascal }}.{{ schemakey | pascal }}:
+    {{ schemagroupid | pascal }}.{{ schemaid | pascal }}:
           {%- if ns.newest_schemaversion.schemaurl -%}
           {%- if ns.newest_schemaversion.schemaurl.startswith('#') %}
           $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaurl.split('#/schemagroups/')[1] }}"

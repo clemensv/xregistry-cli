@@ -182,8 +182,8 @@ namespace {{ project_name | pascal }}.Test
     {
     }
 
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-    {%- set pascal_group_name = messagegroup.id | pascal %}
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroupid | pascal %}
     {%- set class_name = (pascal_group_name | strip_namespace) + "EventConsumer" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"Tests" %}
     [Collection("Artemis container")]
@@ -200,13 +200,13 @@ namespace {{ project_name | pascal }}.Test
 
 #pragma warning disable CS8604 // init takes care of nullables 
 
-        {%- for id, message in messagegroup.messages.items() %}
-        {%- set pascal_message_name = message.id | strip_dots | pascal %}
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_dots | pascal %}
         {%- set message_body_type = util.body_type(data_project_name, root, message) %}
         [Fact]
-        public async Task Test{{ pascal_message_name }}Message()
+        public async Task Test{{ messagename }}Message()
         {
-            _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
+            _logger.LogInformation("Starting Test{{ messagename }}Message");
             try
             {
                 var plainEndpointCredential = new PlainEndpointCredential("guest", "guest");
@@ -216,18 +216,18 @@ namespace {{ project_name | pascal }}.Test
                 try
                 {
                     var messageReceived = new TaskCompletionSource<bool>();
-                    dispatcher.{{ pascal_message_name }}Async += (amqpMessage, messageObj) =>
+                    dispatcher.{{ messagename }}Async += (amqpMessage, messageObj) =>
                     {
                         try
                         {
-                            _logger.LogInformation("{{ pascal_message_name }} message received");
+                            _logger.LogInformation("{{ messagename }} message received");
                             Assert.NotNull(amqpMessage);
                             Assert.NotNull(messageObj);
                             messageReceived.SetResult(true);
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "An error occurred during {{ pascal_message_name }} message processing");
+                            _logger.LogError(ex, "An error occurred during {{ messagename }} message processing");
                             messageReceived.SetResult(false);
                         }
                         return Task.CompletedTask;
@@ -259,7 +259,7 @@ namespace {{ project_name | pascal }}.Test
                                 };
                                 amqpMessage.ApplicationProperties = new ApplicationProperties();
                                 amqpMessage.ApplicationProperties["cloudEvents:specversion"] = "1.0";
-                                amqpMessage.ApplicationProperties["cloudEvents:type"] = "{{ message.id }}";
+                                amqpMessage.ApplicationProperties["cloudEvents:type"] = "{{ messageid }}";
                                 amqpMessage.ApplicationProperties["cloudEvents:id"] = Guid.NewGuid().ToString();
                                 amqpMessage.ApplicationProperties["cloudEvents:source"] = "urn:example-com:example-source";
                                 amqpMessage.ApplicationProperties["cloudEvents:time"] = DateTime.UtcNow.ToString("O");
@@ -290,7 +290,7 @@ namespace {{ project_name | pascal }}.Test
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred during Test{{ pascal_message_name }}Message");
+                _logger.LogError(ex, "An error occurred during Test{{ messagename }}Message");
                 throw;
             }
         }

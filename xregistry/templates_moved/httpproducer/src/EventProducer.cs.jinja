@@ -9,11 +9,11 @@ using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
 using Microsoft.Extensions.Logging;
  
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
 namespace {{ project_name | pascal }}
 {
-    {%- set class_name = ( pascalGroupName | strip_namespace )+"EventProducer" %}
+    {%- set class_name = ( groupname | strip_namespace )+"EventProducer" %}
     public partial class {{ class_name }}
     {
         {%- if uses_cloudevents_message %}
@@ -33,14 +33,13 @@ namespace {{ project_name | pascal }}
         }
 
         {%- if root.endpoints -%} 
-        {%- for endpoint_key in root.endpoints.keys() -%}
-        {%- set endpoint = root.endpoints[endpoint_key] -%}
-        {%- if endpoint.usage == "producer" -%}
+        {%- for endpointid, endpoint in root.endpoints.items() -%}
+                {%- if endpoint.usage == "producer" -%}
             {%- set protocol = endpoint.config.protocol | lower -%}
             {%- set options = endpoint.config.options -%}
             {%- set endpoints = endpoint.config.endpoints %}
 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {
@@ -67,11 +66,10 @@ namespace {{ project_name | pascal }}
         }
         {%- endif %}
 
-        {% for id in messagegroup.messages -%}
-        {%- set message = messagegroup.messages[id] -%}
-        {%- set pascal_message_name = message.id | pascal %}
+        {% for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
-        public async Task Send{{ pascal_message_name | strip_namespace }}Async(
+        public async Task Send{{ messagename | strip_namespace }}Async(
         {{ util.body_type(data_project_name, root, message) }} data
         {%- if isCloudEvent -%}
         {{- cloudEvents.DeclareUriTemplateArguments(message) -}}

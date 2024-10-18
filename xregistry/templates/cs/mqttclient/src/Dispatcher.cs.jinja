@@ -19,12 +19,12 @@ using {{ project_name | pascal }}.Tools;
 
 namespace {{ project_name | pascal }}
 {
-    {% for messagegroup_key, messagegroup in messagegroups.items() -%}
+    {% for messagegroupid, messagegroup in messagegroups.items() -%}
     {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
     {%- set uses_plain_mqtt_message = (messagegroup | exists( "binding", "mqtt" )) %}
-    {%- set pascalGroupName = messagegroup.id  | pascal -%}
-    {%- set class_name = ( pascalGroupName | strip_namespace )+"Dispatcher" %}
-    namespace {{ pascalGroupName | pascal  }}
+    {%- set messagegroupname = messagegroupid  | pascal -%}
+    {%- set class_name = ( messagegroupname | strip_namespace )+"Dispatcher" %}
+    namespace {{ messagegroupname | pascal  }}
     {
         /// <summary>
         /// Dispatcher class for processing messages from an MQTT topic.
@@ -32,8 +32,8 @@ namespace {{ project_name | pascal }}
         public class {{ class_name }} : DispatcherBase, IDisposable
         {
             private readonly MqttSubscriber _subscriber;
-            {%- for id, message in messagegroup.messages.items() -%}
-            {%- set pascal_message_name = message.id | strip_namespace | pascal -%}
+            {%- for messageid, message in messagegroup.messages.items() -%}
+            {%- set messagename = messageid | strip_namespace | pascal -%}
             {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
             {%- if message.description %}
             /// <summary>
@@ -43,9 +43,9 @@ namespace {{ project_name | pascal }}
             {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
             {%- set isMqtt = (message | exists( "binding", "mqtt" )) %}
             /// <summary>
-            /// Event that is raised when a message of type {{ pascal_message_name }} is received.
+            /// Event that is raised when a message of type {{ messagename }} is received.
             /// </summary>
-            public event Func<MqttApplicationMessage, {% if isCloudEvent %}CloudEvent?, {% endif %}{{ message_body_type }}?, Task>? {{ pascal_message_name | strip_namespace }}Async;
+            public event Func<MqttApplicationMessage, {% if isCloudEvent %}CloudEvent?, {% endif %}{{ message_body_type }}?, Task>? {{ messagename | strip_namespace }}Async;
             {%- endfor %}
             /// <summary>
             /// Event that is raised when an unhandled message is received.
@@ -113,14 +113,14 @@ namespace {{ project_name | pascal }}
                 _logger.LogInformation($"Dispatching CloudEvent of type {cloudEventType}");
                 switch (cloudEventType)
                 {
-                    {% for id, message in messagegroup.messages.items() -%}
-                    {%- set pascal_message_name = message.id | pascal %}
+                    {% for messageid, message in messagegroup.messages.items() -%}
+                    {%- set messagename = messageid | pascal %}
                     {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
                     {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
-                    case "{{ message.id }}":
-                        if ({{ pascal_message_name | strip_namespace }}Async != null)
+                    case "{{ messageid }}":
+                        if ({{ messagename | strip_namespace }}Async != null)
                         {
-                            await Task.WhenAll(Array.ConvertAll({{ pascal_message_name | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(messageArgs,
+                            await Task.WhenAll(Array.ConvertAll({{ messagename | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(messageArgs,
                             {%- if isCloudEvent %}cloudEvent, {%- endif %}
                             {%- if message_body_type != "byte[]" -%}{{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)
                             {%- else -%}
@@ -146,14 +146,14 @@ namespace {{ project_name | pascal }}
                 _logger.LogInformation($"Dispatching MQTT message on topic {messageTopic}");
                 switch (messageTopic)
                 {
-                {% for id, message in messagegroup.messages.items() if ((message | exists("binding", "mqtt" )) and not (message | exists("format", "cloudevents" ))) -%}
-                {%- set pascal_message_name = message.id | pascal %}
+                {% for messageid, message in messagegroup.messages.items() if ((message | exists("binding", "mqtt" )) and not (message | exists("format", "cloudevents" ))) -%}
+                {%- set messagename = messageid | pascal %}
                 {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
                 {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                     case "{{ message.message.properties.topic.value }}":
-                        if ({{ pascal_message_name | strip_namespace }}Async != null)
+                        if ({{ messagename | strip_namespace }}Async != null)
                         {
-                            await Task.WhenAll(Array.ConvertAll({{ pascal_message_name | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(messageArgs,
+                            await Task.WhenAll(Array.ConvertAll({{ messagename | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(messageArgs,
                         {%- if isCloudEvent %}null, {% endif %}
                         {%- if message_body_type != "byte[]" -%}
                         {{ message_body_type }}.FromData(messageArgs.Payload, messageArgs.ContentType)
@@ -174,61 +174,62 @@ namespace {{ project_name | pascal }}
     {% endfor %}
 
     {%- if root.endpoints -%}
-    {%- for endpoint_key in root.endpoints.keys() -%}
-    {%- set endpoint = root.endpoints[endpoint_key] -%}
-    {%- set pascalGroupName = endpoint.id | default(endpoint_key) | pascal -%}
+    {%- for endpointid, endpoint in root.endpoints.items() -%}
+    {%- set endpointname = endpointid | default(endpointid) | pascal -%}
     {%- if endpoint.usage == "consumer" -%}
     {%- set protocol = endpoint.config.protocol | lower -%}
     {%- if protocol.startswith("mqtt") -%}
     {%- set options = endpoint.config.options -%}
     {%- set endpoints = endpoint.config.endpoints -%}
     {%- set messagegroupuris = endpoint.messagegroups %}
+    
     {%- macro MessageGroupArgs() -%}
     {%- for uri in messagegroupuris %}
-    {%- set group = schema_object( root, uri ) -%}
-    {%- if group %}
-    {%- set groupname = group.id | pascal -%}
-    global::{{ groupname | concat_namespace(project_name) | pascal }}.{{ groupname | strip_namespace }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
+    {%- set messagegroup = schema_object( root, uri ) -%}
+    {%- if messagegroup %}
+    {%- set messagegroupname = messagegroup.messagegroupid | pascal -%}
+    {{ messagegroupname }}EventDispatcher? {{ messagegroupname | strip_namespace | camel }}Dispatcher = null
     {%- if not loop.last -%}, {%- endif -%}
     {%- endif %}
     {%- endfor %}
     {%- endmacro -%}
+    
     {%- macro MessageGroupHooks(arg) -%}
     Task.WhenAll(
     {%- for uri in messagegroupuris %}
-    {%- set group = schema_object( root, uri ) -%}
-    {% if group %}
-    {%- set groupname = group.id | pascal -%}
-    {{- groupname | strip_namespace | camel }}Dispatcher != null?{{- groupname | strip_namespace | camel }}Dispatcher.ProcessMessageAsync({{ arg }}):Task.CompletedTask
+    {%- set messagegroup = schema_object( root, uri ) -%}
+    {% if messagegroup %}
+    {%- set messagegroupname = messagegroup.messagegroupid | pascal -%}
+    {{- messagegroupname | strip_namespace | camel }}Dispatcher != null?{{- messagegroupname | strip_namespace | camel }}Dispatcher.ProcessMessageAsync({{ arg }}):Task.CompletedTask
     {%- if not loop.last -%}, {%- endif -%}
     {%- endif %}
     {%- endfor %}
     )
     {%- endmacro %}
 
-    namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
+    namespace {{ endpointname | concat_namespace(project_name) | pascal }}
     {
-        {%- set class_name = ( pascalGroupName | strip_namespace )+"MqttProcessorFactory" %}
+        {%- set class_name = ( endpointname | strip_namespace )+"MqttProcessorFactory" %}
         /// <summary>
-        /// Factory class for creating MqttSubscriber instances for the {{ pascalGroupName }} endpoint.
+        /// Factory class for creating MqttSubscriber instances for the {{ endpointname }} endpoint.
         /// </summary>
         public class {{ class_name }}
         {
             /// <summary>
-            /// Creates an MqttSubscriber instance for the {{ pascalGroupName }} endpoint.
+            /// Creates an MqttSubscriber instance for the {{ endpointname }} endpoint.
             /// </summary>
             /// <param name="options">The MqttClientOptions to use for the MqttSubscriber.</param>
             /// <param name="topics">The topics to subscribe to.</param>
-            public static MqttSubscriber CreateMqttProcessorFor{{ endpoint_key | pascal | strip_namespace }}(IMqttClient client, string[] topics, {{ MessageGroupArgs() }})
+            public static MqttSubscriber CreateMqttProcessorFor{{ endpointid | pascal | strip_namespace }}(IMqttClient client, string[] topics, {{ MessageGroupArgs() }})
             {
                 var subscriber = new MqttSubscriber(client, options, topics);
                 {%- for uri in messagegroupuris %}
-                {%- set group = schema_object( root, uri ) -%}
-                {%- if group %}
-                {%- set groupname = group.id | pascal -%}
-                if ({{ groupname | strip_namespace | camel }}Dispatcher != null)
+                {%- set messagegroup = schema_object( root, uri ) -%}
+                {%- if messagegroup %}
+                {%- set messagegroupname = messagegroup.messagegroupid | pascal -%}
+                if ({{ messagegroupname | strip_namespace | camel }}Dispatcher != null)
                 {
-                    subscriber.Attach({{ groupname | strip_namespace | camel }}Dispatcher);
+                    subscriber.Attach({{ messagegroupname | strip_namespace | camel }}Dispatcher);
                 }
                 {%- endif %}
                 {%- endfor %}

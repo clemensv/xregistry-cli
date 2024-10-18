@@ -1,38 +1,38 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- import "amqp.jinja.include" as amqp -%}
 {%- set messagegroups = root.messagegroups %}
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
 
-# C# Azure Event Hubs Event Factory for `{{ messagegroup.id }}`
+# C# Azure Event Hubs Event Factory for `{{ messagegroupid }}`
 
 This is a C# library that provides a factory class for creating Azure Event Hubs
-events for the `{{ messagegroup.id }}` message group, along with a set of classes
+events for the `{{ messagegroupid }}` message group, along with a set of classes
 for the event data.
 
-Namespace: `{{ pascalGroupName | namespace(project_name) | pascal }}`
-Class Name: `{{ pascalGroupName }}EventFactory`
+Namespace: `{{ groupname | namespace(project_name) | pascal }}`
+Class Name: `{{ groupname }}EventFactory`
 
 ## Methods and Properties
 
  {%- if root.endpoints -%} 
-{%- for endpoint_key in root.endpoints.keys() -%}
-### CreateFor{{ endpoint_key | pascal | strip_namespace }} Method
+{%- for endpointid, endpoint in root.endpoints.items() -%}
+### CreateFor{{ endpointid | pascal | strip_namespace }} Method
 
-Creates an `EventHubProducerClient` for the {{ endpoint_key }} endpoint message. 
+Creates an `EventHubProducerClient` for the {{ endpointid }} endpoint message. 
 
 There are three overloads for this method, each taking a different type of credential:
 
 ```csharp
-public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null);
+public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null);
 ```
 
 ```csharp	
-public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null);
+public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null);
 ```
 
 ```csharp
-public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
+public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
 ```
 
 #### Parameters
@@ -45,15 +45,14 @@ public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_n
 {%- endfor -%}
 {% endif %}
 
-{% for id in messagegroup.messages -%}
-{%- set message = messagegroup.messages[id] -%}
-{%- set pascalDefinitionName = message.id | pascal %}
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal %}
 {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
 {%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
 
-### Create{{ pascalDefinitionName | strip_namespace }}Event Method
+### Create{{ messagename | strip_namespace }}Event Method
 
-Creates an `EventData` object for the `{{ message.id }}` message.
+Creates an `EventData` object for the `{{ messageid }}` message.
 
 {%- if message.description %}
 #### Event Description
@@ -64,7 +63,7 @@ Creates an `EventData` object for the `{{ message.id }}` message.
 #### Usage
 
 ```csharp
-public static EventData Create{{ pascalDefinitionName | strip_namespace }}Event(
+public static EventData Create{{ messagename | strip_namespace }}Event(
 {%- if message.schemaurl or message.schema -%}
 {%- set type_name = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal )  %}
 {%- if message.schemaformat.lower().startswith("jsonschema") %}

@@ -19,11 +19,11 @@ using Azure.Messaging.EventGrid;
 using Microsoft.Azure.Messaging.EventGrid.CloudNativeCloudEvents;
 using System.Threading.Tasks;
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
 namespace {{ project_name | pascal }}
 {
-    {%- set class_name = ( pascalGroupName | strip_namespace )+"ProducerClient" %}
+    {%- set class_name = ( groupname | strip_namespace )+"ProducerClient" %}
     public partial class {{ class_name }}
     {
         private const string cePrefix = "cloudEvents_";
@@ -46,9 +46,8 @@ namespace {{ project_name | pascal }}
         }
 
         {%- if root.endpoints -%} 
-        {%- for endpoint_key in root.endpoints.keys() -%}
-        {%- set endpoint = root.endpoints[endpoint_key] -%}
-        {%- if endpoint.usage == "producer" -%}
+        {%- for endpointid, endpoint in root.endpoints.items() -%}
+                {%- if endpoint.usage == "producer" -%}
         {%- set protocol = endpoint.config.protocol | lower -%}
         {%- if protocol == "http" -%}
         {%- set options = endpoint.config.options -%}
@@ -66,17 +65,17 @@ namespace {{ project_name | pascal }}
             return new {{ class_name }}(eventGridPublisherClient);
         {%- endmacro %}
         
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(TokenCredential credential, Uri? endpointUrl = null, string? entityName = null) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(TokenCredential credential, Uri? endpointUrl = null, string? entityName = null) 
         {   
             {{ createforbody(class_name, endpoints, options) }}
         }
 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureKeyCredential credential, Uri? endpointUrl = null, string? entityName = null) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(AzureKeyCredential credential, Uri? endpointUrl = null, string? entityName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureSasCredential credential, Uri? endpointUrl = null, string? entityName = null) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(AzureSasCredential credential, Uri? endpointUrl = null, string? entityName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
@@ -85,9 +84,8 @@ namespace {{ project_name | pascal }}
         {%- endfor -%}
         {% endif %}
 
-        {% for id in messagegroup.messages -%}
-        {%- set message = messagegroup.messages[id] -%}
-        {%- set pascal_message_name = message.id | pascal %}
+        {% for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | pascal %}
         {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
         {%- if isCloudEvent %}
         {%- if message.description %}
@@ -95,7 +93,7 @@ namespace {{ project_name | pascal }}
         /// {{ message.description }}
         /// </summary>
         {%- endif %}
-        public async Task Send{{ pascal_message_name | strip_namespace }}Async(
+        public async Task Send{{ messagename | strip_namespace }}Async(
         {{ util.body_type(data_project_name, root, message) }} data
         {{- cloudEvents.DeclareUriTemplateArguments(message) -}},
         string contentType = System.Net.Mime.MediaTypeNames.Application.Json)

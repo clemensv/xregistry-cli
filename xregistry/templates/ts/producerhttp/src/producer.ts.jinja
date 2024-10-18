@@ -8,10 +8,10 @@ import * as types from "./types"
 import { httpTransport, emitterFor, CloudEvent } from "cloudevents";
 import { v4 as uuidv4 } from "uuid";
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
 
-export class {{ pascalGroupName | strip_dots }}EventProducer
+export class {{ groupname | strip_dots }}EventProducer
 {
     credential : any;
     endpoints : any;
@@ -24,14 +24,13 @@ export class {{ pascalGroupName | strip_dots }}EventProducer
     } 
   
     {%- if root.endpoints -%} 
-    {%- for endpoint_key in root.endpoints.keys() -%}
-    {%- set endpoint = root.endpoints[endpoint_key] -%}
-    {%- if endpoint.usage == "producer" and "http" == (endpoint.config.protocol | lower) -%}
+    {%- for endpointid, endpoint in root.endpoints.items() -%}
+        {%- if endpoint.usage == "producer" and "http" == (endpoint.config.protocol | lower) -%}
       {%- set protocol = endpoint.config.protocol | lower -%}
       {%- set options = endpoint.config.options -%}
       {%- set endpoints = endpoint.config.endpoints %}
            
-   static createFor{{ endpoint_key | pascal | strip_dots }}(credential : any) 
+   static createFor{{ endpointid | pascal | strip_dots }}(credential : any) 
    {       
        {%- if options %}
        var options = { 
@@ -49,29 +48,28 @@ export class {{ pascalGroupName | strip_dots }}EventProducer
            {%- if not loop.last -%},{%- endif %}
        {%- endfor %}
        ];
-       return new {{ pascalGroupName | strip_dots }}EventProducer(credential, endpoints, options);
+       return new {{ groupname | strip_dots }}EventProducer(credential, endpoints, options);
    }
    {%- endif -%}
    {%- endfor -%}
    {% endif %}
 
-   {% for id in messagegroup.messages -%}
-   {%- set definition = messagegroup.messages[id] -%}
-   {%- set pascalDefinitionName = definition.id | pascal %}
-   {%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
-   {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}
-   {%- set isMqtt = not isCloudEvent and definition.format.lower().startswith("mqtt") %}
-   async send{{ pascalDefinitionName | strip_namespace }}Async(
-   {%- if definition.schemaurl or definition.schema -%}
-   {% set dataType = "types." + ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | strip_namespace | pascal) %}
+   {% for messageid, message in messagegroup.messages.items() -%}
+   {%- set messagename = messageid | pascal %}
+   {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+   {%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
+   {%- set isMqtt = not isCloudEvent and message.format.lower().startswith("mqtt") %}
+   async send{{ messagename | strip_namespace }}Async(
+   {%- if message.schemaurl or message.schema -%}
+   {% set dataType = "types." + ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
    {%- else -%}
    {% set dataType = "any" %}
    {%- endif %}    
    data : {{ dataType }}
-   {{- cloudEvents.DeclareUriTemplateArguments(definition) -}}
+   {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
    )
    {
-       {{ cloudEvents.DeclareCloudEvent("cloudEvent", definition, dataType) | indent(9) }}
+       {{ cloudEvents.DeclareCloudEvent("cloudEvent", message, dataType) | indent(9) }}
        await this._sendAsync(cloudEvent);
    }
    {% endfor %}

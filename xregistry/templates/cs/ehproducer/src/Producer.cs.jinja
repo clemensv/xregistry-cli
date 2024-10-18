@@ -16,19 +16,18 @@ using CloudNative.CloudEvents.SystemTextJson;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Producer;
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
-namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
+namespace {{ groupname | concat_namespace(project_name) | pascal }}
 {
-    {%- set class_name = ( pascalGroupName | strip_namespace )+"Producer" %}
+    {%- set class_name = ( groupname | strip_namespace )+"Producer" %}
     /// <summary>
-    /// Producer class to send events in the `{{ messagegroup.id }}` message group.
+    /// Producer class to send events in the `{{ messagegroupid }}` message group.
     /// </summary>
     public partial class {{ class_name }}
     {
         {%- if root.endpoints -%} 
-        {%- for endpoint_key in root.endpoints.keys() -%}
-        {%- set endpoint = root.endpoints[endpoint_key] -%}
+        {%- for endpointid, endpoint in root.endpoints.items() -%}
         {%- if endpoint.usage == "producer" -%}
         {%- set protocol = endpoint.config.protocol | lower -%}
         {%- if protocol == "amqp" -%}
@@ -56,37 +55,37 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endmacro %}
         
         /// <summary>
-        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpointid }} endpoint.
         /// </summary>
         /// <param name="credential">The Azure credential to use for authentication.</param>
         /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
         /// <param name="eventHubName">The name of the Event Hub.</param>
         /// <returns>A new instance of the `EventHubProducerClient`.</returns>
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {   
             {{ createforbody(class_name, endpoints, options) }}
         }
 
         /// <summary>
-        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpointid }} endpoint.
         /// </summary>
         /// <param name="credential">The Azure credential to use for authentication.</param>
         /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
         /// <param name="eventHubName">The name of the Event Hub.</param>
         /// <returns>A new instance of the `EventHubProducerClient`.</returns>
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
 
         /// <summary>
-        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpointid }} endpoint.
         /// </summary>
         /// <param name="credential">The Azure credential to use for authentication.</param>
         /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
         /// <param name="eventHubName">The name of the Event Hub.</param>
         /// <returns>A new instance of the `EventHubProducerClient`.</returns>
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
@@ -111,9 +110,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             get; private set;
         }
 
-        {% for id in messagegroup.messages -%}
-        {%- set message = messagegroup.messages[id] -%}
-        {%- set pascal_message_name = message.id | pascal %}
+        {% for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isAmqp = amqp.isAmqp(message) %}
         {%- set type_name = util.body_type(data_project_name, root, message) %}
@@ -123,7 +121,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
         {%- endif %}
         /// <summary>
-        /// Publish the `{{ pascal_message_name }}` event
+        /// Publish the `{{ messagename }}` event
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -139,8 +137,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if isCloudEvent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
-        /// <returns>An `EventData` instance for the {{ pascal_message_name }} message.</returns>
-        public Task Send{{ pascal_message_name | strip_namespace }}Async(
+        /// <returns>An `EventData` instance for the {{ messagename }} message.</returns>
+        public Task Send{{ messagename | strip_namespace }}Async(
         {{ type_name }} data
         {%- if uriargs -%}
         {{- uriargs -}}
@@ -152,7 +150,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endif %}
         {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
         {
-            var eventData = {{pascalGroupName | strip_namespace}}EventFactory.Create{{ pascal_message_name | strip_namespace }}Event(data,
+            var eventData = {{groupname | strip_namespace}}EventFactory.Create{{ messagename | strip_namespace }}Event(data,
                 {%- if uriargs %}
                 {%- for arg in uriargs.split(',') if arg.strip() %}
                 {%- set splitarg = arg.strip().split(' ')%}
@@ -166,7 +164,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         }
 
         /// <summary>
-        /// Send a batch of `{{ pascal_message_name }}` events
+        /// Send a batch of `{{ messagename }}` events
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -183,7 +181,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
         /// <returns>Task object</returns>
-        public async Task Send{{ pascal_message_name | strip_namespace }}BatchAsync(
+        public async Task Send{{ messagename | strip_namespace }}BatchAsync(
         {{ type_name }}[] data
         {%- if uriargs -%}
         {{- uriargs -}}
@@ -198,7 +196,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             var batch = await this.Client.CreateBatchAsync();
             foreach( var record in data )
             {
-                var eventData = {{pascalGroupName | strip_namespace}}EventFactory.Create{{ pascal_message_name | strip_namespace }}Event(record, 
+                var eventData = {{groupname | strip_namespace}}EventFactory.Create{{ messagename | strip_namespace }}Event(record, 
                 {%- if uriargs %}
                 {%- for arg in uriargs.split(',') if arg.strip() %}
                 {%- set splitarg = arg.strip().split(' ')%}

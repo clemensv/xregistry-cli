@@ -3,7 +3,7 @@
 # {{ project_name | capitalize }} Azure Event Hubs Producer SDK for Python
 
 This is the {{ project_name | capitalize }} Azure Event Hubs Producer SDK for Python. It was generated from the xRegistry CLI tool
-based on message catalog definitions for {% for messagegroup_key, _ in messagegroups.items() %}"{{ messagegroup_key }}"{%- if not loop.last %}, {% endif %}{%- endfor %}.
+based on message catalog messages for {% for messagegroupid, _ in messagegroups.items() %}"{{ messagegroupid }}"{%- if not loop.last %}, {% endif %}{%- endfor %}.
 
 ## Quick Install
 
@@ -65,10 +65,10 @@ Event producers wrap the `EventHubProducerClient` and are responsible for
 constructing and sending messages to the Event Hub using that client. Multiple
 producers can be used concurrently with the same `EventHubProducerClient`.
 
-{%- set messagegroup_key, messagegroup = messagegroups.items()|first %}
+{%- set messagegroupid, messagegroup = messagegroups.items()|first %}
 {%- set message_id, message = messagegroup.messages.items()|first %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
 The required parameters for the generated `send` methods are:
 * `data`: The event data to be sent.
 * `content_type`: The content type that the event data shall be sent with.
@@ -78,8 +78,8 @@ The example below shows how to create and send an event:
 
 ```python
 producer = EventHubProducerClient.from_connection_string("your-connection-string", eventhub_name="your-eventhub-name")
-event_producer = {{ (messagegroup.id | pascal | strip_dots) + "EventProducer" }}(producer)
+event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
 data = {{ data_type | strip_namespace }}(...)  # Construct your event data here
-await event_producer.send_{{ message.id | dotunderscore | lower }}(data=data, content_type="application/json")
+await event_producer.send_{{ messageid | dotunderscore | lower }}(data=data, content_type="application/json")
 ```
 {%- endfilter %}

@@ -33,20 +33,19 @@ from datetime import datetime
 from confluent_kafka import Producer as KafkaProducer
 
 # imports the producer clients for the message group(s)
-{% for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
 from {{main_project_name}}.producer import {{class_name}}
 {%- endfor %}
 
 # imports for the data classes for each event
 {% set messagegroups = root.messagegroups %}
 {%- set imports = [] %}
-{%- for messagegroup_key in messagegroups.keys() -%}
-{%- set messagegroup = messagegroups[messagegroup_key] -%}
-{%- for id in messagegroup.messages -%}
-{%- set definition = messagegroup.messages[id] %}
-{%- set type_name = util.DeclareDataType( data_project_name, root, definition ) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set messagegroup = messagegroups[messagegroupid] -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
 {%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
 {%- if import_statement not in imports %}
@@ -67,9 +66,9 @@ async def main(connection_string: Optional[str], producer_config: Optional[str],
         topic (Optional[str]): The Kafka topic to send events to
     """
 
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-    {%- set pascalGroupName = messagegroup.id | pascal %}
-    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal %}
+    {%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
     if connection_string:
         # use a connection string obtained for an Event Stream from the Microsoft Fabric portal
         # or an Azure Event Hubs connection string
@@ -79,19 +78,19 @@ async def main(connection_string: Optional[str], producer_config: Optional[str],
         kafka_producer = KafkaProducer(json.loads(producer_config))
         {{ class_name | snake }} = {{ class_name }}(kafka_producer, topic, 'binary')
 
-    {%- for id, message in messagegroup.messages.items() %}
+    {%- for messageid, message in messagegroup.messages.items() %}
     {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
     {%- if type_name != "object" %}
 
-    # ---- {{ message.id }} ----
-    # TODO: Supply event data for the {{ message.id }} event
+    # ---- {{ messageid }} ----
+    # TODO: Supply event data for the {{ messageid }} event
     _{{ type_name | strip_namespace | snake }} = {{ type_name | pascal | strip_namespace }}()
     {%- else %}
     _{{ type_name | strip_namespace | snake }} = {}
     {%- endif %}
 
-    # sends the '{{ message.id }}' event to Kafka topic.
-    await {{ class_name | snake }}.send_{{ message.id | dotunderscore | snake }}(
+    # sends the '{{ messageid }}' event to Kafka topic.
+    await {{ class_name | snake }}.send_{{ messageid | dotunderscore | snake }}(
         {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
             {%- if attrname == 'time' -%}
             _{{ attrname }} = datetime.now().isoformat(),
@@ -109,7 +108,7 @@ async def main(connection_string: Optional[str], producer_config: Optional[str],
             , _{{ attrname }} = ''
         {%- endfor -%}
     )
-    print(f"Sent '{{ message.id }}' event: {_{{ type_name | strip_namespace | snake }}.to_json()}")
+    print(f"Sent '{{ messageid }}' event: {_{{ type_name | strip_namespace | snake }}.to_json()}")
     {%- endfor %}
     {%- endfor %}
 

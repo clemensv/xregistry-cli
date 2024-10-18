@@ -1,9 +1,9 @@
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
-   {%- for eventkey, event in messagegroup.messages.items() %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
+   {%- for messageid, message in messagegroup.messages.items() %}
 SELECT type, *
-INTO [output{{event.id | strip_namespace | pascal }}] 
+INTO [output{{messageid | strip_namespace | pascal }}] 
 FROM [input]
-WHERE type = '{{event.id}}'
+WHERE type = '{{messageid}}'
 
     {% endfor -%}
 {%- endfor %}

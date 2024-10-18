@@ -6,9 +6,10 @@ from typing import Any, Dict, List, Tuple, Union
 import urllib.request
 import urllib.parse
 import urllib.error
+from pydantic import Json
 import yaml
 
-JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, bool, None]
+JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, bool, int, float, None]
 
 class XRegistryLoader:
     """ Class to handle the loading of definitions """
@@ -121,7 +122,7 @@ class XRegistryLoader:
                 docroot["endpoints"] = subroot
                 docroot["endpointsurl"] = None
 
-        self.preprocess_messagegroups(docroot)
+        self.preprocess_manifest(docroot)
 
         if messagegroup_filter:
             if isinstance(docroot, dict):
@@ -141,26 +142,69 @@ class XRegistryLoader:
 
         return definitions_file, docroot
 
-    def preprocess_messagegroups(self, xreg_doc: JsonNode):
-        if isinstance(xreg_doc, dict) and "messagegroups" in xreg_doc:
-            if isinstance(xreg_doc["messagegroups"], dict):
-                for group_name, group in xreg_doc["messagegroups"].items():
-                    if isinstance(group, dict) and "messages" in group:
-                        if isinstance(group["messages"], dict):
-                            for message_name, message in group["messages"].items():
-                                if isinstance(message, dict) and message.get("format") == "CloudEvents/1.0":
-                                    metadata: JsonNode = message.get("metadata", {})
-                                    if not isinstance(metadata, dict):
-                                        raise ValueError(f"Message '{message_name}' has invalid metadata")
-                                    required_fields = ["id", "time", "source", "type"]
-                                    for field in required_fields:
-                                        if field not in metadata.keys():
-                                            if field == "type":
-                                                raise ValueError(f"Message '{message_name}' is missing required 'type' attribute")
-                                            elif field == "source":
-                                                metadata[field] = {"required": True, "type": "uritemplate", "value": "{sourceuri}", "description": "The URI of the source of the event"}
-                                            elif field == "id":
-                                                metadata[field] = {"type": "string", "required": True, "description": "A unique identifier for the event"}
-                                            elif field == "time":
-                                                metadata[field] = {"type": "string", "required": True, "description": "A ISO8601 timestamp of when the event happened"}
-                                    message["metadata"] = metadata
+    def preprocess_manifest(self, xreg_doc: JsonNode):
+        """ Preprocess the manifest document """
+
+        def patch_cloudevents_schema(message: Dict[str, JsonNode]):
+            """ Patch the CloudEvents schema """
+            metadata: JsonNode = message.get("metadata", {})
+            if not isinstance(metadata, dict):
+                raise ValueError(f"Message '{messageid}' has invalid metadata")
+            required_fields = ["id", "time", "source", "type"]
+            for field in required_fields:
+                if field not in metadata.keys():
+                    if field == "type":
+                        raise ValueError(f"Message '{messageid}' is missing required 'type' attribute")
+                    elif field == "source":
+                        metadata[field] = {"required": True, "type": "uritemplate", "value": "{sourceuri}", "description": "The URI of the source of the event"}
+                    elif field == "id":
+                        metadata[field] = {"type": "string", "required": True, "description": "A unique identifier for the event"}
+                    elif field == "time":
+                        metadata[field] = {"type": "string", "required": True, "description": "A ISO8601 timestamp of when the event happened"}
+            message["metadata"] = metadata
+
+
+        if isinstance(xreg_doc, dict):
+            if "messagegroups" in xreg_doc:
+                if isinstance(xreg_doc["messagegroups"], dict):
+                    for messagegroupid, messagegroup in xreg_doc["messagegroups"].items():
+                        if isinstance(messagegroup, dict) and "messages" in messagegroup:
+                            if not "messagegroupid" in messagegroup:
+                                messagegroup["messagegroupid"] = messagegroupid
+                            if isinstance(messagegroup["messages"], dict):
+                                for messageid, message in messagegroup["messages"].items():
+                                    if isinstance(message, dict):
+                                        if not "messageid" in message:
+                                            message["messageid"] = messageid
+                                        if message.get("format") == "CloudEvents/1.0":
+                                            patch_cloudevents_schema(message)
+            if "schemagroups" in xreg_doc:
+                if isinstance(xreg_doc["schemagroups"], dict):
+                    for schemagroupid, schemagroup in xreg_doc["schemagroups"].items():
+                        if isinstance(schemagroup, dict) and "schemas" in schemagroup:
+                            if not "schemagroupid" in schemagroup:
+                                schemagroup["schemagroupid"] = schemagroupid
+                            if isinstance(schemagroup["schemas"], dict):
+                                for schemaid, schema in schemagroup["schemas"].items():
+                                    if isinstance(schema, dict):
+                                        if not "schemaid" in schema:
+                                            schema["schemaid"] = schemaid
+            if "endpoint" in xreg_doc:
+                if isinstance(xreg_doc["endpoint"], dict):
+                    for endpointid, endpoint in xreg_doc["endpoint"].items():
+                        if isinstance(endpoint, dict):
+                            if not "endpointid" in endpoint:
+                                endpoint["endpointid"] = endpointid
+                            if "messages" in endpoint:
+                                 if isinstance(endpoint["messages"], dict):
+                                    for messageid, message in endpoint["messages"].items():
+                                        if isinstance(message, dict):
+                                            if not "messageid" in message:
+                                                message["messageid"] = messageid
+                                            if message.get("format") == "CloudEvents/1.0":
+                                               patch_cloudevents_schema(message)
+                                   
+
+                        
+
+        

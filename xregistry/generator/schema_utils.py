@@ -8,7 +8,7 @@ from xregistry.cli import logger
 from xregistry.generator.generator_context import GeneratorContext
 from xregistry.generator.jinja_filters import JinjaFilters
 
-JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, None]
+JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, bool, int, float, None]
 
 class SchemaUtils:
     """Utility class for schema operations."""
@@ -94,11 +94,11 @@ class SchemaUtils:
                     raise RuntimeError(f"Schema version not found: {latestversion}")
                 schema_version = schema_obj['versions'][latestversion]
                 if not class_name:
-                    class_name = str(schema_obj.get("id", ''))
+                    class_name = str(schema_obj.get("schemaid", ''))
                 parent_reference = schema_ref.rsplit("/", 2)[0]
                 parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
                 if parent and isinstance(parent, dict):
-                    prefix = parent.get("id", '')
+                    prefix = parent.get("schemagroupid", '')
                     if not class_name.startswith(prefix):
                         class_name = prefix + '.' + class_name
             elif isinstance(schema_obj, dict):
@@ -106,11 +106,11 @@ class SchemaUtils:
                 parent_reference = schema_ref.rsplit("/", 1)[0]
                 parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
                 if parent and isinstance(parent, dict) and not class_name:
-                    class_name = parent.get("id", class_name)
+                    class_name = parent.get("schemaid", class_name)
                 parent_reference = parent_reference.rsplit("/", 2)[0]
                 parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
                 if parent and isinstance(parent, dict):
-                    prefix = parent.get("id", '')
+                    prefix = parent.get("schemagroupid", '')
                     if not class_name.startswith(prefix):
                         class_name = prefix + '.' + class_name
             if not schema_version or not isinstance(schema_version, dict):

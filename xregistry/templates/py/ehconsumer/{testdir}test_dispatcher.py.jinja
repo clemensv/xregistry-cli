@@ -27,11 +27,11 @@ from testcontainers.core.network import Network
 from testcontainers.azurite import AzuriteContainer
 from testcontainers.core.waiting_utils import wait_for_logs
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
 from {{main_project_name}}.dispatcher import {{class_name}}
-{%- for id, message in messagegroup.messages.items() %}
+{%- for messageid, message in messagegroup.messages.items() %}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
 from test_{{ type_name | dotunderscore | lower}} import Test_{{ type_name | pascal | strip_namespace }}
@@ -118,21 +118,21 @@ async def event_hub_emulator():
             finally:
                 os.unlink(config_file_path)
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
-{%- set test_class_name = (project_name | pascal | strip_dots) + (pascalGroupName | strip_dots) + "Tests" %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
+{%- set test_class_name = (project_name | pascal | strip_dots) + (groupname | strip_dots) + "Tests" %}
 
-{%- for id, message in messagegroup.messages.items() %}
-{%- set message_id = id | pascal | strip_dots | strip_namespace %}
-{%- set test_function_name = "test_" + pascalGroupName | lower | replace(" ", "_") + "_" + message_id | lower | replace(" ", "_") %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
+{%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
 {%- set isAmqpMessage = (message | exists( "binding", "amqp" )) %}
 
 @pytest.mark.asyncio
 async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
-    """Test the {{ message_id }} message from the {{ pascalGroupName }} message group"""
+    """Test the {{ messagename }} message from the {{ groupname }} message group"""
 
     # Turn on logging if running in debugger
     if sys.gettrace() is not None:
@@ -152,7 +152,7 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
             future.set_result(data)
             return future
 
-        dispatcher.{{ message.id | dotunderscore | snake }}_async = set_future
+        dispatcher.{{ messageid | dotunderscore | snake }}_async = set_future
 
         async with BlobServiceClientAsync.from_connection_string(blob_storage_conn_str) as blob_service_client:
             container_client = blob_service_client.get_container_client("eventhub-checkpoints")
@@ -173,7 +173,7 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
             event_data.content_type = "application/json"
             {%- if isCloudEvent %}
             event_data.properties = {
-                "cloudEvents_type": "{{ message.id }}",
+                "cloudEvents_type": "{{ messageid }}",
                 "cloudEvents_specversion": "1.0",
                 "cloudEvents_source": "/test",
                 "cloudEvents_id": "test-id"

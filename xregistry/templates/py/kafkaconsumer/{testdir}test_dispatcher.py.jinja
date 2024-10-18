@@ -23,11 +23,11 @@ from confluent_kafka import Producer
 from confluent_kafka.admin import AdminClient, NewTopic
 from testcontainers.kafka import KafkaContainer
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
 from {{main_project_name}}.dispatcher import {{class_name}}
-{%- for id, message in messagegroup.messages.items() %}
+{%- for messageid, message in messagegroup.messages.items() %}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
 from test_{{ type_name | dotunderscore | lower}} import Test_{{ type_name | pascal | strip_namespace }}
@@ -47,18 +47,18 @@ async def kafka_emulator():
             "bootstrap_servers": connection
         }
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
-{%- set test_class_name = (project_name | pascal | strip_dots) + (pascalGroupName | strip_dots) + "Tests" %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
+{%- set test_class_name = (project_name | pascal | strip_dots) + (groupname | strip_dots) + "Tests" %}
 
-{%- for id, message in messagegroup.messages.items() %}
-{%- set message_id = id | pascal | strip_dots | strip_namespace %}
-{%- set test_function_name = "test_" + pascalGroupName | lower | replace(" ", "_") + "_" + message_id | lower | replace(" ", "_") %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
+{%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
 
 @pytest.mark.asyncio
 async def {{ test_function_name | dotunderscore }}(kafka_emulator):
-    """Test the {{ message_id }} message from the {{ pascalGroupName }} message group"""
+    """Test the {{ messagename }} message from the {{ groupname }} message group"""
 
     # Turn on logging if running in debugger
     if sys.gettrace() is not None:
@@ -77,7 +77,7 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
             if not future.done():
                 future.set_result(data)
 
-        dispatcher.{{ message.id | dotunderscore | snake }}_async = set_future
+        dispatcher.{{ messageid | dotunderscore | snake }}_async = set_future
         async with dispatcher.create_consumer({
                     'bootstrap.servers': bootstrap_servers,
                     'group.id': "test-group",
@@ -94,7 +94,7 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
             event_data = {}
             {%- endif %}
             producer.produce(topic='test_topic', key=b'abc', value=event_data, headers=[
-                ("ce_type", b"{{ message.id }}"),
+                ("ce_type", b"{{ messageid }}"),
                 ("ce_specversion", b"1.0"),
                 ("ce_source", b"/test"),
                 ("ce_id", b"test-id"),

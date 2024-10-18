@@ -48,35 +48,29 @@ cloud_event["{{ attrname }}"] = "{{ attribute.value }}" if "{{ attribute.value }
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
-{%- if withType -%}{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher{% endif %} {{ messagegroup.id  | strip_namespace | camel }}_dispatcher
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+{%- set messagegroupname = messagegroupid  | pascal %}
+{%- if withType -%}{{ messagegroupname | namespace_dot(project_name) | pascal }}I{{ messagegroupname | strip_namespace }}Dispatcher{% endif %} {{ messagegroupid  | strip_namespace | camel }}_dispatcher
 {%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectField(project_name,messagegroup) %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher {{ messagegroup.id | strip_namespace | camel }}_dispatcher
+{%- set messagegroupname = messagegroupid | pascal %}
+{{ messagegroupname | namespace_dot(project_name) | pascal }}I{{ messagegroupname | strip_namespace }}Dispatcher {{ messagegroupid | strip_namespace | camel }}_dispatcher
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) %}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
 {{ DeclareDispatchObjectField( project_name, messagegroup ) }}
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectConstructor(project_name, class_name, messagegroup, args, body) %}
-def __init__(self, {{ args }}, {{ messagegroup.id | strip_namespace | camel }}_dispatcher):
-    self.{{ messagegroup.id | strip_namespace | camel }}_dispatcher = {{ messagegroup.id  | strip_namespace | camel }}_dispatcher
-    {{ body | indent(4) }}
-{%- endmacro -%}
-
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) %}
 {%- if messagegroups | exists("format", "cloudevents" ) %}
-def __init__(self, {{ args }}, {%- for messagegroup_key, messagegroup in messagegroups.items() -%} {{ messagegroup.id | strip_namespace | camel }}_dispatcher {%- if not loop.last %}, {%- endif -%}{%- endfor -%}):
-    {%- for messagegroup_key, messagegroup in messagegroups.items() -%}
-    self.{{ messagegroup.id  | strip_namespace | camel }}_dispatcher = {{ messagegroup.id  | strip_namespace | camel }}_dispatcher
+def __init__(self, {{ args }}, {%- for messagegroupid, messagegroup in messagegroups.items() -%} {{ messagegroupid | strip_namespace | camel }}_dispatcher {%- if not loop.last %}, {%- endif -%}{%- endfor -%}):
+    {%- for messagegroupid, messagegroup in messagegroups.items() -%}
+    self.{{ messagegroupid  | strip_namespace | camel }}_dispatcher = {{ messagegroupid  | strip_namespace | camel }}_dispatcher
     {%- endfor %}
     {{ body | indent(4) }}
 {% endif -%}
@@ -85,9 +79,9 @@ def __init__(self, {{ args }}, {%- for messagegroup_key, messagegroup in message
 {%- macro DispatchToDispatchObject(project_name, root, cloudEvent, messagegroup, logger) -%}
 cloud_event_type = {{ cloudEvent }}['type']
 switcher = {
-    {%- for id, message in messagegroup.messages.items() -%}
-    {% set pascalDefinitionName = message.id | pascal %}
-    "{{ message.id }}": lambda: self.{{ messagegroup.id | strip_namespace | camel }}_dispatcher.on_{{ pascalDefinitionName | strip_namespace }}_async({{ cloudEvent }},
+    {%- for messageid, message in messagegroup.messages.items() -%}
+    {% set messagename = messageid | pascal %}
+    "{{ messageid }}": lambda: self.{{ messagegroupid | strip_namespace | camel }}_dispatcher.on_{{ messagename | strip_namespace }}_async({{ cloudEvent }},
     {%- if message.schemaurl or message.schema -%}
     {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ cloudEvent }}['data'], {{cloudEvent}}['datacontenttype'])
     {%- else -%}
@@ -110,10 +104,10 @@ else:
 {%- if messagegroups | exists("format", "cloudevents" ) -%}
 cloud_event_type = {{ cloudEvent }}['type']
 switcher = {
-    {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-    {%- for id, message in messagegroup.messages.items() -%}
-    {% set pascalDefinitionName = message.id | pascal %}
-    "{{ message.id }}": lambda: self.{{ messagegroup.id  | strip_namespace | camel }}_dispatcher.on_{{ pascalDefinitionName | strip_namespace }}_async({{ cloudEvent }},
+    {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+    {%- for messageid, message in messagegroup.messages.items() -%}
+    {% set messagename = messageid | pascal %}
+    "{{ messageid }}": lambda: self.{{ messagegroupid  | strip_namespace | camel }}_dispatcher.on_{{ messagename | strip_namespace }}_async({{ cloudEvent }},
     {%- if message.schemaurl or message.schema -%}
     {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ cloudEvent }}['data'], {{cloudEvent}}['datacontenttype'])
     {%- else -%}
@@ -144,17 +138,17 @@ from azure.eventhub import EventData
 {%- else %}
 from cloudevents.sdk.event import v1 as CloudEvent
 {%- endif %}
-{% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
-class I{{ pascalGroupName | strip_namespace }}Dispatcher:
-    {%- for id, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) -%}
-    {%- set pascalDefinitionName = message.id | strip_namespace | pascal %}
+{% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+{%- set messagegroupname = messagegroupid  | pascal %}
+class I{{ messagegroupname | strip_namespace }}Dispatcher:
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) -%}
+    {%- set messagename = messageid | strip_namespace | pascal %}
     {%- if message.schemaurl or message.schema -%}
     {%- set dataType = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
     {%- else -%}
     {%- set dataType = "object" %}
     {%- endif %}
-    async def on_{{ pascalDefinitionName | strip_namespace }}_async(self, cloud_event: CloudEvent, data: {{ dataType }} = None):
+    async def on_{{ messagename | strip_namespace }}_async(self, cloud_event: CloudEvent, data: {{ dataType }} = None):
         pass
     {%- endfor %}
 {% endfor %}

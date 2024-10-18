@@ -20,11 +20,9 @@ from cloudevents.http import from_http, CloudEvent
 
 {%- set messagegroups = root.messagegroups %}
 {%- set imports = [] %}
-{%- for messagegroup_key in messagegroups.keys() -%}
-{%- set messagegroup = messagegroups[messagegroup_key] -%}
-{%- for id in messagegroup.messages -%}
-{%- set definition = messagegroup.messages[id] %}
-{%- set type_name = util.DeclareDataType( data_project_name, root, definition ) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for _, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
 {%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
 {%- if import_statement not in imports %}
@@ -233,26 +231,26 @@ class EventProcessorRunner:
         )
         return cls(client)
 
-{% for messagegroup_key, messagegroup in messagegroups.items() %}
+{% for messagegroupid, messagegroup in messagegroups.items() %}
 {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_amqp_message = (messagegroup | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots )+"EventDispatcher" %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"EventDispatcher" %}
 
 class {{ class_name }}(_DispatcherBase):
     """
-    Dispatcher for {{ pascalGroupName }} events.
+    Dispatcher for {{ groupname }} events.
     """
     def __init__(self):
-        {%- for id, message in messagegroup.messages.items() %}
-        {%- set message_id = message.id %}
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set message_id = messageid %}
         {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
         {%- if message.description %}
         # {{ message.description }}
         {%- endif %}
         {%- set is_cloudevent = (message | exists( "format", "cloudevents" )) %}
         {%- set isAmqp = (message | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
-        self.{{ message.id | dotunderscore | snake }}_async: Callable[[PartitionContext, EventData, {%if uses_cloudevents_message%}CloudEvent ,{%endif%}{{ data_type | strip_namespace }}], Awaitable[None]] = self._unhandled_event{%if is_cloudevent%}_ce{%endif%}
+        self.{{ messageid | dotunderscore | snake }}_async: Callable[[PartitionContext, EventData, {%if uses_cloudevents_message%}CloudEvent ,{%endif%}{{ data_type | strip_namespace }}], Awaitable[None]] = self._unhandled_event{%if is_cloudevent%}_ce{%endif%}
 
     {%- endfor %}
 
@@ -290,11 +288,11 @@ class {{ class_name }}(_DispatcherBase):
         """
         cloud_event_type = cloud_event['type']
         switcher = {
-            {%- for id, message in messagegroup.messages.items() %}
-            {%- set message_id = message.id %}
+            {%- for messageid, message in messagegroup.messages.items() %}
+            {%- set message_id = messageid %}
             {%- set is_cloudevent = (message | exists( "format", "cloudevents" )) %}
             {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
-            "{{ message.id }}": lambda: self.{{ message.id | dotunderscore | snake }}_async(partition_context, event, cloud_event,
+            "{{ messageid }}": lambda: self.{{ messageid | dotunderscore | snake }}_async(partition_context, event, cloud_event,
             {%- if data_type != "object" %}
                 {{ data_type | strip_namespace }}.from_data(cloud_event.data, cloud_event["datacontenttype"])
             {%- else %}
@@ -331,8 +329,8 @@ class {{ class_name }}(_DispatcherBase):
         else:
             raise NotImplementedError("AMQP message with Sequence body type is not supported")
 
-        {%- for id, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) %}
-        {%- set message_id = message.id %}
+        {%- for messageid, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) %}
+        {%- set message_id = messageid %}
         {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
         {%- set message_application_properties = message.message['application-properties'] if 'application-properties' in message.message else None %}
         {%- set message_properties = message.message.properties %}
@@ -354,7 +352,7 @@ class {{ class_name }}(_DispatcherBase):
         {%- set dispatch_condition_eff = dispatch_condition(message_application_properties, message_properties) %}
         {%- if dispatch_condition_eff %}
         if {{ dispatch_condition_eff }}:
-            await self.{{ message.id | dotunderscore | snake }}_async(partition_context, event,
+            await self.{{ messageid | dotunderscore | snake }}_async(partition_context, event,
             {%- if data_type != "object" -%}
             {{ data_type | strip_namespace }}.from_data(event_body, event.content_type)
             {%- else -%}

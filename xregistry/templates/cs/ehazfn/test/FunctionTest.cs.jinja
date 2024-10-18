@@ -41,8 +41,8 @@ namespace {{ project_name | pascal }}.Tests
 
             {{ function_class_field }} = new {{ function_class_ref }}(
                 loggerFactoryMock.Object,
-                {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-                _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Object{% if not loop.last %},
+                {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+                _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Object{% if not loop.last %},
                 {% endif -%}
                 {%- endfor -%});
         }
@@ -57,12 +57,12 @@ namespace {{ project_name | pascal }}.Tests
             await {{ function_class_field }}.Run(events, loggerMock.Object);
 
             // Assert
-            {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-            {%- for id, message in messagegroup.messages.items() -%}
+            {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+            {%- for messageid, message in messagegroup.messages.items() -%}
             {%- if message.format.startswith("CloudEvents") -%}  
-            {%- set pascal_message_name = message.id | pascal %}
-            _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Verify(
-                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ util.body_type(data_project_name, root, message) }}>()),
+            {%- set messagename = messageid | pascal %}
+            _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Verify(
+                x => x.On{{ messageid | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ util.body_type(data_project_name, root, message) }}>()),
                 Times.Never
             );
             {%- endif -%}
@@ -70,13 +70,13 @@ namespace {{ project_name | pascal }}.Tests
             {%- endfor -%}
         }
 
-        {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-        {%- for id, message in messagegroup.messages.items() -%}
+        {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+        {%- for messageid, message in messagegroup.messages.items() -%}
         {%- if message.format.startswith("CloudEvents") -%}     
-        {%- set pascal_message_name = message.id | pascal %}
+        {%- set messagename = messageid | pascal %}
         {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
         [Test]
-        public async Task Run_With{{ message.id | strip_namespace | pascal }}_ShouldInvoke{{ messagegroup_key | strip_namespace | pascal }}DispatcherOn{{ message.id | strip_namespace | pascal }}Async()
+        public async Task Run_With{{ messageid | strip_namespace | pascal }}_ShouldInvoke{{ messagegroupid | strip_namespace | pascal }}DispatcherOn{{ messageid | strip_namespace | pascal }}Async()
         {
             {%- if message_body_type != "byte[]" %}
             var eventDataTest = new {{ message_body_type }}Tests();
@@ -86,12 +86,12 @@ namespace {{ project_name | pascal }}.Tests
             var eventData = new EventData(new BinaryData(""));
             {%- endif %}
             eventData.Properties.Add("cloudEvents:specversion", "1.0");
-            eventData.Properties.Add("cloudEvents_type", "{{ message.id }}");
+            eventData.Properties.Add("cloudEvents_type", "{{ messageid }}");
             eventData.ContentType = "application/json";
             var events = new[] { eventData };
             await {{ function_class_field }}.Run(events, loggerMock.Object);
-            _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Verify(
-                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type if message_body_type != "byte[]" else "BinaryData" }}>()),
+            _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Verify(
+                x => x.On{{ messageid | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type if message_body_type != "byte[]" else "BinaryData" }}>()),
                 Times.Once
             );
         }

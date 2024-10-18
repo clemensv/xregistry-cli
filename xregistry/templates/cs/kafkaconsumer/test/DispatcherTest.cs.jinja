@@ -27,8 +27,8 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Networks;
 
 using {{ project_name | pascal }};
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascal_group_name = messagegroup.id | pascal %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set pascal_group_name = messagegroupid | pascal %}
 using {{ project_name | pascal }}.{{ pascal_group_name | pascal  }};
 {%- endfor %}
 {%- if uses_ce_message %}
@@ -126,8 +126,8 @@ namespace {{ project_name | pascal }}.Test
     {
     }
 
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-    {%- set pascal_group_name = messagegroup.id | pascal %}
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroupid | pascal %}
     {%- set class_name = (pascal_group_name | strip_namespace) + "EventDispatcher" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"Tests" %}
     [Collection("Kafka container")]
@@ -144,23 +144,23 @@ namespace {{ project_name | pascal }}.Test
 
 #pragma warning disable CS8604 // init takes care of nullables 
 
-        {%- for id, message in messagegroup.messages.items() %}
-        {%- set pascal_message_name = message.id | strip_namespace | pascal %}
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_namespace | pascal %}
         {%- set message_body_type = util.body_type(data_project_name, root, message) %}
         [Fact]
-        public async Task Test{{ pascal_message_name }}Message()
+        public async Task Test{{ messagename }}Message()
         {
-            _logger.LogInformation("Starting Test{{ pascal_message_name }}Message");
+            _logger.LogInformation("Starting Test{{ messagename }}Message");
             try
             {
                 var dispatcher = new {{ class_name }}(_fixture.GetLoggerFactory());
                 var messageReceived = new TaskCompletionSource<bool>();
 
-                dispatcher.{{ pascal_message_name }}Async += (message, cloudEvent, messageObj) =>
+                dispatcher.{{ messagename }}Async += (message, cloudEvent, messageObj) =>
                 {
                     try
                     {
-                        _logger.LogInformation("{{ pascal_message_name }} message received");
+                        _logger.LogInformation("{{ messagename }} message received");
                         Assert.NotNull(message);
                         Assert.NotNull(cloudEvent);
                         {%- if message_body_type != "byte[]" %}
@@ -170,7 +170,7 @@ namespace {{ project_name | pascal }}.Test
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "An error occurred during {{ pascal_message_name }} message processing");
+                        _logger.LogError(ex, "An error occurred during {{ messagename }} message processing");
                         messageReceived.SetResult(false);
                     }
                     return Task.CompletedTask;
@@ -203,7 +203,7 @@ namespace {{ project_name | pascal }}.Test
                     Headers = new Headers
                     {
                         new Header("content-type", Encoding.UTF8.GetBytes("application/json")),
-                        new Header("ce_type", Encoding.UTF8.GetBytes("{{ message.id }}")),
+                        new Header("ce_type", Encoding.UTF8.GetBytes("{{ messageid }}")),
                         new Header("ce_specversion", Encoding.UTF8.GetBytes("1.0")),
                         new Header("ce_source", Encoding.UTF8.GetBytes("/test")),
                         new Header("ce_id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))
@@ -224,7 +224,7 @@ namespace {{ project_name | pascal }}.Test
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred during Test{{ pascal_message_name }}Message");
+                _logger.LogError(ex, "An error occurred during Test{{ messagename }}Message");
                 throw;
             }
         }

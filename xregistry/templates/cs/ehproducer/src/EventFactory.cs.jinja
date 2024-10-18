@@ -15,13 +15,13 @@ using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
 using Azure.Messaging.EventHubs;
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
-namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
+namespace {{ groupname | concat_namespace(project_name) | pascal }}
 {
-    {%- set class_name = ( pascalGroupName | strip_namespace )+"EventFactory" %}
+    {%- set class_name = ( groupname | strip_namespace )+"EventFactory" %}
     /// <summary>
-    /// Factory class to create Azure Event Hubs `EventData` for the messages declared in the `{{ messagegroup.id }}` message group.
+    /// Factory class to create Azure Event Hubs `EventData` for the messages declared in the `{{ messagegroupid }}` message group.
     /// </summary>
     public partial class {{ class_name }}
     {
@@ -34,9 +34,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         private delegate byte[] Serialize<T>(T data, string contentType);
         
         {%- if root.endpoints -%} 
-        {%- for endpoint_key in root.endpoints.keys() -%}
-        {%- set endpoint = root.endpoints[endpoint_key] -%}
-        {%- if endpoint.usage == "producer" -%}
+        {%- for endpointid, endpoint in root.endpoints.items() -%}
+                {%- if endpoint.usage == "producer" -%}
         {%- set protocol = endpoint.config.protocol | lower -%}
         {%- if protocol == "amqp" -%}
         {%- set options = endpoint.config.options -%}
@@ -62,37 +61,37 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endmacro %}
         
         /// <summary>
-        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpointid }} endpoint.
         /// </summary>
         /// <param name="credential">The Azure credential to use for authentication.</param>
         /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
         /// <param name="eventHubName">The name of the Event Hub.</param>
         /// <returns>A new instance of the `EventHubProducerClient`.</returns>
-        public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
+        public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {   
             {{ createforbody(class_name, endpoints, options) }}
         }
 
         /// <summary>
-        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpointid }} endpoint.
         /// </summary>
         /// <param name="credential">The Azure credential to use for authentication.</param>
         /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
         /// <param name="eventHubName">The name of the Event Hub.</param>
         /// <returns>A new instance of the `EventHubProducerClient`.</returns>
-        public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
+        public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
 
         /// <summary>
-        /// Create a new instance of the `EventHubProducerClient` for the {{ endpoint_key }} endpoint.
+        /// Create a new instance of the `EventHubProducerClient` for the {{ endpointid }} endpoint.
         /// </summary>
         /// <param name="credential">The Azure credential to use for authentication.</param>
         /// <param name="fullyQualifiedNamespace">The fully qualified namespace of the Event Hub.</param>
         /// <param name="eventHubName">The name of the Event Hub.</param>
         /// <returns>A new instance of the `EventHubProducerClient`.</returns>
-        public static EventHubProducerClient CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
+        public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
@@ -179,9 +178,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             {%- endif %}
         }
 
-        {% for id in messagegroup.messages -%}
-        {%- set message = messagegroup.messages[id] -%}
-        {%- set pascal_message_name = message.id | pascal %}
+        {% for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isAmqp = amqp.isAmqp(message) %}
         {%- if isAmqp or isCloudEvent %}
@@ -192,7 +190,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
         {%- endif %}
         /// <summary>
-        /// Create an `EventData` instance for the `{{ pascal_message_name }}` event
+        /// Create an `EventData` instance for the `{{ messagename }}` event
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -208,8 +206,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if isCloudEvent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
-        /// <returns>An `EventData` instance for the {{ pascal_message_name }} message.</returns>
-        public static EventData Create{{ pascal_message_name | strip_namespace }}Event(
+        /// <returns>An `EventData` instance for the {{ messagename }} message.</returns>
+        public static EventData Create{{ messagename | strip_namespace }}Event(
         {{- type_name }} data
         {%- if uriargs -%}
         {{- uriargs -}}

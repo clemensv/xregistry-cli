@@ -7,15 +7,14 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { SocketService } from './services/socket.service';
 import { EventStreamListener } from './event-stream-listener';
 import { CloudEvent } from 'cloudevents';
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
 import {
-{%- for id in messagegroup.messages -%}
-{%- set definition = messagegroup.messages[id] -%}
-{%- set pascalDefinitionName = definition.id | pascal %}
-{%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
-{%- if definition.schemaurl or definition.schema -%}
-{%- set dataType = ((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( data_project_name, root, definition.schemaformat) | pascal) %}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal %}
+{%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+{%- if message.schemaurl or message.schema -%}
+{%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
 {{- dataType | dotunderscore }}{% if not loop.last %},{% endif -%}
 {%- endif -%}
 {%- endfor -%}

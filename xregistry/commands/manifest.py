@@ -104,7 +104,7 @@ class ManifestSubcommands:
         if endpoint_id in self.manifest['endpoints']:
             raise ValueError(f"Endpoint with id {endpoint_id} already exists.")
         endpoint: Dict[str, Union[str, Dict[str, str], List[str]]] = {
-            "id": endpoint_id,
+            "endpointid": endpoint_id,
             "usage": usage.capitalize(),
         }
         endpoint_config = {}
@@ -235,7 +235,7 @@ class ManifestSubcommands:
         if group_id in self.manifest['messagegroups']:
             raise ValueError(f"Message group with id {group_id} already exists.")
         messagegroup = {
-            "id": group_id,
+            "messagegroupid": group_id,
             "messages": {}
         }
         if format_ and format_.lower() != 'none':
@@ -342,7 +342,7 @@ class ManifestSubcommands:
         if message_id in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} already exists in group {group_id}.")
         message: Dict[str, Union[Dict[str, str], Dict[str, Dict[str, str]], str]] = {
-            "id": message_id
+            "messageid": message_id
         }
         if format_:
             if format_.lower() == 'cloudevents':
@@ -624,7 +624,7 @@ class ManifestSubcommands:
         if group_id in self.manifest['schemagroups']:
             raise ValueError(f"Schema group with id {group_id} already exists.")
         schemagroup = {
-            "id": group_id,
+            "schemagroupid": group_id,
             "schemas": {}
         }
         self._set_common_fields(schemagroup, description,
@@ -1403,7 +1403,7 @@ class ManifestSubcommands:
             schema_data = schemagroup['schemas'][schema_id]
         else:
             schema_data = {
-                "id": schema_id,
+                "schemaid": schema_id,
                 "format": format_,
                 "versions": {}
             }
@@ -1415,7 +1415,8 @@ class ManifestSubcommands:
             else:
                 version_id = str(max([int(v) for v in schema_data['versions']]) + 1)
         version_data = {
-            "id": version_id,
+            "schemaid": schema_id,
+            "versionid": version_id,
             "format": format_
         }
         if schema:

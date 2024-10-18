@@ -10,9 +10,9 @@ from cloudevents.http import CloudEvent
 
 {%- set messagegroups = root.messagegroups %}
 {%- set imports = [] %}
-{%- for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- for id, definition in messagegroup.messages.items() -%}
-{%- set type_name = util.DeclareDataType( data_project_name, root, definition ) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
 {%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
 {%- if import_statement not in imports %}
@@ -23,11 +23,11 @@ from cloudevents.http import CloudEvent
 {%- endfor %}
 {%- endfor %}
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set parts = messagegroup.id.split('.') -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroupid.split('.') -%}
 {%- set groupName = parts | join('_') | lower %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots )+"EventProducer" %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"EventProducer" %}
 
 class {{ class_name }}:
     def __init__(self, producer: EventHubProducerClient, content_mode:typing.Literal['structured','binary']= 'structured'):
@@ -41,9 +41,9 @@ class {{ class_name }}:
         self.producer = producer
         self.content_mode = content_mode
 
-    {% for id, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) -%}
-    {%- set definitionName = message.id | dotunderscore | snake %}
-    async def send_{{definitionName.split('.')[-1]}}(self,
+    {% for messageid, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) -%}
+    {%- set messagename = messageid | dotunderscore | snake %}
+    async def send_{{messagename.split('.')[-1]}}(self,
     {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
         _{{ attrname }}: str, {{ '' }}
     {%- endfor -%}
@@ -55,7 +55,7 @@ class {{ class_name }}:
         , _{{ attrname }}: typing.Optional[str] = None
     {%- endfor -%} ) -> None:
         """
-        Sends the '{{ message.id }}' event to the EventHub
+        Sends the '{{ messageid }}' event to the EventHub
 
         Args:
         {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined %}

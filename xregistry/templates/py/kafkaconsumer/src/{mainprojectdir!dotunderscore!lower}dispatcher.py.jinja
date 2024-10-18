@@ -24,11 +24,10 @@ from cloudevents.kafka import from_binary, from_structured, KafkaMessage
 
 {%- set messagegroups = root.messagegroups %}
 {%- set imports = [] %}
-{%- for messagegroup_key in messagegroups.keys() -%}
-{%- set messagegroup = messagegroups[messagegroup_key] -%}
-{%- for id in messagegroup.messages -%}
-{%- set definition = messagegroup.messages[id] %}
-{%- set type_name = util.DeclareDataType(data_project_name, root, definition) %}
+{%- for messagegroupid, message in messagegroups.items() -%}
+{%- set messagegroup = messagegroups[messagegroupid] -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType(data_project_name, root, message) %}
 {%- if type_name != "object" %}
 {%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
 {%- if import_statement not in imports %}
@@ -239,19 +238,19 @@ class DispatcherBase:
         return DispatcherBase.ConsumerManager.create_consumer_manager(kafka_config, self, [kafka_topic])
 
 
-{% for messagegroup_key, messagegroup in messagegroups.items() %}
+{% for messagegroupid, messagegroup in messagegroups.items() %}
 {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_kafka_message = (messagegroup | existswithout( "binding", "kafka", "format", "cloudevents" )) %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots )+"EventDispatcher" %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"EventDispatcher" %}
 
 class {{ class_name }}(DispatcherBase):
     """
-    Dispatcher for {{ pascalGroupName }} events.
+    Dispatcher for {{ groupname }} events.
     """
 
     def __init__(self):
-        """ Initializes the {{ pascalGroupName }} dispatcher. """
+        """ Initializes the {{ groupname }} dispatcher. """
         super().__init__()
 
         {%- if uses_cloudevents_message %}
@@ -266,15 +265,15 @@ class {{ class_name }}(DispatcherBase):
             pass
         {%- endif %}
 
-        {%- for id, message in messagegroup.messages.items() %}
+        {%- for messageid, message in messagegroup.messages.items() %}
         {%- set dataType = util.DeclareDataType( data_project_name, root, message ) %}
-        {%- set message_id = message.id %}
+        {%- set message_id = messageid %}
         {%- if message.description %}
         # {{ message.description }}
         {%- endif %}
         {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
         {%- set isKafka = (message | existswithout( "binding", "kafka", "format", "cloudevents" )) %}
-        self.{{ message.id | dotunderscore | snake }}_async: Callable[[Consumer, Message, {% if isCloudEvent %}CloudEvent, {%endif%}{{ dataType | strip_namespace }}], Awaitable[None]] = _unhandled_event{%if isCloudEvent%}_ce{%endif%}
+        self.{{ messageid | dotunderscore | snake }}_async: Callable[[Consumer, Message, {% if isCloudEvent %}CloudEvent, {%endif%}{{ dataType | strip_namespace }}], Awaitable[None]] = _unhandled_event{%if isCloudEvent%}_ce{%endif%}
         {%- endfor %}
 
     async def process_message(self, consumer: Consumer, msg: Message):
@@ -307,11 +306,11 @@ class {{ class_name }}(DispatcherBase):
         """
         cloud_event_type = cloud_event['type']
         switcher = {
-            {%- for id, message in messagegroup.messages.items() %}
-            {%- set message_id = message.id %}
+            {%- for messageid, message in messagegroup.messages.items() %}
+            {%- set message_id = messageid %}
             {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
             {%- set dataType = util.DeclareDataType( data_project_name, root, message ) %}
-            "{{ message.id }}": lambda: self.{{ message.id | dotunderscore | snake }}_async(consumer, message, cloud_event,
+            "{{ messageid }}": lambda: self.{{ messageid | dotunderscore | snake }}_async(consumer, message, cloud_event,
             {%- if dataType != "object" %}
                 {{ dataType | strip_namespace }}.from_data(cloud_event.data, cloud_event["datacontenttype"])
             {%- else %}
@@ -338,11 +337,11 @@ class {{ class_name }}(DispatcherBase):
         
         message_subject = message.headers.get("subject")
         switcher = {
-            {%- for id, message in messagegroup.messages.items() if ((message | exists("binding", "kafka" )) and not (message | exists("format", "cloudevents" ))) %}
-            {%- set message_id = message.id %}
+            {%- for messageid, message in messagegroup.messages.items() if ((message | exists("binding", "kafka" )) and not (message | exists("format", "cloudevents" ))) %}
+            {%- set message_id = messageid %}
             {%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
             {%- set dataType = util.DeclareDataType( data_project_name, root, message ) %}
-            "{{ message.id }}": lambda: self.{{ message.id | dotunderscore | snake }}_async(message,
+            "{{ messageid }}": lambda: self.{{ messageid | dotunderscore | snake }}_async(message,
             {%- if isCloudEvent %}None, {%- endif %}
             {%- if dataType != "object" %}
             {{ dataType }}.from_data(message.value(), message.headers.get('content-type'))

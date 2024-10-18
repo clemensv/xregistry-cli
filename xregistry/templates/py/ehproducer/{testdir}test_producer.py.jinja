@@ -20,11 +20,11 @@ from testcontainers.core.network import Network
 from testcontainers.azurite import AzuriteContainer
 from testcontainers.core.waiting_utils import wait_for_logs
 
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
 from {{main_project_name}}.producer import {{class_name}}
-{%- for id, message in messagegroup.messages.items() %}
+{%- for messageid, message in messagegroup.messages.items() %}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
 from test_{{ type_name | dotunderscore | lower}} import Test_{{ type_name | pascal | strip_namespace }}
@@ -111,16 +111,16 @@ async def event_hub_emulator():
             finally:
                 os.unlink(config_file_path)
 
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
-{%- for id, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) %}
-{%- set message_id = id | pascal | strip_dots | strip_namespace %}
-{%- set test_function_name = "test_" + pascalGroupName | lower | replace(" ", "_") + "_" + message_id | lower | replace(" ", "_") %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
+{%- for messageid, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) %}
+{%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
+{%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
 
 @pytest.mark.asyncio
 async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
-    """Test the {{ message_id }} event from the {{ pascalGroupName }} message group"""
+    """Test the {{ messagename }} event from the {{ groupname }} message group"""
 
     async for emulator in event_hub_emulator:
         event_hub_conn_str = emulator["event_hub_connection_str"]
@@ -131,7 +131,7 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
         on_event_future = asyncio.Future()
         async def on_event(partition_context, event):
             try:
-                assert event.properties["cloudEvents_type".encode('utf-8')] == "{{ message.id }}".encode('utf-8')
+                assert event.properties["cloudEvents_type".encode('utf-8')] == "{{ messageid }}".encode('utf-8')
                 await partition_context.update_checkpoint(event)
                 on_event_future.set_result(True)
             except Exception as e:
@@ -145,7 +145,7 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
         {%- else %}
         event_data = {}
         {%- endif %}
-        await producer_instance.send_{{ message.id | dotunderscore | snake }}(
+        await producer_instance.send_{{ messageid | dotunderscore | snake }}(
             {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
                 _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
             {%- endfor -%}

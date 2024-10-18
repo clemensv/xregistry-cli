@@ -25,9 +25,9 @@ import java.util.ArrayList;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
-{%- set className = (pascalGroupName | strip_namespace)+"EventDispatcher" %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
+{%- set className = (groupname | strip_namespace)+"EventDispatcher" %}
 public class {{ className | strip_namespace }}
 {
     

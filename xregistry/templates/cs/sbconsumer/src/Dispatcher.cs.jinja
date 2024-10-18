@@ -29,20 +29,20 @@ namespace {{ project_name | pascal }}
     }
 } 
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
 {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_amqp_message = (messagegroup | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
-{%- set class_name = ( pascalGroupName | strip_namespace )+"EventDispatcher" %}
-namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }} 
+{%- set messagegroupname = messagegroupid  | pascal -%}
+{%- set class_name = ( messagegroupname | strip_namespace )+"EventDispatcher" %}
+namespace {{ messagegroupname | concat_namespace(project_name) | pascal }} 
 {
     public class {{ class_name }} : global::{{ project_name | pascal }}.Tools.DispatcherBase
     {
         {%- if (messagegroup | exists( "format", "cloudevents" )) %}
         
         {%- endif %}
-        {%- for id, message in messagegroup.messages.items() -%}
-        {%- set pascal_message_name = message.id | strip_namespace | pascal -%}
+        {%- for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | strip_namespace | pascal -%}
         {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
         {%- if message.description %}   
         /// <summary>
@@ -51,7 +51,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endif -%}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isAmqp = amqp.isAmqp(message) %}
-        public event Func<ServiceBusReceivedMessage, {%if isCloudEvent%}CloudEvent?, {%endif%}{{message_body_type}}?, Task>? {{ pascal_message_name | strip_namespace }}Async;
+        public event Func<ServiceBusReceivedMessage, {%if isCloudEvent%}CloudEvent?, {%endif%}{{message_body_type}}?, Task>? {{ messagename | strip_namespace }}Async;
         {%- endfor %}
 
         public async Task ProcessMessageAsync(ProcessMessageEventArgs messageArgs)
@@ -78,14 +78,14 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             var cloudEventType = cloudEvent.Type;
             switch (cloudEventType)
             {
-                {% for id, message in messagegroup.messages.items() -%}
-                {%- set pascal_message_name = message.id | pascal %}
+                {% for messageid, message in messagegroup.messages.items() -%}
+                {%- set messagename = messageid | pascal %}
                 {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
                 {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
-                case "{{ message.id }}":
-                    if ({{ pascal_message_name | strip_namespace }}Async != null && cloudEvent.Data != null) 
+                case "{{ messageid }}":
+                    if ({{ messagename | strip_namespace }}Async != null && cloudEvent.Data != null) 
                         {
-                            await Task.WhenAll(Array.ConvertAll({{ pascal_message_name | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
+                            await Task.WhenAll(Array.ConvertAll({{ messagename | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
                             {%- if isCloudEvent %}cloudEvent, {%- endif -%}
                             {%- if message_body_type != "byte[]" -%}
                             {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)
@@ -107,14 +107,14 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             var messageSubject = message.GetRawAmqpMessage().Properties.Subject;
             switch (messageSubject)
             {
-            {% for id, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) -%}
-            {%- set pascal_message_name = message.id | pascal %}
+            {% for messageid, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) -%}
+            {%- set messagename = messageid | pascal %}
             {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
             {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
-                case "{{ message.id }}":
-                        if ({{ pascal_message_name | strip_namespace }}Async != null) 
+                case "{{ messageid }}":
+                        if ({{ messagename | strip_namespace }}Async != null) 
                         {
-                            await Task.WhenAll(Array.ConvertAll({{ pascal_message_name | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
+                            await Task.WhenAll(Array.ConvertAll({{ messagename | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
                             {%- if isCloudEvent%}null, {% endif %}
                             {%- if message_body_type != "byte[]" -%}
                             {{ message_body_type }}.FromData(eventData.Body, eventData.ContentType)
@@ -148,32 +148,33 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
 
 
 {%- if root.endpoints -%} 
-{%- for endpoint_key in root.endpoints.keys() -%}
-{%- set endpoint = root.endpoints[endpoint_key] -%}
-{%- set pascalGroupName = endpoint.id | default(endpoint_key) | pascal -%}
+{%- for endpointid, endpoint in root.endpoints.items() -%}
+{%- set endpointname = endpointid | default(endpointid) | pascal -%}
 {%- if endpoint.usage == "consumer" -%}
 {%- set protocol = endpoint.config.protocol | lower -%}
 {%- if protocol.startswith("amqp") -%}
 {%- set options = endpoint.config.options -%}
 {%- set endpoints = endpoint.config.endpoints -%}
 {%- set messagegroupuris = endpoint.messagegroups %}
+
 {%- macro MessageGroupArgs() -%}
 {%- for uri in messagegroupuris %}
-{%- set group = schema_object( root, uri ) -%}
-{%- if group %}
-{%- set groupname = group.id | pascal -%}
-global::{{ groupname | concat_namespace(project_name) | pascal }}.{{ groupname | strip_namespace | pascal }}EventDispatcher? {{ groupname | strip_namespace | camel }}Dispatcher = null
+{%- set messagegroup = schema_object( root, uri ) -%}
+{%- if messagegroup %}
+{%- set messagegroupname = messagegroup.messagegroupid | pascal -%}
+global::{{ messagegroupname | concat_namespace(project_name) | pascal }}.{{ messagegroupname | strip_namespace | pascal }}EventDispatcher? {{ messagegroupname | strip_namespace | camel }}Dispatcher = null
 {%- if not loop.last -%}, {%- endif -%}
 {%- endif %}
 {%- endfor -%}
 {%- endmacro -%}    
+
 {%- macro MessageGroupHooks(arg) -%}
 Task.WhenAll(
 {%- for uri in messagegroupuris %}
-{%- set group = schema_object( root, uri ) -%}
-{% if group %}
-{%- set groupname = group.id | pascal -%}
-{{- groupname | strip_namespace | camel }}Dispatcher != null?{{- groupname | strip_namespace | camel }}Dispatcher.ProcessMessageAsync({{ arg }}):Task.CompletedTask
+{%- set messagegroup = schema_object( root, uri ) -%}
+{% if messagegroup %}
+{%- set messagegroupname = messagegroup.messagegroupid | pascal -%}
+{{- messagegroupname | strip_namespace | camel }}Dispatcher != null?{{- messagegroupname | strip_namespace | camel }}Dispatcher.ProcessMessageAsync({{ arg }}):Task.CompletedTask
 {%- if not loop.last -%}, {%- endif -%}
 {%- endif %}
 {%- endfor -%}
@@ -181,19 +182,19 @@ Task.WhenAll(
 {%- endmacro -%}    
 
 
-namespace {{ pascalGroupName | namespace(project_name) | pascal  }}
+namespace {{ endpointname | namespace(project_name) | pascal  }}
 {
-    {%- set class_name = ( pascalGroupName | strip_namespace )+"ServiceBusProcessorFactory" %}
+    {%- set class_name = ( endpointname | strip_namespace )+"ServiceBusProcessorFactory" %}
     public class {{ class_name }} 
     {
-        public static ServiceBusProcessor CreateServiceBusProcessorFor{{ endpoint_key | pascal | strip_namespace }}(ServiceBusClient serviceBusClient, string queueName, ServiceBusProcessorOptions options, {{ MessageGroupArgs() }}) 
+        public static ServiceBusProcessor CreateServiceBusProcessorFor{{ endpointid | pascal | strip_namespace }}(ServiceBusClient serviceBusClient, string queueName, ServiceBusProcessorOptions options, {{ MessageGroupArgs() }}) 
         {   
             var serviceBusProcessor = serviceBusClient.CreateProcessor(queueName, options);
             serviceBusProcessor.ProcessMessageAsync += (eventArgs) => {{ MessageGroupHooks("eventArgs") }};
             return serviceBusProcessor;
         }
 
-        public static ServiceBusProcessor CreateEventProcessorClientFor{{ endpoint_key | pascal | strip_namespace }}(ServiceBusClient serviceBusClient, string topicName, string subscriptionName, ServiceBusProcessorOptions options, {{ MessageGroupArgs() }}) 
+        public static ServiceBusProcessor CreateEventProcessorClientFor{{ endpointid | pascal | strip_namespace }}(ServiceBusClient serviceBusClient, string topicName, string subscriptionName, ServiceBusProcessorOptions options, {{ MessageGroupArgs() }}) 
         {       
             var serviceBusProcessor = serviceBusClient.CreateProcessor(topicName, subscriptionName, options);
             serviceBusProcessor.ProcessMessageAsync += (eventArgs) => {{ MessageGroupHooks("eventArgs") }};

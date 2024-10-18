@@ -12,11 +12,11 @@
       "console": "integratedTerminal",
       "justMyCode": false,
       "jinja": true,
-      "args": "generate --style dashboard --language ts --definitions C:\\git\\real-time-sources\\gtfs\\xreg\\gtfs.xreg.json --projectname gtfs_dash --output c:\\temp\\gtfs_dash",
+      //"args": "generate --style dashboard --language ts --definitions C:\\git\\real-time-sources\\gtfs\\xreg\\gtfs.xreg.json --projectname gtfs_dash --output c:\\temp\\gtfs_dash",
       // "args": "generate --style dashboard --language ts --definitions C:\\git\\cedisco-codegen\\samples\\message-definitions\\inkjet.xreg.json --projectname inkjet_dash --output c:\\temp\\inkjet_dash",
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\compact\\cloudevent-avro-embedded.json --projectname Sample --language cs --style ehproducer --output c:\\temp\\outp\\cs12"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\fabrikam-motorsports.xreg.json --projectname Sample --language cs --style ehconsumer --output c:\\temp\\outp\\cs13"
-      //"args": "generate --projectname ContosoErp --definitions C:\\git\\cedisco-codegen\\test\\xreg\\contoso-erp.xreg.json --output c:\\temp\\contoso\\ehazfn --style ehazfn --language cs"
+      "args": "generate --projectname ContosoErp --definitions C:\\git\\cedisco-codegen\\test\\xreg\\contoso-erp.xreg.json --output c:\\temp\\contoso\\ehazfn --style ehazfn --language cs"
       //"args": "generate generate --style kafkaproducer --language py --definitions c:\\git\\real-time-sources\\gtfs\\xreg\\gtfs.xreg.json --projectname gtfs_rt_producer --output c:\\temp\\gtfs_rt_producer"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\separate-schema\\cloudevent-avro-separate.json --projectname Sample --language cs --style amqpproducer --output c:\\temp\\outp\\cs1"
       //"args": "generate --style ehproducer --language cs --definitions C:\\temp\\kusto\\avro-avsc.xreg.json  --projectname Test --output c:\\temp\\outp\\SoccerTest"

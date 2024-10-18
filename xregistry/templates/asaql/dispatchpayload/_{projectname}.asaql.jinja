@@ -16,42 +16,42 @@ CROSS APPLY
 
 -#}
 
-WITH {% for messagegroup_key, messagegroup in root.messagegroups.items() -%}
-{%- for definitionid, definition in messagegroup.messages.items() %}
+WITH {% for messagegroupid, messagegroup in root.messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() %}
 {%- if not loop.first -%},
-{% endif %}{{ definition.id | strip_dots  | pascal }} AS (
-    SELECT type, {% if definition.schemaurl or definition.schema -%}data AS {{ (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) | strip_namespace  | pascal }}, {% endif -%} *
+{% endif %}{{ messageid | strip_dots  | pascal }} AS (
+    SELECT type, {% if message.schemaurl or message.schema -%}data AS {{ (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace  | pascal }}, {% endif -%} *
     FROM [input]
-    WHERE type = '{{definition.id}}'
+    WHERE type = '{{messageid}}'
 )
 {%- endfor -%}
 {%- endfor -%}
 
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
-{%- for definitionid, definition in messagegroup.messages.items() %}
-{%- if definition.schemaurl %}
-SELECT {% for attrname, attribute in definition.metadata.items() %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- if message.schemaurl %}
+SELECT {% for attrname, attribute in message.metadata.items() %}
 {%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor -%}
-{%- set schemalist = get("select:"+((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat))).split(",") -%}
+{%- set schemalist = get("select:"+((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat))).split(",") -%}
 {%- for item in schemalist if item.strip() -%}
 ,event.{{ item }}
 {%- endfor -%}
-{%- set itemlist= get("selectitem:"+((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat))).split(",") %}
+{%- set itemlist= get("selectitem:"+((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat))).split(",") %}
 {%- for item in itemlist if item.strip() -%}
 ,{{ item }}
 {%- endfor %}
-INTO [output{{ definition.id | strip_namespace | pascal }}]
-FROM {{ definition.id | strip_dots  | pascal }} as event
-{% set apply = get("apply:"+((definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat))) %}
+INTO [output{{ messageid | strip_namespace | pascal }}]
+FROM {{ messageid | strip_dots  | pascal }} as event
+{% set apply = get("apply:"+((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat))) %}
 {%- if apply -%}
 CROSS APPLY
     {{ apply }}
 {% endif -%}
 {%- else %}
-SELECT {% for attrname, attribute in definition.metadata.items() %}
+SELECT {% for attrname, attribute in message.metadata.items() %}
 {%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor %}
-INTO [output{{ definition.id | strip_namespace | pascal }}]
-FROM {{ definition.id | strip_dots  | pascal }} as event
+INTO [output{{ messageid | strip_namespace | pascal }}]
+FROM {{ messageid | strip_dots  | pascal }} as event
 {%- endif -%}
 {%- endfor -%}
 {%- endfor -%}

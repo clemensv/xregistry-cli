@@ -25,7 +25,7 @@ from xregistry.generator.jinja_filters import JinjaFilters
 from xregistry.generator.schema_utils import SchemaUtils
 from xregistry.generator.url_utils import URLUtils
 
-JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, None]
+JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, bool, int, float, None]
 
 string_resolver_filters = {
     'lower': lambda x: x.lower(),
@@ -207,13 +207,13 @@ class TemplateRenderer:
                             # and picking the last one. To sort the keys, we need to make them the same length
                             # by prepending spaces to the keys that are shorter than the longest key
                             if not class_name:
-                                class_name = str(schema_root.get("id", ''))
+                                class_name = str(schema_root.get("schemaid", ''))
                             parent_reference = schema_reference.rsplit(
                                 "/", 2)[0]
                             parent = jsonpointer.resolve_pointer(
                                 xregistry_document, parent_reference[1:])
                             if parent and isinstance(parent, dict):
-                                prefix = parent.get("id", '')
+                                prefix = parent.get("schemagroupid", '')
                                 if not class_name.startswith(prefix):
                                     class_name = prefix + '.' + class_name
                             versions = schema_root["versions"]
@@ -233,13 +233,13 @@ class TemplateRenderer:
                             parent = jsonpointer.resolve_pointer(
                                 xregistry_document, parent_reference[1:])
                             if parent and isinstance(parent, dict) and not class_name:
-                                class_name = parent.get("id", class_name)
+                                class_name = parent.get("schemaid", class_name)
                             parent_reference = parent_reference.rsplit(
                                 "/", 2)[0]
                             parent = jsonpointer.resolve_pointer(
                                 xregistry_document, parent_reference[1:])
                             if parent and isinstance(parent, dict):
-                                prefix = parent.get("id", '')
+                                prefix = parent.get("schemagroupid", '')
                                 if not class_name.startswith(prefix):
                                     class_name = prefix + '.' + class_name
 

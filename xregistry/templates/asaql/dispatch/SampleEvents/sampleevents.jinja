@@ -23,9 +23,9 @@
     }
 }
 {% endmacro %}
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
-{%- for eventkey, event in messagegroup.messages.items() %}
-{{ generate(event.metadata) | pushfile("event_" + (event.id | strip_namespace | snake) + ".json") }}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() %}
+{{ generate(message.metadata) | pushfile("event_" + (messageid | strip_namespace | snake) + ".json") }}
 {%- endfor %}
 {%- endfor %}
 {% exit %}

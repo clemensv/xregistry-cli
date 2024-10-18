@@ -7,11 +7,10 @@ from cloudevents.conversion import to_binary, to_structured
 from cloudevents.http import CloudEvent
 {%- set messagegroups = root.messagegroups %}
 {%- set imports = [] %}
-{%- for messagegroup_key in messagegroups.keys() -%}
-{%- set messagegroup = messagegroups[messagegroup_key] -%}
-{%- for id in messagegroup.messages -%}
-{%- set definition = messagegroup.messages[id] %}
-{%- set type_name = util.DeclareDataType( '', root, definition ) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set messagegroup = messagegroups[messagegroupid] -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( '', root, message ) %}
 {%- if type_name != "object" %}
 {%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace | pascal %}
 {%- if import_statement not in imports %}
@@ -22,9 +21,8 @@ from cloudevents.http import CloudEvent
 {%- endfor %}
 {%- endfor %}
 
-{%- for messagegroup_key in messagegroups.keys() -%}
-{%- set messagegroup = messagegroups[messagegroup_key] -%}
-{%- set parts = messagegroup.id.split('.') -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroupid.split('.') -%}
 {%- set groupName = parts | join('_') | lower %}
 
 class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
@@ -33,24 +31,23 @@ class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
         self.url = url
         self.content_mode = content_mode
 
-    {% for id in messagegroup.messages -%}
-    {%- set definition = messagegroup.messages[id] -%}
-    {%- set parts = definition.id.split('.') -%}
-    {%- set definitionName = parts|join('_')|lower %}
-    def send_{{definitionName.split('.')[-1]}}(self,
-    {%- for attrname in definition.metadata -%}
-    {%- set attribute = definition.metadata[attrname] -%}
+    {% for messageid, message in messagegroup.messages.items() -%}
+    {%- set parts = message.messageid.split('.') -%}
+    {%- set messageName = parts|join('_')|lower %}
+    def send_{{messageName.split('.')[-1]}}(self,
+    {%- for attrname in message.metadata -%}
+    {%- set attribute = message.metadata[attrname] -%}
         {%- if attribute.type == "uritemplate" -%}
             {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} : str, {% endfor -%}
         {%- elif attribute.value is not defined -%}
             _{{ attrname }}: str {%- if not attribute.required -%} = default {% endif %},
         {%- endif -%}
     {%- endfor -%} 
-    data: {{ util.DeclareDataType( project_name, root, definition ) | strip_namespace }} ) -> None:
-        """ send_{{definitionName.split('.')[-1]}} """
+    data: {{ util.DeclareDataType( project_name, root, message ) | strip_namespace }} ) -> None:
+        """ send_{{messageName.split('.')[-1]}} """
         attributes = {
-        {%- for attrname in definition.metadata -%}
-        {%- set attribute = definition.metadata[attrname] %}
+        {%- for attrname in message.metadata -%}
+        {%- set attribute = message.metadata[attrname] %}
             "{{ attrname }}": 
             {%- if attribute.value -%}
             "{{ attribute.value }}"

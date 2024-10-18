@@ -41,8 +41,8 @@ namespace {{ project_name | pascal }}.Tests
             
             {{ function_class_field }} = new {{ function_class_ref }}(
                 loggerFactoryMock.Object,
-                {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-                _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Object{% if not loop.last %},
+                {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+                _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Object{% if not loop.last %},
                 {% endif -%}
                 {%- endfor -%});
         }
@@ -63,16 +63,16 @@ namespace {{ project_name | pascal }}.Tests
             await {{ function_class_field }}.Run(message, loggerMock.Object);
 
             // Assert
-            {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-            {%- for id, message in messagegroup.messages.items() -%}
+            {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+            {%- for messageid, message in messagegroup.messages.items() -%}
             {%- if message.format.startswith("CloudEvents") -%}  
-            {%- set pascal_message_name = message.id | pascal %}
+            {%- set messagename = messageid | pascal %}
             {%- set message_body_type = util.body_type(data_project_name, root, message) %}
-            _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Verify(
+            _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Verify(
                 {% if message.schemaurl or message.schema -%}
-                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type }}>()),
+                x => x.On{{ messageid | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type }}>()),
                 {%- else %}
-                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<object>()),
+                x => x.On{{ messageid | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<object>()),
                 {%- endif %}                
                 Times.Never
             );
@@ -81,12 +81,12 @@ namespace {{ project_name | pascal }}.Tests
             {%- endfor -%}
         }
 
-        {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
-        {%- for id, message in messagegroup.messages.items() -%}
+        {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+        {%- for messageid, message in messagegroup.messages.items() -%}
         {%- if message.format.startswith("CloudEvents") -%}     
-        {%- set pascal_message_name = message.id | pascal %}
+        {%- set messagename = messageid | pascal %}
         [Test]
-        public async Task Run_With{{ message.id | strip_namespace | pascal }}_ShouldInvoke{{ messagegroup_key | strip_namespace | pascal }}DispatcherOn{{ message.id | strip_namespace | pascal }}Async()
+        public async Task Run_With{{ messageid | strip_namespace | pascal }}_ShouldInvoke{{ messagegroupid | strip_namespace | pascal }}DispatcherOn{{ messageid | strip_namespace | pascal }}Async()
         {
             {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
             {%- if message_body_type != "byte[]" %}
@@ -98,7 +98,7 @@ namespace {{ project_name | pascal }}.Tests
                 properties: new Dictionary<string, object>
                 {
                     {"cloudEvents_specversion", "1.0"},
-                    {"cloudEvents_type", "{{ message.id }}"}
+                    {"cloudEvents_type", "{{ messageid }}"}
                 }
             );
             {%- else %}
@@ -108,13 +108,13 @@ namespace {{ project_name | pascal }}.Tests
                 properties: new Dictionary<string, object>
                 {
                     {"cloudEvents:specversion", "1.0"},
-                    {"cloudEvents_type", "{{ message.id }}"}
+                    {"cloudEvents_type", "{{ messageid }}"}
                 }
             );
             {%- endif %}
             await {{ function_class_field }}.Run(message, loggerMock.Object);
-            _{{ messagegroup.id | strip_namespace | camel }}DispatcherMock.Verify(
-                x => x.On{{ message.id | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type if message_body_type != "byte[]" else "BinaryData" }}>()),
+            _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Verify(
+                x => x.On{{ messageid | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type if message_body_type != "byte[]" else "BinaryData" }}>()),
                 Times.Once
             );
         }

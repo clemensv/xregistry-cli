@@ -47,15 +47,15 @@ import os
 import signal
 from azure.identity.aio import DefaultAzureCredential
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
 from {{main_project_name}}.dispatcher import {{class_name}}
-{%- for id, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
+{%- for messageid, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
 
-async def handle_{{ message.id | dotunderscore | snake }}(partition_context, event, cloud_event, {{ message.id | dotunderscore | snake }}_event_data):
-    """ Handles the {{ message.id }} event """
-    print(f"{{ message.id }}: { {{- message.id | dotunderscore | snake -}}_event_data.asdict()}")
+async def handle_{{ messageid | dotunderscore | snake }}(partition_context, event, cloud_event, {{ messageid | dotunderscore | snake }}_event_data):
+    """ Handles the {{ messageid }} event """
+    print(f"{{ messageid }}: { {{- messageid | dotunderscore | snake -}}_event_data.asdict()}")
     await partition_context.update_checkpoint(event)
 {%- endfor %}
 {%- endfor %}
@@ -64,12 +64,12 @@ async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, bl
     """ Main function to consume events from Azure EventHub """
     {%- if messagegroups|length == 1 -%}
     {%- set messagegroups = root.messagegroups %}
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-    {%- set pascalGroupName = messagegroup.id | pascal %}
-    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal %}
+    {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
     dispatcher = {{ class_name }}()
-    {%- for id, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
-    dispatcher.{{ message.id | dotunderscore | snake }}_async = handle_{{ message.id | dotunderscore | snake }}
+    {%- for messageid, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
+    dispatcher.{{ messageid | dotunderscore | snake }}_async = handle_{{ messageid | dotunderscore | snake }}
     {%- endfor %}
     {%- endfor %}
     async with dispatcher.create_processor(
@@ -86,12 +86,12 @@ async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, bl
             loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
             await stop_event.wait()
     {%- else -%}
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-    {%- set pascalGroupName = messagegroup.id | pascal %}
-    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
-    {{messagegroup.id | dotunderscore | snake}}_dispatcher = {{ class_name }}()
-    {%- for id, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
-    {{messagegroup.id | dotunderscore | snake}}_dispatcher.{{ message.id | dotunderscore | snake }}_async = {{ message.id | dotunderscore | snake }}_event
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal %}
+    {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
+    {{messagegroupid | dotunderscore | snake}}_dispatcher = {{ class_name }}()
+    {%- for messageid, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
+    {{messagegroupid | dotunderscore | snake}}_dispatcher.{{ messageid | dotunderscore | snake }}_async = {{ messageid | dotunderscore | snake }}_event
     {%- endfor %}
     {%- endfor %}
     event_processor = EventStreamProcessor.create(
@@ -102,10 +102,10 @@ async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, bl
         checkpoint_container,
         DefaultAzureCredential(),
     )
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-    {%- set pascalGroupName = messagegroup.id | pascal %}
-    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
-    event_processor.add_dispatcher({{messagegroup.id | dotunderscore | snake}}_dispatcher)
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal %}
+    {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
+    event_processor.add_dispatcher({{messagegroupid | dotunderscore | snake}}_dispatcher)
     {%- endfor %}
     async with event_processor:
         stop_event = asyncio.Event()

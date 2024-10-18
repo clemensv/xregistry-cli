@@ -12,8 +12,8 @@ from cloudevents.http import CloudEvent
 
 {%- set messagegroups = root.messagegroups %}
 {%- set imports = [] %}
-{%- for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- for id, message in messagegroup.messages.items() -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
 {%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace | pascal %}
@@ -25,11 +25,11 @@ from cloudevents.http import CloudEvent
 {%- endfor %}
 {%- endfor %}
 
-{%- for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set parts = messagegroup.id.split('.') -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroupid.split('.') -%}
 {%- set groupName = parts | join('_') | lower %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
 
 class {{ class_name }}:
     def __init__(self, producer: Producer, topic: str, content_mode:typing.Literal['structured','binary']='structured'):
@@ -58,8 +58,8 @@ class {{ class_name }}:
             return key_mapper(x, m)
         else:
             return f'{str(x.get("type"))}:{str(x.get("source"))}{("-"+str(x.get("subject"))) if x.get("subject") else ""}'
-    {%- for id, message in messagegroup.messages.items() -%}
-    {%- set message_snake = id | dotunderscore | snake %}
+    {%- for messageid, message in messagegroup.messages.items() -%}
+    {%- set message_snake = messageid | dotunderscore | snake %}
     {%- set data_type = util.DeclareDataType( data_project_name, root, message ) %}
 
     async def send_{{message_snake}}(self,
@@ -74,7 +74,7 @@ class {{ class_name }}:
             , _{{ attrname }}: typing.Optional[str] = None
         {%- endfor -%}, flush_producer=True, key_mapper: typing.Callable[[CloudEvent, {{ data_type | strip_namespace -}}], str]=None) -> None:
         """
-        Sends the '{{ message.id }}' event to the Kafka topic
+        Sends the '{{ messageid }}' event to the Kafka topic
 
         Args:
         {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined %}

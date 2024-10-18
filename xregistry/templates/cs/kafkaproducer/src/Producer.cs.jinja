@@ -13,20 +13,19 @@ using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
 using Confluent.Kafka;
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | pascal -%}
-namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+namespace {{ groupname | concat_namespace(project_name) | pascal }}
 {
-    {%- set class_name = (pascalGroupName | strip_namespace) + "Producer" %}
+    {%- set class_name = (groupname | strip_namespace) + "Producer" %}
     /// <summary>
-    /// Producer class to send events in the `{{ messagegroup.id }}` message group.
+    /// Producer class to send events in the `{{ messagegroupid }}` message group.
     /// </summary>
     public partial class {{ class_name }}
     {
         {%- if root.endpoints -%}
-        {%- for endpoint_key in root.endpoints.keys() -%}
-        {%- set endpoint = root.endpoints[endpoint_key] -%}
-        {%- if endpoint.usage == "producer" -%}
+        {%- for endpointid, endpoint in root.endpoints.items() -%}
+                {%- if endpoint.usage == "producer" -%}
         {%- set protocol = endpoint.config.protocol | lower -%}
         {%- if protocol == "kafka" -%}
         {%- set options = endpoint.config.options -%}
@@ -45,10 +44,10 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endmacro %}
 
         /// <summary>
-        /// Create a new instance of the IProducer&lt;byte[], byte[]&gt; for the {{ endpoint_key }} endpoint.
+        /// Create a new instance of the IProducer&lt;byte[], byte[]&gt; for the {{ endpointid }} endpoint.
         /// </summary>
         /// <returns>A new instance of the IProducer&lt;byte[], byte[]&gt;.</returns>
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(Uri[] bootstrapServers) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(Uri[]? bootstrapServers) 
         {   
             {{ createforbody(class_name, endpoints, options) }}
         }
@@ -73,9 +72,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             get; private set;
         }
 
-        {% for id in messagegroup.messages -%}
-        {%- set message = messagegroup.messages[id] -%}
-        {%- set pascal_message_name = message.id | pascal %}
+        {% for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isKafka = not isCloudEvent and message.format.lower().startswith("kafka") %}
         {%- set type_name = util.body_type(data_project_name, root, message) -%}
@@ -85,7 +83,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set uriargs = kafka.DeclareUriTemplateArguments(message) -%}
         {%- endif %}
         /// <summary>
-        /// Publish the `{{ pascal_message_name }}` event
+        /// Publish the `{{ messagename }}` event
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -102,7 +100,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
         /// <returns>A `Task` object representing the asynchronous publish operation.</returns>
-        public Task Send{{ pascal_message_name | strip_namespace }}Async(
+        public Task Send{{ messagename | strip_namespace }}Async(
         {{ type_name }} data
         {%- if uriargs -%}
         {{- uriargs -}}
@@ -114,7 +112,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endif %}
         {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
         {
-            var message = {{pascalGroupName | strip_namespace}}EventFactory.Create{{ pascal_message_name | strip_namespace }}Message(data,
+            var message = {{groupname | strip_namespace}}EventFactory.Create{{ messagename | strip_namespace }}Message(data,
                 {%- if uriargs %}
                 {%- for arg in uriargs.split(',') if arg.strip() %}
                 {%- set splitarg = arg.strip().split(' ') %}
@@ -124,11 +122,11 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
                 contentType
                 {%- if isCloudEvent %}, formatter{% endif -%}
             );
-            return this.Producer.ProduceAsync("{{ pascal_message_name }}", message);
+            return this.Producer.ProduceAsync("{{ messagename }}", message);
         }
 
         /// <summary>
-        /// Send a batch of `{{ pascal_message_name }}` events
+        /// Send a batch of `{{ messagename }}` events
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -145,7 +143,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
         /// <returns>A `Task` object representing the asynchronous batch publish operation.</returns>
-        public async Task Send{{ pascal_message_name | strip_namespace }}BatchAsync(
+        public async Task Send{{ messagename | strip_namespace }}BatchAsync(
         {{ type_name }}[] data
         {%- if uriargs -%}
         {{- uriargs -}}
@@ -158,7 +156,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
         {
             var messages = data.Select(record =>
-                {{pascalGroupName | strip_namespace}}EventFactory.Create{{ pascal_message_name | strip_namespace }}Message(record,
+                {{groupname | strip_namespace}}EventFactory.Create{{ messagename | strip_namespace }}Message(record,
                     {%- if uriargs %}
                     {%- for arg in uriargs.split(',') if arg.strip() %}
                     {%- set splitarg = arg.strip().split(' ') %}
@@ -172,7 +170,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             
             foreach (var message in messages)
             {
-                await this.Producer.ProduceAsync("{{ pascal_message_name }}", message);
+                await this.Producer.ProduceAsync("{{ messagename }}", message);
             }
         }
         {% endfor %}

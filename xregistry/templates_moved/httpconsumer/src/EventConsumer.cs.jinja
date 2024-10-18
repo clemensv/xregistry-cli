@@ -17,11 +17,11 @@ using CloudNative.CloudEvents.SystemTextJson;
 {%- endif %}
 using Microsoft.Extensions.Logging;
  
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
- {%- set pascalGroupName = messagegroup.id  | pascal -%}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+ {%- set groupname = messagegroupid  | pascal -%}
 namespace {{ project_name | pascal }}
 {
-     {%- set class_name = ( pascalGroupName | strip_namespace )+"EventConsumer" %}
+     {%- set class_name = ( groupname | strip_namespace )+"EventConsumer" %}
     public class {{ class_name }} : IDisposable
     {
         {%- if uses_cloudevents_message %}
@@ -55,15 +55,14 @@ namespace {{ project_name | pascal }}
         }
 
         {%- if root.endpoints -%} 
-         {%- for endpoint_key in root.endpoints.keys() -%}
-         {%- set endpoint = root.endpoints[endpoint_key] -%}
-         {%- if endpoint.usage == "consumer" -%}
+         {%- for endpointid, endpoint in root.endpoints.items() -%}
+                  {%- if endpoint.usage == "consumer" -%}
            {%- set protocol = endpoint.config.protocol | lower -%}
            {%- set options = endpoint.config.options -%}
            {%- set endpoints = endpoint.config.endpoints %}
            {%- set isCloudEvent = endpoint.format and endpoint.format.lower().startswith("cloudevents") -%}
                 
-        public static {{ class_name }} CreateFor{{ endpoint_key | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( project_name,  messagegroups, true ) }}) 
+        public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( project_name,  messagegroups, true ) }}) 
         {       
             {%- if options %}
             var options = new Dictionary<string, string> {

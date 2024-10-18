@@ -39,7 +39,7 @@ class CatalogSubcommands:
         """Adds an endpoint to the catalog."""
         self.set_base_url(uri)
         endpoint = {
-            "id": id,
+            "endpointid": id,
             "usage": usage,
             "protocol": protocol,
             "createdon": current_time_iso(),
@@ -122,7 +122,7 @@ class CatalogSubcommands:
         self.set_base_url(uri)
         with open(file, 'r', encoding='utf-8') as ef:
             endpoint = json.load(ef)
-            id = endpoint["id"]
+            id = endpoint["endpointid"]
             response = requests.get(f"{self.base_url}/endpoints/{id}")
             if response.status_code == 200:
                 self.edit_endpoint(uri, id, **endpoint)
@@ -135,7 +135,7 @@ class CatalogSubcommands:
         """Adds a messagegroup to the catalog."""
         self.set_base_url(uri)
         messagegroup = {
-            "id": id,
+            "messagegroupid": id,
             "format": format,
             "binding": binding,
             "createdon": current_time_iso(),
@@ -205,7 +205,7 @@ class CatalogSubcommands:
         self.set_base_url(uri)
         with open(file, 'r', encoding='utf-8') as ef:
             messagegroup = json.load(ef)
-            id = messagegroup["id"]
+            id = messagegroup["messagegroupid"]
             response = requests.get(f"{self.base_url}/messagegroups/{id}")
             if response.status_code == 200:
                 self.edit_messagegroup(uri, id, **messagegroup)
@@ -218,7 +218,7 @@ class CatalogSubcommands:
         """Adds a schemagroup to the catalog."""
         self.set_base_url(uri)
         schemagroup = {
-            "id": id,
+            "schemagroupid": id,
             "format": format,
             "createdon": current_time_iso(),
             "modifiedon": current_time_iso(),
@@ -285,7 +285,7 @@ class CatalogSubcommands:
         self.set_base_url(uri)
         with open(file, 'r', encoding='utf-8') as ef:
             schemagroup = json.load(ef)
-            id = schemagroup["id"]
+            id = schemagroup["schemagroupid"]
             response = requests.get(f"{self.base_url}/schemagroups/{id}")
             if response.status_code == 200:
                 self.edit_schemagroup(uri, id, **schemagroup)
@@ -303,7 +303,7 @@ class CatalogSubcommands:
         schemagroup = response.json()
 
         schema_obj = {
-            "id": id,
+            "schemaid": id,
             "format": format,
             "createdon": current_time_iso(),
             "modifiedon": current_time_iso(),
@@ -437,8 +437,8 @@ class CatalogSubcommands:
         self.set_base_url(uri)
         with open(file, 'r', encoding='utf-8') as sf:
             schema = json.load(sf)
-            groupid = schema["groupid"]
-            id = schema["id"]
+            groupid = schema["schemagroupid"]
+            id = schema["schemaid"]
             response = requests.get(f"{self.base_url}/schemagroups/{groupid}")
             if response.status_code == 200:
                 self.edit_schema(uri, groupid, id, **schema)
@@ -595,7 +595,7 @@ class CatalogSubcommands:
             catalog_subcommands.apply_endpoint(args.uri, args.file)
 
         elif command == 'messagegroup_add':
-            catalog_subcommands.add_messagegroup(args.uri, args.id, args.format)
+            catalog_subcommands.add_messagegroup(args.uri, args.id, args.format, args.binding)
         elif command == 'messagegroup_remove':
             catalog_subcommands.remove_messagegroup(args.uri, args.id, args.epoch)
         elif command == 'messagegroup_edit':

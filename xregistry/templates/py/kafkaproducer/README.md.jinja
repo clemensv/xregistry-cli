@@ -8,7 +8,7 @@ This module provides an event dispatcher for processing events from Apache Kafka
 ## Table of Contents
 1. [Overview](#overview)
 2. [Generated Event Dispatchers](#generated-event-dispatchers)
-    - {% for messagegroup_key, messagegroup in messagegroups.items() %}{{ (messagegroup.id | pascal | strip_dots ) + "EventDispatcher" }}{% if not loop.last %}, {% endif %}
+    - {% for messagegroupid, messagegroup in messagegroups.items() %}{{ (messagegroupid | pascal | strip_dots ) + "EventDispatcher" }}{% if not loop.last %}, {% endif %}
     {% endfor %}
 3. [Internals](#internals)
     - [EventProcessorRunner](#eventprocessorrunner)
@@ -23,13 +23,13 @@ solution for event-driven applications.
 
 ## Generated Event Dispatchers
 
-{% for messagegroup_key, messagegroup in messagegroups.items() %}
+{% for messagegroupid, messagegroup in messagegroups.items() %}
 {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_kafka_message = (messagegroup | exists( "binding", "kafka" )) %}
 
-### {{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }}
+### {{ (messagegroupid | pascal | strip_dots) + "EventDispatcher" }}
 
-`{{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }}` handles events for the {{ messagegroup.id }} message group.
+`{{ (messagegroupid | pascal | strip_dots) + "EventDispatcher" }}` handles events for the {{ messagegroupid }} message group.
 
 #### Methods:
 
@@ -67,17 +67,17 @@ Args:
 
 #### Event Handlers
 
-The {{ (messagegroup.id | pascal | strip_dots) + "EventDispatcher" }} defines the following event handler hooks.
+The {{ (messagegroupid | pascal | strip_dots) + "EventDispatcher" }} defines the following event handler hooks.
 
-{% for id, message in messagegroup.messages.items() %}
+{% for messageid, message in messagegroup.messages.items() %}
 {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
-##### `{{ message.id | dotunderscore | snake }}_async`
+##### `{{ messageid | dotunderscore | snake }}_async`
 
 ```python
-{{ message.id | dotunderscore | snake }}_async:  Callable[[ConsumerRecord, CloudEvent, {{ data_type | strip_namespace }}], Awaitable[None]]
+{{ messageid | dotunderscore | snake }}_async:  Callable[[ConsumerRecord, CloudEvent, {{ data_type | strip_namespace }}], Awaitable[None]]
 ```
 
-Asynchronous handler hook for `{{ message.id }}`: {% if message.description %}{{ message.description }}{%- endif %}
+Asynchronous handler hook for `{{ messageid }}`: {% if message.description %}{{ message.description }}{%- endif %}
 
 The assigned handler must be a coroutine (`async def`) that accepts the following parameters:
 
@@ -88,7 +88,7 @@ The assigned handler must be a coroutine (`async def`) that accepts the followin
 Example:
 
 ```python
-async def {{ message.id | dotunderscore | snake }}_event(record: ConsumerRecord, cloud_event: CloudEvent, data: {{ data_type | strip_namespace }}) -> None:
+async def {{ messageid | dotunderscore | snake }}_event(record: ConsumerRecord, cloud_event: CloudEvent, data: {{ data_type | strip_namespace }}) -> None:
     # Process the event data
     await some_processing_function(record, cloud_event, data)
 ```
@@ -96,7 +96,7 @@ async def {{ message.id | dotunderscore | snake }}_event(record: ConsumerRecord,
 The handler function is then assigned to the event dispatcher for the message group. The event dispatcher is responsible for calling the appropriate handler function when a message is received. Example:
 
 ```python
-{{ messagegroup.id | dotunderscore | snake }}_dispatcher.{{ message.id | dotunderscore | snake }}_async = {{ message.id | dotunderscore | snake }}_event
+{{ messagegroupid | dotunderscore | snake }}_dispatcher.{{ messageid | dotunderscore | snake }}_async = {{ messageid | dotunderscore | snake }}_event
 ```
 
 {% endfor %}

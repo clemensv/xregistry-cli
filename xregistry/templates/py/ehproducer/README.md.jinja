@@ -8,7 +8,7 @@ This module provides an event producer for sending events to Azure Event Hubs. I
 ## Table of Contents
 1. [Overview](#overview)
 2. [Generated Event Producers](#generated-event-producers)
-    - {% for messagegroup_key, messagegroup in messagegroups.items() %}{{ (messagegroup.id | pascal | strip_dots ) + "EventProducer" }}{% if not loop.last %}, {% endif %}
+    - {% for messagegroupid, messagegroup in messagegroups.items() %}{{ (messagegroupid | pascal | strip_dots ) + "EventProducer" }}{% if not loop.last %}, {% endif %}
     {% endfor %}
 
 ## Overview
@@ -20,13 +20,13 @@ solution for event-driven applications.
 
 ## Generated Event Producers
 
-{% for messagegroup_key, messagegroup in messagegroups.items() %}
+{% for messagegroupid, messagegroup in messagegroups.items() %}
 {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
 {%- set uses_plain_amqp_message = (messagegroup | exists( "binding", "amqp" )) %}
 
-### {{ (messagegroup.id | pascal | strip_dots) + "EventProducer" }}
+### {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}
 
-`{{ (messagegroup.id | pascal | strip_dots) + "EventProducer" }}` sends events for the {{ messagegroup.id }} message group.
+`{{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}` sends events for the {{ messagegroupid }} message group.
 
 #### Methods:
 
@@ -44,12 +44,12 @@ Args:
 
 #### Event Sending Methods
 
-{% for id, message in messagegroup.messages.items() if (message | exists("format", "cloudevents") )%}
+{% for messageid, message in messagegroup.messages.items() if (message | exists("format", "cloudevents") )%}
 {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
-##### `send_{{ message.id | dotunderscore | snake }}`
+##### `send_{{ messageid | dotunderscore | snake }}`
 
 ```python
-async def send_{{ message.id | dotunderscore | snake }}(self,
+async def send_{{ messageid | dotunderscore | snake }}(self,
     {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
         _{{ attrname }}: str, 
     {%- endfor %}
@@ -59,7 +59,7 @@ async def send_{{ message.id | dotunderscore | snake }}(self,
     {%- endfor -%} ) -> None:
 ```
 
-Sends the `{{ message.id }}` event to the EventHub.
+Sends the `{{ messageid }}` event to the EventHub.
 
 Args:
 {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined %}
@@ -81,9 +81,9 @@ Example:
 ```python
 async def send_event():
     producer = EventHubProducerClient.from_connection_string("your-connection-string", eventhub_name="your-eventhub-name")
-    event_producer = {{ (messagegroup.id | pascal | strip_dots) + "EventProducer" }}(producer)
+    event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
     data = {{ data_type | strip_namespace }}(...)  # Construct your event data here
-    await event_producer.send_{{ message.id | dotunderscore | lower }}(data=data, content_type="application/json")
+    await event_producer.send_{{ messageid | dotunderscore | lower }}(data=data, content_type="application/json")
 ```
 
 {% endfor %}

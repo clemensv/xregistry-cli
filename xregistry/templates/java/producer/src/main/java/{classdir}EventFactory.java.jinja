@@ -22,21 +22,20 @@ import io.cloudevents.core.v1.CloudEventBuilder;
 {{ mqtt.PahoImports() }}
 {%- endif %}
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
-{%- set className = (pascalGroupName | strip_namespace)+"EventFactory" %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
+{%- set className = (groupname | strip_namespace)+"EventFactory" %}
 public class {{ className | strip_namespace }}
 {
-    {% for id in messagegroup.messages -%}
-    {%- set definition = messagegroup.messages[id] -%}
-    {%- set pascalDefinitionName = definition.id | pascal %}
-    {%- set isCloudEvent = not definition.format or definition.format.lower().startswith("cloudevents") -%}
-    {%- set isAmqp = not isCloudEvent and definition.format.lower().startswith("amqp") %}
-    {%- set isMqtt = not isCloudEvent and definition.format.lower().startswith("mqtt") %}
-    public {% if isCloudEvent %}CloudEvent{% elif isAmqp %}Amqp.Message{% elif isMqtt %}MqttMessageV5{% endif %} create{{ pascalDefinitionName | strip_namespace }}(
-    {%- if definition.schemaurl -%}
+    {% for messageid, message in messagegroup.messages.items() -%}
+    {%- set messagename = messageid | pascal %}
+    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
+    {%- set isMqtt = not isCloudEvent and message.format.lower().startswith("mqtt") %}
+    public {% if isCloudEvent %}CloudEvent{% elif isAmqp %}Amqp.Message{% elif isMqtt %}MqttMessageV5{% endif %} create{{ messagename | strip_namespace }}(
+    {%- if message.schemaurl -%}
     {%- set toBytes="data.toByteArray(contentType)" -%}
-    {%- set type = (definition.schemaurl if definition.schemaurl else definition.schema) | schema_type( project_name, root, definition.schemaformat) %}
+    {%- set type = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
     {%- set typePackage = type | namespace | lower %}
     {%- set typeName = type | strip_namespace | pascal %}    
     {{- typePackage }}.{{ typeName }} data
@@ -46,22 +45,22 @@ public class {{ className | strip_namespace }}
     {%- endif -%}
     , String contentType
     {%- if isCloudEvent -%}
-    {{- cloudEvents.DeclareUriTemplateArguments(definition) -}}
+    {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
     {%- elif isAmqp -%}
-    {{- amqp.DeclareUriTemplateArguments(definition) -}}
+    {{- amqp.DeclareUriTemplateArguments(message) -}}
     {%- elif isMqtt -%}
-    {{- mqtt.DeclareUriTemplateArguments(definition) -}}
+    {{- mqtt.DeclareUriTemplateArguments(message) -}}
     {%- endif -%}
     ) throws Exception {
         {% if isCloudEvent %}
-        {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", toBytes, definition, 'contentType') | indent(12)}}
+        {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", toBytes, message, 'contentType') | indent(12)}}
         return cloudEvent;
         {%- elif isAmqp %}
-        {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", definition) | indent(12)}}
+        {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", message) | indent(12)}}
         amqpMessage.BodySection = new Data() { Binary = {{ toBytes }} };
         return amqpMessage;
         {%- elif isMqtt %}
-        {{- mqtt.DeclareMqttNetMessage("mqttMessage", definition) | indent(12)}}
+        {{- mqtt.DeclareMqttNetMessage("mqttMessage", message) | indent(12)}}
         return mqttMessage;
         {%- endif %}
     }

@@ -113,16 +113,16 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessageBuilder()
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
-{%- if withType -%}global::{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher {% endif %}{{ messagegroup.id  | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- set messagegroupname = messagegroupid  | pascal %}
+{%- if withType -%}global::{{ messagegroupname | namespace_dot(project_name) | pascal }}I{{ messagegroupname | strip_namespace }}Dispatcher {% endif %}{{ messagegroupid  | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) -%}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
-{%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"MqttDispatcher" -%}
-{%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"MqttDispatcher" -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- set handlerName=(messagegroupid  | strip_namespace | camel)+"MqttDispatcher" -%}
+{%- set handlerType=(messagegroupid  | namespace_dot(project_name) | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"MqttDispatcher" -%}
 {{ handlerType }} {{ handlerName }};
 {%- endfor %}
 {%- endmacro-%}
@@ -130,18 +130,18 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessageBuilder()
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
 {%- if messagegroups | exists("binding", "mqtt" ) %}
 public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
-    {%- for messagegroup_key, messagegroup in messagegroups.items() -%}
-    {%- set pascalGroupName = messagegroup.id  | pascal -%} 
-    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"MqttDispatcher" -%}
-    {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"MqttDispatcher" -%}
+    {%- for messagegroupid, messagegroup in messagegroups.items() -%}
+    {%- set messagegroupname = messagegroupid  | pascal -%} 
+    {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"MqttDispatcher" -%}
+    {%- set handlerType=(messagegroupid  | namespace_dot | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"MqttDispatcher" -%}
     {{ handlerType }} {{ handlerName }}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
 {
-    {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-    {%- set pascalGroupName = messagegroup.id  | pascal %}
-    {%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"MqttDispatcher" -%}
-   {%- set handlerType=(messagegroup.id  | namespace_dot | pascal)+"I"+(messagegroup.id  | strip_namespace | pascal)+"MqttDispatcher" -%}
+    {% for messagegroupid, messagegroup in messagegroups.items() -%}
+    {%- set messagegroupname = messagegroupid  | pascal %}
+    {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"MqttDispatcher" -%}
+   {%- set handlerType=(messagegroupid  | namespace_dot | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"MqttDispatcher" -%}
     this.{{ handlerName }} = {{ handlerName }};
     {%- endfor %}
     {{ body | indent(4) }}
@@ -154,15 +154,15 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 Regex regex; 
 Match match; 
 var messageTopic = {{ message }}.Topic;
-{% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
-{%- set handlerName=(messagegroup.id  | strip_namespace | camel)+"MqttDispatcher" -%}
-{% for id, message in messagegroup.messages.items() if (message | exists("binding", "mqtt" )) -%}
-{% set pascalDefinitionName = message.id | pascal %}
+{% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- set handlerName=(messagegroupid  | strip_namespace | camel)+"MqttDispatcher" -%}
+{% for messageid, message in messagegroup.messages.items() if (message | exists("binding", "mqtt" )) -%}
+{% set messagename = messageid | pascal %}
 regex = new Regex("^" + "{{ message.message.properties.topic.value}}".Replace("{", "(?<").Replace("}", ">[^/]+)") + "$");
 match = regex.Match(messageTopic);
 if (match.Success)
 {
-   await this.{{ handlerName }}.On{{ pascalDefinitionName | strip_namespace }}Async({{ message }},
+   await this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
    {%- if message.schemaurl or message.schema -%}
    global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
    {%- else -%}
@@ -178,25 +178,25 @@ if (match.Success)
 {%- set messagegroups = root.messagegroups -%}
 {%- if messagegroups | exists("binding", "mqtt" ) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- set messagegroupname = messagegroupid  | pascal %}
 using MQTTnet;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using System.Threading.Tasks;
 
-namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
+namespace {{ messagegroupname | concat_namespace(project_name) | pascal }}
 {
-    public interface I{{ pascalGroupName | strip_namespace }}MqttDispatcher
+    public interface I{{ messagegroupname | strip_namespace }}MqttDispatcher
     {
-        {%- for id, message in messagegroup.messages.items() if ( message | exists("binding", "mqtt" )) -%}
-        {%- set pascalDefinitionName = message.id | strip_namespace | pascal -%}
+        {%- for messageid, message in messagegroup.messages.items() if ( message | exists("binding", "mqtt" )) -%}
+        {%- set messagename = messageid | strip_namespace | pascal -%}
         {%- if message.schemaurl or message.schema -%}
         {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   
-        Task On{{ pascalDefinitionName | strip_namespace }}Async(MqttApplicationMessage mqttMessage, {{ dataType }}? data, IDictionary<string, string> parameters);
+        Task On{{ messagename | strip_namespace }}Async(MqttApplicationMessage mqttMessage, {{ dataType }}? data, IDictionary<string, string> parameters);
         {%- endfor %}
     }
 }

@@ -13,13 +13,13 @@ using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
 using Confluent.Kafka;
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id | pascal -%}
-namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+namespace {{ groupname | concat_namespace(project_name) | pascal }}
 {
-    {%- set class_name = (pascalGroupName | strip_namespace) + "EventFactory" %}
+    {%- set class_name = (groupname | strip_namespace) + "EventFactory" %}
     /// <summary>
-    /// Factory class to create Confluent Kafka message for the messages declared in the `{{ messagegroup.id }}` message group.
+    /// Factory class to create Confluent Kafka message for the messages declared in the `{{ messagegroupid }}` message group.
     /// </summary>
     public partial class {{ class_name }}
     {
@@ -29,9 +29,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         private static CloudEventFormatter defaultFormatter = new JsonEventFormatter();
 
         {%- if root.endpoints -%}
-        {%- for endpoint_key in root.endpoints.keys() -%}
-        {%- set endpoint = root.endpoints[endpoint_key] -%}
-        {%- if endpoint.usage == "producer" -%}
+        {%- for endpointid, endpoint in root.endpoints.items() -%}
+                {%- if endpoint.usage == "producer" -%}
         {%- set protocol = endpoint.config.protocol | lower -%}
         {%- if protocol == "kafka" -%}
         {%- set options = endpoint.config.options -%}
@@ -49,10 +48,10 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- endmacro %}
         
         /// <summary>
-        /// Create a new instance for the {{ endpoint_key }} endpoint.
+        /// Create a new instance for the {{ endpointid }} endpoint.
         /// </summary>
         /// <returns>A new instance of the IProducer&lt;byte[], byte[]&gt;.</returns>
-        public static IProducer<byte[], byte[]> CreateFor{{ endpoint_key | pascal | strip_namespace }}(Uri[] bootstrapServers) 
+        public static IProducer<byte[], byte[]> CreateFor{{ endpointid | pascal | strip_namespace }}(Uri[]? bootstrapServers) 
         {   
             {{ createforbody(class_name, endpoints, options) }}
         }
@@ -138,9 +137,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             }
         }
 
-        {% for id in messagegroup.messages -%}
-        {%- set message = messagegroup.messages[id] -%}
-        {%- set pascal_message_name = message.id | pascal %}
+        {% for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | pascal %}
         {%- set is_cloudevent = not message.format or message.format.lower().startswith("cloudevents") -%}
         {%- set isKafka = not is_cloudevent and message.format.lower().startswith("kafka") %}
         {%- set type_name = util.body_type(data_project_name, root, message) -%}
@@ -150,7 +148,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- set uriargs = kafka.DeclareUriTemplateArguments(message) -%}
         {%- endif %}
         /// <summary>
-        /// Create a `Message&lt;byte[], byte[]&gt;` instance for the `{{ pascal_message_name }}` event
+        /// Create a `Message&lt;byte[], byte[]&gt;` instance for the `{{ messagename }}` event
         {%- if message.description %}
         /// Event description: "{{ message.description }}"
         {%- endif %}
@@ -166,8 +164,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         {%- if is_cloudevent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
-        /// <returns>A `Message&lt;byte[], byte[]&gt;` instance for the {{ pascal_message_name }} message.</returns>
-        public static Message<byte[], byte[]> Create{{ pascal_message_name | strip_namespace }}Message(
+        /// <returns>A `Message&lt;byte[], byte[]&gt;` instance for the {{ messagename }} message.</returns>
+        public static Message<byte[], byte[]> Create{{ messagename | strip_namespace }}Message(
         {{ type_name }} data
         {%- if uriargs -%}
         {{- uriargs -}}

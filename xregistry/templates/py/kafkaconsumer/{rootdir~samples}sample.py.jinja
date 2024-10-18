@@ -45,11 +45,9 @@ from cloudevents.abstract import CloudEvent
 
 {% set messagegroups = root.messagegroups %}
 {%- set imports = [] %}
-{%- for messagegroup_key in messagegroups.keys() -%}
-{%- set messagegroup = messagegroups[messagegroup_key] -%}
-{%- for id in messagegroup.messages -%}
-{%- set definition = messagegroup.messages[id] %}
-{%- set type_name = util.DeclareDataType(data_project_name, root, definition) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for _, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType(data_project_name, root, message) %}
 {%- if type_name != "object" %}
 {%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
 {%- if import_statement not in imports %}
@@ -60,17 +58,17 @@ from cloudevents.abstract import CloudEvent
 {%- endfor %}
 {%- endfor %}
 
-{% for messagegroup_key, messagegroup in messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
 from {{main_project_name}}.dispatcher import {{class_name}}
 
-{% for id, message in messagegroup.messages.items() %}
+{% for messageid, message in messagegroup.messages.items() %}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
-async def handle_{{ message.id | dotunderscore | snake }}(dispatcher: {{class_name}}, record: Message, cloud_event: CloudEvent, {{ message.id | dotunderscore | snake }}_event_data: {{ type_name | strip_namespace }}):
-    """ Handles the {{ message.id }} event """
-    print(f"{{ message.id }}: { {{- message.id | dotunderscore | snake -}}_event_data.to_json()}")
-    # await some_processing_function(record, cloud_event, {{ message.id | dotunderscore | snake }}_event_data)
+async def handle_{{ messageid | dotunderscore | snake }}(dispatcher: {{class_name}}, record: Message, cloud_event: CloudEvent, {{ messageid | dotunderscore | snake }}_event_data: {{ type_name | strip_namespace }}):
+    """ Handles the {{ messageid }} event """
+    print(f"{{ messageid }}: { {{- messageid | dotunderscore | snake -}}_event_data.to_json()}")
+    # await some_processing_function(record, cloud_event, {{ messageid | dotunderscore | snake }}_event_data)
 
 {% endfor %}
 {%- endfor %}
@@ -79,12 +77,12 @@ async def main(bootstrap_servers, group_id, topics):
     """ Main function to consume events from Kafka """
     {%- if messagegroups|length == 1 -%}
     {%- set messagegroups = root.messagegroups %}
-    {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-    {%- set pascalGroupName = messagegroup.id | pascal %}
-    {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal %}
+    {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
     dispatcher = {{ class_name }}()
-    {%- for id, message in messagegroup.messages.items() %}
-    dispatcher.{{ message.id | dotunderscore | snake }}_async = handle_{{ message.id | dotunderscore | snake }}
+    {%- for messageid, message in messagegroup.messages.items() %}
+    dispatcher.{{ messageid | dotunderscore | snake }}_async = handle_{{ messageid | dotunderscore | snake }}
     {%- endfor %}
     {%- endfor %}
     consumer = Consumer()
@@ -119,11 +117,11 @@ async def main(bootstrap_servers, group_id, topics):
                         continue
                     else:
                         raise KafkaException(msg.error())
-                {%- for messagegroup_key, messagegroup in messagegroups.items() %}
-                {%- set pascalGroupName = messagegroup.id | pascal %}
-                {%- set class_name = ( pascalGroupName | strip_dots ) + "EventDispatcher" %}
-                {{messagegroup.id | dotunderscore | snake}}_dispatcher = {{ class_name }}()
-                await {{messagegroup.id | dotunderscore | snake}}_dispatcher._process_event(msg)
+                {%- for messagegroupid, messagegroup in messagegroups.items() %}
+                {%- set groupname = messagegroupid | pascal %}
+                {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
+                {{messagegroupid | dotunderscore | snake}}_dispatcher = {{ class_name }}()
+                await {{messagegroupid | dotunderscore | snake}}_dispatcher._process_event(msg)
                 {%- endfor %}
     finally:
         for consumer in consumers:

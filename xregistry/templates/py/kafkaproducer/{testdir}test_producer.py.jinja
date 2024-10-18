@@ -20,11 +20,11 @@ from cloudevents.abstract import CloudEvent
 from cloudevents.kafka import from_binary, from_structured, KafkaMessage
 from testcontainers.kafka import KafkaContainer
 
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
 from {{main_project_name}}.producer import {{class_name}}
-{%- for id, message in messagegroup.messages.items() %}
+{%- for messageid, message in messagegroup.messages.items() %}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
 from test_{{ type_name | dotunderscore | lower}} import Test_{{ type_name | pascal | strip_namespace }}
@@ -63,16 +63,16 @@ def parse_cloudevent(msg: Message) -> CloudEvent:
         ce['datacontenttype'] = 'application/json'
     return ce
 
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
-{%- set pascalGroupName = messagegroup.id | pascal %}
-{%- set class_name = ( pascalGroupName | strip_dots ) + "EventProducer" %}
-{%- for id, message in messagegroup.messages.items() %}
-{%- set message_id = id | pascal | strip_dots | strip_namespace %}
-{%- set test_function_name = "test_" + pascalGroupName | lower | replace(" ", "_") + "_" + message_id | lower | replace(" ", "_") %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
+{%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
 
 @pytest.mark.asyncio
 async def {{ test_function_name | dotunderscore }}(kafka_emulator):
-    """Test the {{ message_id }} event from the {{ pascalGroupName }} message group"""
+    """Test the {{ messagename }} event from the {{ groupname }} message group"""
 
     bootstrap_servers = kafka_emulator["bootstrap_servers"]
     topic = kafka_emulator["topic"]
@@ -91,7 +91,7 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
             if msg is None:
                 continue
             cloudevent = parse_cloudevent(msg)
-            if cloudevent['type'] == "{{ message.id }}":
+            if cloudevent['type'] == "{{ messageid }}":
                 return True
 
     kafka_producer = Producer({'bootstrap.servers': bootstrap_servers})
@@ -102,7 +102,7 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
     {%- else %}
     event_data = {}
     {%- endif %}
-    await producer_instance.send_{{ message.id | dotunderscore | snake }}(
+    await producer_instance.send_{{ messageid | dotunderscore | snake }}(
         {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
             _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
         {%- endfor -%}

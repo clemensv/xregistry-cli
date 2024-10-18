@@ -77,37 +77,31 @@ message = Producer()
 {%- endif %}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchObjectsArgs(project_name, messagegroups, withType) -%}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
-{%- if withType -%}{{ pascalGroupName | namespace_dot(project_name) | pascal }}I{{ pascalGroupName | strip_namespace }}Dispatcher{% endif %} {{ messagegroup.id  | strip_namespace | camel }}_kafka_dispatcher
+{%- macro DeclareDispatchObjectField(project_name, messagegroups, withType) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+{%- set messagegroupname = messagegroupid  | pascal %}
+{%- if withType -%}{{ messagegroupname | namespace_dot(project_name) | pascal }}I{{ messagegroupname | strip_namespace }}Dispatcher{% endif %} {{ messagegroupid  | strip_namespace | camel }}_kafka_dispatcher
 {%- if not loop.last %}, {%- endif -%}
 {%- endfor -%}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectField(project_name,messagegroup) %}
-{%- set handlerName=(messagegroup.id | strip_namespace | camel)+"_kafka_dispatcher" -%}
-{%- set handlerType=(messagegroup.id  | namespace_dot(project_name) | pascal)+"I"+(messagegroup.id | strip_namespace | pascal)+"Dispatcher" %}
+{%- set handlerName=(messagegroupid | strip_namespace | camel)+"_kafka_dispatcher" -%}
+{%- set handlerType=(messagegroupid  | namespace_dot(project_name) | pascal)+"I"+(messagegroupid | strip_namespace | pascal)+"Dispatcher" %}
 {{ handlerType }} {{ handlerName }}
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) %}
-{%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) %}
 {{ DeclareDispatchObjectField( project_name, messagegroup ) }}
 {%- endfor %}
 {%- endmacro -%}
 
-{%- macro DeclareDispatchObjectConstructor(project_name, class_name, messagegroup, args, body) %}
-def __init__(self, {{ args }}, {{ messagegroup.id | strip_namespace | camel }}_kafka_dispatcher):
-    self.{{ messagegroup.id | strip_namespace | camel }}_kafka_dispatcher = {{ messagegroup.id | strip_namespace | camel }}_kafka_dispatcher
-    {{ body | indent(4) }}
-{%- endmacro -%}
-
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) %}
 {%- if messagegroups | exists("binding", "kafka" ) %}
-def __init__(self, {{ args }}, {%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%} {{ messagegroup.id | strip_namespace | camel }}_kafka_dispatcher {%- if not loop.last %}, {%- endif -%}{%- endfor -%}):
-    {%- for messagegroup_key, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%}
-    self.{{ messagegroup.id  | strip_namespace | camel }}_kafka_dispatcher = {{ messagegroup.id  | strip_namespace | camel }}_kafka_dispatcher
+def __init__(self, {{ args }}, {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%} {{ messagegroupid | strip_namespace | camel }}_kafka_dispatcher {%- if not loop.last %}, {%- endif -%}{%- endfor -%}):
+    {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%}
+    self.{{ messagegroupid  | strip_namespace | camel }}_kafka_dispatcher = {{ messagegroupid  | strip_namespace | camel }}_kafka_dispatcher
     {%- endfor %}
     {{ body | indent(4) }}
 {%- endif -%}
@@ -116,9 +110,9 @@ def __init__(self, {{ args }}, {%- for messagegroup_key, messagegroup in message
 {%- macro DispatchToDispatchObject(project_name, root, message, messagegroup, logger) -%}
 message_subject = {{ message }}.topic()
 switcher = {
-    {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
-    {%- set pascalDefinitionName = message.id | pascal %}
-    "{{ message.id }}": lambda: self.{{ messagegroup.id | strip_namespace | camel }}_kafka_dispatcher.on_{{ pascalDefinitionName | strip_namespace }}_async({{ message }},
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+    {%- set messagename = messageid | pascal %}
+    "{{ messageid }}": lambda: self.{{ messagegroupid | strip_namespace | camel }}_kafka_dispatcher.on_{{ messagename | strip_namespace }}_async({{ message }},
     {%- if message.schemaurl or message.schema -%}
     {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.value(), {{ message }}.headers.get('content-type'))
     {%- else -%}
@@ -141,10 +135,10 @@ else:
 {%- if messagegroups | exists("binding", "kafka" ) %}
 message_subject = {{ message }}.topic()
 switcher = {
-    {%- for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
-    {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
-    {%- set pascalDefinitionName = message.id | pascal %}
-    "{{ message.id }}": lambda: self.{{ messagegroup.id  | strip_namespace | camel }}_kafka_dispatcher.on_{{ pascalDefinitionName | strip_namespace }}_async({{ message }},
+    {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+    {%- set messagename = messageid | pascal %}
+    "{{ messageid }}": lambda: self.{{ messagegroupid  | strip_namespace | camel }}_kafka_dispatcher.on_{{ messagename | strip_namespace }}_async({{ message }},
     {%- if message.schemaurl or message.schema -%}
     {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.value(), {{ message }}.headers.get('content-type'))
     {%- else -%}
@@ -171,11 +165,11 @@ else:
 {%- set function_name = project_name | pascal | strip_dots %}
 import asyncio
 from confluent_kafka import Message
-{% for messagegroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
-{%- set pascalGroupName = messagegroup.id  | pascal %}
-class I{{ pascalGroupName | strip_namespace }}KafkaDispatcher:
-    {%- for id, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
-    {%- set pascalDefinitionName = message.id | strip_namespace | pascal %}
+{% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+{%- set messagegroupname = messagegroupid  | pascal %}
+class I{{ messagegroupname | strip_namespace }}KafkaDispatcher:
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+    {%- set messagename = messageid | strip_namespace | pascal %}
     {%- if message.schemaurl or message.schema -%}
     {%- set dataType = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
     {%- else -%}
@@ -184,7 +178,7 @@ class I{{ pascalGroupName | strip_namespace }}KafkaDispatcher:
     {%- if message.description %}
     # {{ message.description }}
     {%- endif %}
-    async def on_{{ pascalDefinitionName | strip_namespace }}_async(self, message: Message, data: {{ dataType }} = None):
+    async def on_{{ messagename | strip_namespace }}_async(self, message: Message, data: {{ dataType }} = None):
         pass
     {%- endfor %}
 {% endfor %}

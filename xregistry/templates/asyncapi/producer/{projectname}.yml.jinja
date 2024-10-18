@@ -14,11 +14,11 @@ info:
 defaultContentType: "application/cloudmessages+json"
 servers:
 {%- if root.endpoints %}
-{%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.config -%}
+{%- for endpointid, endpoint in root.endpoints.items() if endpoint.config -%}
 {%- set options = endpoint.config.options -%}
 {%- set endpoints = endpoint.config.endpoints -%}
 {%- for endpointObject in endpoints %}
-  {{ endpoint_key | strip_dots }}:
+  {{ endpointid | strip_dots }}:
       host: {{ geturlhost( endpointObject.uri ) }}
       {%- if geturlpath( endpointObject.uri ) %}
       pathname: {{ geturlpath( endpointObject.uri ) }}    
@@ -39,34 +39,34 @@ servers:
       host: "http://localhost"
 {%- endif %}
 channels:
-{%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
-  {{messagegroup.id | strip_dots }}:
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+  {{messagegroupid | strip_dots }}:
     description: "{{ messagegroup.description }}"
     messages:
-    {%- for messagekey, message in messagegroup.messages.items() -%}         
+    {%- for messageid, message in messagegroup.messages.items() -%}         
     {%- set protocol = (message.binding if message.binding else message.format) %}
-      {{ message.id | strip_dots | pascal }}:
-        $ref: "#/components/messages/{{ message.id | strip_dots | pascal }}"
+      {{ messageid | strip_dots | pascal }}:
+        $ref: "#/components/messages/{{ messageid | strip_dots | pascal }}"
     {%- endfor %}
     {%- if root.endpoints %}
-    {%- for endpoint_key, endpoint in root.endpoints.items() if endpoint.messagegroups -%}
+    {%- for endpointid, endpoint in root.endpoints.items() if endpoint.messagegroups -%}
     {%- if loop.first %}
     servers:
     {%- endif %}
-    {%- for group in endpoint.messagegroups if group.endswith('/'+messagegroup.id) %}
-      - $ref: "#/servers/{{ endpoint_key | strip_dots }}"
+    {%- for group in endpoint.messagegroups if group.endswith('/'+messagegroupid) %}
+      - $ref: "#/servers/{{ endpointid | strip_dots }}"
     {%- endfor -%}      
     {%- endfor -%}
     {%- endif %}
 {%- endfor %}
 components:
   messages:
-  {%- for messagegroup_key, messagegroup in root.messagegroups.items() %}
-  {%- for messagekey, message in messagegroup.messages.items() -%}         
+  {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+  {%- for messageid, message in messagegroup.messages.items() -%}         
   {%- set protocol = (message.binding if message.binding else message.format) %}
-    {{ message.id | strip_dots | pascal }}:
-      {# messageId: "{{protocol | strip_dots | pascal}}{{ message.id | strip_dots | pascal }}" #}
-      title: "{{ message.id }}"
+    {{ messageid | strip_dots | pascal }}:
+      {# messageId: "{{protocol | strip_dots | pascal}}{{ messageid | strip_dots | pascal }}" #}
+      title: "{{ messageid }}"
       summary: "{{ message.description }}"
       {%- if message.metadata.datacontenttype is defined and message.metadata.datacontenttype.value is defined %}
       contentType: {{ message.metadata.datacontenttype.value }}
@@ -136,14 +136,14 @@ components:
           schema:
               $ref: "#/components/schemas/{{ message.schemaurl[1:].split('/')[-3] | pascal }}.{{ message.schemaurl[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
-                  {%- set fileName = (schemaObj.id | lower | snake) +".proto" -%}
+                  {%- set fileName = (schemaObj.schemaid | lower | snake) +".proto" -%}
                   {%- set x = schemaVersion.schema | pushfile(fileName) %}
       payload:
         schemaFormat: "application/vnd.google.protobuf;version={{schemaObj.format.split('/')[-1]}};type=proto"
         schema:
             $ref: "{{ fileName }}"
                   {%- elif schemaObj.format.lower().startswith("avro")%}
-                  {%- set fileName = (schemaObj.id | lower | snake) +".avsc" -%}
+                  {%- set fileName = (schemaObj.schemaid | lower | snake) +".avsc" -%}
                   {%- set x = schemaVersion.schema | tojson | pushfile(fileName) %}
       payload:
         schemaFormat: "application/vnd.apache.avro;version={{schemaObj.format.split('/')[-1]}}"
@@ -162,9 +162,9 @@ components:
     {%- endfor %}
   schemas:
   {%- if ce_content_mode == "structured" -%}
-  {%- for messagegroup_key, messagegroup in root.messagegroups.items() -%}
-    {%- for messagekey, message in messagegroup.messages.items() %}
-    {{ message.id }}:
+  {%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {{ messageid }}:
       type: "object"
       properties:
         {%- for attributeKey, attribute in message.metadata.items() %}
@@ -207,11 +207,11 @@ components:
                   {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
                   $ref: "#/components/schemas/{{ message.schemaurl[1:].split('/')[-3] | pascal }}.{{ message.schemaurl[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
-                  {%- set x = schemaVersion.schema | pushfile(schemaObj.id+".proto") %}
+                  {%- set x = schemaVersion.schema | pushfile(schemaObj.schemaid+".proto") %}
                   type: string
                   format: binary
                   {%- elif schemaObj.format.lower().startswith("avro")%}
-                  {%- set x = schemaVersion.schema | tojson | pushfile(schemaObj.id+".avsc") %}
+                  {%- set x = schemaVersion.schema | tojson | pushfile(schemaObj.schemaid+".avsc") %}
                   type: string
                   format: binary
                   {%- endif -%}
@@ -233,11 +233,10 @@ components:
   {%- endfor -%}
   {%- endif %}
   {%- if root.schemagroups is defined -%}
-    {%- for schemagroupkey in root.schemagroups.keys() -%}
-      {%- set schemagroup = root.schemagroups[schemagroupkey] -%}
-       {%- for schemakey, schema in schemagroup.schemas.items() if schema.format.lower().startswith("json") -%}
+    {%- for schemagroupid, schemagroup in root.schemagroups.items() -%}
+       {%- for schemaid, schema in schemagroup.schemas.items() if schema.format.lower().startswith("json") -%}
           {%- set newest_schemaversion = latest_dict_entry(schema.versions) %} 
-    {{ schemagroupkey | pascal }}.{{ schemakey | pascal }}:
+    {{ schemagroupid | pascal }}.{{ schemaid | pascal }}:
             {%- if newest_schemaversion.schemaurl is defined -%}
             {%- if ns.newest_schemaversion.schemaurl.startswith('#') %}
       $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaurl.split('#/schemagroups/')[1] }}"

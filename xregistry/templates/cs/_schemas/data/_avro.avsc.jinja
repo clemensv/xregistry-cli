@@ -1,7 +1,7 @@
 {%- set schema = root -%}
 {%- set namespace = class_name | namespace(project_name) -%}
 {
-    {%- if 'namespace' not in schema.keys() %}
+    {%- if 'namespace' not in schema %}
         "namespace": "{{ namespace }}",
     {%- endif %}    
     {%- for attr, value in schema.items() %}

@@ -10,11 +10,11 @@ using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
 using Azure.Messaging.ServiceBus;
 
-{% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
-namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
+namespace {{ groupname | concat_namespace(project_name) | pascal }}
 {
-    {%- set class_name = ( pascalGroupName | strip_namespace )+"EventFactory" %}
+    {%- set class_name = ( groupname | strip_namespace )+"EventFactory" %}
     public partial class {{ class_name }}
     {
         private const string cePrefix = "cloudEvents_";
@@ -23,9 +23,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         private static CloudEventFormatter defaultFormatter = new JsonEventFormatter();
 
         {%- if root.endpoints -%} 
-        {%- for endpoint_key in root.endpoints.keys() -%}
-        {%- set endpoint = root.endpoints[endpoint_key] -%}
-        {%- if endpoint.usage == "producer" -%}
+        {%- for endpointid, endpoint in root.endpoints.items() -%}
+                {%- if endpoint.usage == "producer" -%}
         {%- set protocol = endpoint.config.protocol | lower -%}
         {%- if protocol == "amqp" -%}
         {%- set options = endpoint.config.options -%}
@@ -51,17 +50,17 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             return serviceBusClient.CreateSender(entityName);
         {%- endmacro %}
         
-        public static ServiceBusSender CreateFor{{ endpoint_key | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? entityName = null) 
+        public static ServiceBusSender CreateFor{{ endpointid | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? entityName = null) 
         {   
             {{ createforbody(class_name, endpoints, options) }}
         }
 
-        public static ServiceBusSender CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? entityName = null) 
+        public static ServiceBusSender CreateFor{{ endpointid | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? entityName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
 
-        public static ServiceBusSender CreateFor{{ endpoint_key | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? entityName = null) 
+        public static ServiceBusSender CreateFor{{ endpointid | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? entityName = null) 
         {       
             {{ createforbody(class_name, endpoints, options) }}
         }
@@ -110,9 +109,8 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
             }
         }
 
-        {% for id in messagegroup.messages -%}
-        {%- set message = messagegroup.messages[id] -%}
-        {%- set pascal_message_name = message.id | pascal %}
+        {% for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set isAmqp = amqp.isAmqp(message) %}
         {%- set type_name = util.body_type(data_project_name, root, message) %}
@@ -121,7 +119,7 @@ namespace {{ pascalGroupName | concat_namespace(project_name) | pascal }}
         /// {{ message.description }}
         /// </summary>
         {%- endif %}
-        public static ServiceBusMessage Create{{ pascal_message_name | strip_namespace }}Event(
+        public static ServiceBusMessage Create{{ messagename | strip_namespace }}Event(
         {{ type_name }} data
         {%- if isCloudEvent -%}
         {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
