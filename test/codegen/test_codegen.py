@@ -42,7 +42,7 @@ def test_codegen_cs():
                 assert xregistry.cli() == 0
                 # run dotnet build on the csproj here that references the generated files already
                 assert subprocess.check_call(
-                    ['dotnet', 'build'], cwd=output_dir, stdout=sys.stdout, stderr=sys.stderr) == 0
+                    ['dotnet', 'build'], cwd=output_dir, shell=True, stdout=sys.stdout, stderr=sys.stderr) == 0
         except Exception as e:
             print(f'Error processing {dir_name}: {e}')
             raise e

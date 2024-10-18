@@ -43,7 +43,7 @@ def run_python_test(xreg_file: str, output_dir: str, projectname: str, style: st
     with subprocess.Popen(
             cmd, cwd=os.path.dirname(__file__),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            shell=False, text=True) as proc:
+            shell=True, text=True) as proc:
         stdout, stderr = proc.communicate()
 
     # Output stdout and stderr to the test log
