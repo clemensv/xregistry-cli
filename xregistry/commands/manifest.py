@@ -211,15 +211,15 @@ class ManifestSubcommands:
         """
         with open(endpoint_json, 'r', encoding='utf-8') as file:
             endpoint_data = json.load(file)
-        endpoint_id = endpoint_data.get('id')
+        endpoint_id = endpoint_data.get('endpointid')
         if not endpoint_id:
             raise ValueError("Endpoint ID is required in the JSON data.")
         self.manifest['endpoints'][endpoint_id] = endpoint_data
         self.save_manifest()
 
-    def add_messagegroup(self, group_id: str, format_: Optional[str] = None, documentation: Optional[str] = None,
+    def add_messagegroup(self, group_id: str, envelope: Optional[str] = None, documentation: Optional[str] = None,
                          description: Optional[str] = None, labels: Optional[List[str]] = None, name: Optional[str] = None,
-                         binding: Optional[str] = None):
+                         protocol: Optional[str] = None):
         """
         Add a message group to the manifest.
 
@@ -230,7 +230,7 @@ class ManifestSubcommands:
             description (Optional[str]): Description of the message group.
             labels (Optional[List[str]]): A list of key=value pairs for labels.
             name (Optional[str]): Human-readable name for the message group.
-            binding (Optional[str]): Binding identifier for the message group.
+            protocol (Optional[str]): protocol identifier for the message group.
         """
         if group_id in self.manifest['messagegroups']:
             raise ValueError(f"Message group with id {group_id} already exists.")
@@ -238,10 +238,10 @@ class ManifestSubcommands:
             "messagegroupid": group_id,
             "messages": {}
         }
-        if format_ and format_.lower() != 'none':
-            messagegroup['format'] = format_
-        if binding:
-            messagegroup['binding'] = binding
+        if envelope and envelope.lower() != 'none':
+            messagegroup['envelope'] = envelope
+        if protocol:
+            messagegroup['protocol'] = protocol
         self._set_common_fields(messagegroup, description,
                                 documentation, labels, name, initial=True)
         self.manifest['messagegroups'][group_id] = messagegroup
@@ -259,9 +259,9 @@ class ManifestSubcommands:
         del self.manifest['messagegroups'][group_id]
         self.save_manifest()
 
-    def edit_messagegroup(self, group_id: str, format_: Optional[str] = None, documentation: Optional[str] = None,
+    def edit_messagegroup(self, group_id: str, envelope: Optional[str] = None, documentation: Optional[str] = None,
                           description: Optional[str] = None, labels: Optional[List[str]] = None, name: Optional[str] = None,
-                          binding: Optional[str] = None):
+                          protocol: Optional[str] = None):
         """
         Edit an existing message group in the manifest.
 
@@ -272,15 +272,15 @@ class ManifestSubcommands:
             description (Optional[str]): Description of the message group.
             labels (Optional[List[str]]): A list of key=value pairs for labels.
             name (Optional[str]): Human-readable name for the message group.
-            binding (Optional[str]): Binding identifier for the message group.
+            protocol (Optional[str]): protocol identifier for the message group.
         """
         if group_id not in self.manifest['messagegroups']:
             raise ValueError(f"Message group with id {group_id} does not exist.")
         messagegroup = self.manifest['messagegroups'][group_id]
-        if format_ and format_.lower() != 'none':
-            messagegroup['format'] = format_
-        if binding:
-            messagegroup['binding'] = binding
+        if envelope and envelope.lower() != 'none':
+            messagegroup['envelope'] = envelope
+        if protocol:
+            messagegroup['protocol'] = protocol
         self._set_common_fields(messagegroup, description,
                                 documentation, labels, name)
         if 'epoch' not in messagegroup:
@@ -308,13 +308,13 @@ class ManifestSubcommands:
         """
         with open(messagegroup_json, 'r', encoding='utf-8') as file:
             messagegroup_data = json.load(file)
-        group_id = messagegroup_data.get('id')
+        group_id = messagegroup_data.get('messagegroupid')
         if not group_id:
             raise ValueError("Message group ID is required in the JSON data.")
         self.manifest['messagegroups'][group_id] = messagegroup_data
         self.save_manifest()
 
-    def add_message(self, group_id: str, message_id: str, format_: Optional[str] = None, binding: Optional[str] = None,
+    def add_message(self, group_id: str, message_id: str, envelope: Optional[str] = None, protocol: Optional[str] = None,
                     schemaformat: Optional[str] = None, schemagroup: Optional[str] = None, schemaid: Optional[str] = None,
                     schemaurl: Optional[str] = None, documentation: Optional[str] = None,
                     description: Optional[str] = None, labels: Optional[List[str]] = None, name: Optional[str] = None):
@@ -325,7 +325,7 @@ class ManifestSubcommands:
             group_id (str): The unique identifier for the message group.
             message_id (str): The unique identifier for the message.
             format (Optional[str]): The format of the message (CloudEvents or None).
-            binding (Optional[str]): The binding of the message (AMQP, MQTT, NATS, HTTP, Kafka, or None).
+            protocol (Optional[str]): The protocol of the message (AMQP, MQTT, NATS, HTTP, Kafka, or None).
             schemaformat (Optional[str]): The schema format of the message.
             schemagroup (Optional[str]): The schema group identifier.
             schemaid (Optional[str]): The schema identifier.
@@ -344,30 +344,30 @@ class ManifestSubcommands:
         message: Dict[str, Union[Dict[str, str], Dict[str, Dict[str, str]], str]] = {
             "messageid": message_id
         }
-        if format_:
-            if format_.lower() == 'cloudevents':
-                format_ = 'CloudEvents/1.0'
-            if format_ not in ['CloudEvents/1.0', 'None']:
-                raise ValueError(f"Invalid format {format_}. Must be 'CloudEvents/1.0' or 'None'")
-            message['format'] = format_
-            if format_.lower() == 'CloudEvents/1.0':
+        if envelope:
+            if envelope.lower() == 'cloudevents':
+                envelope = 'CloudEvents/1.0'
+            if envelope not in ['CloudEvents/1.0', 'None']:
+                raise ValueError(f"Invalid format {envelope}. Must be 'CloudEvents/1.0' or 'None'")
+            message['envelope'] = envelope
+            if envelope.lower() == 'CloudEvents/1.0':
                 metadata: Dict[str, Any] = {
                     "type": {
                         "value": message_id
                     }
                 }
-                message['metadata'] = metadata
+                message['envelopemetadata'] = metadata
 
-        if binding:
-            message['binding'] = binding.capitalize()
-            if binding.lower() != 'none':
+        if protocol:
+            message['protocol'] = protocol.capitalize()
+            if protocol.lower() != 'none':
                 message['message'] = {}
         if schemaformat:
             message['schemaformat'] = schemaformat
         if schemagroup and schemaid:
-            message['schemaurl'] = f"#/schemagroups/{schemagroup}/schemas/{schemaid}"
+            message['schemauri'] = f"#/schemagroups/{schemagroup}/schemas/{schemaid}"
         elif schemaurl:
-            message['schemaurl'] = schemaurl
+            message['schemauri'] = schemaurl
         self._set_common_fields(message, description,
                                 documentation, labels, name, initial=True)
         messagegroup['messages'][message_id] = message
@@ -389,7 +389,7 @@ class ManifestSubcommands:
         del messagegroup['messages'][message_id]
         self.save_manifest()
 
-    def edit_message(self, group_id: str, message_id: str, format_: Optional[str] = None, binding: Optional[str] = None,
+    def edit_message(self, group_id: str, message_id: str, envelope: Optional[str] = None, protocol: Optional[str] = None,
                      schemaformat: Optional[str] = None, schemagroup: Optional[str] = None, schemaid: Optional[str] = None,
                      schemaurl: Optional[str] = None, documentation: Optional[str] = None,
                      description: Optional[str] = None, labels: Optional[List[str]] = None, name: Optional[str] = None):
@@ -399,8 +399,8 @@ class ManifestSubcommands:
         Args:
             group_id (str): The unique identifier for the message group.
             message_id (str): The unique identifier for the message.
-            format_ (Optional[str]): The format of the message (CloudEvents or None).
-            binding (Optional[str]): The binding of the message (AMQP, MQTT, NATS, HTTP, Kafka, or None).
+            envelope (Optional[str]): The format of the message (CloudEvents or None).
+            protocol (Optional[str]): The protocol of the message (AMQP, MQTT, NATS, HTTP, Kafka, or None).
             schemaformat (Optional[str]): The schema format of the message.
             schemagroup (Optional[str]): The schema group identifier.
             schemaid (Optional[str]): The schema identifier.
@@ -416,18 +416,18 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if format_:
-            if format_.lower() == 'cloudevents':
-                format_ = 'CloudEvents/1.0'
-            if format_ not in ['CloudEvents/1.0', 'None']:
-                raise ValueError(f"Invalid format {format_}. Must be 'CloudEvents/1.0' or 'None' to clear")
-            message['format'] = format_
-            if format_.lower() == 'None':
-                if 'metadata' in message:
-                    del message['metadata']
-        if binding:
-            message['binding'] = binding.capitalize()
-            if binding.lower() != 'none':
+        if envelope:
+            if envelope.lower() == 'cloudevents':
+                envelope = 'CloudEvents/1.0'
+            if envelope not in ['CloudEvents/1.0', 'None']:
+                raise ValueError(f"Invalid format {envelope}. Must be 'CloudEvents/1.0' or 'None' to clear")
+            message['envelope'] = envelope
+            if envelope.lower() == 'None':
+                if 'envelopemetadata' in message:
+                    del message['envelopemetadata']
+        if protocol:
+            message['protocol'] = protocol.capitalize()
+            if protocol.lower() != 'none':
                 message['message'] = {}
         if schemaformat:
             message['schemaformat'] = schemaformat
@@ -470,7 +470,7 @@ class ManifestSubcommands:
         group_id = message_data.get('group_id')
         if not group_id:
             raise ValueError("Message group ID is required in the JSON data.")
-        message_id = message_data.get('id')
+        message_id = message_data.get('messageid')
         if not message_id:
             raise ValueError("Message ID is required in the JSON data.")
         if group_id not in self.manifest['messagegroups']:
@@ -498,14 +498,14 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'format' in message and message['format'].lower() != 'cloudevents/1.0':
+        if 'envelope' in message and message['envelope'].lower() != 'cloudevents/1.0':
             raise ValueError(
-                f"Message with id {message_id} is not a CloudEvents message, but has format {message['format']}.")
-        if not 'format' in message:
-            message['format'] = 'CloudEvents/1.0'
-        if 'metadata' not in message:
-            message['metadata'] = {}
-        if name in message['metadata']:
+                f"Message with id {message_id} is not a CloudEvents message, but has format {message['envelope']}.")
+        if not 'envelope' in message:
+            message['envelope'] = 'CloudEvents/1.0'
+        if 'envelopemetadata' not in message:
+            message['envelopemetadata'] = {}
+        if name in message['envelopemetadata']:
             raise ValueError(f"Metadata with key {name} already exists in message {message_id}.")
         metadata: Dict[str, Any] = {
             "name": name,
@@ -517,7 +517,7 @@ class ManifestSubcommands:
             metadata['value'] = value
         if description:
             metadata['description'] = description
-        message['metadata'][name] = metadata
+        message['envelopemetadata'][name] = metadata
         self.save_manifest()
 
     def remove_cloudevents_message_metadata(self, group_id: str, message_id: str, name: str):
@@ -536,11 +536,11 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'metadata' not in message:
+        if 'envelopemetadata' not in message:
             raise ValueError(f"Message with id {message_id} does not have any metadata.")
-        if name not in message['metadata']:
+        if name not in message['envelopemetadata']:
             raise ValueError(f"Metadata with key {name} does not exist in message {message_id}.")
-        del message['metadata'][name]
+        del message['envelopemetadata'][name]
         self.save_manifest()
 
     def edit_cloudevents_message_metadata(self, group_id: str, message_id: str, name: Optional[str] = None, type_: Optional[Literal['string', 'int', 'timestamp', 'uritemplate']] = None, description: Optional[str] = None, value: Optional[str] = None, required: Optional[bool] = None):
@@ -562,13 +562,13 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if not 'format' in message or message['format'].lower() != 'cloudevents/1.0':
+        if not 'envelope' in message or message['envelope'].lower() != 'cloudevents/1.0':
             raise ValueError(f"Message with id {message_id} is not a CloudEvents message.")
-        if 'metadata' not in message:
+        if 'envelopemetadata' not in message:
             raise ValueError(f"Message with id {message_id} does not have any metadata.")
-        if name not in message['metadata']:
+        if name not in message['envelopemetadata']:
             raise ValueError(f"Metadata with key {name} does not exist in message {message_id}.")
-        metadata = message['metadata'][name]
+        metadata = message['envelopemetadata'][name]
         metadata['name'] = name
         if type_:
             metadata['type'] = type_
@@ -601,12 +601,12 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             self.add_message(group_id, message_id)
         message = messagegroup['messages'][message_id]
-        if 'metadata' not in message:
-            message['metadata'] = {}
-        for key, metadata in message_cloudevents_metadata_data['metadata'].items():
-            if key in message['metadata']:
+        if 'envelopemetadata' not in message:
+            message['envelopemetadata'] = {}
+        for key, metadata in message_cloudevents_metadata_data['envelopemetadata'].items():
+            if key in message['envelopemetadata']:
                 raise ValueError(f"Metadata with key {key} already exists in message {message_id}.")
-            message['metadata'][key] = metadata
+            message['envelopemetadata'][key] = metadata
         self.save_manifest()
 
     def add_schemagroup(self, group_id: str, documentation: Optional[str] = None, description: Optional[str] = None,
@@ -660,11 +660,11 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'amqp/1.0':
+        if 'protocol' in message and message['protocol'].lower() != 'amqp/1.0':
             raise ValueError(
-                f"Message with id {message_id} is not bound to AMQP 1.0, but has binding {message['binding']}.")
-        if not 'binding' in message:
-            message['binding'] = 'AMQP/1.0'
+                f"Message with id {message_id} is not bound to AMQP 1.0, but has protocol {message['protocol']}.")
+        if not 'protocol' in message:
+            message['protocol'] = 'AMQP/1.0'
         if 'message' not in message:
             message['message'] = {}
         if section not in ['properties', 'application-properties']:
@@ -703,9 +703,9 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'amqp/1.0':
+        if 'protocol' in message and message['protocol'].lower() != 'amqp/1.0':
             raise ValueError(
-                f"Message with id {message_id} is not bound to AMQP 1.0, but has binding {message['binding']}.")
+                f"Message with id {message_id} is not bound to AMQP 1.0, but has protocol {message['protocol']}.")
         if 'message' not in message:
             raise ValueError(f"Message with id {message_id} does not have any AMQP metadata.")
         if section not in message['message']:
@@ -739,9 +739,9 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'amqp/1.0':
+        if 'protocol' in message and message['protocol'].lower() != 'amqp/1.0':
             raise ValueError(
-                f"Message with id {message_id} is not bound to AMQP 1.0, but has binding {message['binding']}.")
+                f"Message with id {message_id} is not bound to AMQP 1.0, but has protocol {message['protocol']}.")
         if 'message' not in message:
             raise ValueError(f"Message with id {message_id} does not have any AMQP metadata.")
         if section not in message['message']:
@@ -815,11 +815,11 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'http':
+        if 'protocol' in message and message['protocol'].lower() != 'http':
             raise ValueError(
-                f"Message with id {message_id} is not bound to HTTP, but has binding {message['binding']}.")
-        if not 'binding' in message:
-            message['binding'] = 'HTTP'
+                f"Message with id {message_id} is not bound to HTTP, but has protocol {message['protocol']}.")
+        if not 'protocol' in message:
+            message['protocol'] = 'HTTP'
         if 'message' not in message:
             message['message'] = {}
         if section:
@@ -873,9 +873,9 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'http':
+        if 'protocol' in message and message['protocol'].lower() != 'http':
             raise ValueError(
-                f"Message with id {message_id} is not bound to HTTP, but has binding {message['binding']}.")
+                f"Message with id {message_id} is not bound to HTTP, but has protocol {message['protocol']}.")
         if 'message' not in message:
             raise ValueError(f"Message with id {message_id} does not have any HTTP metadata.")
         if section:
@@ -917,9 +917,9 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'http':
+        if 'protocol' in message and message['protocol'].lower() != 'http':
             raise ValueError(
-                f"Message with id {message_id} is not bound to HTTP, but has binding {message['binding']}.")
+                f"Message with id {message_id} is not bound to HTTP, but has protocol {message['protocol']}.")
         if 'message' not in message:
             raise ValueError(f"Message with id {message_id} does not have any HTTP metadata.")
         if section:
@@ -1010,11 +1010,11 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'kafka':
+        if 'protocol' in message and message['protocol'].lower() != 'KAFKA':
             raise ValueError(
-                f"Message with id {message_id} is not bound to Kafka, but has binding {message['binding']}.")
-        if not 'binding' in message:
-            message['binding'] = 'Kafka'
+                f"Message with id {message_id} is not bound to Kafka, but has protocol {message['protocol']}.")
+        if not 'protocol' in message:
+            message['protocol'] = 'KAFKA'
         if 'message' not in message:
             message['message'] = {}
         if section:
@@ -1035,9 +1035,9 @@ class ManifestSubcommands:
             message['message'][section][name] = metadata
             self.save_manifest()
         else:
-            if key not in ['topic', 'partition', 'key']:
+            if name not in ['topic', 'partition', 'key']:
                 raise ValueError(f"Invalid key {name}. Must be 'topic', 'partition', or 'key'.")
-            if key in message['message']:
+            if name in message['message']:
                 raise ValueError(f"Kafka message metadata with key {name} already exists in message {message_id}")
             metadata: Dict[str, Any] = {
                 "name": name,
@@ -1067,9 +1067,9 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'kafka':
+        if 'protocol' in message and message['protocol'].lower() != 'KAFKA':
             raise ValueError(
-                f"Message with id {message_id} is not bound to Kafka, but has binding {message['binding']}.")
+                f"Message with id {message_id} is not bound to Kafka, but has protocol {message['protocol']}.")
         if 'message' not in message:
             raise ValueError(f"Message with id {message_id} does not have any Kafka metadata.")
         if section:
@@ -1111,9 +1111,9 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message and message['binding'].lower() != 'kafka':
+        if 'protocol' in message and message['protocol'].lower() != 'KAFKA':
             raise ValueError(
-                f"Message with id {message_id} is not bound to Kafka, but has binding {message['binding']}.")
+                f"Message with id {message_id} is not bound to Kafka, but has protocol {message['protocol']}.")
         if 'message' not in message:
             raise ValueError(f"Message with id {message_id} does not have any Kafka metadata.")
         if section:
@@ -1211,16 +1211,16 @@ class ManifestSubcommands:
             mqtt_version = '3.1.1'
         if mqtt_version == '5':
             mqtt_version = '5.0'
-        if 'binding' in message:
-            message_binding = message['binding'].lower()
-            if not message_binding.startswith('mqtt'):
+        if 'protocol' in message:
+            message_protocol = message['protocol'].lower()
+            if not message_protocol.startswith('mqtt'):
                 raise ValueError(
-                    f"Message with id {message_id} is not bound to MQTT, but has binding {message['binding']}.")
-            if message_binding != f"mqtt/{mqtt_version}":
+                    f"Message with id {message_id} is not bound to MQTT, but has protocol {message['protocol']}.")
+            if message_protocol != f"mqtt/{mqtt_version}":
                 raise ValueError(
-                    f"Message with id {message_id} is not bound to MQTT, but has binding {message['binding']}.")
+                    f"Message with id {message_id} is not bound to MQTT, but has protocol {message['protocol']}.")
         else:
-            message['binding'] = f"MQTT/{mqtt_version}"
+            message['protocol'] = f"MQTT/{mqtt_version}"
         if 'message' not in message:
             message['message'] = {}
         if name in message['message']:
@@ -1258,11 +1258,11 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message:
-            message_binding = message['binding'].lower()
-            if not message_binding.startswith('mqtt'):
+        if 'protocol' in message:
+            message_protocol = message['protocol'].lower()
+            if not message_protocol.startswith('mqtt'):
                 raise ValueError(
-                    f"Message with id {message_id} is not bound to MQTT, but has binding {message['binding']}.")
+                    f"Message with id {message_id} is not bound to MQTT, but has protocol {message['protocol']}.")
         else:
             raise ValueError(f"Message with id {message_id} is not bound to MQTT.")
         if 'message' not in message:
@@ -1293,11 +1293,11 @@ class ManifestSubcommands:
         if message_id not in messagegroup['messages']:
             raise ValueError(f"Message with id {message_id} does not exist in group {group_id}.")
         message = messagegroup['messages'][message_id]
-        if 'binding' in message:
-            message_binding = message['binding'].lower()
-            if not message_binding.startswith('mqtt'):
+        if 'protocol' in message:
+            message_protocol = message['protocol'].lower()
+            if not message_protocol.startswith('mqtt'):
                 raise ValueError(
-                    f"Message with id {message_id} is not bound to MQTT, but has binding {message['binding']}.")
+                    f"Message with id {message_id} is not bound to MQTT, but has protocol {message['protocol']}.")
         else:
             raise ValueError(f"Message with id {message_id} is not bound to MQTT.")
         if 'message' not in message:
@@ -1371,13 +1371,13 @@ class ManifestSubcommands:
         """
         with open(schemagroup_json, 'r', encoding='utf-8') as file:
             schemagroup_data = json.load(file)
-        group_id = schemagroup_data.get('id')
+        group_id = schemagroup_data.get('schemagroupid')
         if not group_id:
             raise ValueError("Schema group ID is required in the JSON data.")
         self.manifest['schemagroups'][group_id] = schemagroup_data
         self.save_manifest()
 
-    def add_schemaversion(self, group_id: str, schema_id: str, format_: str, version_id: Optional[str] = None, schema: Optional[str] = None,
+    def add_schemaversion(self, group_id: str, schema_id: str, schemaformat: str, version_id: Optional[str] = None, schema: Optional[str] = None,
                    schemaimport: Optional[str] = None, schemaurl: Optional[str] = None, documentation: Optional[str] = None,
                    description: Optional[str] = None, labels: Optional[List[str]] = None, name: Optional[str] = None):
         """
@@ -1404,7 +1404,7 @@ class ManifestSubcommands:
         else:
             schema_data = {
                 "schemaid": schema_id,
-                "format": format_,
+                "format": schemaformat,
                 "versions": {}
             }
         if version_id and version_id in schema_data['versions']:
@@ -1417,7 +1417,7 @@ class ManifestSubcommands:
         version_data = {
             "schemaid": schema_id,
             "versionid": version_id,
-            "format": format_
+            "format": schemaformat
         }
         if schema:
             try:
@@ -1462,7 +1462,7 @@ class ManifestSubcommands:
             del schemagroup['schemas'][schema_id]
         self.save_manifest()
 
-    def edit_schemaversion(self, group_id: str, schema_id: str, version_id: str, format_: Optional[str] = None,
+    def edit_schemaversion(self, group_id: str, schema_id: str, version_id: str, schemaformat: Optional[str] = None,
                     schema: Optional[str] = None, schemaimport: Optional[str] = None, schemaurl: Optional[str] = None,
                     documentation: Optional[str] = None, description: Optional[str] = None, labels: Optional[List[str]] = None,
                     name: Optional[str] = None, confirm_edit: bool = False):
@@ -1496,8 +1496,8 @@ class ManifestSubcommands:
             if response.lower() != 'y':
                 return
         version_data = schemagroup['schemas'][schema_id]
-        if format_:
-            version_data['format'] = format_
+        if schemaformat:
+            version_data['format'] = schemaformat
         if version_id:
             version_data['version'] = version_id
         if schema:
@@ -1548,7 +1548,7 @@ class ManifestSubcommands:
         group_id = schema_data.get('group_id')
         if not group_id:
             raise ValueError("Schema group ID is required in the JSON data.")
-        schema_id = schema_data.get('id')
+        schema_id = schema_data.get('schemaid')
         if not schema_id:
             raise ValueError("Schema ID is required in the JSON data.")
         if group_id not in self.manifest['schemagroups']:
@@ -1636,10 +1636,10 @@ class ManifestSubcommands:
         messagegroup_add = messagegroup_subparsers.add_parser("add", help="Add a new message group")
         messagegroup_add.add_argument("--id", required=True, help="Message group ID")
         messagegroup_add.add_argument("--format", choices=["CloudEvents", "None"], help="Message group format")
-        messagegroup_add.add_argument("--binding", help="Binding identifier")
+        messagegroup_add.add_argument("--protocol", help="protocol identifier")
         add_common_arguments(messagegroup_add)
         messagegroup_add.set_defaults(func=lambda args: ManifestSubcommands(args.filename).add_messagegroup(args.id, args.format, args.documentation, args.description, args.labels, args.name,
-                                                                                                            args.binding
+                                                                                                            args.protocol
                                                                                                             ))
 
         messagegroup_remove = messagegroup_subparsers.add_parser("remove", help="Remove a message group")
@@ -1650,10 +1650,10 @@ class ManifestSubcommands:
         messagegroup_edit = messagegroup_subparsers.add_parser("edit", help="Edit a message group")
         messagegroup_edit.add_argument("--id", required=True, help="Message group ID")
         messagegroup_edit.add_argument("--format", choices=["CloudEvents", "None"], help="Message group format")
-        messagegroup_edit.add_argument("--binding", help="Binding identifier")
+        messagegroup_edit.add_argument("--protocol", help="protocol identifier")
         add_common_arguments(messagegroup_edit)
         messagegroup_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_messagegroup(args.id, args.format, args.documentation, args.description, args.labels, args.name,
-                                                                                                              args.binding
+                                                                                                              args.protocol
                                                                                                               ))
 
         messagegroup_show = messagegroup_subparsers.add_parser("show", help="Show a message group")
@@ -1673,14 +1673,14 @@ class ManifestSubcommands:
         message_add.add_argument("--id", required=True, help="Message ID")
         message_add.add_argument("--format", choices=["CloudEvents", "None"],
                                  help="Message format", default="CloudEvents")
-        message_add.add_argument("--binding", choices=["AMQP", "MQTT", "NATS",
-                                 "HTTP", "Kafka", "None"], help="Message binding", default="None")
+        message_add.add_argument("--protocol", choices=["AMQP", "MQTT", "NATS",
+                                 "HTTP", "Kafka", "None"], help="Message protocol", default="None")
         message_add.add_argument("--schemaformat", help="Schema format")
         message_add.add_argument("--schemagroup", help="Schema group ID")
         message_add.add_argument("--schemaid", help="Schema ID")
         message_add.add_argument("--schemaurl", help="Schema URL")
         add_common_arguments(message_add)
-        message_add.set_defaults(func=lambda args: ManifestSubcommands(args.filename).add_message(args.groupid, args.id, args.format, args.binding, args.schemaformat, args.schemagroup, args.schemaid,
+        message_add.set_defaults(func=lambda args: ManifestSubcommands(args.filename).add_message(args.groupid, args.id, args.format, args.protocol, args.schemaformat, args.schemagroup, args.schemaid,
                                                                                                   args.schemaurl, args.documentation, args.description, args.labels, args.name
                                                                                                   ))
 
@@ -1694,14 +1694,14 @@ class ManifestSubcommands:
         message_edit.add_argument("--groupid", required=True, help="Message group ID")
         message_edit.add_argument("--id", required=True, help="Message ID")
         message_edit.add_argument("--format", choices=["CloudEvents", "None"], help="Message format")
-        message_edit.add_argument("--binding", choices=["AMQP", "MQTT",
-                                  "NATS", "HTTP", "Kafka", "None"], help="Message binding")
+        message_edit.add_argument("--protocol", choices=["AMQP", "MQTT",
+                                  "NATS", "HTTP", "Kafka", "None"], help="Message protocol")
         message_edit.add_argument("--schemaformat", help="Schema format")
         message_edit.add_argument("--schemagroup", help="Schema group ID")
         message_edit.add_argument("--schemaid", help="Schema ID")
         message_edit.add_argument("--schemaurl", help="Schema URL")
         add_common_arguments(message_edit)
-        message_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(args.groupid, args.id, args.format, args.binding, args.schemaformat, args.schemagroup, args.schemaid,
+        message_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(args.groupid, args.id, args.format, args.protocol, args.schemaformat, args.schemagroup, args.schemaid,
                                                                                                     args.schemaurl, args.documentation, args.description, args.labels, args.name))
 
         message_cloudevent_subparsers = manifest_subparsers.add_parser(

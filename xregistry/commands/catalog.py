@@ -32,14 +32,14 @@ class CatalogSubcommands:
         if response.status_code != 200:
             raise ValueError(f"Failed to initialize catalog: {response.text}")
 
-    def add_endpoint(self, uri: str, id: str, usage: str, protocol: str, endpoints: Optional[List[str]] = None,
+    def add_endpoint(self, uri: str, endpointid: str, usage: str, protocol: str, endpoints: Optional[List[str]] = None,
                      options: Optional[Dict[str, Any]] = None, messagegroups: Optional[List[str]] = None, deployed: bool = False,
                      documentation: Optional[str] = None, description: Optional[str] = None, labels: Optional[Dict[str, str]] = None,
                      name: Optional[str] = None) -> None:
         """Adds an endpoint to the catalog."""
         self.set_base_url(uri)
         endpoint = {
-            "endpointid": id,
+            "endpointid": endpointid,
             "usage": usage,
             "protocol": protocol,
             "createdon": current_time_iso(),
@@ -62,26 +62,26 @@ class CatalogSubcommands:
             endpoint["labels"] = labels
         if name:
             endpoint["name"] = name
-        response = requests.put(f"{self.base_url}/endpoints/{id}", json=endpoint)
+        response = requests.put(f"{self.base_url}/endpoints/{endpointid}", json=endpoint)
         if response.status_code != 200:
             raise ValueError(f"Failed to add endpoint: {response.text}")
 
-    def remove_endpoint(self, uri: str, id: str, epoch: int) -> None:
+    def remove_endpoint(self, uri: str, endpointid: str, epoch: int) -> None:
         """Removes an endpoint from the catalog."""
         self.set_base_url(uri)
-        response = requests.delete(f"{self.base_url}/endpoints/{id}", params={"epoch": epoch})
+        response = requests.delete(f"{self.base_url}/endpoints/{endpointid}", params={"epoch": epoch})
         if response.status_code != 204:
             raise ValueError(f"Failed to remove endpoint: {response.text}")
 
-    def edit_endpoint(self, uri: str, id: str, usage: Optional[str] = None, protocol: Optional[str] = None, endpoints: Optional[List[str]] = None,
-                      options: Optional[Dict[str, Any]] = None, messagegroups: Optional[List[str]] = None, deployed: bool = None,
+    def edit_endpoint(self, uri: str, endpointid: str, usage: Optional[str] = None, protocol: Optional[str] = None, endpoints: Optional[List[str]] = None,
+                      options: Optional[Dict[str, Any]] = None, messagegroups: Optional[List[str]] = None, deployed: bool|None = None,
                       documentation: Optional[str] = None, description: Optional[str] = None, labels: Optional[Dict[str, str]] = None,
                       name: Optional[str] = None) -> None:
         """Edits an existing endpoint in the catalog."""
         self.set_base_url(uri)
-        response = requests.get(f"{self.base_url}/endpoints/{id}")
+        response = requests.get(f"{self.base_url}/endpoints/{endpointid}")
         if response.status_code != 200:
-            raise ValueError(f"Endpoint with id {id} does not exist: {response.text}")
+            raise ValueError(f"Endpoint with id {endpointid} does not exist: {response.text}")
         endpoint = response.json()
         if usage:
             endpoint["usage"] = usage
@@ -105,16 +105,16 @@ class CatalogSubcommands:
             endpoint["name"] = name
         endpoint["modifiedon"] = current_time_iso()
         endpoint["epoch"] += 1
-        response = requests.put(f"{self.base_url}/endpoints/{id}", json=endpoint)
+        response = requests.put(f"{self.base_url}/endpoints/{endpointid}", json=endpoint)
         if response.status_code != 200:
             raise ValueError(f"Failed to edit endpoint: {response.text}")
 
-    def show_endpoint(self, uri: str, id: str) -> None:
+    def show_endpoint(self, uri: str, endpointid: str) -> None:
         """Shows an endpoint from the catalog."""
         self.set_base_url(uri)
-        response = requests.get(f"{self.base_url}/endpoints/{id}")
+        response = requests.get(f"{self.base_url}/endpoints/{endpointid}")
         if response.status_code != 200:
-            raise ValueError(f"Endpoint with id {id} does not exist: {response.text}")
+            raise ValueError(f"Endpoint with id {endpointid} does not exist: {response.text}")
         print(json.dumps(response.json(), indent=2))
 
     def apply_endpoint(self, uri: str, file: str) -> None:
@@ -122,20 +122,20 @@ class CatalogSubcommands:
         self.set_base_url(uri)
         with open(file, 'r', encoding='utf-8') as ef:
             endpoint = json.load(ef)
-            id = endpoint["endpointid"]
-            response = requests.get(f"{self.base_url}/endpoints/{id}")
+            endpointid = endpoint["endpointid"]
+            response = requests.get(f"{self.base_url}/endpoints/{endpointid}")
             if response.status_code == 200:
-                self.edit_endpoint(uri, id, **endpoint)
+                self.edit_endpoint(uri, endpointid, **endpoint)
             else:
                 self.add_endpoint(uri, **endpoint)
 
-    def add_messagegroup(self, uri: str, id: str, format: str, binding: str, messages: Optional[Dict[str, Any]] = None,
+    def add_messagegroup(self, uri: str, messagegroupid: str, format: str, binding: str, messages: Optional[Dict[str, Any]] = None,
                          description: Optional[str] = None, documentation: Optional[str] = None, labels: Optional[Dict[str, str]] = None,
                          name: Optional[str] = None) -> None:
         """Adds a messagegroup to the catalog."""
         self.set_base_url(uri)
         messagegroup = {
-            "messagegroupid": id,
+            "messagegroupid": messagegroupid,
             "format": format,
             "binding": binding,
             "createdon": current_time_iso(),
@@ -152,25 +152,25 @@ class CatalogSubcommands:
             messagegroup["labels"] = labels
         if name:
             messagegroup["name"] = name
-        response = requests.put(f"{self.base_url}/messagegroups/{id}", json=messagegroup)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}", json=messagegroup)
         if response.status_code != 200:
             raise ValueError(f"Failed to add messagegroup: {response.text}")
 
-    def remove_messagegroup(self, uri: str, id: str, epoch: int) -> None:
+    def remove_messagegroup(self, uri: str, messagegroupid: str, epoch: int) -> None:
         """Removes a messagegroup from the catalog."""
         self.set_base_url(uri)
-        response = requests.delete(f"{self.base_url}/messagegroups/{id}", params={"epoch": epoch})
+        response = requests.delete(f"{self.base_url}/messagegroups/{messagegroupid}", params={"epoch": epoch})
         if response.status_code != 204:
             raise ValueError(f"Failed to remove messagegroup: {response.text}")
 
-    def edit_messagegroup(self, uri: str, id: str, format: Optional[str] = None, binding: Optional[str] = None, messages: Optional[Dict[str, Any]] = None,
+    def edit_messagegroup(self, uri: str, messagegroupid: str, format: Optional[str] = None, binding: Optional[str] = None, messages: Optional[Dict[str, Any]] = None,
                           description: Optional[str] = None, documentation: Optional[str] = None, labels: Optional[Dict[str, str]] = None,
                           name: Optional[str] = None) -> None:
         """Edits an existing messagegroup in the catalog."""
         self.set_base_url(uri)
-        response = requests.get(f"{self.base_url}/messagegroups/{id}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}")
         if response.status_code != 200:
-            raise ValueError(f"Messagegroup with id {id} does not exist: {response.text}")
+            raise ValueError(f"Messagegroup with id {messagegroupid} does not exist: {response.text}")
         messagegroup = response.json()
         if format:
             messagegroup["format"] = format
@@ -188,16 +188,16 @@ class CatalogSubcommands:
             messagegroup["name"] = name
         messagegroup["modifiedon"] = current_time_iso()
         messagegroup["epoch"] += 1
-        response = requests.put(f"{self.base_url}/messagegroups/{id}", json=messagegroup)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}", json=messagegroup)
         if response.status_code != 200:
             raise ValueError(f"Failed to edit messagegroup: {response.text}")
 
-    def show_messagegroup(self, uri: str, id: str) -> None:
+    def show_messagegroup(self, uri: str, messagegroupid: str) -> None:
         """Shows a messagegroup from the catalog."""
         self.set_base_url(uri)
-        response = requests.get(f"{self.base_url}/messagegroups/{id}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}")
         if response.status_code != 200:
-            raise ValueError(f"Messagegroup with id {id} does not exist: {response.text}")
+            raise ValueError(f"Messagegroup with id {messagegroupid} does not exist: {response.text}")
         print(json.dumps(response.json(), indent=2))
 
     def apply_messagegroup(self, uri: str, file: str) -> None:
@@ -205,20 +205,20 @@ class CatalogSubcommands:
         self.set_base_url(uri)
         with open(file, 'r', encoding='utf-8') as ef:
             messagegroup = json.load(ef)
-            id = messagegroup["messagegroupid"]
-            response = requests.get(f"{self.base_url}/messagegroups/{id}")
+            messagegroupid = messagegroup["messagegroupid"]
+            response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}")
             if response.status_code == 200:
-                self.edit_messagegroup(uri, id, **messagegroup)
+                self.edit_messagegroup(uri, messagegroupid, **messagegroup)
             else:
                 self.add_messagegroup(uri, **messagegroup)
 
-    def add_schemagroup(self, uri: str, id: str, format: str, schemas: Optional[Dict[str, Any]] = None,
+    def add_schemagroup(self, uri: str, schemagroupid: str, format: str, schemas: Optional[Dict[str, Any]] = None,
                         description: Optional[str] = None, documentation: Optional[str] = None, labels: Optional[Dict[str, str]] = None,
                         name: Optional[str] = None) -> None:
         """Adds a schemagroup to the catalog."""
         self.set_base_url(uri)
         schemagroup = {
-            "schemagroupid": id,
+            "schemagroupid": schemagroupid,
             "format": format,
             "createdon": current_time_iso(),
             "modifiedon": current_time_iso(),
@@ -234,25 +234,25 @@ class CatalogSubcommands:
             schemagroup["labels"] = labels
         if name:
             schemagroup["name"] = name
-        response = requests.put(f"{self.base_url}/schemagroups/{id}", json=schemagroup)
+        response = requests.put(f"{self.base_url}/schemagroups/{schemagroupid}", json=schemagroup)
         if response.status_code != 200:
             raise ValueError(f"Failed to add schemagroup: {response.text}")
 
-    def remove_schemagroup(self, uri: str, id: str, epoch: int) -> None:
+    def remove_schemagroup(self, uri: str, schemagroupid: str, epoch: int) -> None:
         """Removes a schemagroup from the catalog."""
         self.set_base_url(uri)
-        response = requests.delete(f"{self.base_url}/schemagroups/{id}", params={"epoch": epoch})
+        response = requests.delete(f"{self.base_url}/schemagroups/{schemagroupid}", params={"epoch": epoch})
         if response.status_code != 204:
             raise ValueError(f"Failed to remove schemagroup: {response.text}")
 
-    def edit_schemagroup(self, uri: str, id: str, format: Optional[str] = None, schemas: Optional[Dict[str, Any]] = None,
+    def edit_schemagroup(self, uri: str, schemagroupid: str, format: Optional[str] = None, schemas: Optional[Dict[str, Any]] = None,
                          description: Optional[str] = None, documentation: Optional[str] = None, labels: Optional[Dict[str, str]] = None,
                          name: Optional[str] = None) -> None:
         """Edits an existing schemagroup in the catalog."""
         self.set_base_url(uri)
-        response = requests.get(f"{self.base_url}/schemagroups/{id}")
+        response = requests.get(f"{self.base_url}/schemagroups/{schemagroupid}")
         if response.status_code != 200:
-            raise ValueError(f"Schemagroup with id {id} does not exist: {response.text}")
+            raise ValueError(f"Schemagroup with id {schemagroupid} does not exist: {response.text}")
         schemagroup = response.json()
         if format:
             schemagroup["format"] = format
@@ -268,16 +268,16 @@ class CatalogSubcommands:
             schemagroup["name"] = name
         schemagroup["modifiedon"] = current_time_iso()
         schemagroup["epoch"] += 1
-        response = requests.put(f"{self.base_url}/schemagroups/{id}", json=schemagroup)
+        response = requests.put(f"{self.base_url}/schemagroups/{schemagroupid}", json=schemagroup)
         if response.status_code != 200:
             raise ValueError(f"Failed to edit schemagroup: {response.text}")
 
-    def show_schemagroup(self, uri: str, id: str) -> None:
+    def show_schemagroup(self, uri: str, schemagroupid: str) -> None:
         """Shows a schemagroup from the catalog."""
         self.set_base_url(uri)
-        response = requests.get(f"{self.base_url}/schemagroups/{id}")
+        response = requests.get(f"{self.base_url}/schemagroups/{schemagroupid}")
         if response.status_code != 200:
-            raise ValueError(f"Schemagroup with id {id} does not exist: {response.text}")
+            raise ValueError(f"Schemagroup with id {schemagroupid} does not exist: {response.text}")
         print(json.dumps(response.json(), indent=2))
 
     def apply_schemagroup(self, uri: str, file: str) -> None:
@@ -285,14 +285,14 @@ class CatalogSubcommands:
         self.set_base_url(uri)
         with open(file, 'r', encoding='utf-8') as ef:
             schemagroup = json.load(ef)
-            id = schemagroup["schemagroupid"]
-            response = requests.get(f"{self.base_url}/schemagroups/{id}")
+            schemagroupid = schemagroup["schemagroupid"]
+            response = requests.get(f"{self.base_url}/schemagroups/{schemagroupid}")
             if response.status_code == 200:
-                self.edit_schemagroup(uri, id, **schemagroup)
+                self.edit_schemagroup(uri, schemagroupid, **schemagroup)
             else:
                 self.add_schemagroup(uri, **schemagroup)
 
-    def add_schema(self, uri: str, groupid: str, id: str, format: str, versionid: str = "1", schema: Optional[str] = None,
+    def add_schema(self, uri: str, groupid: str, schemaid: str, format: str, versionid: str = "1", schema: Optional[str] = None,
                    schemaimport: Optional[str] = None, schemaurl: Optional[str] = None, description: Optional[str] = None, documentation: Optional[str] = None,
                    labels: Optional[Dict[str, str]] = None, name: Optional[str] = None) -> None:
         """Adds a schema to a schemagroup in the catalog."""
@@ -303,7 +303,7 @@ class CatalogSubcommands:
         schemagroup = response.json()
 
         schema_obj = {
-            "schemaid": id,
+            "schemaid": schemaid,
             "format": format,
             "createdon": current_time_iso(),
             "modifiedon": current_time_iso(),
@@ -336,13 +336,13 @@ class CatalogSubcommands:
 
         if "schemas" not in schemagroup:
             schemagroup["schemas"] = {}
-        schemagroup["schemas"][id] = schema_obj
+        schemagroup["schemas"][schemaid] = schema_obj
 
         response = requests.put(f"{self.base_url}/schemagroups/{groupid}", json=schemagroup)
         if response.status_code != 200:
             raise ValueError(f"Failed to add schema: {response.text}")
 
-    def remove_schema(self, uri: str, groupid: str, id: str, versionid: Optional[str] = None) -> None:
+    def remove_schema(self, uri: str, groupid: str, schemaid: str, versionid: Optional[str] = None) -> None:
         """Removes a schema from a schemagroup in the catalog."""
         self.set_base_url(uri)
         response = requests.get(f"{self.base_url}/schemagroups/{groupid}")
@@ -350,28 +350,28 @@ class CatalogSubcommands:
             raise ValueError(f"Schemagroup with id {groupid} does not exist: {response.text}")
         schemagroup = response.json()
 
-        if "schemas" not in schemagroup or id not in schemagroup["schemas"]:
-            raise ValueError(f"Schema with id {id} does not exist in schemagroup {groupid}")
+        if "schemas" not in schemagroup or schemaid not in schemagroup["schemas"]:
+            raise ValueError(f"Schema with id {schemaid} does not exist in schemagroup {groupid}")
 
         if versionid:
-            if "versions" in schemagroup["schemas"][id]:
-                versions = schemagroup["schemas"][id]["versions"]
+            if "versions" in schemagroup["schemas"][schemaid]:
+                versions = schemagroup["schemas"][schemaid]["versions"]
                 if versionid in versions:
                     del versions[versionid]
                     if not versions:
-                        del schemagroup["schemas"][id]
+                        del schemagroup["schemas"][schemaid]
                 else:
-                    raise ValueError(f"Version id {versionid} does not exist in schema {id}")
+                    raise ValueError(f"Version id {versionid} does not exist in schema {schemaid}")
             else:
-                raise ValueError(f"No versions found for schema {id}")
+                raise ValueError(f"No versions found for schema {schemaid}")
         else:
-            del schemagroup["schemas"][id]
+            del schemagroup["schemas"][schemaid]
 
         response = requests.put(f"{self.base_url}/schemagroups/{groupid}", json=schemagroup)
         if response.status_code != 200:
             raise ValueError(f"Failed to remove schema: {response.text}")
 
-    def edit_schema(self, uri: str, groupid: str, id: str, format: Optional[str] = None, versionid: str = "1", schema: Optional[str] = None,
+    def edit_schema(self, uri: str, groupid: str, schemaid: str, format: Optional[str] = None, versionid: str = "1", schema: Optional[str] = None,
                     schemaimport: Optional[str] = None, schemaurl: Optional[str] = None, description: Optional[str] = None, documentation: Optional[str] = None,
                     labels: Optional[Dict[str, str]] = None, name: Optional[str] = None) -> None:
         """Edits an existing schema in a schemagroup in the catalog."""
@@ -381,10 +381,10 @@ class CatalogSubcommands:
             raise ValueError(f"Schemagroup with id {groupid} does not exist: {response.text}")
         schemagroup = response.json()
 
-        if "schemas" not in schemagroup or id not in schemagroup["schemas"]:
-            raise ValueError(f"Schema with id {id} does not exist in schemagroup {groupid}")
+        if "schemas" not in schemagroup or schemaid not in schemagroup["schemas"]:
+            raise ValueError(f"Schema with id {schemaid} does not exist in schemagroup {groupid}")
 
-        schema_obj = schemagroup["schemas"][id]
+        schema_obj = schemagroup["schemas"][schemaid]
         if format:
             schema_obj["format"] = format
         if schema:
@@ -419,7 +419,7 @@ class CatalogSubcommands:
         if response.status_code != 200:
             raise ValueError(f"Failed to edit schema: {response.text}")
 
-    def show_schema(self, uri: str, groupid: str, id: str) -> None:
+    def show_schema(self, uri: str, groupid: str, schemaid: str) -> None:
         """Shows a schema from a schemagroup in the catalog."""
         self.set_base_url(uri)
         response = requests.get(f"{self.base_url}/schemagroups/{groupid}")
@@ -427,10 +427,10 @@ class CatalogSubcommands:
             raise ValueError(f"Schemagroup with id {groupid} does not exist: {response.text}")
         schemagroup = response.json()
 
-        if "schemas" not in schemagroup or id not in schemagroup["schemas"]:
-            raise ValueError(f"Schema with id {id} does not exist in schemagroup {groupid}")
+        if "schemas" not in schemagroup or schemaid not in schemagroup["schemas"]:
+            raise ValueError(f"Schema with id {schemaid} does not exist in schemagroup {groupid}")
 
-        print(json.dumps(schemagroup["schemas"][id], indent=2))
+        print(json.dumps(schemagroup["schemas"][schemaid], indent=2))
 
     def apply_schema(self, uri: str, file: str) -> None:
         """Applies a schema from a file."""
@@ -438,14 +438,14 @@ class CatalogSubcommands:
         with open(file, 'r', encoding='utf-8') as sf:
             schema = json.load(sf)
             groupid = schema["schemagroupid"]
-            id = schema["schemaid"]
+            schemaid = schema["schemaid"]
             response = requests.get(f"{self.base_url}/schemagroups/{groupid}")
             if response.status_code == 200:
-                self.edit_schema(uri, groupid, id, **schema)
+                self.edit_schema(uri, groupid, schemaid, **schema)
             else:
-                self.add_schema(uri, groupid, id, **schema)
+                self.add_schema(uri, groupid, schemaid, **schema)
 
-    def add_catalog_parsers(self, subparsers: _SubParsersAction[argparse.ArgumentParser]):
+    def add_catalog_parsers(self, subparsers: argparse._SubParsersAction[argparse.ArgumentParser]):
         catalog_parser = subparsers.add_parser('catalog', help="Operate on catalog via webservice")
         catalog_subparsers = catalog_parser.add_subparsers(dest="catalog_command", help="Catalog command to execute")
 
