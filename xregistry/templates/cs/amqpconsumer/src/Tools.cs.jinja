@@ -3,7 +3,7 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {{ util.CommonFileHeader() }}
 
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
 #nullable enable
 
 using System;

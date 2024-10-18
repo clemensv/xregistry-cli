@@ -4,60 +4,56 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "endpoints": {
         "Fabrikam.RedmondUsWa.Building42.Environment.Temperature": {
-            "id": "Fabrikam.RedmondUsWa.Building42.Environment.Temperature",
             "usage": "producer",
-            "config": {
-                "protocol": "NATS",
-                "deployed": false,
-                "endpoints": [{ "uri": "nats://myserver.example.com:4222" }],
-                "options": {
-                    "subject": "temperature",
+            "protocol": "NATS",
+            "deployed": false,
+            "endpoints": [
+                {
+                    "uri": "nats://myserver.example.com:4222"
                 }
+            ],
+            "protocoloptions": {
+                "subject": "temperature"
             },
             "messagegroups": [
                 "#/messagegroups/Contoso.Sensors.Temperature"
             ],
-            "format": "CloudEvents/1.0"
+            "envelope": "CloudEvents/1.0"
         }
     },
     "messagegroups": {
         "Contoso.Sensors.Temperature": {
-            "id": "Contoso.ERP.Events",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "messages": {
                 "Contoso.Sensors.Temperature.Metrics": {
-                    "id": "Contoso.Sensors.Temperature.Metrics",
                     "description": "A set of metrics emitted by a temperature sensor",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.Sensors.Temperature.Metrics",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/contoso/{site}/sensors/{sensorid}",
-                                "required": true
-                            }
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
+                        "type": {
+                            "type": "string",
+                            "value": "Contoso.Sensors.Temperature.Metrics",
+                            "required": true
                         },
-                    "schemaformat" : "Avro/1.11.0",
-                    "schemaurl": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
+                        "source": {
+                            "type": "uritemplate",
+                            "value": "/contoso/{site}/sensors/{sensorid}",
+                            "required": true
+                        }
+                    },
+                    "schemaformat": "Avro/1.11.0",
+                    "schemauri": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
             }
         }
     },
     "schemagroups": {
         "Contoso.Sensors.Temperature": {
-            "id": "Contoso.Sensors.Temperature",
             "schemas": {
                 "temperatureData": {
                     "format": "Avro/1.11.0",
-                    "id": "temperatureData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.0",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "TemperatureData",

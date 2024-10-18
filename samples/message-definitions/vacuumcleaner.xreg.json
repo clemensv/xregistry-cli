@@ -4,15 +4,13 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "Fabrikam.RoboVac": {
-            "id": "Fabrikam.RoboVac",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "description": "Operational events for a Fabrikam robotic vacuum",
             "messages": {
                 "Fabrikam.RoboVac.StartedCleaning": {
-                    "id": "Fabrikam.RoboVac.StartedCleaning",
                     "description": "Event for when the vacuum starts a cleaning session",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -34,13 +32,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.StartedCleaningEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.StartedCleaningEventData"
                 },
                 "Fabrikam.RoboVac.StoppedCleaning": {
-                    "id": "Fabrikam.RoboVac.StoppedCleaning",
                     "description": "Event for when the vacuum stops a cleaning session",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -62,13 +59,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.StoppedCleaningEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.StoppedCleaningEventData"
                 },
                 "Fabrikam.RoboVac.Docked": {
-                    "id": "Fabrikam.RoboVac.Docked",
                     "description": "Event for when the vacuum returns to its docking station",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -90,13 +86,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.DockedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.DockedEventData"
                 },
                 "Fabrikam.RoboVac.ErrorOccurred": {
-                    "id": "Fabrikam.RoboVac.ErrorOccurred",
                     "description": "Event for when an error occurs during the vacuum's operation",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -118,13 +113,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.ErrorOccurredEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.ErrorOccurredEventData"
                 },
-                "Fabrikam.RoboVac.Condition" : {
-                    "id": "Fabrikam.RoboVac.Condition",
+                "Fabrikam.RoboVac.Condition": {
                     "description": "Event for when the vacuum reports its current condition",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -146,22 +140,19 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.ConditionEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.ConditionEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Fabrikam.RoboVac": {
-            "id": "Fabrikam.RoboVac",
             "schemas": {
                 "Fabrikam.RoboVac.StartedCleaningEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.RoboVac.StartedCleaningEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "StartedCleaningEventData",
@@ -203,11 +194,9 @@
                 },
                 "Fabrikam.RoboVac.StoppedCleaningEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.RoboVac.StoppedCleaningEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "StoppedCleaningEventData",
@@ -239,7 +228,8 @@
                                                 "Success",
                                                 "Cancelled",
                                                 "Error"
-                                            ]}
+                                            ]
+                                        }
                                     }
                                 ]
                             }
@@ -248,11 +238,9 @@
                 },
                 "Fabrikam.RoboVac.DockedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.RoboVac.DockedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "DockedEventData",
@@ -290,7 +278,7 @@
                                                 "CleaningComplete",
                                                 "UserRequest"
                                             ]
-                                        }                                        
+                                        }
                                     }
                                 ]
                             }
@@ -299,11 +287,9 @@
                 },
                 "Fabrikam.RoboVac.ErrorOccurredEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.RoboVac.ErrorOccurredEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "ErrorOccurredEventData",
@@ -339,7 +325,8 @@
                                                 "BrushError",
                                                 "DustbinFull",
                                                 "Other"
-                                            ]}
+                                            ]
+                                        }
                                     },
                                     {
                                         "name": "errorDescription",
@@ -353,11 +340,9 @@
                 },
                 "Fabrikam.RoboVac.ConditionEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.RoboVac.ConditionEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "ConditionEventData",

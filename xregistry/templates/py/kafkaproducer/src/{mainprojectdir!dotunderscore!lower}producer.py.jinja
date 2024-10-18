@@ -63,31 +63,31 @@ class {{ class_name }}:
     {%- set data_type = util.DeclareDataType( data_project_name, root, message ) %}
 
     async def send_{{message_snake}}(self,
-        {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
         _{{ attrname }}: str, {{ '' }}
         {%- endfor -%}
-        {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
             {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} : str, {% endfor -%}
         {%- endfor -%}
         data: {{ data_type | strip_namespace -}}, content_type: str = "application/json"
-        {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
             , _{{ attrname }}: typing.Optional[str] = None
         {%- endfor -%}, flush_producer=True, key_mapper: typing.Callable[[CloudEvent, {{ data_type | strip_namespace -}}], str]=None) -> None:
         """
         Sends the '{{ messageid }}' event to the Kafka topic
 
         Args:
-        {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
             _{{ attrname }}(str) : {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
         {%- endfor -%}
-        {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
             {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
             _{{ placeholder | snake }}(str):  Value for placeholder {{ placeholder }} in attribute {{ attrname }}
             {%- endfor -%}
         {%- endfor %}
             data: ({{ data_type | strip_namespace -}}): The event data to be sent
             content_type (str): The content type that the event data shall be sent with
-        {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined %}
             _{{ attrname }}(typing.Optional[str]): {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
         {%- endfor %}
             flush_producer(bool): Whether to flush the producer after sending the event (default: True)
@@ -95,7 +95,7 @@ class {{ class_name }}:
                 The default key mapper maps the CloudEvent type, source, and subject to the Kafka key
         """
         attributes = {
-        {%- for attrname, attribute in message.metadata.items() %}
+        {%- for attrname, attribute in message.envelopemetadata.items() %}
              "{{ attrname }}":
             {%- if attribute.value -%}
             "{{ attribute.value }}"

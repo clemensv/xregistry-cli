@@ -51,7 +51,7 @@ from azure.identity.aio import DefaultAzureCredential
 {%- set groupname = messagegroupid | pascal %}
 {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
 from {{main_project_name}}.dispatcher import {{class_name}}
-{%- for messageid, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
+{%- for messageid, message in messagegroup.messages.items() if ( message | exists("envelope","CloudEvents/1.0")) %}
 
 async def handle_{{ messageid | dotunderscore | snake }}(partition_context, event, cloud_event, {{ messageid | dotunderscore | snake }}_event_data):
     """ Handles the {{ messageid }} event """
@@ -68,7 +68,7 @@ async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, bl
     {%- set groupname = messagegroupid | pascal %}
     {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
     dispatcher = {{ class_name }}()
-    {%- for messageid, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
+    {%- for messageid, message in messagegroup.messages.items() if ( message | exists("envelope","CloudEvents/1.0")) %}
     dispatcher.{{ messageid | dotunderscore | snake }}_async = handle_{{ messageid | dotunderscore | snake }}
     {%- endfor %}
     {%- endfor %}
@@ -90,7 +90,7 @@ async def main(consumer_group_name, fully_qualified_namespace, eventhub_name, bl
     {%- set groupname = messagegroupid | pascal %}
     {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
     {{messagegroupid | dotunderscore | snake}}_dispatcher = {{ class_name }}()
-    {%- for messageid, message in messagegroup.messages.items() if ( message | exists( "format", "cloudevents" )) %}
+    {%- for messageid, message in messagegroup.messages.items() if ( message | exists("envelope","CloudEvents/1.0")) %}
     {{messagegroupid | dotunderscore | snake}}_dispatcher.{{ messageid | dotunderscore | snake }}_async = {{ messageid | dotunderscore | snake }}_event
     {%- endfor %}
     {%- endfor %}

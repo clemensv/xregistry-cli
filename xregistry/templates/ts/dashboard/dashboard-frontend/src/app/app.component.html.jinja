@@ -8,9 +8,9 @@
 <div id="counters-bar" style="display: flex; justify-content: space-evenly; margin-top: 20px;">
 {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
 {%- for message_id, message in messagegroup.messages.items() -%}
-{%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+{%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
 {%- if isCloudEvent %}
-<div class="counter" id="{{ message.metadata["type"]["value"] | dotdash| lower}}-counter">{{ message.metadata["type"]["value"] }}: 0</div>
+<div class="counter" id="{{ message.envelopemetadata["type"]["value"] | dotdash| lower}}-counter">{{ message.envelopemetadata["type"]["value"] }}: 0</div>
 {%- endif %}
 {%- endfor %}
 {%- endfor %}

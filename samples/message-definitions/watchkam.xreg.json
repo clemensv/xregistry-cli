@@ -4,15 +4,13 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "Fabrikam.Watchkam": {
-            "id": "Fabrikam.Watchkam",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "description": "State change events for a Fabrikam security camera",
             "messages": {
                 "Fabrikam.Watchkam.MotionDetected": {
-                    "id": "Fabrikam.Watchkam.MotionDetected",
                     "description": "Event for when motion is detected",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -34,13 +32,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionDetectedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionDetectedEventData"
                 },
                 "Fabrikam.Watchkam.MotionEnded": {
-                    "id": "Fabrikam.Watchkam.MotionEnded",
                     "description": "Event for when detected motion has ended",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -62,22 +59,19 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionEndedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionEndedEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Fabrikam.Watchkam": {
-            "id": "Fabrikam.Watchkam",
             "schemas": {
                 "Fabrikam.Watchkam.MotionDetectedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.Watchkam.MotionDetectedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "MotionDetectedEventData",
@@ -122,11 +116,9 @@
                 },
                 "Fabrikam.Watchkam.MotionEndedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.Watchkam.MotionEndedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "MotionEndedEventData",

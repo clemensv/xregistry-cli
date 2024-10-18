@@ -20,12 +20,12 @@ from confluent_kafka import Producer, Consumer, KafkaError, Message
 
 # Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- if message.message["header"] -%}{{ EmitArguments(message.message["header"]) }}{%- endif -%}
-{%- if message.message["footer"] -%}{{ EmitArguments(message.message["footer"]) }}{%- endif -%}
-{%- if message.message["message-annotations"] -%}{{ EmitArguments(message.message["message-annotations"]) }}{%- endif -%}
-{%- if message.message["delivery-annotations"] -%}{{ EmitArguments(message.message["delivery-annotations"]) }}{%- endif -%}
-{%- if message.message["properties"] -%}{{ EmitArguments(message.message["properties"]) }}{%- endif -%}
-{%- if message.message["application-properties"] -%}{{ EmitArguments(message.message["application-properties"]) }}{%- endif -%}
+{%- if message.protocoloptions["header"] -%}{{ EmitArguments(message.protocoloptions["header"]) }}{%- endif -%}
+{%- if message.protocoloptions["footer"] -%}{{ EmitArguments(message.protocoloptions["footer"]) }}{%- endif -%}
+{%- if message.protocoloptions["message_annotations"] -%}{{ EmitArguments(message.protocoloptions["message_annotations"]) }}{%- endif -%}
+{%- if message.protocoloptions["delivery_annotations"] -%}{{ EmitArguments(message.protocoloptions["delivery_annotations"]) }}{%- endif -%}
+{%- if message.protocoloptions["properties"] -%}{{ EmitArguments(message.protocoloptions["properties"]) }}{%- endif -%}
+{%- if message.protocoloptions["application_properties"] -%}{{ EmitArguments(message.protocoloptions["application_properties"]) }}{%- endif -%}
 {%- endmacro %}
 
 # Helper macro for assigning properties
@@ -50,12 +50,12 @@ from confluent_kafka import Producer, Consumer, KafkaError, Message
 
 # Generates Kafka message objects from kafkaDefinition as message
 {%- macro DeclareMessage(variable, message) -%}
-{%- set header = message.message["header"] %}
-{%- set footer = message.message["footer"] %}
-{%- set messageAnnotations = message.message["message-annotations"] %}
-{%- set deliveryAnnotations = message.message["delivery-annotations"] %}
-{%- set properties = message.message["properties"] %}
-{%- set applicationProperties = message.message["application-properties"] %}
+{%- set header = message.protocoloptions["header"] %}
+{%- set footer = message.protocoloptions["footer"] %}
+{%- set messageAnnotations = message.protocoloptions["message_annotations"] %}
+{%- set deliveryAnnotations = message.protocoloptions["delivery_annotations"] %}
+{%- set properties = message.protocoloptions["properties"] %}
+{%- set applicationProperties = message.protocoloptions["application_properties"] %}
 message = Producer()
 {%- if header %}
 {{- AssignProps("message.headers", header, True) }}
@@ -78,7 +78,7 @@ message = Producer()
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectField(project_name, messagegroups, withType) -%}
-{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "kafka" )) -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 {%- if withType -%}{{ messagegroupname | namespace_dot(project_name) | pascal }}I{{ messagegroupname | strip_namespace }}Dispatcher{% endif %} {{ messagegroupid  | strip_namespace | camel }}_kafka_dispatcher
 {%- if not loop.last %}, {%- endif -%}
@@ -92,15 +92,15 @@ message = Producer()
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) %}
-{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists( "protocol", "kafka" ) %}
 {{ DeclareDispatchObjectField( project_name, messagegroup ) }}
 {%- endfor %}
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) %}
-{%- if messagegroups | exists("binding", "kafka" ) %}
-def __init__(self, {{ args }}, {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%} {{ messagegroupid | strip_namespace | camel }}_kafka_dispatcher {%- if not loop.last %}, {%- endif -%}{%- endfor -%}):
-    {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%}
+{%- if messagegroups | exists( "protocol", "kafka" ) %}
+def __init__(self, {{ args }}, {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists( "protocol", "kafka" ) -%} {{ messagegroupid | strip_namespace | camel }}_kafka_dispatcher {%- if not loop.last %}, {%- endif -%}{%- endfor -%}):
+    {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists( "protocol", "kafka" ) -%}
     self.{{ messagegroupid  | strip_namespace | camel }}_kafka_dispatcher = {{ messagegroupid  | strip_namespace | camel }}_kafka_dispatcher
     {%- endfor %}
     {{ body | indent(4) }}
@@ -110,11 +110,11 @@ def __init__(self, {{ args }}, {%- for messagegroupid, messagegroup in messagegr
 {%- macro DispatchToDispatchObject(project_name, root, message, messagegroup, logger) -%}
 message_subject = {{ message }}.topic()
 switcher = {
-    {%- for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "kafka" )) -%}
     {%- set messagename = messageid | pascal %}
     "{{ messageid }}": lambda: self.{{ messagegroupid | strip_namespace | camel }}_kafka_dispatcher.on_{{ messagename | strip_namespace }}_async({{ message }},
-    {%- if message.schemaurl or message.schema -%}
-    {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.value(), {{ message }}.headers.get('content-type'))
+    {%- if message.schemauri or message.schema -%}
+    {{ ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.value(), {{ message }}.headers.get('content-type'))
     {%- else -%}
     {{ message }}.value()
     {%- endif %})
@@ -132,15 +132,15 @@ else:
 {%- endmacro -%}
 
 {%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
-{%- if messagegroups | exists("binding", "kafka" ) %}
+{%- if messagegroups | exists( "protocol", "kafka" ) %}
 message_subject = {{ message }}.topic()
 switcher = {
-    {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
-    {%- for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+    {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "kafka" )) -%}
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "kafka" )) -%}
     {%- set messagename = messageid | pascal %}
     "{{ messageid }}": lambda: self.{{ messagegroupid  | strip_namespace | camel }}_kafka_dispatcher.on_{{ messagename | strip_namespace }}_async({{ message }},
-    {%- if message.schemaurl or message.schema -%}
-    {{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.value(), {{ message }}.headers.get('content-type'))
+    {%- if message.schemauri or message.schema -%}
+    {{ ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.value(), {{ message }}.headers.get('content-type'))
     {%- else -%}
     {{ message }}.value()
     {%- endif %})
@@ -161,17 +161,17 @@ else:
 
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
-{%- if messagegroups | exists("binding", "kafka" ) %}
+{%- if messagegroups | exists( "protocol", "kafka" ) %}
 {%- set function_name = project_name | pascal | strip_dots %}
 import asyncio
 from confluent_kafka import Message
-{% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+{% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "kafka" )) -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 class I{{ messagegroupname | strip_namespace }}KafkaDispatcher:
-    {%- for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "kafka" )) -%}
     {%- set messagename = messageid | strip_namespace | pascal %}
-    {%- if message.schemaurl or message.schema -%}
-    {%- set dataType = (message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+    {%- if message.schemauri or message.schema -%}
+    {%- set dataType = (message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
     {%- else -%}
     {%- set dataType = "object" %}
     {%- endif %}

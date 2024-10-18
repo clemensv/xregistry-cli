@@ -4,47 +4,42 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "Microsoft.Samples.TollRecordEvents": {
-            "id": "Microsoft.Samples.TollRecordEvents",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "messages": {
                 "Microsoft.Samples.TollRecordEvents.TollRecordReceived": {
-                    "id": "Microsoft.Samples.TollRecordEvents.TollRecordReceived",
                     "description": "A toll record event has been received",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "type": {
-                                "value": "Microsoft.Samples.TollRecordEvents.TollRecordReceived",
-                                "description": "Type of the event"
-                            },
-                            "time": {
-                                "value": "{entrytime}",
-                                "description": "Time the event was captured"
-                            },
-                            "source": {
-                                "value": "toolbooths://{site}",
-                                "description": "Toll station id"
-                            },
-                            "subject": {
-                                "value": "{sensorid}",
-                                "description": "Id of the sensor that scanned the vehicle"
-                            }
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
+                        "type": {
+                            "value": "Microsoft.Samples.TollRecordEvents.TollRecordReceived",
+                            "description": "Type of the event"
                         },
-                    "schemaurl": "#/schemagroups/Microsoft.Samples.TollRecordEvents/schemas/TollRecordEventData"
+                        "time": {
+                            "value": "{entrytime}",
+                            "description": "Time the event was captured"
+                        },
+                        "source": {
+                            "value": "toolbooths://{site}",
+                            "description": "Toll station id"
+                        },
+                        "subject": {
+                            "value": "{sensorid}",
+                            "description": "Id of the sensor that scanned the vehicle"
+                        }
+                    },
+                    "schemauri": "#/schemagroups/Microsoft.Samples.TollRecordEvents/schemas/TollRecordEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Microsoft.Samples.TollRecordEvents": {
-            "id": "Microsoft.Samples.TollRecordEvents",
             "schemas": {
                 "TollRecordEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "TollRecordEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "TollRecordEventData",

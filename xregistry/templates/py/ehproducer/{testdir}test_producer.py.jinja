@@ -114,7 +114,7 @@ async def event_hub_emulator():
 {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
 {%- set groupname = messagegroupid | pascal %}
 {%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
-{%- for messageid, message in messagegroup.messages.items() if (message | exists( "format", "cloudevents" )) %}
+{%- for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) %}
 {%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
 {%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
 
@@ -146,14 +146,14 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
         event_data = {}
         {%- endif %}
         await producer_instance.send_{{ messageid | dotunderscore | snake }}(
-            {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+            {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
                 _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
             {%- endfor -%}
-            {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
+            {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
                 {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
             {%- endfor -%}
             data = event_data
-            {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+            {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
                 , _{{ attrname }} = ''
             {%- endfor -%}
         )

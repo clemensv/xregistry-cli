@@ -39,7 +39,7 @@ import org.eclipse.paho.mqttv5.common.packet.MqttWireMessage as MqttMessageV5;
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- if message.message["properties"] -%}{{ EmitArguments(message.message["properties"]) }}{%- endif -%}
+{%- if message.protocoloptions["properties"] -%}{{ EmitArguments(message.protocoloptions["properties"]) }}{%- endif -%}
 {%- endmacro %}
 
 {#- Helper macro for assigning properties -#}
@@ -92,7 +92,7 @@ new MqttUserProperty("{{ prop.name }}",
 
 {#- Generates AMQP message objects from mqttDefinition as message -#}
 {%- macro DeclareMqttNetMessage(variable, message) -%}
-{%- set properties = message.message["properties"] %}
+{%- set properties = message.protocoloptions["properties"] %}
 MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {
    {{- AssignProps(properties) | indent(3) }}
@@ -104,14 +104,14 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 
 
 {%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
-{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "mqtt" )) -%}
 {%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal %}
 {%- if withType -%}{{ messagegroupname | namespace_dot(project_name) | lower }}I{{ messagegroupname | strip_namespace }}Dispatcher {% endif %}{{ messagegroupid | default(definitiongroup_key) | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) -%}
-{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "mqtt" )) -%}
 {%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
 {%- set handlerType=(messagegroupid  | namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"MqttDispatcher" -%}
 {{ handlerType }} _{{ handlerName }};
@@ -119,7 +119,7 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
-{%- if messagegroups | exists("binding", "mqtt" ) %}
+{%- if messagegroups | exists( "protocol", "mqtt" ) %}
 {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- for definitiongroup_key, messagegroup in messagegroups.items() -%}
     {%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal -%} 
@@ -141,22 +141,22 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessage()
 {%- endmacro -%}
 
 {%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
-{%- if messagegroups | exists("binding", "mqtt" ) %}
+{%- if messagegroups | exists( "protocol", "mqtt" ) %}
 try {
    Regex regex; 
    Match match; 
    var messageTopic = {{ message }}.Topic;
-   {% for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+   {% for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "mqtt" )) -%}
    {%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"MqttDispatcher" -%}
-   {% for messageid, message in messagegroup.messages.items() if (message | exists("binding", "mqtt" )) -%}
+   {% for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "mqtt" )) -%}
    {% set messagename = messageid | pascal %}
-   regex = new Regex("^" + "{{ message.message.properties.topic.value}}".Replace("{", "(?<").Replace("}", ">[^/]+)") + "$");
+   regex = new Regex("^" + "{{ message.protocoloptions.properties.topic.value}}".Replace("{", "(?<").Replace("}", ">[^/]+)") + "$");
    match = regex.Match(messageTopic);
    if (match.Success)
    {
       return this._{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-      {%- if message.schemaurl or message.schema -%}
-      {%- set type = ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+      {%- if message.schemauri or message.schema -%}
+      {%- set type = ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
       {%- set typePackage = type | namespace | lower %}
       {%- set typeName = type | strip_namespace | pascal %}
       {%- set dataType = typePackage + '.' + typeName -%}
@@ -184,10 +184,10 @@ import java.util.concurrent.CompletableFuture;
 
 public interface {{ interfaceName }}
 {
-    {%- for messageid, message in messagegroup.messages.items() if (message | exists( "binding", "mqtt" )) -%}
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "mqtt" )) -%}
     {%- set messagename = messageid | strip_namespace | pascal -%}
-    {%- if message.schemaurl or message.schema -%}
-    {%- set type = ( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+    {%- if message.schemauri or message.schema -%}
+    {%- set type = ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
     {%- set typePackage = type | namespace | lower %}
     {%- set typeName = type | strip_namespace | pascal %}
     {%- set dataType = typePackage + '.' + typeName -%}
@@ -201,8 +201,8 @@ public interface {{ interfaceName }}
 
 {%- macro DeclareDispatchInterfaces(project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
-{%- if messagegroups | exists("binding", "mqtt" ) %}
-{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- if messagegroups | exists( "protocol", "mqtt" ) %}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "mqtt" )) -%}
 {%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal -%}
 {%- set interfaceName = "I"+(messagegroupname | strip_namespace)+"MqttDispatcher" -%}
 {{- DeclareDispatchInterfaceV5(root, project_name, messagegroup, messagegroupname, interfaceName) | pushfile(interfaceName+".java") -}}

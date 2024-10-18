@@ -3,7 +3,7 @@
 {{ util.CommonFileHeader() }}
 
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
 using System;
 using System.Collections.Generic;
@@ -57,9 +57,9 @@ namespace {{ project_name | pascal }}
         {%- if root.endpoints -%} 
          {%- for endpointid, endpoint in root.endpoints.items() -%}
                   {%- if endpoint.usage == "consumer" -%}
-           {%- set protocol = endpoint.config.protocol | lower -%}
-           {%- set options = endpoint.config.options -%}
-           {%- set endpoints = endpoint.config.endpoints %}
+           {%- set protocol = endpoint.protocol | lower -%}
+           {%- set options = endpoint.protocoloptions -%}
+           {%- set endpoints = endpoint.endpoints %}
            {%- set isCloudEvent = endpoint.format and endpoint.format.lower().startswith("cloudevents") -%}
                 
         public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential, {{ cloudEvents.DeclareDispatchObjectsArgs( project_name,  messagegroups, true ) }}) 

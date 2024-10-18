@@ -91,7 +91,7 @@ async def main(connection_string: Optional[str], producer_config: Optional[str],
 
     # sends the '{{ messageid }}' event to Kafka topic.
     await {{ class_name | snake }}.send_{{ messageid | dotunderscore | snake }}(
-        {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
             {%- if attrname == 'time' -%}
             _{{ attrname }} = datetime.now().isoformat(),
             {%- elif attrname == 'id' -%}
@@ -100,11 +100,11 @@ async def main(connection_string: Optional[str], producer_config: Optional[str],
             _{{ attrname }} = 'TODO:replace',
             {%- endif %}
         {%- endfor -%}
-        {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
             {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'TODO: replace me', {% endfor -%}
         {%- endfor -%}
         data = _{{ type_name | strip_namespace | snake }}
-        {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
             , _{{ attrname }} = ''
         {%- endfor -%}
     )

@@ -21,16 +21,16 @@
             }
         }
     },
-    "schemagroups" : {
-        "com.example.group1" : {
+    "schemagroups": {
+        "com.example.group1": {
             "id": "com.example.group1",
             "format": "JSONSchema/draft-07",
             "schemas": {
                 "com.example.group1.schema1": {
                     "id": "com.example.group1.schema1",
                     "defaultversionid": "1",
-                    "versions" : {
-                        "1" : {
+                    "versions": {
+                        "1": {
                             "id": "1",
                             "format": "JSONSchema/draft-07",
                             "schema": {

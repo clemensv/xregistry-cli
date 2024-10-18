@@ -3,8 +3,8 @@
 {%- import "util.jinja.include" as util -%}
 {{ util.CommonFileHeader() }}
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_plain_mqtt_message = (root | exists( "binding", "mqtt" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_mqtt_message = (root | exists( "protocol", "mqtt" )) %}
 {%- set uses_mqtt_endpoint = (root | exists( "protocol", "mqtt" )) %}
 
 #nullable enable
@@ -20,8 +20,8 @@ using {{ project_name | pascal }}.Tools;
 namespace {{ project_name | pascal }}
 {
     {% for messagegroupid, messagegroup in messagegroups.items() -%}
-    {%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
-    {%- set uses_plain_mqtt_message = (messagegroup | exists( "binding", "mqtt" )) %}
+    {%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+    {%- set uses_plain_mqtt_message = (messagegroup | exists( "protocol", "mqtt" )) %}
     {%- set messagegroupname = messagegroupid  | pascal -%}
     {%- set class_name = ( messagegroupname | strip_namespace )+"Dispatcher" %}
     namespace {{ messagegroupname | pascal  }}
@@ -41,7 +41,7 @@ namespace {{ project_name | pascal }}
             /// </summary>
             {%- endif %}
             {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
-            {%- set isMqtt = (message | exists( "binding", "mqtt" )) %}
+            {%- set isMqtt = (message | exists( "protocol", "mqtt" )) %}
             /// <summary>
             /// Event that is raised when a message of type {{ messagename }} is received.
             /// </summary>
@@ -146,11 +146,11 @@ namespace {{ project_name | pascal }}
                 _logger.LogInformation($"Dispatching MQTT message on topic {messageTopic}");
                 switch (messageTopic)
                 {
-                {% for messageid, message in messagegroup.messages.items() if ((message | exists("binding", "mqtt" )) and not (message | exists("format", "cloudevents" ))) -%}
+                {% for messageid, message in messagegroup.messages.items() if ((message | exists( "protocol", "mqtt" )) and not (message | exists("envelope","CloudEvents/1.0"))) -%}
                 {%- set messagename = messageid | pascal %}
                 {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
                 {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
-                    case "{{ message.message.properties.topic.value }}":
+                    case "{{ message.protocoloptions.properties.topic.value }}":
                         if ({{ messagename | strip_namespace }}Async != null)
                         {
                             await Task.WhenAll(Array.ConvertAll({{ messagename | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(messageArgs,
@@ -177,10 +177,10 @@ namespace {{ project_name | pascal }}
     {%- for endpointid, endpoint in root.endpoints.items() -%}
     {%- set endpointname = endpointid | default(endpointid) | pascal -%}
     {%- if endpoint.usage == "consumer" -%}
-    {%- set protocol = endpoint.config.protocol | lower -%}
+    {%- set protocol = endpoint.protocol | lower -%}
     {%- if protocol.startswith("mqtt") -%}
-    {%- set options = endpoint.config.options -%}
-    {%- set endpoints = endpoint.config.endpoints -%}
+    {%- set options = endpoint.protocoloptions -%}
+    {%- set endpoints = endpoint.endpoints -%}
     {%- set messagegroupuris = endpoint.messagegroups %}
     
     {%- macro MessageGroupArgs() -%}

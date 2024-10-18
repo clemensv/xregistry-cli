@@ -21,6 +21,8 @@ class JinjaFilters:
     def exists(obj: Any, prop: str, value: str) -> bool:
         """Check if a property exists with a value prefixed with a given string."""
         logger.debug("Checking existence of property: %s with value prefix: %s in object", prop, value)
+        prop = prop.lower()
+        value = value.lower()
 
         def recursive_search(obj: Any, prop: str, value: str) -> bool:
             if isinstance(obj, dict):

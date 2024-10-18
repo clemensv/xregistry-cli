@@ -25,7 +25,7 @@
 {% endmacro %}
 {%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
 {%- for messageid, message in messagegroup.messages.items() %}
-{{ generate(message.metadata) | pushfile("event_" + (messageid | strip_namespace | snake) + ".json") }}
+{{ generate(message.envelopemetadata) | pushfile("event_" + (messageid | strip_namespace | snake) + ".json") }}
 {%- endfor %}
 {%- endfor %}
 {% exit %}

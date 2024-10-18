@@ -41,7 +41,7 @@ namespace {{ project_name | pascal }}.Tests
 
             {{ function_class_field }} = new {{ function_class_ref }}(
                 loggerFactoryMock.Object,
-                {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+                {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("envelope","CloudEvents/1.0")) -%}
                 _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Object{% if not loop.last %},
                 {% endif -%}
                 {%- endfor -%});
@@ -57,9 +57,9 @@ namespace {{ project_name | pascal }}.Tests
             await {{ function_class_field }}.Run(events, loggerMock.Object);
 
             // Assert
-            {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+            {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("envelope","CloudEvents/1.0")) -%}
             {%- for messageid, message in messagegroup.messages.items() -%}
-            {%- if message.format.startswith("CloudEvents") -%}  
+            {%- if message.envelope.startswith("CloudEvents") -%}  
             {%- set messagename = messageid | pascal %}
             _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Verify(
                 x => x.On{{ messageid | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ util.body_type(data_project_name, root, message) }}>()),
@@ -70,9 +70,9 @@ namespace {{ project_name | pascal }}.Tests
             {%- endfor -%}
         }
 
-        {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("format", "cloudevents" )) -%}
+        {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("envelope","CloudEvents/1.0")) -%}
         {%- for messageid, message in messagegroup.messages.items() -%}
-        {%- if message.format.startswith("CloudEvents") -%}     
+        {%- if message.envelope.startswith("CloudEvents") -%}     
         {%- set messagename = messageid | pascal %}
         {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
         [Test]

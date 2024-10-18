@@ -49,7 +49,7 @@ using CloudNative.CloudEvents.Avro;
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- if message.message["properties"] -%}{{ EmitArguments(message.message["properties"]) }}{%- endif -%}
+{%- if message.protocoloptions["properties"] -%}{{ EmitArguments(message.protocoloptions["properties"]) }}{%- endif -%}
 {%- endmacro -%}
 
 {#- Helper macro for assigning properties -#}
@@ -102,7 +102,7 @@ new MqttUserProperty("{{ prop.name }}",
 
 {#- Generates MQTT message objects from mqttDefinition as message -#}
 {%- macro DeclareMqttNetMessage(variable, message) -%}
-{%- set properties = message.message["properties"] %}
+{%- set properties = message.protocoloptions["properties"] %}
 MqttApplicationMessage {{ variable }} = new MqttApplicationMessageBuilder()
 {
    {{- AssignProps(properties) | indent(3) }}
@@ -113,14 +113,14 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessageBuilder()
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
-{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "mqtt" )) -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 {%- if withType -%}global::{{ messagegroupname | namespace_dot(project_name) | pascal }}I{{ messagegroupname | strip_namespace }}Dispatcher {% endif %}{{ messagegroupid  | strip_namespace | camel }}MqttDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) -%}
-{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "mqtt" )) -%}
 {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"MqttDispatcher" -%}
 {%- set handlerType=(messagegroupid  | namespace_dot(project_name) | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"MqttDispatcher" -%}
 {{ handlerType }} {{ handlerName }};
@@ -128,7 +128,7 @@ MqttApplicationMessage {{ variable }} = new MqttApplicationMessageBuilder()
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
-{%- if messagegroups | exists("binding", "mqtt" ) %}
+{%- if messagegroups | exists( "protocol", "mqtt" ) %}
 public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- for messagegroupid, messagegroup in messagegroups.items() -%}
     {%- set messagegroupname = messagegroupid  | pascal -%} 
@@ -150,21 +150,21 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endmacro -%}
 
 {%- macro DispatchToDispatchObjects(project_name, data_project_name, root, message, messagegroups, logger) -%}
-{%- if messagegroups | exists("binding", "mqtt" ) %}
+{%- if messagegroups | exists( "protocol", "mqtt" ) %}
 Regex regex; 
 Match match; 
 var messageTopic = {{ message }}.Topic;
-{% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "mqtt" )) -%}
 {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"MqttDispatcher" -%}
-{% for messageid, message in messagegroup.messages.items() if (message | exists("binding", "mqtt" )) -%}
+{% for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "mqtt" )) -%}
 {% set messagename = messageid | pascal %}
-regex = new Regex("^" + "{{ message.message.properties.topic.value}}".Replace("{", "(?<").Replace("}", ">[^/]+)") + "$");
+regex = new Regex("^" + "{{ message.protocoloptions.properties.topic.value}}".Replace("{", "(?<").Replace("}", ">[^/]+)") + "$");
 match = regex.Match(messageTopic);
 if (match.Success)
 {
    await this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-   {%- if message.schemaurl or message.schema -%}
-   global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
+   {%- if message.schemauri or message.schema -%}
+   global::{{( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Payload, {{ message }}.ContentType)
    {%- else -%}
    {{ message }}.Data
    {%- endif %}, match.Groups.Values.Where(g => g.Name != "0").ToDictionary(g => g.Name, g => g.Value));
@@ -176,9 +176,9 @@ if (match.Success)
 
 {%- macro DeclareDispatchInterfaces(project_name, data_project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
-{%- if messagegroups | exists("binding", "mqtt" ) %}
+{%- if messagegroups | exists( "protocol", "mqtt" ) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
-{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "mqtt" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "mqtt" )) -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 using MQTTnet;
 using MQTTnet.Packets;
@@ -189,10 +189,10 @@ namespace {{ messagegroupname | concat_namespace(project_name) | pascal }}
 {
     public interface I{{ messagegroupname | strip_namespace }}MqttDispatcher
     {
-        {%- for messageid, message in messagegroup.messages.items() if ( message | exists("binding", "mqtt" )) -%}
+        {%- for messageid, message in messagegroup.messages.items() if ( message | exists( "protocol", "mqtt" )) -%}
         {%- set messagename = messageid | strip_namespace | pascal -%}
-        {%- if message.schemaurl or message.schema -%}
-        {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
+        {%- if message.schemauri or message.schema -%}
+        {%- set dataType = 'global::' + (( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   

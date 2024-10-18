@@ -3,8 +3,8 @@
 {%- import "util.jinja.include" as util -%}
 {{ util.CommonFileHeader() }}
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists("format", "cloudevents")) %}
-{%- set uses_kafka_message = (root | exists("binding", "kafka")) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_kafka_message = (root | exists( "protocol", "kafka")) %}
 {%- set uses_kafka_endpoint = (root | exists("protocol", "kafka")) %}
 
 #nullable enable
@@ -31,10 +31,10 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         {%- if root.endpoints -%}
         {%- for endpointid, endpoint in root.endpoints.items() -%}
                 {%- if endpoint.usage == "producer" -%}
-        {%- set protocol = endpoint.config.protocol | lower -%}
+        {%- set protocol = endpoint.protocol | lower -%}
         {%- if protocol == "kafka" -%}
-        {%- set options = endpoint.config.options -%}
-        {%- set endpoints = endpoint.config.endpoints %}
+        {%- set options = endpoint.protocoloptions -%}
+        {%- set endpoints = endpoint.endpoints %}
         {%- macro createforbody(class_name, endpoints, options) -%}
             if (bootstrapServers == null || bootstrapServers.Length == 0)
             {
@@ -139,8 +139,8 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
 
         {% for messageid, message in messagegroup.messages.items() -%}
         {%- set messagename = messageid | pascal %}
-        {%- set is_cloudevent = not message.format or message.format.lower().startswith("cloudevents") -%}
-        {%- set isKafka = not is_cloudevent and message.format.lower().startswith("kafka") %}
+        {%- set is_cloudevent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
+        {%- set isKafka = not is_cloudevent and message.envelope.lower().startswith("kafka") %}
         {%- set type_name = util.body_type(data_project_name, root, message) -%}
         {%- if is_cloudevent %}
         {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
@@ -170,8 +170,8 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         {%- if uriargs -%}
         {{- uriargs -}}
         {%- endif -%}
-        {%- if is_cloudevent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] -%}
-        , string contentType = "{{ message.metadata["datacontenttype"]["value"] }}"
+        {%- if is_cloudevent and "datacontenttype" in message.envelopemetadata and "value" in message.envelopemetadata["datacontenttype"] -%}
+        , string contentType = "{{ message.envelopemetadata["datacontenttype"]["value"] }}"
         {%- else -%}
         , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
         {%- endif %}

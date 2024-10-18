@@ -2,9 +2,9 @@
 {%- import "eventhubs.jinja.include" as eventhub -%}
 {%- import "util.include.jinja" as util -%}
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_plain_amqp_message = (root | exists( "binding", "amqp" )) %}
-{%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_amqp_message = (root | exists("protocol","AMQP/1.0")) %}
+{%- set uses_amqp_endpoint = (root | exists("protocol","AMQP/1.0")) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
 # pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, redefined-outer-name, missing-class-docstring
 
@@ -127,8 +127,8 @@ async def event_hub_emulator():
 {%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
 {%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
-{%- set isCloudEvent = (message | exists( "format", "cloudevents" )) %}
-{%- set isAmqpMessage = (message | exists( "binding", "amqp" )) %}
+{%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+{%- set is_amqpMessage = (message | exists("protocol","AMQP/1.0")) %}
 
 @pytest.mark.asyncio
 async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
@@ -179,8 +179,8 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
                 "cloudEvents_id": "test-id"
             }
             {% else %}
-            {%- set message_application_properties = message.message['application-properties'] if 'application-properties' in message.message else None %}
-            {%- set message_properties = message.message.properties %}
+            {%- set message_application_properties = message.protocoloptions['application_properties'] if 'application_properties' in message.protocoloptions else None %}
+            {%- set message_properties = message.protocoloptions.properties %}
             {%- if message_application_properties %}
             {%- for key, prop in message_application_properties.items() if "value" in prop %}
             event_data.raw_amqp_message.application_properties['{{ key }}'] = '{{ prop.value }}'

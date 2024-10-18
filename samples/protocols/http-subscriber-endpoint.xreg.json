@@ -3,49 +3,48 @@
     "specversion": "0.5-wip",
     "endpoints": {
         "myhttpsubscriber": {
-            "id": "myhttpsubscriber",
             "usage": "subscriber",
-            "config": {
-                "protocol": "HTTP",
-                "deployed": false,
-                "endpoints": [{ "uri": "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions" }]
-            },
+            "protocol": "HTTP",
+            "deployed": false,
+            "endpoints": [
+                {
+                    "uri": "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
+                }
+            ],
             "messagegroups": [
                 "#/messagegroups/mygroup"
             ],
-            "format": "CloudEvents/1.0"
+            "envelope": "CloudEvents/1.0"
         }
     },
     "messagegroups": {
         "mygroup": {
-            "id": "mygroup",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "messages": {
                 "myevent": {
-                    "id": "myevent",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "myevent",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/me",
-                                "required": true
-                            }
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
+                        "id": {
+                            "type": "string",
+                            "required": true
+                        },
+                        "type": {
+                            "type": "string",
+                            "value": "myevent",
+                            "required": true
+                        },
+                        "time": {
+                            "type": "datetime",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "value": "/me",
+                            "required": true
                         }
                     }
                 }
             }
         }
     }
+}

@@ -21,7 +21,7 @@
             }
         }
     },
-    "schemagroups" : {
+    "schemagroups": {
         "com.example.group1": {
             "id": "com.example.group1",
             "format": "AVRO/1.11.2",
@@ -31,7 +31,7 @@
                     "format": "AVRO/1.11.2",
                     "defaultversionid": "1",
                     "versions": {
-                        "1" : {
+                        "1": {
                             "id": "1",
                             "format": "AVRO/1.11.2",
                             "schema": {
@@ -50,5 +50,5 @@
                 }
             }
         }
-    }    
+    }
 }

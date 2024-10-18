@@ -3,34 +3,33 @@
     "specversion": "0.5-wip",
     "endpoints": {
         "MyEventStream": {
-            "id": "MyEventStream",
             "usage": "consumer",
-            "config": {
-                "protocol": "AMQP/1.0",
-                "deployed": false,
-                "endpoints": [{ "uri": "amqps://cediscoveryinterop.example.com/stream" }],
-                "options": {
-                    "link_properties": {
-                        "myprop": "prop"
-                    },
-                    "distribution_mode": "copy"
+            "protocol": "AMQP/1.0",
+            "deployed": false,
+            "endpoints": [
+                {
+                    "uri": "amqps://cediscoveryinterop.example.com/stream"
                 }
+            ],
+            "protocoloptions": {
+                "link_properties": {
+                    "myprop": "prop"
+                },
+                "distribution_mode": "copy"
             },
             "messagegroups": [
                 "#/messagegroups/Contoso.MyGroup1",
                 "#/messagegroups/Contoso.MyGroup2"
-            ]           
+            ]
         }
     },
     "messagegroups": {
         "Contoso.MyGroup1": {
-            "id": "Contoso.MyGroup1",
-            "binding": "AMQP/1.0",
+            "protocol": "AMQP/1.0",
             "messages": {
                 "Contoso.MyGroup1.MyEvent": {
-                    "id": "Contoso.MyGroup1.MyEvent",
-                    "binding": "AMQP/1.0",
-                    "message": {
+                    "protocol": "AMQP/1.0",
+                    "protocoloptions": {
                         "header": {
                             "ttl": {
                                 "type": "integer",
@@ -43,7 +42,7 @@
                                 "value": "myvalue"
                             }
                         },
-                        "application-properties": {
+                        "application_properties": {
                             "myProperty1": {
                                 "type": "string"
                             },
@@ -56,18 +55,16 @@
                         }
                     },
                     "schemaformat": "JsonSchema/draft-07",
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                    "schemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         },
         "Contoso.MyGroup2": {
-            "id": "Contoso.MyGroup2",
-            "binding": "AMQP/1.0",
+            "protocol": "AMQP/1.0",
             "messages": {
                 "Contoso.MyGroup2.MyEvent": {
-                    "id": "Contoso.MyGroup2.MyEvent",
-                    "binding": "AMQP/1.0",
-                    "message": {
+                    "protocol": "AMQP/1.0",
+                    "protocoloptions": {
                         "header": {
                             "ttl": {
                                 "type": "integer",
@@ -80,7 +77,7 @@
                                 "value": "myvalue"
                             }
                         },
-                        "application-properties": {
+                        "application_properties": {
                             "myProperty1": {
                                 "type": "string"
                             },
@@ -93,21 +90,18 @@
                         }
                     },
                     "schemaformat": "JsonSchema/draft-07",
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                    "schemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Contoso.MyEvents": {
-            "id": "Contoso.MyEvents",
             "schemas": {
                 "MyEventData": {
-                    "id": "MyEventData",
                     "format": "JsonSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "id": "1.0",
                             "format": "JsonSchema/draft-07",
                             "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",

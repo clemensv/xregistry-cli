@@ -6,9 +6,9 @@ Dispatcher module for processing events from Azure Event Hubs.
 {%- import "eventhubs.jinja.include" as eventhub -%}
 {%- import "util.include.jinja" as util -%}
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_plain_amqp_message = (root | exists( "binding", "amqp" )) %}
-{%- set uses_amqp_endpoint = (root | exists( "protocol", "amqp" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_amqp_message = (root | exists("protocol","AMQP/1.0")) %}
+{%- set uses_amqp_endpoint = (root | exists("protocol","AMQP/1.0")) %}
 
 import asyncio
 from typing import Awaitable, Callable, Iterable, List, cast
@@ -232,7 +232,7 @@ class EventProcessorRunner:
         return cls(client)
 
 {% for messagegroupid, messagegroup in messagegroups.items() %}
-{%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
 {%- set uses_plain_amqp_message = (messagegroup | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
 {%- set groupname = messagegroupid | pascal %}
 {%- set class_name = ( groupname | strip_dots )+"EventDispatcher" %}
@@ -248,8 +248,8 @@ class {{ class_name }}(_DispatcherBase):
         {%- if message.description %}
         # {{ message.description }}
         {%- endif %}
-        {%- set is_cloudevent = (message | exists( "format", "cloudevents" )) %}
-        {%- set isAmqp = (message | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
+        {%- set is_cloudevent = (message | exists("envelope","CloudEvents/1.0")) %}
+        {%- set is_amqp = (message | existswithout( "binding", "amqp", "format", "cloudevents" )) %}
         self.{{ messageid | dotunderscore | snake }}_async: Callable[[PartitionContext, EventData, {%if uses_cloudevents_message%}CloudEvent ,{%endif%}{{ data_type | strip_namespace }}], Awaitable[None]] = self._unhandled_event{%if is_cloudevent%}_ce{%endif%}
 
     {%- endfor %}
@@ -290,7 +290,7 @@ class {{ class_name }}(_DispatcherBase):
         switcher = {
             {%- for messageid, message in messagegroup.messages.items() %}
             {%- set message_id = messageid %}
-            {%- set is_cloudevent = (message | exists( "format", "cloudevents" )) %}
+            {%- set is_cloudevent = (message | exists("envelope","CloudEvents/1.0")) %}
             {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
             "{{ messageid }}": lambda: self.{{ messageid | dotunderscore | snake }}_async(partition_context, event, cloud_event,
             {%- if data_type != "object" %}
@@ -329,11 +329,11 @@ class {{ class_name }}(_DispatcherBase):
         else:
             raise NotImplementedError("AMQP message with Sequence body type is not supported")
 
-        {%- for messageid, message in messagegroup.messages.items() if ((message | exists("binding", "amqp" )) and not (message | exists("format", "cloudevents" ))) %}
+        {%- for messageid, message in messagegroup.messages.items() if ((message | exists("protocol","AMQP/1.0")) and not (message | exists("envelope","CloudEvents/1.0"))) %}
         {%- set message_id = messageid %}
         {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
-        {%- set message_application_properties = message.message['application-properties'] if 'application-properties' in message.message else None %}
-        {%- set message_properties = message.message.properties %}
+        {%- set message_application_properties = message.protocoloptions['application_properties'] if 'application_properties' in message.protocoloptions else None %}
+        {%- set message_properties = message.protocoloptions.properties %}
         {%- macro dispatch_condition(message_application_properties, message_properties) %}
         {%- if message_application_properties %}
         {%- for key, prop in message_application_properties.items() if "value" in prop -%}

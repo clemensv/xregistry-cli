@@ -17,11 +17,11 @@ using Confluent.Kafka;
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- if message.message["headers"] -%}{{ EmitArguments(message.message["headers"]) }}{%- endif -%}
-{%- if message.message["key"] -%}{{ EmitArguments(message.message["key"]) }}{%- endif -%}
-{%- if message.message["partition"] -%}{{ EmitArguments(message.message["partition"]) }}{%- endif -%}
-{%- if message.message["topic"] -%}{{ EmitArguments(message.message["topic"]) }}{%- endif -%}
-{%- if message.message["timestamp"] -%}{{ EmitArguments(message.message["timestamp"]) }}{%- endif -%}
+{%- if message.protocoloptions["headers"] -%}{{ EmitArguments(message.protocoloptions["headers"]) }}{%- endif -%}
+{%- if message.protocoloptions["key"] -%}{{ EmitArguments(message.protocoloptions["key"]) }}{%- endif -%}
+{%- if message.protocoloptions["partition"] -%}{{ EmitArguments(message.protocoloptions["partition"]) }}{%- endif -%}
+{%- if message.protocoloptions["topic"] -%}{{ EmitArguments(message.protocoloptions["topic"]) }}{%- endif -%}
+{%- if message.protocoloptions["timestamp"] -%}{{ EmitArguments(message.protocoloptions["timestamp"]) }}{%- endif -%}
 {%- endmacro %}
 
 {#- Helper macro for assigning properties -#}
@@ -46,11 +46,11 @@ using Confluent.Kafka;
 
 {#- Generates Kafka message objects from kafkaDefinition as message -#}
 {%- macro DeclareKafkaMessage(variable, message) -%}
-{%- set headers = message.message["headers"] %}
-{%- set key = message.message["key"] %}
-{%- set partition = message.message["partition"] %}
-{%- set topic = message.message["topic"] %}
-{%- set timestamp = message.message["timestamp"] %}
+{%- set headers = message.protocoloptions["headers"] %}
+{%- set key = message.protocoloptions["key"] %}
+{%- set partition = message.protocoloptions["partition"] %}
+{%- set topic = message.protocoloptions["topic"] %}
+{%- set timestamp = message.protocoloptions["timestamp"] %}
 Message<byte[], byte[]> {{ variable }} = new Message<byte[], byte[]>();
 {%- if headers %}
 {{- AssignProps("{{ variable }}.Headers", headers, True) | indent(6) }}
@@ -70,7 +70,7 @@ Message<byte[], byte[]> {{ variable }} = new Message<byte[], byte[]>();
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsArgs(project_name, messagegroups, withType) -%}
-{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "kafka" )) -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 {%- if withType -%}global::{{ messagegroupname | namespace_dot(project_name) | pascal }}I{{ messagegroupname | strip_namespace }}Dispatcher {% endif %}{{ messagegroupid  | strip_namespace | camel }}KafkaDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
@@ -83,16 +83,16 @@ Message<byte[], byte[]> {{ variable }} = new Message<byte[], byte[]>();
 {% endmacro -%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) %}
-{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists( "protocol", "kafka" ) %}
 {{ DeclareDispatchObjectField( project_name, messagegroup ) }}
 {%- endfor %}
 {%- endmacro -%}
 
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) %}
-{%- if messagegroups | exists("binding", "kafka" ) %}
+{%- if messagegroups | exists( "protocol", "kafka" ) %}
 public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
-    {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%}
+    {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists( "protocol", "kafka" ) -%}
     {%- set messagegroupname = messagegroupid  | pascal -%} 
     {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"KafkaDispatcher" -%}
     {%- set handlerType=(messagegroupid  | namespace_dot(project_name) | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"KafkaDispatcher" -%}
@@ -100,7 +100,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
 {
-    {% for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "kafka" ) -%}
+    {% for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists( "protocol", "kafka" ) -%}
     {%- set messagegroupname = messagegroupid  | pascal %}
     {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"KafkaDispatcher" -%}
     {%- set handlerType=(messagegroupid  | namespace_dot(project_name) | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"KafkaDispatcher" -%}
@@ -118,14 +118,14 @@ var messageSubject = message.Headers.FirstOrDefault(h => h.Key == "subject")?.Ge
 switch (messageSubject)
 {
    {%- set handlerName=(messagegroupid | strip_namespace | camel)+"KafkaDispatcher" -%}
-   {% for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+   {% for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "kafka" )) -%}
    {% set messagename = messageid | pascal %}
    case "{{ messageid }}":
          if ( this.{{ handlerName }} != null )
          {
             await this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-               {%- if message.schemaurl or message.schema -%}
-            global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
+               {%- if message.schemauri or message.schema -%}
+            global::{{( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
             {%- else -%}
             {{ message }}.Data
             {%- endif %});
@@ -140,22 +140,22 @@ switch (messageSubject)
 {%- endmacro -%}
 
 {%- macro DispatchToDispatchObjects(project_name, data_project_name, root, message, messagegroups, logger) -%}
-{%- if messagegroups | exists("binding", "kafka" ) %}
+{%- if messagegroups | exists( "protocol", "kafka" ) %}
 var messageSubject = message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes() != null 
     ? Encoding.UTF8.GetString(message.Headers.FirstOrDefault(h => h.Key == "subject")?.GetValueBytes()) 
     : null;
 switch (messageSubject)
 {
-   {% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+   {% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "kafka" )) -%}
    {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"KafkaDispatcher" -%}
-   {% for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+   {% for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "kafka" )) -%}
    {% set messagename = messageid | pascal %}
    case "{{ messageid }}":
          if ( this.{{ handlerName }} != null )
          {
             await this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-               {%- if message.schemaurl or message.schema -%}
-            global::{{( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
+               {%- if message.schemauri or message.schema -%}
+            global::{{( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
             {%- else -%}
             {{ message }}.Data
             {%- endif %});
@@ -173,20 +173,20 @@ switch (messageSubject)
 
 {%- macro DeclareDispatchInterfaces(project_name, data_project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
-{%- if messagegroups | exists("binding", "kafka" ) %}
+{%- if messagegroups | exists( "protocol", "kafka" ) %}
 {%- set function_name = project_name | pascal | strip_dots %}
 using System.Threading.Tasks;
 using Confluent.Kafka;
-{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "kafka" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists( "protocol", "kafka" )) -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 namespace {{ messagegroupname | concat_namespace(project_name) | pascal }}
 {
    public interface I{{ messagegroupname | strip_namespace }}KafkaDispatcher
    {
-      {%- for messageid, message in messagegroup.messages.items() if (message | exists("binding", "kafka" )) -%}
+      {%- for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "kafka" )) -%}
       {%- set messagename = messageid | strip_namespace | pascal -%}
-      {%- if message.schemaurl or message.schema -%}
-      {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
+      {%- if message.schemauri or message.schema -%}
+      {%- set dataType = 'global::' + (( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
       {%- else -%}
       {%- set dataType = "object" -%}
       {%- endif %}

@@ -3,28 +3,27 @@
     "specversion": "0.5-wip",
     "endpoints": {
         "Contoso.MyAmqpProducer": {
-            "id": "Contoso.MyAmqpProducer",
             "usage": "producer",
-            "config": {
-                "protocol": "AMQP/1.0",
-                "deployed": false,
-                "endpoints": [{ "uri": "amqps://cediscoveryinterop.example.com/topic" }]
-            },
+            "protocol": "AMQP/1.0",
+            "deployed": false,
+            "endpoints": [
+                {
+                    "uri": "amqps://cediscoveryinterop.example.com/topic"
+                }
+            ],
             "messagegroups": [
                 "#/messagegroups/Contoso.MyGroup"
             ],
-            "format": "CloudEvents/1.0"
+            "envelope": "CloudEvents/1.0"
         }
     },
     "messagegroups": {
         "Contoso.MyGroup": {
-            "id": "Contoso.MyGroup",
-            "binding": "AMQP/1.0",
+            "protocol": "AMQP/1.0",
             "messages": {
                 "Contoso.MyGroup.MyEvent": {
-                    "id": "Contoso.MyGroup.MyEvent",
-                    "binding": "AMQP/1.0",
-                    "message": {
+                    "protocol": "AMQP/1.0",
+                    "protocoloptions": {
                         "header": {
                             "ttl": {
                                 "type": "integer",
@@ -37,7 +36,7 @@
                                 "value": "myvalue"
                             }
                         },
-                        "application-properties": {
+                        "application_properties": {
                             "myProperty1": {
                                 "type": "string"
                             },
@@ -50,21 +49,18 @@
                         }
                     },
                     "schemaformat": "JsonSchema/draft-07",
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                    "schemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Contoso.MyEvents": {
-            "id": "Contoso.MyEvents",
             "schemas": {
                 "MyEventData": {
-                    "id": "MyEventData",
                     "format": "JsonSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "id": "1.0",
                             "format": "JsonSchema/draft-07",
                             "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",

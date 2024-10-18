@@ -4,9 +4,9 @@
 {{ util.CommonFileHeader() }}
 
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_amqp_message = amqp.usesAmqpBinding(root) %}
-{%- set uses_amqp_endpoint = amqp.usesAmqpEndpoint(root) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_amqp_message = amqp.uses_amqp_protocol(root) %}
+{%- set uses_amqp_endpoint = amqp.uses_amqp_endpoint(root) %}
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
 {%- if uses_amqp_message %}
@@ -42,9 +42,9 @@ namespace {{ project_name | pascal }}
          {%- if root.endpoints -%} 
          {%- for endpointid, endpoint in root.endpoints.items() -%}
            {%- if endpoint.usage == "producer" -%}
-           {%- set protocol = endpoint.config.protocol | lower -%}
-           {%- set options = endpoint.config.options -%}
-           {%- set endpoints = endpoint.config.endpoints %}
+           {%- set protocol = endpoint.protocol | lower -%}
+           {%- set options = endpoint.protocoloptions -%}
+           {%- set endpoints = endpoint.endpoints %}
         public static {{ class_name }} CreateProducerFor{{ endpointid | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
         {       
             {%- if options %}
@@ -75,16 +75,16 @@ namespace {{ project_name | pascal }}
         {% for messageid, message in messagegroup.messages.items() -%}
         {%- set messagename = messageid | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
-        {%- set isAmqp = amqp.isAmqp(message) %}
+        {%- set is_amqp = amqp.is_amqp(message) %}
         public async Task Send{{ messagename | strip_namespace }}Async(
         {{- util.body_type(data_project_name, root, message) }} data    
         {%- if isCloudEvent -%}
         {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
-        {%- elif isAmqp -%}
+        {%- elif is_amqp -%}
         {{- amqp.DeclareUriTemplateArguments(message) -}}
         {%- endif -%}
-        {%- if isCloudEvent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] -%}
-        , string contentType = "{{ message.metadata["datacontenttype"]["value"] }}"
+        {%- if isCloudEvent and "datacontenttype" in message.envelopemetadata and "value" in message.envelopemetadata["datacontenttype"] -%}
+        , string contentType = "{{ message.envelopemetadata["datacontenttype"]["value"] }}"
         {%- else -%}
         , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
         {%- endif %}
@@ -92,8 +92,8 @@ namespace {{ project_name | pascal }}
         {
             {% if isCloudEvent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12)}}
-            cloudEvent.Data = {% if message.schemaurl -%}
-            {%- set schemaObj = schema_object(root, message.schemaurl ) -%}
+            cloudEvent.Data = {% if message.schemauri -%}
+            {%- set schemaObj = schema_object(root, message.schemauri ) -%}
             {%- if schemaObj and "format" in schemaObj and not schemaObj.format.lower().startswith("json") -%}
             data.ToByteArray(contentType)
             {%- else -%}
@@ -106,7 +106,7 @@ namespace {{ project_name | pascal }}
                 BeforeSend(this, cloudEvent);
             }
             await endpoint.SendAsync(cloudEvent, contentMode, formatter);
-            {% elif isAmqp %}
+            {% elif is_amqp %}
             {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", message) | indent(12)}}
             amqpMessage.BodySection = new Data() { Binary = data.ToByteArray(contentType) };
             await ((AmqpProducer)endpoint).SendAsync(amqpMessage);

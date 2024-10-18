@@ -8,10 +8,10 @@ info:
 {%- if root.endpoints %} 
 servers:
 {%- for endpointid, endpoint in root.endpoints.items() -%}
-{%- set protocol = endpoint.config.protocol | lower -%}
+{%- set protocol = endpoint.protocol | lower -%}
 {%- if endpoint.usage == "producer" and protocol == "http" -%}
-{%- set options = endpoint.config.options -%}
-{%- set endpoints = endpoint.config.endpoints -%}
+{%- set options = endpoint.protocoloptions -%}
+{%- set endpoints = endpoint.endpoints -%}
 {%- for endpointObject in endpoints %}
 - url: {{ endpointObject.uri }}
 {%- if endpoint.description %}
@@ -50,7 +50,7 @@ components:
     {{ messageid }}:
       type: "object"
       properties:
-        {%- for attributeKey, attribute in message.metadata.items() %}
+        {%- for attributeKey, attribute in message.envelopemetadata.items() %}
         "{{ attributeKey }}":
           {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
           type: "string"
@@ -81,17 +81,17 @@ components:
           {%- endif %}
         {%- endfor %}
         data:
-        {%- if message.schemaurl %}
-            {%- if message.schemaurl.startswith('#') %}
-            $ref: "#/components/schemas/{{ message.schemaurl[1:].split('/')[-3] | pascal }}.{{ message.schemaurl[1:].split('/')[-1] | pascal }}"
+        {%- if message.schemauri %}
+            {%- if message.schemauri.startswith('#') %}
+            $ref: "#/components/schemas/{{ message.schemauri[1:].split('/')[-3] | pascal }}.{{ message.schemauri[1:].split('/')[-1] | pascal }}"
             {%- else %}
-            $ref: "{{ message.schemaurl }}"
+            $ref: "{{ message.schemauri }}"
             {%- endif %}
         {%- else %}
             type: "object"
         {%- endif %}
       required:
-        {%- for attributeKey, attribute in message.metadata.items() %}
+        {%- for attributeKey, attribute in message.envelopemetadata.items() %}
         {%- if attribute.required %}
         - "{{ attributeKey }}"
         {%- endif %}

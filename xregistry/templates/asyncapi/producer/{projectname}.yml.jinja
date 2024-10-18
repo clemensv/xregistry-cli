@@ -14,17 +14,17 @@ info:
 defaultContentType: "application/cloudmessages+json"
 servers:
 {%- if root.endpoints %}
-{%- for endpointid, endpoint in root.endpoints.items() if endpoint.config -%}
-{%- set options = endpoint.config.options -%}
-{%- set endpoints = endpoint.config.endpoints -%}
+{%- for endpointid, endpoint in root.endpoints.items() if endpoint -%}
+{%- set options = endpoint.protocoloptions -%}
+{%- set endpoints = endpoint.endpoints -%}
 {%- for endpointObject in endpoints %}
   {{ endpointid | strip_dots }}:
       host: {{ geturlhost( endpointObject.uri ) }}
       {%- if geturlpath( endpointObject.uri ) %}
       pathname: {{ geturlpath( endpointObject.uri ) }}    
       {%- endif %}  
-      {%- if endpoint.config.protocol %}
-      {%- set pv = endpoint.config.protocol.split('/') %}
+      {%- if endpoint.protocol %}
+      {%- set pv = endpoint.protocol.split('/') %}
       protocol: {{ pv[0] | lower }}
       {%- if pv[1] %}
       protocolVersion: '{{ pv[1] }}'
@@ -44,7 +44,7 @@ channels:
     description: "{{ messagegroup.description }}"
     messages:
     {%- for messageid, message in messagegroup.messages.items() -%}         
-    {%- set protocol = (message.binding if message.binding else message.format) %}
+    {%- set protocol = (message.protocol if message.protocol else message.envelope) %}
       {{ messageid | strip_dots | pascal }}:
         $ref: "#/components/messages/{{ messageid | strip_dots | pascal }}"
     {%- endfor %}
@@ -63,13 +63,13 @@ components:
   messages:
   {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
   {%- for messageid, message in messagegroup.messages.items() -%}         
-  {%- set protocol = (message.binding if message.binding else message.format) %}
+  {%- set protocol = (message.protocol if message.protocol else message.envelope) %}
     {{ messageid | strip_dots | pascal }}:
       {# messageId: "{{protocol | strip_dots | pascal}}{{ messageid | strip_dots | pascal }}" #}
       title: "{{ messageid }}"
       summary: "{{ message.description }}"
-      {%- if message.metadata.datacontenttype is defined and message.metadata.datacontenttype.value is defined %}
-      contentType: {{ message.metadata.datacontenttype.value }}
+      {%- if message.envelopemetadata.datacontenttype is defined and message.envelopemetadata.datacontenttype.value is defined %}
+      contentType: {{ message.envelopemetadata.datacontenttype.value }}
       {%- else %}
       contentType: "application/json"
       {%- endif %}
@@ -78,7 +78,7 @@ components:
       headers:
         type: object
         properties:
-          {%- for attributeKey, attribute in message.metadata.items() %}
+          {%- for attributeKey, attribute in message.envelopemetadata.items() %}
           {% if protocol == "http" -%}ce-{% elif protocol == "amqp"%}ce_{%- endif -%}        
           {{ attributeKey }}:
             {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
@@ -117,16 +117,16 @@ components:
               properties:
                 Content-Type:
                   type: string
-                   {%- if message.metadata.datacontenttype is defined and message.metadata.datacontenttype.value is defined %}
-                  enum: ["{{ message.metadata.datacontenttype.value }}"]
+                   {%- if message.envelopemetadata.datacontenttype is defined and message.envelopemetadata.datacontenttype.value is defined %}
+                  enum: ["{{ message.envelopemetadata.datacontenttype.value }}"]
                    {%- else %}
                   enum: ["application/json"]
                    {%- endif %}
             bindingVersion: '0.1.0'
         {%- endif %}
-        {%- if message.schemaurl %}
-            {%- if message.schemaurl.startswith('#') or message.schemaurl.startswith('/') %}
-              {%- set schemaObj = schema_object(root, message.schemaurl ) -%}
+        {%- if message.schemauri %}
+            {%- if message.schemauri.startswith('#') or message.schemauri.startswith('/') %}
+              {%- set schemaObj = schema_object(root, message.schemauri ) -%}
                 {%- if schemaObj.format is defined -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
                   {%- if schemaVersion.schema is defined -%}
@@ -134,7 +134,7 @@ components:
       payload:
           schemaFormat: "application/schema+json;version=draft-07"
           schema:
-              $ref: "#/components/schemas/{{ message.schemaurl[1:].split('/')[-3] | pascal }}.{{ message.schemaurl[1:].split('/')[-1] | pascal }}"
+              $ref: "#/components/schemas/{{ message.schemauri[1:].split('/')[-3] | pascal }}.{{ message.schemauri[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
                   {%- set fileName = (schemaObj.schemaid | lower | snake) +".proto" -%}
                   {%- set x = schemaVersion.schema | pushfile(fileName) %}
@@ -153,7 +153,7 @@ components:
                 {%- endif -%}
               {%- endif -%}
             {%- else %}
-            $ref: "{{ message.schemaurl }}"
+            $ref: "{{ message.schemauri }}"
             {%- endif %}
         {%- else %}
             type: "object"
@@ -167,7 +167,7 @@ components:
     {{ messageid }}:
       type: "object"
       properties:
-        {%- for attributeKey, attribute in message.metadata.items() %}
+        {%- for attributeKey, attribute in message.envelopemetadata.items() %}
         "{{ attributeKey }}":
           {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
           type: "string"
@@ -198,14 +198,14 @@ components:
           {%- endif %}
         {%- endfor %}
         data:
-        {%- if message.schemaurl %}
-             {%- if message.schemaurl.startswith('#') %}
-              {%- set schemaObj = schema_object(root, message.schemaurl ) -%}
+        {%- if message.schemauri %}
+             {%- if message.schemauri.startswith('#') %}
+              {%- set schemaObj = schema_object(root, message.schemauri ) -%}
                 {%- if schemaObj.format is defined -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
                   {%- if schemaVersion.schema is defined -%}
                   {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
-                  $ref: "#/components/schemas/{{ message.schemaurl[1:].split('/')[-3] | pascal }}.{{ message.schemaurl[1:].split('/')[-1] | pascal }}"
+                  $ref: "#/components/schemas/{{ message.schemauri[1:].split('/')[-3] | pascal }}.{{ message.schemauri[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
                   {%- set x = schemaVersion.schema | pushfile(schemaObj.schemaid+".proto") %}
                   type: string
@@ -218,13 +218,13 @@ components:
                 {%- endif -%}
               {%- endif -%}
             {%- else %}
-            $ref: "{{ message.schemaurl }}"
+            $ref: "{{ message.schemauri }}"
             {%- endif %}
         {%- else %}
             type: "object"
         {%- endif %}
       required:
-        {%- for attributeKey, attribute in message.metadata.items() %}
+        {%- for attributeKey, attribute in message.envelopemetadata.items() %}
         {%- if attribute.required %}
         - "{{ attributeKey }}"
         {%- endif %}

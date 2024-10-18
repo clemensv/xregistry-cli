@@ -21,8 +21,8 @@ solution for event-driven applications.
 ## Generated Event Producers
 
 {% for messagegroupid, messagegroup in messagegroups.items() %}
-{%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
-{%- set uses_plain_amqp_message = (messagegroup | exists( "binding", "amqp" )) %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_amqp_message = (messagegroup | exists("protocol","AMQP/1.0")) %}
 
 ### {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}
 
@@ -44,17 +44,17 @@ Args:
 
 #### Event Sending Methods
 
-{% for messageid, message in messagegroup.messages.items() if (message | exists("format", "cloudevents") )%}
+{% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0") )%}
 {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
 ##### `send_{{ messageid | dotunderscore | snake }}`
 
 ```python
 async def send_{{ messageid | dotunderscore | snake }}(self,
-    {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+    {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
         _{{ attrname }}: str, 
     {%- endfor %}
     data: {{ data_type | strip_namespace }}, content_type: str = "application/json"
-    {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+    {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
         , _{{ attrname }}: Optional[str] = None
     {%- endfor -%} ) -> None:
 ```
@@ -62,17 +62,17 @@ async def send_{{ messageid | dotunderscore | snake }}(self,
 Sends the `{{ messageid }}` event to the EventHub.
 
 Args:
-{%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
 - `_{{ attrname }}(str)`: {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
 {%- endfor %}
-{%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
     {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
 - `_{{ placeholder | snake }}(str)`:  Value for placeholder {{ placeholder }} in attribute {{ attrname }}
     {%- endfor %}
 {%- endfor %}
 - `data({{ data_type | strip_namespace }})`: The event data to be sent.
 - `content_type(str)`: The content type that the event data shall be sent with.
-{%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined %}
+{%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined %}
 - `_{{ attrname }}(Optional[str])`: {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
 {%- endfor %}
 

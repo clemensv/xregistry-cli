@@ -20,12 +20,12 @@ using Azure.Messaging.ServiceBus;
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- if message.message["header"] -%}{{ EmitArguments(message.message["header"]) }}{%- endif -%}
-{%- if message.message["footer"] -%}{{ EmitArguments(message.message["footer"]) }}{%- endif -%}
-{%- if message.message["message-annotations"] -%}{{ EmitArguments(message.message["message-annotations"]) }}{%- endif -%}
-{%- if message.message["delivery-annotations"] -%}{{ EmitArguments(message.message["delivery-annotations"]) }}{%- endif -%}
-{%- if message.message["properties"] -%}{{ EmitArguments(message.message["properties"]) }}{%- endif -%}
-{%- if message.message["application-properties"] -%}{{ EmitArguments(message.message["application-properties"]) }}{%- endif -%}
+{%- if message.protocoloptions["header"] -%}{{ EmitArguments(message.protocoloptions["header"]) }}{%- endif -%}
+{%- if message.protocoloptions["footer"] -%}{{ EmitArguments(message.protocoloptions["footer"]) }}{%- endif -%}
+{%- if message.protocoloptions["message_annotations"] -%}{{ EmitArguments(message.protocoloptions["message_annotations"]) }}{%- endif -%}
+{%- if message.protocoloptions["delivery_annotations"] -%}{{ EmitArguments(message.protocoloptions["delivery_annotations"]) }}{%- endif -%}
+{%- if message.protocoloptions["properties"] -%}{{ EmitArguments(message.protocoloptions["properties"]) }}{%- endif -%}
+{%- if message.protocoloptions["application_properties"] -%}{{ EmitArguments(message.protocoloptions["application_properties"]) }}{%- endif -%}
 {%- endmacro %}
 
 {#- Helper macro for assigning properties -#}
@@ -50,12 +50,12 @@ using Azure.Messaging.ServiceBus;
 
 {#- Generates AMQP message objects from amqpDefinition as message -#}
 {%- macro DeclareEventdata(variable, message) -%}
-{%- set header = message.message["header"] %}
-{%- set footer = message.message["footer"] %}
-{%- set messageAnnotations = message.message["message-annotations"] %}
-{%- set deliveryAnnotations = message.message["delivery-annotations"] %}
-{%- set properties = message.message["properties"] %}
-{%- set applicationProperties = message.message["application-properties"] %}
+{%- set header = message.protocoloptions["header"] %}
+{%- set footer = message.protocoloptions["footer"] %}
+{%- set messageAnnotations = message.protocoloptions["message_annotations"] %}
+{%- set deliveryAnnotations = message.protocoloptions["delivery_annotations"] %}
+{%- set properties = message.protocoloptions["properties"] %}
+{%- set applicationProperties = message.protocoloptions["application_properties"] %}
 ServiceBusMessage {{ variable }} = new ServiceBusMessage();
 AmqpAnnotatedMessage am = {{ variable }}.GetRawAmqpMessage();
 {%- if header %}
@@ -80,14 +80,14 @@ AmqpAnnotatedMessage am = {{ variable }}.GetRawAmqpMessage();
 
 
 {%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
-{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 {%- if withType -%}global::{{ messagegroupname | namespace_dot(project_name) | pascal }}I{{ messagegroupname | strip_namespace }}Dispatcher {% endif %}{{ messagegroupid  | strip_namespace | camel }}ServiceBusDispatcher{%- if not loop.last %}, {%- endif -%}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) -%}
-{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
 {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"ServiceBusDispatcher" -%}
 {%- set handlerType=(messagegroupid  | namespace_dot(project_name) | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"ServiceBusDispatcher" -%}
 {{ handlerType }} {{ handlerName }};
@@ -95,8 +95,8 @@ AmqpAnnotatedMessage am = {{ variable }}.GetRawAmqpMessage();
 {%- endmacro -%}
 
 {%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
-{%- if messagegroups | exists("binding", "amqp" ) %}
-{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
+{%- if messagegroups | exists("protocol","AMQP/1.0") %}
+{%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"ServiceBusDispatcher" -%}
 {%- set handlerType=(messagegroupid  | namespace_dot | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"ServiceBusDispatcher" -%}
@@ -104,7 +104,7 @@ AmqpAnnotatedMessage am = {{ variable }}.GetRawAmqpMessage();
 {%- endfor %}
 
 public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
-    {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
+    {%- for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
     {%- set messagegroupname = messagegroupid  | pascal -%} 
     {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"ServiceBusDispatcher" -%}
     {%- set handlerType=(messagegroupid  | namespace_dot | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"ServiceBusDispatcher" -%}
@@ -112,7 +112,7 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
     {%- if not loop.last -%}, {%- endif -%}
     {%- endfor -%})
 {
-    {% for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("binding", "amqp" ) -%}
+    {% for messagegroupid, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
     {%- set messagegroupname = messagegroupid  | pascal %}
     {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"ServiceBusDispatcher" -%}
     {%- set handlerType=(messagegroupid  | namespace_dot | pascal)+"I"+(messagegroupid  | strip_namespace | pascal)+"ServiceBusDispatcher" -%}
@@ -124,20 +124,20 @@ public {{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
 {%- endmacro -%}
 
 {%- macro DispatchToDispatchObjects(project_name, data_project_name, root, message, messagegroups, logger) -%}
-{%- if messagegroups | exists("binding", "amqp" ) %}
+{%- if messagegroups | exists("protocol","AMQP/1.0") %}
 var messageSubject = {{ message }}.Subject;
 switch (messageSubject)
 {
-   {% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
+   {% for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
    {%- set handlerName=(messagegroupid  | strip_namespace | camel)+"ServiceBusDispatcher" -%}
-   {% for messageid, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
+   {% for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
    {% set messagename = messageid | pascal %}
    case "{{ messageid }}":
          if ( this.{{ handlerName }} != null )
          {
             await this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-            {%- if message.schemaurl or message.schema -%}
-            global::{{ ( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Body, {{ message }}.ContentType)
+            {%- if message.schemauri or message.schema -%}
+            global::{{ ( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Body, {{ message }}.ContentType)
             {%- else -%}
             {{ message }}.Data
             {%- endif %});
@@ -155,9 +155,9 @@ switch (messageSubject)
 
 {%- macro DeclareDispatchInterfaces(project_name, data_project_name, root) -%}
 {%- set messagegroups = root.messagegroups -%}
-{%- if messagegroups | exists("binding", "amqp" ) %}
+{%- if messagegroups | exists("protocol","AMQP/1.0") %}
 {%- set function_name = project_name | pascal | strip_dots -%}
-{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("binding", "amqp" )) -%}
+{%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
 {%- set messagegroupname = messagegroupid  | pascal %}
 using System.Threading.Tasks;
 
@@ -165,10 +165,10 @@ namespace {{ messagegroupname | concat_namespace(project_name) | pascal }}
 {
    public interface I{{ messagegroupname | strip_namespace }}ServiceBusDispatcher
    {
-      {%- for messageid, message in messagegroup.messages.items() if (message | exists("binding", "amqp" )) -%}
+      {%- for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
       {%- set messagename = messageid | strip_namespace | pascal -%}
-      {%- if message.schemaurl or message.schema -%}
-      {%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
+      {%- if message.schemauri or message.schema -%}
+      {%- set dataType = 'global::' + (( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
       {%- else -%}
       {%- set dataType = "object" -%}
       {%- endif %}

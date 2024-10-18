@@ -3,11 +3,11 @@
     "specversion": "0.5-wip",
     "messagegroups": {
         "Microsoft.Storage": {
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "messages": {
                 "Microsoft.Storage.BlobCreated": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -38,19 +38,18 @@
                             "required": true
                         }
                     },
-                    "schemaurl": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreatedEventData#/definitions/StorageBlobCreatedEventData",
-                    "id": "Microsoft.Storage.BlobCreated",
+                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreatedEventData#/definitions/StorageBlobCreatedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.BlobCreated",
                     "description": "Raised when a blob is created.",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.5740728+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.5740728+00:00"
                 },
                 "Microsoft.Storage.BlobDeleted": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -81,19 +80,18 @@
                             "required": true
                         }
                     },
-                    "schemaurl": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeletedEventData#/definitions/StorageBlobDeletedEventData",
-                    "id": "Microsoft.Storage.BlobDeleted",
+                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeletedEventData#/definitions/StorageBlobDeletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.BlobDeleted",
                     "description": "Raised when a blob is deleted.",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.6007233+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.6007233+00:00"
                 },
                 "Microsoft.Storage.DirectoryCreated": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -119,18 +117,17 @@
                             "required": true
                         }
                     },
-                    "id": "Microsoft.Storage.DirectoryCreated",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.DirectoryCreated",
                     "description": "Event published when a directory is created",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.6379151+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.6379151+00:00"
                 },
                 "Microsoft.Storage.DirectoryDeleted": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -156,18 +153,17 @@
                             "required": true
                         }
                     },
-                    "id": "Microsoft.Storage.DirectoryDeleted",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.DirectoryDeleted",
                     "description": "Event published when a directory is deleted",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.6757498+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.6757498+00:00"
                 },
                 "Microsoft.Storage.BlobRenamed": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -193,18 +189,17 @@
                             "required": true
                         }
                     },
-                    "id": "Microsoft.Storage.BlobRenamed",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.BlobRenamed",
                     "description": "Event published when a blob is renamed",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.7377382+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.7377382+00:00"
                 },
                 "Microsoft.Storage.DirectoryRenamed": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -230,18 +225,17 @@
                             "required": true
                         }
                     },
-                    "id": "Microsoft.Storage.DirectoryRenamed",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.DirectoryRenamed",
                     "description": "Event published when a directory is renamed",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.773342+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.773342+00:00"
                 },
                 "Microsoft.Storage.BlobTierChanged": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -267,18 +261,17 @@
                             "required": true
                         }
                     },
-                    "id": "Microsoft.Storage.BlobTierChanged",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.BlobTierChanged",
                     "description": "Event published when blob tier is changed.",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.8117531+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.8117531+00:00"
                 },
                 "Microsoft.Storage.BlobInventoryPolicyCompleted": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -309,19 +302,18 @@
                             "required": true
                         }
                     },
-                    "schemaurl": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompletedEventData#/definitions/StorageBlobInventoryPolicyCompletedEventData",
-                    "id": "Microsoft.Storage.BlobInventoryPolicyCompleted",
+                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompletedEventData#/definitions/StorageBlobInventoryPolicyCompletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.BlobInventoryPolicyCompleted",
                     "description": "Raised when a blob inventory is completed.",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.8437546+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.8437546+00:00"
                 },
                 "Microsoft.Storage.AsyncOperationInitiated": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -352,19 +344,18 @@
                             "required": true
                         }
                     },
-                    "schemaurl": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiatedEventData#/definitions/StorageAsyncOperationInitiatedEventData",
-                    "id": "Microsoft.Storage.AsyncOperationInitiated",
+                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiatedEventData#/definitions/StorageAsyncOperationInitiatedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.AsyncOperationInitiated",
                     "description": "Event published when blob rehydration is triggered using either the CopyBlob or SetBlobTier APIs.",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.8732306+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.8732306+00:00"
                 },
                 "Microsoft.Storage.LifecyclePolicyCompleted": {
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -395,23 +386,21 @@
                             "required": true
                         }
                     },
-                    "schemaurl": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompletedEventData#/definitions/StorageLifecyclePolicyCompletedEventData",
-                    "id": "Microsoft.Storage.LifecyclePolicyCompleted",
+                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompletedEventData#/definitions/StorageLifecyclePolicyCompletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.LifecyclePolicyCompleted",
                     "description": "Raised when a lifecycle policy is completed.",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-                    "modifiedOn": "2023-01-11T14:26:07.9031252+00:00"
+                    "createdat": "2023-01-11T14:26:07.6972372+00:00",
+                    "modifiedat": "2023-01-11T14:26:07.9031252+00:00"
                 }
             },
-            "id": "Microsoft.Storage",
             "version": 133179207678361800,
             "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage",
             "origin": "https://azure.com",
-            "createdOn": "2023-01-11T14:26:07.6972372+00:00",
-            "modifiedOn": "2023-01-11T14:26:07.9307621+00:00"
+            "createdat": "2023-01-11T14:26:07.6972372+00:00",
+            "modifiedat": "2023-01-11T14:26:07.9307621+00:00"
         }
     },
     "schemagroups": {
@@ -423,21 +412,19 @@
                         "133177391754886858": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
-                            "id": "133177391754886858",
                             "version": 133177391754886860,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreated/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "0001-01-01T00:00:00+00:00",
-                            "modifiedOn": "0001-01-01T00:00:00+00:00"
+                            "createdat": "0001-01-01T00:00:00+00:00",
+                            "modifiedat": "0001-01-01T00:00:00+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.BlobCreated",
                     "groupId": "Microsoft.Storage",
                     "version": 133177391754886860,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.BlobCreated",
                     "origin": "https://azure.com",
-                    "createdOn": "0001-01-01T00:00:00+00:00",
-                    "modifiedOn": "2023-01-09T11:59:34.9042425+00:00"
+                    "createdat": "0001-01-01T00:00:00+00:00",
+                    "modifiedat": "2023-01-09T11:59:34.9042425+00:00"
                 },
                 "Microsoft.Storage.BlobDeleted": {
                     "format": "JSONSchema/draft-07",
@@ -445,21 +432,19 @@
                         "133177391754886951": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
-                            "id": "133177391754886951",
                             "version": 133177391754886940,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeleted/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "0001-01-01T00:00:00+00:00",
-                            "modifiedOn": "0001-01-01T00:00:00+00:00"
+                            "createdat": "0001-01-01T00:00:00+00:00",
+                            "modifiedat": "0001-01-01T00:00:00+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.BlobDeleted",
                     "groupId": "Microsoft.Storage",
                     "version": 133177391754886940,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.BlobDeleted",
                     "origin": "https://azure.com",
-                    "createdOn": "0001-01-01T00:00:00+00:00",
-                    "modifiedOn": "2023-01-09T11:59:34.9384385+00:00"
+                    "createdat": "0001-01-01T00:00:00+00:00",
+                    "modifiedat": "2023-01-09T11:59:34.9384385+00:00"
                 },
                 "Microsoft.Storage.BlobInventoryPolicyCompleted": {
                     "format": "JSONSchema/draft-07",
@@ -467,21 +452,19 @@
                         "133177391754886997": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
-                            "id": "133177391754886997",
                             "version": 133177391754886990,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompleted/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "0001-01-01T00:00:00+00:00",
-                            "modifiedOn": "0001-01-01T00:00:00+00:00"
+                            "createdat": "0001-01-01T00:00:00+00:00",
+                            "modifiedat": "0001-01-01T00:00:00+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.BlobInventoryPolicyCompleted",
                     "groupId": "Microsoft.Storage",
                     "version": 133177391754886990,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.BlobInventoryPolicyCompleted",
                     "origin": "https://azure.com",
-                    "createdOn": "0001-01-01T00:00:00+00:00",
-                    "modifiedOn": "2023-01-09T11:59:34.9731964+00:00"
+                    "createdat": "0001-01-01T00:00:00+00:00",
+                    "modifiedat": "2023-01-09T11:59:34.9731964+00:00"
                 },
                 "Microsoft.Storage.AsyncOperationInitiated": {
                     "format": "JSONSchema/draft-07",
@@ -489,21 +472,19 @@
                         "133177391754887023": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
-                            "id": "133177391754887023",
                             "version": 133177391754887020,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiated/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "0001-01-01T00:00:00+00:00",
-                            "modifiedOn": "0001-01-01T00:00:00+00:00"
+                            "createdat": "0001-01-01T00:00:00+00:00",
+                            "modifiedat": "0001-01-01T00:00:00+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.AsyncOperationInitiated",
                     "groupId": "Microsoft.Storage",
                     "version": 133177391754887020,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.AsyncOperationInitiated",
                     "origin": "https://azure.com",
-                    "createdOn": "0001-01-01T00:00:00+00:00",
-                    "modifiedOn": "2023-01-09T11:59:35.00838+00:00"
+                    "createdat": "0001-01-01T00:00:00+00:00",
+                    "modifiedat": "2023-01-09T11:59:35.00838+00:00"
                 },
                 "Microsoft.Storage.LifecyclePolicyCompleted": {
                     "format": "JSONSchema/draft-07",
@@ -511,21 +492,19 @@
                         "133177391754887055": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json",
-                            "id": "133177391754887055",
                             "version": 133177391754887060,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompleted/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "0001-01-01T00:00:00+00:00",
-                            "modifiedOn": "0001-01-01T00:00:00+00:00"
+                            "createdat": "0001-01-01T00:00:00+00:00",
+                            "modifiedat": "0001-01-01T00:00:00+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.LifecyclePolicyCompleted",
                     "groupId": "Microsoft.Storage",
                     "version": 133177391754887060,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.LifecyclePolicyCompleted",
                     "origin": "https://azure.com",
-                    "createdOn": "0001-01-01T00:00:00+00:00",
-                    "modifiedOn": "2023-01-09T11:59:35.0444507+00:00"
+                    "createdat": "0001-01-01T00:00:00+00:00",
+                    "modifiedat": "2023-01-09T11:59:35.0444507+00:00"
                 },
                 "Microsoft.Storage.BlobCreatedEventData": {
                     "format": "JSONSchema/draft-07",
@@ -533,21 +512,19 @@
                         "133179208137780104": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageBlobCreatedEventData",
-                            "id": "133179208137780104",
                             "version": 133179208137780100,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreatedEventData/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                            "modifiedOn": "2023-01-11T14:26:53.7780104+00:00"
+                            "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                            "modifiedat": "2023-01-11T14:26:53.7780104+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.BlobCreatedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179208137780100,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.BlobCreatedEventData",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                    "modifiedOn": "2023-01-11T14:26:53.5268038+00:00"
+                    "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                    "modifiedat": "2023-01-11T14:26:53.5268038+00:00"
                 },
                 "Microsoft.Storage.BlobDeletedEventData": {
                     "format": "JSONSchema/draft-07",
@@ -555,21 +532,19 @@
                         "133179208137780104": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageBlobDeletedEventData",
-                            "id": "133179208137780104",
                             "version": 133179208137780100,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeletedEventData/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                            "modifiedOn": "2023-01-11T14:26:53.7780104+00:00"
+                            "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                            "modifiedat": "2023-01-11T14:26:53.7780104+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.BlobDeletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179208137780100,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.BlobDeletedEventData",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                    "modifiedOn": "2023-01-11T14:26:53.555675+00:00"
+                    "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                    "modifiedat": "2023-01-11T14:26:53.555675+00:00"
                 },
                 "Microsoft.Storage.BlobInventoryPolicyCompletedEventData": {
                     "format": "JSONSchema/draft-07",
@@ -577,21 +552,19 @@
                         "133179208137780104": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageBlobInventoryPolicyCompletedEventData",
-                            "id": "133179208137780104",
                             "version": 133179208137780100,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompletedEventData/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                            "modifiedOn": "2023-01-11T14:26:53.7780104+00:00"
+                            "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                            "modifiedat": "2023-01-11T14:26:53.7780104+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.BlobInventoryPolicyCompletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179208137780100,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.BlobInventoryPolicyCompletedEventData",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                    "modifiedOn": "2023-01-11T14:26:53.5844858+00:00"
+                    "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                    "modifiedat": "2023-01-11T14:26:53.5844858+00:00"
                 },
                 "Microsoft.Storage.AsyncOperationInitiatedEventData": {
                     "format": "JSONSchema/draft-07",
@@ -599,21 +572,19 @@
                         "133179208137780104": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageAsyncOperationInitiatedEventData",
-                            "id": "133179208137780104",
                             "version": 133179208137780100,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiatedEventData/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                            "modifiedOn": "2023-01-11T14:26:53.7780104+00:00"
+                            "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                            "modifiedat": "2023-01-11T14:26:53.7780104+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.AsyncOperationInitiatedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179208137780100,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.AsyncOperationInitiatedEventData",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                    "modifiedOn": "2023-01-11T14:26:53.6122163+00:00"
+                    "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                    "modifiedat": "2023-01-11T14:26:53.6122163+00:00"
                 },
                 "Microsoft.Storage.LifecyclePolicyCompletedEventData": {
                     "format": "JSONSchema/draft-07",
@@ -621,29 +592,26 @@
                         "133179208137780104": {
                             "format": "JSONSchema/draft-07",
                             "schemaurl": "https://raw.githubusercontent.com:443/Azure/azure-rest-api-specs/master/specification/eventgrid/data-plane/Microsoft.Storage/stable/2018-01-01/Storage.json#/definitions/StorageLifecyclePolicyCompletedEventData",
-                            "id": "133179208137780104",
                             "version": 133179208137780100,
                             "self": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompletedEventData/versions/1.0",
                             "origin": "https://azure.com",
-                            "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                            "modifiedOn": "2023-01-11T14:26:53.7780104+00:00"
+                            "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                            "modifiedat": "2023-01-11T14:26:53.7780104+00:00"
                         }
                     },
-                    "id": "Microsoft.Storage.LifecyclePolicyCompletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179208137780100,
                     "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage.LifecyclePolicyCompletedEventData",
                     "origin": "https://azure.com",
-                    "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-                    "modifiedOn": "2023-01-11T14:26:53.6459153+00:00"
+                    "createdat": "2023-01-11T14:26:53.7780104+00:00",
+                    "modifiedat": "2023-01-11T14:26:53.6459153+00:00"
                 }
             },
-            "id": "Microsoft.Storage",
             "version": 133179208137823900,
             "self": "#/schemagroups/Microsoft.Storage/Microsoft.Storage",
             "origin": "https://azure.com",
-            "createdOn": "2023-01-11T14:26:53.7780104+00:00",
-            "modifiedOn": "2023-01-11T14:26:53.67205+00:00"
+            "createdat": "2023-01-11T14:26:53.7780104+00:00",
+            "modifiedat": "2023-01-11T14:26:53.67205+00:00"
         }
     }
 }

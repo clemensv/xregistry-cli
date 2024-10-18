@@ -47,8 +47,8 @@ public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_nam
 
 {% for messageid, message in messagegroup.messages.items() -%}
 {%- set messagename = messageid | pascal %}
-{%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-{%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
+{%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
+{%- set is_amqp = not isCloudEvent and message.envelope.lower().startswith("amqp") %}
 
 ### Create{{ messagename | strip_namespace }}Event Method
 
@@ -64,8 +64,8 @@ Creates an `EventData` object for the `{{ messageid }}` message.
 
 ```csharp
 public static EventData Create{{ messagename | strip_namespace }}Event(
-{%- if message.schemaurl or message.schema -%}
-{%- set type_name = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal )  %}
+{%- if message.schemauri or message.schema -%}
+{%- set type_name = ((message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal )  %}
 {%- if message.schemaformat.lower().startswith("jsonschema") %}
 {%- set type_name = type_name | pascal %}
 {%- endif %}
@@ -75,11 +75,11 @@ public static EventData Create{{ messagename | strip_namespace }}Event(
 {{ type_name }} data
 {%- if isCloudEvent -%}
 {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
-{%- elif isAmqp -%}
+{%- elif is_amqp -%}
 {{- amqp.DeclareUriTemplateArguments(message) -}}
 {%- endif -%}
-{%- if isCloudEvent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] -%}
-, string contentType = "{{ message.metadata["datacontenttype"]["value"] }}"
+{%- if isCloudEvent and "datacontenttype" in message.envelopemetadata and "value" in message.envelopemetadata["datacontenttype"] -%}
+, string contentType = "{{ message.envelopemetadata["datacontenttype"]["value"] }}"
 {%- else -%}
 , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
 {%- endif %}
@@ -93,7 +93,7 @@ public static EventData Create{{ messagename | strip_namespace }}Event(
 | `data` | `{{ type_name }}` | The data to include in the event |
 {%- if isCloudEvent %}
 {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
-{%- elif isAmqp %}
+{%- elif is_amqp %}
 {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
 {%- endif %}
 {%- if uriargs %}
@@ -102,8 +102,8 @@ public static EventData Create{{ messagename | strip_namespace }}Event(
 | `{{ splitarg[1] }}` | `{{ splitarg[0] }}` | URI template argument |
 {%- endfor %}
 {%- endif %}
-{%- if isCloudEvent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] %}
-| `contentType` | `string` | The content type of the event data. Defaults to `{{ message.metadata["datacontenttype"]["value"] }}` |
+{%- if isCloudEvent and "datacontenttype" in message.envelopemetadata and "value" in message.envelopemetadata["datacontenttype"] %}
+| `contentType` | `string` | The content type of the event data. Defaults to `{{ message.envelopemetadata["datacontenttype"]["value"] }}` |
 {%- else %}
 | `contentType` | `string` | The content type of the event data. Defaults to `application/json` |
 {%- endif %}

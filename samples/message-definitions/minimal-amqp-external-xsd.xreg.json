@@ -3,13 +3,11 @@
     "specversion": "0.5-wip",
     "messagegroups": {
         "Contoso.MyGroup": {
-            "id": "Contoso.MyGroup",
-                       "binding" : "AMQP/1.0",
+            "protocol": "AMQP/1.0",
             "messages": {
                 "Contoso.MyGroup.MyEvent": {
-                    "id": "Contoso.MyGroup.MyEvent",
-                    "binding": "AMQP/1.0",
-                    "message": {
+                    "protocol": "AMQP/1.0",
+                    "protocoloptions": {
                         "properties": {
                             "subject": {
                                 "type": "string",
@@ -17,21 +15,18 @@
                             }
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                    "schemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Contoso.MyEvents": {
-            "id": "Contoso.MyEvents",
             "schemas": {
                 "MyEventData": {
-                    "id": "MyEventData",
                     "format": "XSD/1.0",
                     "versions": {
                         "1.0": {
-                            "id": "1.0",
                             "format": "XSD/1.0",
                             "schemaurl": "  https://contoso.com/schemas/myeventdata/1.0.xsd"
                         }

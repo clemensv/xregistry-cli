@@ -35,8 +35,8 @@ class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
     {%- set parts = message.messageid.split('.') -%}
     {%- set messageName = parts|join('_')|lower %}
     def send_{{messageName.split('.')[-1]}}(self,
-    {%- for attrname in message.metadata -%}
-    {%- set attribute = message.metadata[attrname] -%}
+    {%- for attrname in message.envelopemetadata -%}
+    {%- set attribute = message.envelopemetadata[attrname] -%}
         {%- if attribute.type == "uritemplate" -%}
             {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} : str, {% endfor -%}
         {%- elif attribute.value is not defined -%}
@@ -46,8 +46,8 @@ class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
     data: {{ util.DeclareDataType( project_name, root, message ) | strip_namespace }} ) -> None:
         """ send_{{messageName.split('.')[-1]}} """
         attributes = {
-        {%- for attrname in message.metadata -%}
-        {%- set attribute = message.metadata[attrname] %}
+        {%- for attrname in message.envelopemetadata -%}
+        {%- set attribute = message.envelopemetadata[attrname] %}
             "{{ attrname }}": 
             {%- if attribute.value -%}
             "{{ attribute.value }}"

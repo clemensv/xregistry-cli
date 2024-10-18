@@ -3,73 +3,69 @@
     "specversion": "0.5-wip",
     "endpoints": {
         "myendpoint": {
-            "id": "myendpoint",
             "usage": "producer",
-            "config": {
-                "protocol": "HTTP",
-                "deployed": false,
-                "endpoints": [{ "uri": "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions" }],
-                "options": {
-                    "method": "post",
-                    "headers": [
-                        {
-                            "name": "Authorization",
-                            "value": "Bearer {token}"
-                        }
-                    ]
+            "protocol": "HTTP",
+            "deployed": false,
+            "endpoints": [
+                {
+                    "uri": "https://cediscoveryinterop.azurewebsites.net/registry/subscriptions"
                 }
+            ],
+            "protocoloptions": {
+                "method": "post",
+                "headers": [
+                    {
+                        "name": "Authorization",
+                        "value": "Bearer {token}"
+                    }
+                ]
             },
             "messagegroups": [
                 "#/messagegroups/Contoso.ERP.Events"
             ],
-            "format": "CloudEvents/1.0"
+            "envelope": "CloudEvents/1.0"
         }
     },
     "messagegroups": {
         "Contoso.ERP.Events": {
-                       "id": "Contoso.ERP.Events",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
-                    "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "Contoso.ERP.Events.ReservationPlaced",
-                                "required": true
-                            },
-                            "time": {
-                                "type": "datetime",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "/erp/orders",
-                                "required": true
-                            }
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
+                        "id": {
+                            "type": "string",
+                            "required": true
                         },
-                    "schemaformat" : "JsonSchema/draft-07",
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
+                        "type": {
+                            "type": "string",
+                            "value": "Contoso.ERP.Events.ReservationPlaced",
+                            "required": true
+                        },
+                        "time": {
+                            "type": "datetime",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "value": "/erp/orders",
+                            "required": true
+                        }
+                    },
+                    "schemaformat": "JsonSchema/draft-07",
+                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 }
             }
         }
     },
     "schemagroups": {
         "Contoso.ERP.Events": {
-            "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
-                    "id": "orderData",
                     "format": "JsonSchema/draft-07",
                     "versions": {
                         "1": {
-                            "id": "1",
                             "format": "JsonSchema/draft-07",
                             "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",

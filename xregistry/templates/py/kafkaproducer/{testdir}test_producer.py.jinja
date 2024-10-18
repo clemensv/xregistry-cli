@@ -103,14 +103,14 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
     event_data = {}
     {%- endif %}
     await producer_instance.send_{{ messageid | dotunderscore | snake }}(
-        {%- for attrname, attribute in message.metadata.items() if attribute.required and attribute.value is not defined -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
             _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
         {%- endfor -%}
-        {%- for attrname, attribute in message.metadata.items() if attribute.type == "uritemplate" -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
             {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
         {%- endfor -%}
         data = event_data
-        {%- for attrname, attribute in message.metadata.items() if not attribute.required and attribute.value is not defined -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
             , _{{ attrname }} = ''
         {%- endfor -%}
     )

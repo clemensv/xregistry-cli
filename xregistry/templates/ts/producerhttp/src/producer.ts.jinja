@@ -1,6 +1,6 @@
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
 {%- if not uses_cloudevents_message %}
 {%- exit -%}
 {%- endif -%}
@@ -25,10 +25,10 @@ export class {{ groupname | strip_dots }}EventProducer
   
     {%- if root.endpoints -%} 
     {%- for endpointid, endpoint in root.endpoints.items() -%}
-        {%- if endpoint.usage == "producer" and "http" == (endpoint.config.protocol | lower) -%}
-      {%- set protocol = endpoint.config.protocol | lower -%}
-      {%- set options = endpoint.config.options -%}
-      {%- set endpoints = endpoint.config.endpoints %}
+        {%- if endpoint.usage == "producer" and "http" == (endpoint.protocol | lower) -%}
+      {%- set protocol = endpoint.protocol | lower -%}
+      {%- set options = endpoint.protocoloptions -%}
+      {%- set endpoints = endpoint.endpoints %}
            
    static createFor{{ endpointid | pascal | strip_dots }}(credential : any) 
    {       
@@ -56,12 +56,12 @@ export class {{ groupname | strip_dots }}EventProducer
 
    {% for messageid, message in messagegroup.messages.items() -%}
    {%- set messagename = messageid | pascal %}
-   {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-   {%- set isAmqp = not isCloudEvent and message.format.lower().startswith("amqp") %}
-   {%- set isMqtt = not isCloudEvent and message.format.lower().startswith("mqtt") %}
+   {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
+   {%- set is_amqp = not isCloudEvent and message.envelope.lower().startswith("amqp") %}
+   {%- set isMqtt = not isCloudEvent and message.envelope.lower().startswith("mqtt") %}
    async send{{ messagename | strip_namespace }}Async(
-   {%- if message.schemaurl or message.schema -%}
-   {% set dataType = "types." + ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+   {%- if message.schemauri or message.schema -%}
+   {% set dataType = "types." + ((message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
    {%- else -%}
    {% set dataType = "any" %}
    {%- endif %}    

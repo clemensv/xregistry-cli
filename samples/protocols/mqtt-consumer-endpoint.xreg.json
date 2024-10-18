@@ -3,16 +3,17 @@
     "specversion": "0.5-wip",
     "endpoints": {
         "MyMqttConsumer": {
-            "id": "MyMqttConsumer",
             "usage": "consumer",
-            "config": {
-                "protocol": "MQTT/5.0",
-                "deployed": false,
-                "endpoints": [{ "uri": "mqtt://mybroker.example.com" }],
-                "options": {
-                    "topic": "events",
-                    "qos": 1
+            "protocol": "MQTT/5.0",
+            "deployed": false,
+            "endpoints": [
+                {
+                    "uri": "mqtt://mybroker.example.com"
                 }
+            ],
+            "protocoloptions": {
+                "topic": "events",
+                "qos": 1
             },
             "messagegroups": [
                 "#/messagegroups/Contoso.MyGroup"
@@ -21,13 +22,11 @@
     },
     "messagegroups": {
         "Contoso.MyGroup": {
-            "id": "Contoso.MyGroup",
-            "binding": "MQTT/5.0",
+            "protocol": "MQTT/5.0",
             "messages": {
                 "Contoso.MyGroup.MyEvent": {
-                    "id": "Contoso.MyGroup.MyEvent",
-                    "binding": "MQTT/5.0",
-                    "message": {
+                    "protocol": "MQTT/5.0",
+                    "protocoloptions": {
                         "properties": {
                             "topic": {
                                 "type": "uritemplate",
@@ -54,21 +53,18 @@
                         }
                     },
                     "schemaformat": "JsonSchema/draft-07",
-                    "schemaurl": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                    "schemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Contoso.MyEvents": {
-            "id": "Contoso.MyEvents",
             "schemas": {
                 "MyEventData": {
-                    "id": "MyEventData",
                     "format": "JsonSchema/draft-07",
                     "versions": {
                         "1.0": {
-                            "id": "1.0",
                             "format": "JsonSchema/draft-07",
                             "schema": {
                                 "$schema": "http://json-schema.org/draft-07/schema",

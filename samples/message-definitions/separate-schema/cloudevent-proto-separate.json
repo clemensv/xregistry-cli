@@ -29,7 +29,7 @@
                 "com.example.group1.example": {
                     "id": "com.example.group1.example",
                     "defaultversionid": "1",
-                    "versions" : {
+                    "versions": {
                         "1": {
                             "id": "1",
                             "format": "Proto/3",

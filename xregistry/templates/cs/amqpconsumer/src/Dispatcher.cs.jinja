@@ -4,8 +4,8 @@
 {{ util.CommonFileHeader() }}
 {%- set messagegroups = root.messagegroups %}
 {%- set uses_cloudevents_message = cloudEvents.usesCloudEvents(root) %}
-{%- set uses_amqp_message = amqp.usesAmqpBinding(root) %}
-{%- set uses_amqp_endpoint = amqp.usesAmqpEndpoint(root) %}
+{%- set uses_amqp_message = amqp.uses_amqp_protocol(root) %}
+{%- set uses_amqp_endpoint = amqp.uses_amqp_endpoint(root) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
 using System;
 using System.Collections.Generic;
@@ -186,11 +186,11 @@ namespace {{ project_name | pascal }}
         {%- if root.endpoints -%}
         {%- for endpointid, endpoint in root.endpoints.items() -%}
         {%- if endpoint.usage == "consumer" -%}
-        {%- set protocol = endpoint.config.protocol | lower -%}
-        {%- set options = endpoint.config.options -%}
-        {%- set endpoints = endpoint.config.endpoints %}
+        {%- set protocol = endpoint.protocol | lower -%}
+        {%- set options = endpoint.protocoloptions -%}
+        {%- set endpoints = endpoint.endpoints %}
         {%- set isCloudEvent = endpoint.format and endpoint.format.lower().startswith("cloudevents") -%}
-        {%- set isAmqp = endpoint.binding and endpoint.binding.lower().startswith("amqp") %}
+        {%- set is_amqp = endpoint.binding and endpoint.binding.lower().startswith("amqp") %}
 
         public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(EndpointCredential credential, ILoggerFactory? loggerFactory)
         {

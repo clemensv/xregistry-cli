@@ -4,15 +4,13 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "Fabrikam.Lumen": {
-            "id": "Fabrikam.Lumen",
             "description": "State change events for a Fabrikam smart lightbulb",
             "messages": {
                 "Fabrikam.Lumen.TurnedOn": {
-                    "id": "Fabrikam.Lumen.TurnedOn",
                     "description": "Event for when the bulb is turned on",
-                    "binding": "AMQP/1.0",
-                    "message" :{
-                        "application-properties" : {
+                    "protocol": "AMQP/1.0",
+                    "protocoloptions": {
+                        "application_properties": {
                             "subject": {
                                 "required": true,
                                 "value": "Fabrikam.Lumen.TurnedOn",
@@ -21,14 +19,13 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOnEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOnEventData"
                 },
                 "Fabrikam.Lumen.TurnedOff": {
-                    "id": "Fabrikam.Lumen.TurnedOff",
                     "description": "Event for when the bulb is turned off",
-                    "binding": "AMQP/1.0",
-                    "message" :{
-                        "application-properties" : {
+                    "protocol": "AMQP/1.0",
+                    "protocoloptions": {
+                        "application_properties": {
                             "subject": {
                                 "required": true,
                                 "value": "Fabrikam.Lumen.TurnedOff",
@@ -37,14 +34,13 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOffEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOffEventData"
                 },
                 "Fabrikam.Lumen.BrightnessChanged": {
-                    "id": "Fabrikam.Lumen.BrightnessChanged",
                     "description": "Event for when the bulb's brightness changes",
-                    "binding": "AMQP/1.0",
-                    "message" :{
-                        "application-properties" : {
+                    "protocol": "AMQP/1.0",
+                    "protocoloptions": {
+                        "application_properties": {
                             "subject": {
                                 "required": true,
                                 "value": "Fabrikam.Lumen.BrightnessChanged",
@@ -53,14 +49,13 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.BrightnessChangedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.BrightnessChangedEventData"
                 },
                 "Fabrikam.Lumen.ColorChanged": {
-                    "id": "Fabrikam.Lumen.ColorChanged",
                     "description": "Event for when the bulb's color changes",
-                    "binding": "AMQP/1.0",
-                    "message" :{
-                        "application-properties" : {
+                    "protocol": "AMQP/1.0",
+                    "protocoloptions": {
+                        "application_properties": {
                             "subject": {
                                 "required": true,
                                 "value": "Fabrikam.Lumen.ColorChanged",
@@ -69,22 +64,19 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.ColorChangedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.ColorChangedEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Fabrikam.Lumen": {
-            "id": "Fabrikam.Lumen",
             "schemas": {
                 "Fabrikam.Lumen.TurnedOnEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.Lumen.TurnedOnEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "TurnedOnEventData",
@@ -144,11 +136,9 @@
                 },
                 "Fabrikam.Lumen.TurnedOffEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.Lumen.TurnedOffEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "TurnedOffEventData",
@@ -178,11 +168,9 @@
                 },
                 "Fabrikam.Lumen.BrightnessChangedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.Lumen.BrightnessChangedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "BrightnessChangedEventData",
@@ -229,11 +217,9 @@
                 },
                 "Fabrikam.Lumen.ColorChangedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.Lumen.ColorChangedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "ColorChangedEventData",

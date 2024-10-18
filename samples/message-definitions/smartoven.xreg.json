@@ -4,15 +4,13 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "Fabrikam.SmartOven": {
-            "id": "Fabrikam.SmartOven",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "description": "State change events for a Fabrikam smart oven",
             "messages": {
                 "Fabrikam.SmartOven.TurnedOn": {
-                    "id": "Fabrikam.SmartOven.TurnedOn",
                     "description": "Event for when the oven is turned on with settings",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -34,13 +32,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TurnedOnEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TurnedOnEventData"
                 },
                 "Fabrikam.SmartOven.TurnedOff": {
-                    "id": "Fabrikam.SmartOven.TurnedOff",
                     "description": "Event for when the oven is turned off",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -62,13 +59,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TurnedOffEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TurnedOffEventData"
                 },
                 "Fabrikam.SmartOven.TimerSet": {
-                    "id": "Fabrikam.SmartOven.TimerSet",
                     "description": "Event for when a timer is set on the oven",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -90,13 +86,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TimerSetEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TimerSetEventData"
                 },
                 "Fabrikam.SmartOven.TimerCompleted": {
-                    "id": "Fabrikam.SmartOven.TimerCompleted",
                     "description": "Event for when a timer completes",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -118,13 +113,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TimerCompletedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TimerCompletedEventData"
                 },
                 "Fabrikam.SmartOven.PreheatingFinished": {
-                    "id": "Fabrikam.SmartOven.PreheatingFinished",
                     "description": "Event for when preheating is finished",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -146,22 +140,19 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.PreheatingFinishedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.PreheatingFinishedEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Fabrikam.SmartOven": {
-            "id": "Fabrikam.SmartOven",
             "schemas": {
                 "Fabrikam.SmartOven.TurnedOnEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.SmartOven.TurnedOnEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "TurnedOnEventData",
@@ -194,7 +185,13 @@
                                         "type": {
                                             "type": "enum",
                                             "name": "OvenMode",
-                                            "symbols": ["Microwave", "TopHeat", "BottomHeat", "TopBottomHeat", "Convection"]
+                                            "symbols": [
+                                                "Microwave",
+                                                "TopHeat",
+                                                "BottomHeat",
+                                                "TopBottomHeat",
+                                                "Convection"
+                                            ]
                                         }
                                     }
                                 ]
@@ -204,11 +201,9 @@
                 },
                 "Fabrikam.SmartOven.TurnedOffEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.SmartOven.TurnedOffEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "TurnedOffEventData",
@@ -232,11 +227,9 @@
                 },
                 "Fabrikam.SmartOven.TimerSetEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.SmartOven.TimerSetEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "TimerSetEventData",
@@ -259,7 +252,11 @@
                                         "type": {
                                             "type": "enum",
                                             "name": "TimerType",
-                                            "symbols": ["Standard", "Smart"]}
+                                            "symbols": [
+                                                "Standard",
+                                                "Smart"
+                                            ]
+                                        }
                                     },
                                     {
                                         "name": "duration",
@@ -273,11 +270,9 @@
                 },
                 "Fabrikam.SmartOven.TimerCompletedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.SmartOven.TimerCompletedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "TimerCompletedEventData",
@@ -306,11 +301,9 @@
                 },
                 "Fabrikam.SmartOven.PreheatingFinishedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.SmartOven.PreheatingFinishedEventData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "PreheatingFinishedEventData",

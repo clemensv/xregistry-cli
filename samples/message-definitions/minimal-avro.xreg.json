@@ -4,14 +4,12 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "Contoso.ERP.Events": {
-            "id": "Contoso.ERP.Events",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "messages": {
                 "Contoso.ERP.Events.ReservationPlaced": {
-                    "id": "Contoso.ERP.Events.ReservationPlaced",
                     "description": "A reservation has been placed",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "type": "string",
                             "required": true
@@ -31,22 +29,19 @@
                             "required": true
                         }
                     },
-                    "schemaurl": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
+                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 }
             }
         }
     },
     "schemagroups": {
         "Contoso.ERP.Events": {
-            "id": "Contoso.ERP.Events",
             "schemas": {
                 "orderData": {
                     "format": "Avro/1.8.2",
-                    "id": "orderData",
                     "versions": {
                         "1": {
                             "format": "Avro/1.8.2",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "OrderData",

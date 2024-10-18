@@ -61,11 +61,11 @@ if (!effectiveConfig.KQL_CONNECTION_STRING || !effectiveConfig.KQL_DATABASE_NAME
 const eventTypeTableMap = {
 {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
 {%- for message_id, message in messagegroup.messages.items() -%}
-{%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+{%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
 {%- if isCloudEvent %}
-{%- if message.schemaurl or message.schema -%}
-{%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace ) %}
-'{{ message.metadata["type"]["value"] }}': '{{ dataType }}',
+{%- if message.schemauri or message.schema -%}
+{%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace ) %}
+'{{ message.envelopemetadata["type"]["value"] }}': '{{ dataType }}',
 {%- endif %}
 {%- endif %}
 {%- endfor %}

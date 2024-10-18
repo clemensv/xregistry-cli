@@ -4,7 +4,7 @@
 {{ util.CommonFileHeader() }}
 
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
 
 #nullable enable
 

@@ -25,8 +25,8 @@ solution for event-driven applications.
 ## Generated Event Dispatchers
 
 {% for messagegroupid, messagegroup in messagegroups.items() %}
-{%- set uses_cloudevents_message = (messagegroup | exists( "format", "cloudevents" )) %}
-{%- set uses_plain_amqp_message = (messagegroup | exists( "binding", "amqp" )) %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_amqp_message = (messagegroup | exists("protocol","AMQP/1.0")) %}
 
 ### {{ (messagegroupid | pascal | strip_dots) + "EventDispatcher" }}
 

@@ -2,8 +2,8 @@
 {%- import "kafka.jinja.include" as kafka -%}
 {%- import "util.include.jinja" as util -%}
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
-{%- set uses_plain_kafka_message = (root | exists( "binding", "kafka" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_kafka_message = (root | exists( "protocol", "kafka" )) %}
 {%- set uses_kafka_endpoint = (root | exists( "protocol", "kafka" )) %}
 {%- set function_name = project_name | pascal | strip_dots -%}
 # pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, redefined-outer-name, missing-class-docstring

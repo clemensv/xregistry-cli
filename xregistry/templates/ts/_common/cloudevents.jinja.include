@@ -1,8 +1,8 @@
 {#- CloudEvents macros -#}
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-  {%- for attrname in message.metadata -%}
-  {%- set attribute = message.metadata[attrname] -%}
+  {%- for attrname in message.envelopemetadata -%}
+  {%- set attribute = message.envelopemetadata[attrname] -%}
       {%- if attribute.type == "uritemplate" -%}
           {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
           , string {{ placeholder }}
@@ -17,8 +17,8 @@
 {#- Generates a CloudEvent object from cloudEventDefinition as message -#}
 {%- macro DeclareCloudEvent(variable, message, data_type) -%}
   const {{ variable }} = new CloudEvent<{{ data_type }}>({
-  {%- for attrname in message.metadata -%}
-  {%- set attribute = message.metadata[attrname] -%}
+  {%- for attrname in message.envelopemetadata -%}
+  {%- set attribute = message.envelopemetadata[attrname] -%}
   {%- if attrname in ["time"] %}
   {{ attrname }} : {% if attribute.value -%}
   {%- if attribute.value == "0001-01-01T00:00:00+00:00" -%}

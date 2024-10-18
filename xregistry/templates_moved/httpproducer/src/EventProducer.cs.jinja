@@ -3,7 +3,7 @@
 {{ util.CommonFileHeader() }}
 
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
 
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.SystemTextJson;
@@ -35,9 +35,9 @@ namespace {{ project_name | pascal }}
         {%- if root.endpoints -%} 
         {%- for endpointid, endpoint in root.endpoints.items() -%}
                 {%- if endpoint.usage == "producer" -%}
-            {%- set protocol = endpoint.config.protocol | lower -%}
-            {%- set options = endpoint.config.options -%}
-            {%- set endpoints = endpoint.config.endpoints %}
+            {%- set protocol = endpoint.protocol | lower -%}
+            {%- set options = endpoint.protocoloptions -%}
+            {%- set endpoints = endpoint.endpoints %}
 
         public static {{ class_name }} CreateFor{{ endpointid | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
         {       
@@ -74,8 +74,8 @@ namespace {{ project_name | pascal }}
         {%- if isCloudEvent -%}
         {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
         {%- endif -%}
-        {%- if isCloudEvent and "datacontenttype" in message.metadata and "value" in message.metadata["datacontenttype"] %}
-        , string contentType = "{{ message.metadata["datacontenttype"]["value"] }}"
+        {%- if isCloudEvent and "datacontenttype" in message.envelopemetadata and "value" in message.envelopemetadata["datacontenttype"] %}
+        , string contentType = "{{ message.envelopemetadata["datacontenttype"]["value"] }}"
         {%- else %}
         , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
         {%- endif %}
@@ -83,8 +83,8 @@ namespace {{ project_name | pascal }}
         {
             {% if isCloudEvent %}
             {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12)}}
-            cloudEvent.Data = {% if message.schemaurl -%}
-            {%- set schemaObj = schema_object(root, message.schemaurl ) -%}
+            cloudEvent.Data = {% if message.schemauri -%}
+            {%- set schemaObj = schema_object(root, message.schemauri ) -%}
             {%- if schemaObj and "format" in schemaObj and not schemaObj.format.lower().startswith("json") -%}
             data.ToByteArray(contentType)
             {%- else -%}

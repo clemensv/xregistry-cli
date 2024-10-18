@@ -4,15 +4,13 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "Fabrikam.InkJetPrinter": {
-            "id": "Fabrikam.InkJetPrinter",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "description": "Operational events for a Fabrikam inkjet printer",
             "messages": {
                 "Fabrikam.InkJetPrinter.PrintJobStarted": {
-                    "id": "Fabrikam.InkJetPrinter.PrintJobStarted",
                     "description": "Event for when a print job starts",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -34,13 +32,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobStartedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobStartedEventData"
                 },
                 "Fabrikam.InkJetPrinter.PrintJobCompleted": {
-                    "id": "Fabrikam.InkJetPrinter.PrintJobCompleted",
                     "description": "Event for when a print job is completed",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -62,13 +59,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobCompletedEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobCompletedEventData"
                 },
                 "Fabrikam.InkJetPrinter.InkLow": {
-                    "id": "Fabrikam.InkJetPrinter.InkLow",
                     "description": "Event for when ink levels are low",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -90,13 +86,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.InkLowEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.InkLowEventData"
                 },
                 "Fabrikam.InkJetPrinter.PaperJam": {
-                    "id": "Fabrikam.InkJetPrinter.PaperJam",
                     "description": "Event for when a paper jam occurs",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -118,13 +113,12 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PaperJamEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PaperJamEventData"
                 },
                 "Fabrikam.InkJetPrinter.MaintenanceRequired": {
-                    "id": "Fabrikam.InkJetPrinter.MaintenanceRequired",
                     "description": "Event for when the printer requires maintenance",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
                         "id": {
                             "required": true
                         },
@@ -146,23 +140,20 @@
                         }
                     },
                     "schemaformat": "Avro/1.11.1",
-                    "schemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.MaintenanceRequiredEventData"
+                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.MaintenanceRequiredEventData"
                 }
             }
         }
     },
     "schemagroups": {
         "Fabrikam.InkJetPrinter": {
-            "id": "Fabrikam.InkJetPrinter",
             "schemas": {
                 "Fabrikam.InkJetPrinter.PrintJobStartedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.InkJetPrinter.PrintJobStartedEventData",
                     "defaultversionid": "1",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "PrintJobStartedEventData",
@@ -201,12 +192,10 @@
                 },
                 "Fabrikam.InkJetPrinter.PrintJobCompletedEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.InkJetPrinter.PrintJobCompletedEventData",
                     "defaultversionid": "1",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "PrintJobCompletedEventData",
@@ -258,12 +247,10 @@
                 },
                 "Fabrikam.InkJetPrinter.InkLowEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.InkJetPrinter.InkLowEventData",
                     "defaultversionid": "1",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "InkLowEventData",
@@ -296,7 +283,8 @@
                                                 "Cyan",
                                                 "Magenta",
                                                 "Yellow"
-                                            ]}
+                                            ]
+                                        }
                                     },
                                     {
                                         "name": "remainingLevel",
@@ -310,12 +298,10 @@
                 },
                 "Fabrikam.InkJetPrinter.PaperJamEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.InkJetPrinter.PaperJamEventData",
                     "defaultversionid": "1",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "PaperJamEventData",
@@ -349,12 +335,10 @@
                 },
                 "Fabrikam.InkJetPrinter.MaintenanceRequiredEventData": {
                     "format": "Avro/1.11.1",
-                    "id": "Fabrikam.InkJetPrinter.MaintenanceRequiredEventData",
                     "defaultversionid": "1",
                     "versions": {
                         "1": {
                             "format": "Avro/1.11.1",
-                            "id": "1",
                             "schema": {
                                 "type": "record",
                                 "name": "MaintenanceRequiredEventData",
@@ -380,7 +364,8 @@
                                             "symbols": [
                                                 "Cleaning",
                                                 "MechanicalAdjustment"
-                                            ]}
+                                            ]
+                                        }
                                     },
                                     {
                                         "name": "urgency",

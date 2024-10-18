@@ -85,8 +85,8 @@ Below is a list of events and how to subscribe to them:
 
 {%- for messageid, message in messagegroup.messages.items() %}
 {%- set messagename = messageid | strip_namespace | pascal %}
-{%- if message.schemaurl or message.schema %}
-{%- set dataType = 'global::' + (( message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal) %}
+{%- if message.schemauri or message.schema %}
+{%- set dataType = 'global::' + (( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal) %}
 {%- else %}
 {%- set dataType = "object" %}
 {%- endif %}
@@ -95,13 +95,13 @@ Below is a list of events and how to subscribe to them:
 
   Arguments:
     - `eventData`: [`Azure.EventHubs.EventData`](): The Event Hubs event data.
-    {%- if message.format == 'CloudEvents/1.0' %}
+    {%- if message.envelope == 'CloudEvents/1.0' %}
     - `cloudEvent`: [`CloudNative.CloudEvent`](): The CloudEvent envelope information.
     {%- endif %}
     - `data`: [`{{ dataType | lstrip('global::')}}`](): The event data.
 
   ```csharp
-  dispatcher.{{ messagename }}Async += async (eventData, {{ 'cloudEvent, ' if message.format == 'CloudEvents/1.0' }}{{dataType}} data) =>
+  dispatcher.{{ messagename }}Async += async (eventData, {{ 'cloudEvent, ' if message.envelope == 'CloudEvents/1.0' }}{{dataType}} data) =>
   {
       // Your event handling logic here
   };

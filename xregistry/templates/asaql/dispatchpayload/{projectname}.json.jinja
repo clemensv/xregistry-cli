@@ -1,8 +1,8 @@
 {#- triggering generation of all schema-based elements with this loop #}
 {%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
    {%- for messageid, message in messagegroup.messages.items() %}
-    {%- if message.schemaurl or message.schema -%}
-        {% set x=(message.schemaurl if message.schemaurl else message.schema) | schema_type( project_name, root, message.schemaformat) -%}
+    {%- if message.schemauri or message.schema -%}
+        {% set x=(message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) -%}
     {%-endif -%}
     {%- endfor -%}
 {%- endfor %}

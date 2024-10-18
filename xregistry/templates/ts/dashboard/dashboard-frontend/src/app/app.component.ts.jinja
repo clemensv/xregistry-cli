@@ -1,5 +1,5 @@
 {%- set messagegroups = root.messagegroups %}
-{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
 {%- if not uses_cloudevents_message %}
 {%- exit -%}
 {%- endif -%}
@@ -12,9 +12,9 @@ import { CloudEvent } from 'cloudevents';
 import {
 {%- for messageid, message in messagegroup.messages.items() -%}
 {%- set messagename = messageid | pascal %}
-{%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
-{%- if message.schemaurl or message.schema -%}
-{%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
+{%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
+{%- if message.schemauri or message.schema -%}
+{%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
 {{- dataType | dotunderscore }}{% if not loop.last %},{% endif -%}
 {%- endif -%}
 {%- endfor -%}
@@ -32,10 +32,10 @@ export class AppComponent implements OnInit, OnDestroy {
   // Event listeners for each event type
   {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
   {%- for message_id, message in messagegroup.messages.items() -%}
-  {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+  {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
   {%- if isCloudEvent %}
-  {%- if message.schemaurl or message.schema -%}
-  {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
+  {%- if message.schemauri or message.schema -%}
+  {%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
   {{ dataType | dotunderscore | camel }}Listener!: EventStreamListener<{{ dataType | dotunderscore }}>;
   {%- endif %}
   {%- endif %}
@@ -53,9 +53,9 @@ export class AppComponent implements OnInit, OnDestroy {
   eventCounters: { [key: string]: number } = {
     {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
     {%- for message_id, message in messagegroup.messages.items() -%}
-    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
     {%- if isCloudEvent %}
-    '{{ message.metadata["type"]["value"] }}': 0{% if not loop.last %},{% endif %}
+    '{{ message.envelopemetadata["type"]["value"] }}': 0{% if not loop.last %},{% endif %}
     {%- endif %}
     {%- endfor %}
     {%- if not loop.last %},{% endif -%}
@@ -65,9 +65,9 @@ export class AppComponent implements OnInit, OnDestroy {
   eventCountsPerMinute: { [eventType: string]: { [minuteTimestamp: number]: number } } = {
     {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
     {%- for message_id, message in messagegroup.messages.items() -%}
-    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
     {%- if isCloudEvent %}
-    '{{ message.metadata["type"]["value"] }}': {}{% if not loop.last %},{% endif %}
+    '{{ message.envelopemetadata["type"]["value"] }}': {}{% if not loop.last %},{% endif %}
     {%- endif %}
     {%- endfor %}
     {%- if not loop.last %},{% endif -%}
@@ -127,11 +127,11 @@ export class AppComponent implements OnInit, OnDestroy {
     const endTime = new Date().toISOString();
     {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
     {%- for message_id, message in messagegroup.messages.items() -%}
-    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
     {%- if isCloudEvent %}
-    {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
+    {%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
     this.{{ dataType | dotunderscore | camel }}Listener = new EventStreamListener<{{ dataType | dotunderscore}}>(
-      '{{ message.metadata["type"]["value"] }}', '', '',
+      '{{ message.envelopemetadata["type"]["value"] }}', '', '',
       this.socketService, new TypedJSON({{ dataType | dotunderscore }})
     );
     this.{{ dataType | dotunderscore | camel }}Listener
@@ -147,9 +147,9 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
     {%- for message_id, message in messagegroup.messages.items() -%}
-    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
     {%- if isCloudEvent %}
-    {%- set dataType = ((message.schemaurl if message.schemaurl else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
+    {%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
     this.{{ dataType | dotunderscore | camel }}Listener.close();
     {%- endif %}
     {%- endfor %}
@@ -444,9 +444,9 @@ export class AppComponent implements OnInit, OnDestroy {
     // Update the counters at the bottom
     {%- for messagegroup_id, messagegroup in root.messagegroups.items() -%}
     {%- for message_id, message in messagegroup.messages.items() -%}
-    {%- set isCloudEvent = not message.format or message.format.lower().startswith("cloudevents") -%}
+    {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
     {%- if isCloudEvent %}
-    document.getElementById('{{ message.metadata["type"]["value"] | dotdash| lower}}-counter')!.innerHTML = `{{ message.metadata["type"]["value"] }}<br>${this.eventCounters['{{ message.metadata["type"]["value"] }}']}`;
+    document.getElementById('{{ message.envelopemetadata["type"]["value"] | dotdash| lower}}-counter')!.innerHTML = `{{ message.envelopemetadata["type"]["value"] }}<br>${this.eventCounters['{{ message.envelopemetadata["type"]["value"] }}']}`;
     {%- endif %}
     {%- endfor %}
     {%- endfor %}

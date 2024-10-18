@@ -4,91 +4,83 @@
     "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
     "messagegroups": {
         "com.example.grp1": {
-                       "id": "com.example.grp1",
-            "format" : "CloudEvents/1.0",
+            "format": "CloudEvents/1.0",
             "messages": {
                 "com.example.grp1.ev1": {
-                    "id": "com.example.grp1.ev1",
                     "description": "",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "com.example.grp1.ev1",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "value": "",
-                                "required": true
-                            }
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
+                        "id": {
+                            "type": "string",
+                            "required": true
                         },
-                    "schemaurl": "#/schemagroups/com.example.grp1/schemas/s1:x1"
+                        "type": {
+                            "type": "string",
+                            "value": "com.example.grp1.ev1",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "value": "",
+                            "required": true
+                        }
+                    },
+                    "schemauri": "#/schemagroups/com.example.grp1/schemas/s1:x1"
                 }
             }
         },
         "com.example.grp2": {
-                       "id": "com.example.grp2",
-            "format": "CloudEvents/1.0",
+            "envelope": "CloudEvents/1.0",
             "messages": {
                 "com.example.grp2.ev1": {
-                    "id": "com.example.grp2.ev1",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "com.example.grp2.ev1",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "required": true
-                            }
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
+                        "id": {
+                            "type": "string",
+                            "required": true
                         },
-                    "schemaurl": "#/schemagroups/com.example.grp2/schemas/s2:q1"
+                        "type": {
+                            "type": "string",
+                            "value": "com.example.grp2.ev1",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "required": true
+                        }
+                    },
+                    "schemauri": "#/schemagroups/com.example.grp2/schemas/s2:q1"
                 },
                 "com.example.grp2.ev2": {
-                    "id": "com.example.grp2.ev2",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                            "id": {
-                                "type": "string",
-                                "required": true
-                            },
-                            "type": {
-                                "type": "string",
-                                "value": "com.example.grp2.ev2",
-                                "required": true
-                            },
-                            "source": {
-                                "type": "uritemplate",
-                                "required": true
-                            }
+                    "envelope": "CloudEvents/1.0",
+                    "envelopemetadata": {
+                        "id": {
+                            "type": "string",
+                            "required": true
                         },
-                    "schemaurl": "#/schemagroups/com.example.grp2/schemas/s1:q2"
+                        "type": {
+                            "type": "string",
+                            "value": "com.example.grp2.ev2",
+                            "required": true
+                        },
+                        "source": {
+                            "type": "uritemplate",
+                            "required": true
+                        }
+                    },
+                    "schemauri": "#/schemagroups/com.example.grp2/schemas/s1:q2"
                 }
             }
         }
     },
     "schemagroups": {
         "com.example.grp1": {
-            "id": "com.example.grp1",
             "format": "Protobuf/3.0",
             "schemas": {
                 "s1": {
-                    "id": "s1",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message x1 { string a = 1; } }"
                         }
@@ -97,25 +89,20 @@
             }
         },
         "com.example.grp2": {
-            "id": "com.example.grp2",
             "schemas": {
                 "s1": {
-                    "id": "s1",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message q1 { string a = 1; } }"
                         }
                     }
                 },
                 "s2": {
-                    "id": "s2",
                     "format": "Protobuf/3.0",
                     "versions": {
                         "1": {
-                            "id": "1",
                             "format": "Protobuf/3.0",
                             "schema": "syntax = \"proto3\"; message q2 { string a = 1; } }"
                         }
@@ -125,4 +112,3 @@
         }
     }
 }
-
