@@ -49,114 +49,114 @@ def test_ehproducer_contoso_erp_py():
     """ Test the EventHub producer for Contoso ERP. """
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "ehproducer")
+            '/', os.sep)), tmpdirname, "test_ehproducer_contoso_erp_py", "ehproducer")
 
 
 def test_ehproducer_fabrikam_motorsports_py():
     """ Test the EventHub producer for Fabrikam Motorsports."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "ehproducer")
+            '/', os.sep)), tmpdirname, "test_ehproducer_fabrikam_motorsports_py", "ehproducer")
 
 
 def test_ehproducer_inkjet_py():
     """ Test the EventHub producer for Inkjet."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "ehproducer")
+            '/', os.sep)), tmpdirname, "test_ehproducer_inkjet_py", "ehproducer")
 
 
 def test_ehproducer_lightbulb_py():
     """ Test the EventHub producer for Lightbulb. """
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(
-            project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "ehproducer")
+            project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "test_ehproducer_lightbulb_py", "ehproducer")
         
 def test_ehproducer_lightbulb_amqp_py():
     """ Test the EventHub producer for Lightbulb. """
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(
-            project_root, "test/xreg/lightbulb-amqp.xreg.json"), tmpdirname, "TestProject", "ehproducer")
+            project_root, "test/xreg/lightbulb-amqp.xreg.json"), tmpdirname, "test_ehproducer_lightbulb_amqp_py", "ehproducer")
 
 def test_ehconsumer_contoso_erp_py():
     """ Test the EventHub consumer for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "ehconsumer")
+            '/', os.sep)), tmpdirname, "test_ehconsumer_contoso_erp_py", "ehconsumer")
 
 
 def test_ehconsumer_fabrikam_motorsports_py():
     """ Test the EventHub consumer for Fabrikam Motorsports."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "ehconsumer")
+            '/', os.sep)), tmpdirname, "test_ehconsumer_fabrikam_motorsports_py", "ehconsumer")
 
 
 def test_ehconsumer_inkjet_py():
     """ Test the EventHub consumer for Inkjet."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "ehconsumer")
+            '/', os.sep)), tmpdirname, "test_ehconsumer_inkjet_py", "ehconsumer")
 
 
 def test_ehconsumer_lightbulb_py():
     """ Test the EventHub consumer for Lightbulb."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(
-            project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "ehconsumer")
+            project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "test_ehconsumer_lightbulb_py", "ehconsumer")
 
 
 def test_kafkaproducer_contoso_erp_py():
     """ Test the Kafka producer for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "kafkaproducer")
+            '/', os.sep)), tmpdirname, "test_kafkaproducer_contoso_erp_py", "kafkaproducer")
 
 
 def test_kafkaproducer_fabrikam_motorsports_py():
     """ Test the Kafka producer for Fabrikam Motorsports."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "kafkaproducer")
+            '/', os.sep)), tmpdirname, "test_kafkaproducer_fabrikam_motorsports_py", "kafkaproducer")
 
 
 def test_kafkaproducer_inkjet_py():
     """ Test the Kafka producer for Inkjet."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "kafkaproducer")
+            '/', os.sep)), tmpdirname, "test_kafkaproducer_inkjet_py", "kafkaproducer")
 
 
 def test_kafkaproducer_lightbulb_py():
     """ Test the Kafka producer for Lightbulb."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
-                        tmpdirname, "TestProject", "kafkaproducer")
+                        tmpdirname, "test_kafkaproducer_lightbulb_py", "kafkaproducer")
 
 
 def test_kafkaconsumer_contoso_erp_py():
     """ Test the Kafka consumer for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "kafkaconsumer")
+            '/', os.sep)), tmpdirname, "test_kafkaconsumer_contoso_erp_py", "kafkaconsumer")
 
 
 def test_kafkaconsumer_fabrikam_motorsports_py():
     """ Test the Kafka consumer for Fabrikam Motorsports."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "kafkaconsumer")
+            '/', os.sep)), tmpdirname, "test_kafkaconsumer_fabrikam_motorsports_py", "kafkaconsumer")
 
 
 def test_kafkaconsumer_inkjet_py():
     """ Test the Kafka consumer for Inkjet."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
-            '/', os.sep)), tmpdirname, "TestProject", "kafkaconsumer")
+            '/', os.sep)), tmpdirname, "test_kafkaconsumer_inkjet_py", "kafkaconsumer")
 
 
 def test_kafkaconsumer_lightbulb_py():
     """ Test the Kafka consumer for Lightbulb."""
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
-                        tmpdirname, "TestProject", "kafkaconsumer")
+                        tmpdirname, "test_kafkaconsumer_lightbulb_py", "kafkaconsumer")

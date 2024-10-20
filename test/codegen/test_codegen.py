@@ -82,7 +82,7 @@ def test_codegen_py():
                         '--definitions', os.path.join(
                             project_root, 'samples/message-definitions/contoso-erp.xreg.json'.replace('/', os.path.sep)),
                         '--output', output_dir,
-                        '--projectname', f'test.{dir_name}']
+                        '--projectname', f'test_build_{dir_name}']
             assert xregistry.cli() == 0
 
 
