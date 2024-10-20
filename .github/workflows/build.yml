@@ -1,5 +1,4 @@
 name: Python Release
-
 on:
   push:
     tags:
@@ -24,7 +23,7 @@ jobs:
       uses: battila7/get-version-action@v2
     - name: Set version environment variable
       run: |
-        echo "xregistry_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
+        echo "XREGISTRY_VERSION=${{steps.get_version.outputs.version-without-v}}" > $GITHUB_ENV
     - name: Build Python package
       run: |
         python -m pip install --upgrade pip build wheel

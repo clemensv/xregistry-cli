@@ -40,20 +40,7 @@ def run_dotnet_test(xreg_file: str, output_dir: str, projectname: str, style: st
     cmd = ['dotnet', 'test', output_dir] if platform.system() == "Windows" else f'dotnet test {output_dir}'
     
     # Run the dotnet test with stdout and stderr redirected
-    with subprocess.Popen(
-            cmd, cwd=os.path.dirname(__file__), 
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-            shell=True, text=True) as proc:
-        stdout, stderr = proc.communicate()
-
-    # Output stdout and stderr to the test log
-    sys.stdout.write(stdout)
-    sys.stderr.write(stderr)
-
-    # Check the return code and raise an error if the command failed
-    if proc.returncode != 0:
-        raise subprocess.CalledProcessError(proc.returncode, cmd)
-
+    subprocess.check_call(cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True, text=True)
 
 def test_ehproducer_contoso_erp_cs():
     """ Test the EventHub producer for Contoso ERP. """

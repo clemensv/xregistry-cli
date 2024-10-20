@@ -1,3 +1,5 @@
+import platform
+import re
 import xregistry
 import random
 import string
@@ -14,6 +16,18 @@ project_root = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(project_root))
 
+def pascal(string: str) -> str:
+    """Convert a string to PascalCase."""
+    if not string or len(string) == 0:
+        return string
+    words = []
+    if '_' in string:
+        words = re.split(r'_', string)
+    elif string[0].isupper():
+        words = re.findall(r'[A-Z][a-z0-9_]*\.?', string)
+    else:
+        words = re.findall(r'[a-z0-9]+\.?|[A-Z][a-z0-9_]*\.?', string)
+    return ''.join(word.capitalize() for word in words)
 
 def test_codegen_cs():
     """    
@@ -38,11 +52,11 @@ def test_codegen_cs():
                             '--definitions', os.path.join(
                                 project_root, 'samples/message-definitions/contoso-erp.xreg.json'.replace('/', os.path.sep)),
                             '--output', output_dir,
-                            '--projectname', f'test.{dir_name}']
+                            '--projectname', f'Test.{pascal(dir_name)}']
                 assert xregistry.cli() == 0
                 # run dotnet build on the csproj here that references the generated files already
-                assert subprocess.check_call(
-                    ['dotnet', 'build'], cwd=output_dir, shell=True, stdout=sys.stdout, stderr=sys.stderr) == 0
+                cmd = ['dotnet', 'build', output_dir] if platform.system() == "Windows" else f'dotnet build {output_dir}'
+                assert subprocess.check_call(cmd, cwd=output_dir, shell=True, stdout=sys.stdout, stderr=sys.stderr) == 0
         except Exception as e:
             print(f'Error processing {dir_name}: {e}')
             raise e

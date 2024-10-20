@@ -8,7 +8,7 @@ packages = [{include = "{{main_project_name}}", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "<4.0,>=3.10"
-{{data_project_name|replace("_","-")}} = "*"
+{{data_project_name|replace("_","-")}} = {path = "../{{data_project_name}}", develop = true}
 confluent-kafka = ">=2.4.0"
 cloudevents = ">=1.10.1"
 
