@@ -7,10 +7,13 @@ on:
     branches: [ main ]
     tags:
       - 'v*'
-
+    
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -58,8 +61,7 @@ jobs:
         npm install -g azure-functions-core-tools@4 --unsafe-perm true 
         npm install -g @asyncapi/cli
         npm install -g @openapitools/openapi-generator-cli      
-    # unclear test hang inside the Github runner
-    # - name: Run tests
-    #   run: |
-    #     pytest
+    - name: Run tests
+      run: |
+        pytest
 
