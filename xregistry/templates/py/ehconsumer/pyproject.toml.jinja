@@ -8,7 +8,7 @@ packages = [{include = "{{main_project_name}}", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "<4.0,>=3.10"
-{{data_project_name|replace("_","-")}} = "*"
+{{data_project_name|replace("_","-")}} = {path = "../{{data_project_name}}", develop = true}
 azure-eventhub = ">=5.12.1"
 azure-storage-blob = ">=12.20.0"
 azure-eventhub-checkpointstoreblob-aio = ">=1.1.4"
