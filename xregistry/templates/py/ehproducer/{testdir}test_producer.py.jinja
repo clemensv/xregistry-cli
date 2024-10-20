@@ -80,6 +80,7 @@ async def event_hub_emulator():
             config_file.flush()
             config_file.close()
             config_file_path = config_file.name
+            os.chmod(config_file_path, 0o666)
 
             try:
                 with DockerContainer("mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest") \
