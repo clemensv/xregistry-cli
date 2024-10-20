@@ -99,6 +99,9 @@ namespace {{ project_name | pascal }}.Test
                     .Build();
                 emulatorConfigFilePath = Path.GetTempFileName();
                 File.WriteAllText(emulatorConfigFilePath, emulatorConfig);  
+                File.SetUnixFileMode(emulatorConfigFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite | 
+                               UnixFileMode.GroupRead | UnixFileMode.GroupWrite | 
+                               UnixFileMode.OtherRead | UnixFileMode.OtherWrite);
                 AzuriteContainer = new AzuriteBuilder()
                     .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
                     .WithCommand("--skipApiVersionCheck")
