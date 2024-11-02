@@ -6,6 +6,9 @@ import argparse
 import logging
 import sys
 
+from xregistry.commands import catalog
+from xregistry.commands.catalog import CatalogSubcommands
+
 logging.basicConfig(level=logging.DEBUG if sys.gettrace() is not None else logging.ERROR, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,8 @@ def main():
     ManifestSubcommands.add_parsers(manifest_parser)
     manifest_parser.add_argument("filename", help="The manifest file to use")
     subparsers_parser.required = True
+    catalog_parser = subparsers_parser.add_parser("catalog", help="Manage the catalog")
+    CatalogSubcommands.add_parsers(catalog_parser)
 
     # Specify the arguments for the generate command
     generate_parser.add_argument("--projectname", dest="project_name", required=True, help="The project name (namespace name) for the output")
@@ -63,6 +68,9 @@ def main():
 
     # Parse the command line arguments
     args = parser.parse_args()
+    if not 'func' in args:
+        parser.print_help()
+        return 1
     try:
         args.func(args)
         return 0
