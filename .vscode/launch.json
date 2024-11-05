@@ -16,11 +16,12 @@
       // "args": "generate --style dashboard --language ts --definitions C:\\git\\cedisco-codegen\\samples\\message-definitions\\inkjet.xreg.json --projectname inkjet_dash --output c:\\temp\\inkjet_dash",
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\compact\\cloudevent-avro-embedded.json --projectname Sample --language cs --style ehproducer --output c:\\temp\\outp\\cs12"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\fabrikam-motorsports.xreg.json --projectname Sample --language cs --style ehconsumer --output c:\\temp\\outp\\cs13"
-      "args": "generate --projectname ContosoErp --definitions C:\\git\\cedisco-codegen\\test\\xreg\\contoso-erp.xreg.json --output c:\\temp\\contoso\\ehazfn --style ehazfn --language cs"
+      //"args": "generate --projectname ContosoErp --definitions C:\\git\\cedisco-codegen\\test\\xreg\\contoso-erp.xreg.json --output c:\\temp\\contoso\\ehazfn --style ehazfn --language cs"
       //"args": "generate generate --style kafkaproducer --language py --definitions c:\\git\\real-time-sources\\gtfs\\xreg\\gtfs.xreg.json --projectname gtfs_rt_producer --output c:\\temp\\gtfs_rt_producer"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\separate-schema\\cloudevent-avro-separate.json --projectname Sample --language cs --style amqpproducer --output c:\\temp\\outp\\cs1"
       //"args": "generate --style ehproducer --language cs --definitions C:\\temp\\kusto\\avro-avsc.xreg.json  --projectname Test --output c:\\temp\\outp\\SoccerTest"
       //"args": "generate --style kafkaproducer --language py --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\lightbulb.xreg.json  --projectname lightbulb-py-producer --output c:\\temp\\lightbulb-py-prod"
+      "args": "catalog"
     },
     {
       "name": "Python: Manifest",
@@ -42,7 +43,7 @@
     },
     {
       "name": "Python: Current File",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
@@ -51,7 +52,7 @@
     },
     {
       "name": "Python: Code Generator EventHubs",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -60,7 +61,7 @@
     },
     {
       "name": "Python: Code Generator C# SB",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -69,7 +70,7 @@
     },
     {
       "name": "Python: Code Generator C# HTTP",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -78,7 +79,7 @@
     },
     {
       "name": "Python: Code Generator C# Consumer",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -87,7 +88,7 @@
     },
     {
       "name": "Python: Code Generator openAPI Producer",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -96,7 +97,7 @@
     },
     {
       "name": "Python: Code Generator openAPI Subscriber",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -105,7 +106,7 @@
     },
     {
       "name": "Python: Code Generator Java producer",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -114,7 +115,7 @@
     },
     {
       "name": "Python: Code Generator Java producer Proto",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -123,7 +124,7 @@
     },
     {
       "name": "Python: Code Generator Java producer Avro",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -133,7 +134,7 @@
 
     {
       "name": "Python: Code Generator Java consumer",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -142,7 +143,7 @@
     },
     {
       "name": "Python: Code Generator Java consumer Proto",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -151,7 +152,7 @@
     },
     {
       "name": "Python: Code Generator Java consumer Avro",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -160,7 +161,7 @@
     },
     {
       "name": "Python: Code Generator Fropp",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -169,7 +170,7 @@
     },
     {
       "name": "Python: Code Generator Help",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -178,7 +179,7 @@
     },
     {
       "name": "Python: List JSON",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
@@ -187,22 +188,12 @@
     },
     {
       "name": "Python: Validate",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "-m xregistry",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": "validate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\Microsoft.Storage.json"
-    },
-    {
-      "name": "Debug test",
-      "type": "python",
-      "request": "attach",
-      "console": "externalTerminal",
-      "justMyCode": false,
-      "stopOnEntry": false,
-      "envFile": "${workspaceFolder}/.env.test",
-      "purpose": ["debug-test"]
     }
   ]
 }
