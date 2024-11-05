@@ -291,7 +291,7 @@ class CatalogSubcommands:
     def show_schemagroup(self, schemagroupid: str) -> None:
         """Shows a schemagroup from the catalog."""
         
-        response = requests.get(f"{self.base_url}/schemagroups/{schemagroupid}")
+        response = requests.get(f"{self.base_url}/schemagroups/{schemagroupid}?inline=*")
         if response.status_code != 200:
             raise ValueError(f"Schemagroup with id {schemagroupid} does not exist: {response.text}")
         print(json.dumps(response.json(), indent=2))
@@ -412,7 +412,7 @@ class CatalogSubcommands:
 
     def set_protocol_option(self, message:Any, section: str|None, name: str, type: str, value: str|None, description: str, required: bool) -> None:
         """Adds a protocol option to a message."""
-            
+        obj: Any = {}
         if "protocoloptions" not in message:
             obj = message["protocoloptions"] = {}
         if section not in message["protocoloptions"]:
@@ -1042,7 +1042,7 @@ class CatalogSubcommands:
 
         manifest_subparsers = manifest_parser.add_subparsers(help="Manifest commands")
         
-        def add_common_arguments(parser):
+        def add_authentication_arguments(parser):
             """
             Add common arguments to the parser.
 
@@ -1073,7 +1073,7 @@ class CatalogSubcommands:
         endpoint_add.add_argument("--messagegroups", nargs='*', help="Message group IDs")
         endpoint_add.add_argument("--channel", help="Channel identifier")
         endpoint_add.add_argument("--deprecated", help="Deprecation information")
-        add_common_arguments(endpoint_add)
+        add_authentication_arguments(endpoint_add)
         endpoint_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_endpoint(args.endpointid, args.usage, args.protocol, args.deployed, args.endpoints, args.options,
                                                                                                     args.messagegroups, args.documentation, args.description, args.labels, args.name,
                                                                                                     args.channel, args.deprecated
@@ -1081,7 +1081,7 @@ class CatalogSubcommands:
 
         endpoint_remove = endpoint_subparsers.add_parser("remove", help="Remove an endpoint")
         endpoint_remove.add_argument("--endpointid", required=True, help="Endpoint ID")
-        add_common_arguments(endpoint_remove)
+        add_authentication_arguments(endpoint_remove)
         endpoint_remove.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).remove_endpoint(args.endpointid))
         
         endpoint_edit = endpoint_subparsers.add_parser("edit", help="Edit an endpoint")
@@ -1097,7 +1097,7 @@ class CatalogSubcommands:
         endpoint_edit.add_argument("--messagegroups", nargs='*', help="Message group IDs")
         endpoint_edit.add_argument("--channel", help="Channel identifier")
         endpoint_edit.add_argument("--deprecated", help="Deprecation information")
-        add_common_arguments(endpoint_edit)
+        add_authentication_arguments(endpoint_edit)
         endpoint_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_endpoint(args.endpointid, args.usage, args.protocol, args.deployed, args.endpoints, args.options,
                                                                                                       args.messagegroups, args.documentation, args.description, args.labels, args.name,
                                                                                                       args.channel, args.deprecated
@@ -1105,12 +1105,12 @@ class CatalogSubcommands:
 
         endpoint_show = endpoint_subparsers.add_parser("show", help="Show an endpoint")
         endpoint_show.add_argument("--endpointid", required=True, help="Endpoint ID")
-        add_common_arguments(endpoint_show)
+        add_authentication_arguments(endpoint_show)
         endpoint_show.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).show_endpoint(args.endpointid))
 
         endpoint_apply = endpoint_subparsers.add_parser("apply", help="Apply an endpoint JSON")
         endpoint_apply.add_argument("-f", "--file", required=True, help="JSON file containing endpoint data")
-        add_common_arguments(endpoint_apply)
+        add_authentication_arguments(endpoint_apply)
         endpoint_apply.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).apply_endpoint(args.file))
 
         messagegroup_subparsers = manifest_subparsers.add_parser("messagegroup", help="Manage message groups").add_subparsers(
@@ -1124,7 +1124,7 @@ class CatalogSubcommands:
         messagegroup_add.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message group labels (key=value pairs)")
         messagegroup_add.add_argument("--envelope", choices=["CloudEvents/1.0", "None"], help="Message group envelope")
         messagegroup_add.add_argument("--protocol", help="protocol identifier")
-        add_common_arguments(messagegroup_add)
+        add_authentication_arguments(messagegroup_add)
         messagegroup_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_messagegroup(
             messagegroupid=args.messagegroupid,
             envelope=args.envelope,
@@ -1137,7 +1137,7 @@ class CatalogSubcommands:
         
         messagegroup_remove = messagegroup_subparsers.add_parser("remove", help="Remove a message group")
         messagegroup_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
-        add_common_arguments(messagegroup_remove)
+        add_authentication_arguments(messagegroup_remove)
         messagegroup_remove.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).remove_messagegroup(args.messagegroupid))
 
         messagegroup_edit = messagegroup_subparsers.add_parser("edit", help="Edit a message group")
@@ -1148,7 +1148,7 @@ class CatalogSubcommands:
         messagegroup_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message group labels (key=value pairs)")
         messagegroup_edit.add_argument("--envelope", choices=["CloudEvents/1.0", "None"], help="Message group envelope")
         messagegroup_edit.add_argument("--protocol", help="protocol identifier")
-        add_common_arguments(messagegroup_edit)
+        add_authentication_arguments(messagegroup_edit)
         messagegroup_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_messagegroup(
             messagegroupid=args.messagegroupid,
             envelope=args.envelope,
@@ -1161,12 +1161,12 @@ class CatalogSubcommands:
 
         messagegroup_show = messagegroup_subparsers.add_parser("show", help="Show a message group")
         messagegroup_show.add_argument("--messagegroupid", required=True, help="Message group ID")
-        add_common_arguments(messagegroup_show)
+        add_authentication_arguments(messagegroup_show)
         messagegroup_show.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).show_messagegroup(args.messagegroupid))
 
         messagegroup_apply = messagegroup_subparsers.add_parser("apply", help="Apply a message group JSON")
         messagegroup_apply.add_argument("-f", "--file", required=True, help="JSON file containing message group data")
-        add_common_arguments(messagegroup_apply)
+        add_authentication_arguments(messagegroup_apply)
         messagegroup_apply.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).apply_messagegroup(args.file))
 
@@ -1188,7 +1188,7 @@ class CatalogSubcommands:
         message_add.add_argument("--schemagroup", help="Schema group ID")
         message_add.add_argument("--schemaid", help="Schema ID")
         message_add.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_add)
+        add_authentication_arguments(message_add)
         message_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
@@ -1207,7 +1207,7 @@ class CatalogSubcommands:
         message_remove = message_subparsers.add_parser("remove", help="Remove a message")
         message_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_remove.add_argument("--messageid", required=True, help="Message ID")
-        add_common_arguments(message_remove)
+        add_authentication_arguments(message_remove)
         message_remove.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).remove_message(args.messagegroupid, args.messageid))
 
         message_edit = message_subparsers.add_parser("edit", help="Edit a message")
@@ -1224,7 +1224,7 @@ class CatalogSubcommands:
         message_edit.add_argument("--schemagroup", help="Schema group ID")
         message_edit.add_argument("--schemaid", help="Schema ID")
         message_edit.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_edit)
+        add_authentication_arguments(message_edit)
         message_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
@@ -1252,7 +1252,7 @@ class CatalogSubcommands:
         message_cloudevent_add.add_argument("--schemagroup", help="Schema group ID")
         message_cloudevent_add.add_argument("--schemaid", help="Schema ID")
         message_cloudevent_add.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_cloudevent_add)
+        add_authentication_arguments(message_cloudevent_add)
 
         def _add_cloudevent(args):
             sc = CatalogSubcommands(args.catalog)
@@ -1278,7 +1278,7 @@ class CatalogSubcommands:
         message_cloudevent_edit.add_argument("--schemagroup", help="Schema group ID")
         message_cloudevent_edit.add_argument("--schemaid", help="Schema ID")
         message_cloudevent_edit.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_cloudevent_edit)
+        add_authentication_arguments(message_cloudevent_edit)
         message_cloudevent_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             args.messagegroupid, args.messageid, "CloudEvents/1.0", "None", args.schemaformat, args.schemagroup, args.schemaid,
             args.schemaurl, args.documentation, args.description, args.labels, args.name))
@@ -1286,7 +1286,7 @@ class CatalogSubcommands:
         message_cloudevent_remove = message_cloudevent_subparsers.add_parser("remove", help="Remove a CloudEvent")
         message_cloudevent_remove.add_argument("--messagegroupid", required=True, help="Message group ID", type=str)
         message_cloudevent_remove.add_argument("--messageid", required=True, help="Message ID and CloudEvents type", type=str)
-        add_common_arguments(message_cloudevent_remove)
+        add_authentication_arguments(message_cloudevent_remove)
         message_cloudevent_remove.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).remove_message(args.messagegroupid, args.messageid))
 
         message_cloudevent_metadata_subparsers = message_cloudevent_subparsers.add_parser(
@@ -1302,7 +1302,7 @@ class CatalogSubcommands:
         message_cloudevent_metadata_add.add_argument(
             "--value", help="Attribute value, may contain template expressions if the type is 'uritemplate'")
         message_cloudevent_metadata_add.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_cloudevent_metadata_add)
+        add_authentication_arguments(message_cloudevent_metadata_add)
         message_cloudevent_metadata_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_cloudevents_message_metadata(
             args.messagegroupid, args.messageid, args.attribute, args.type, args.description, args.value, args.required))
 
@@ -1316,7 +1316,7 @@ class CatalogSubcommands:
         message_cloudevent_metadata_edit.add_argument(
             "--value", help="Attribute value, may contain template expressions if the type is 'uritemplate'")
         message_cloudevent_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_cloudevent_metadata_edit)
+        add_authentication_arguments(message_cloudevent_metadata_edit)
         message_cloudevent_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_cloudevents_message_metadata(
             args.messagegroupid, args.messageid, args.attribute, args.type, args.description, args.value, args.required))
 
@@ -1325,7 +1325,7 @@ class CatalogSubcommands:
         message_cloudevent_metadata_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_cloudevent_metadata_remove.add_argument("--messageid", required=True, help="Message ID")
         message_cloudevent_metadata_remove.add_argument("--attribute", required=True, help="CloudEvents attribute")
-        add_common_arguments(message_cloudevent_metadata_remove)
+        add_authentication_arguments(message_cloudevent_metadata_remove)
         message_cloudevent_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_cloudevents_message_metadata(args.messagegroupid, args.messageid, args.key))
 
@@ -1360,7 +1360,7 @@ class CatalogSubcommands:
         message_amqp_add.add_argument("--schemagroup", help="Schema group ID")
         message_amqp_add.add_argument("--schemaid", help="Schema ID")
         message_amqp_add.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_amqp_add)
+        add_authentication_arguments(message_amqp_add)
         message_amqp_add.set_defaults(func=_add_amqp_message)
 
         message_amqp_edit = message_amqp_subparsers.add_parser("edit", help="Edit a message")
@@ -1374,9 +1374,9 @@ class CatalogSubcommands:
         message_amqp_edit.add_argument("--schemagroup", help="Schema group ID")
         message_amqp_edit.add_argument("--schemaid", help="Schema ID")
         message_amqp_edit.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_amqp_edit)
+        add_authentication_arguments(message_amqp_edit)
         message_amqp_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
-            groupid=args.messagegroupid,
+            messagegroupid=args.messagegroupid,
             messageid=args.messageid,
             envelope="None",
             protocol="AMQP/1.0",
@@ -1393,7 +1393,7 @@ class CatalogSubcommands:
         message_amqp_remove = message_amqp_subparsers.add_parser("remove", help="Remove a message")
         message_amqp_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_amqp_remove.add_argument("--messageid", required=True, help="Message ID")
-        add_common_arguments(message_amqp_remove)
+        add_authentication_arguments(message_amqp_remove)
         message_amqp_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_message(args.messagegroupid, args.messageid))
 
@@ -1407,7 +1407,7 @@ class CatalogSubcommands:
         message_amqp_metadata_add.add_argument("--value", required=False, help="Metadata value")
         message_amqp_metadata_add.add_argument("--description", help="Metadata description")
         message_amqp_metadata_add.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_amqp_metadata_add)
+        add_authentication_arguments(message_amqp_metadata_add)
         message_amqp_metadata_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_amqp_message_metadata(
             messagegroupid=args.messagegroupid, messageid=args.messageid, section=args.section, name=args.name, type=args.type, value=args.value, description=args.description, required=args.required))
 
@@ -1421,7 +1421,7 @@ class CatalogSubcommands:
         message_amqp_metadata_edit.add_argument("--value", required=False, help="Metadata value")
         message_amqp_metadata_edit.add_argument("--description", help="Metadata description")
         message_amqp_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_amqp_metadata_edit)
+        add_authentication_arguments(message_amqp_metadata_edit)
         message_amqp_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_amqp_message_metadata(
             args.messagegroupid, args.messageid, args.section, args.name, args.type, args.value, args.description, args.required))
 
@@ -1432,7 +1432,7 @@ class CatalogSubcommands:
         message_amqp_metadata_remove.add_argument("--section", required=True, choices=[
                                                   "properties", "application-properties"], help="Metadata section")
         message_amqp_metadata_remove.add_argument("--name", required=True, help="Metadata name")
-        add_common_arguments(message_amqp_metadata_remove)
+        add_authentication_arguments(message_amqp_metadata_remove)
         message_amqp_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_amqp_message_metadata(args.messagegroupid, args.messageid, args.name, args.section))
 
@@ -1461,7 +1461,7 @@ class CatalogSubcommands:
         message_mqtt_add.add_argument("--schemagroup", help="Schema group ID")
         message_mqtt_add.add_argument("--schemaid", help="Schema ID")
         message_mqtt_add.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_mqtt_add)
+        add_authentication_arguments(message_mqtt_add)
         message_mqtt_add.set_defaults(func=_add_amqp_message)
 
         message_mqtt_edit = message_mqtt_subparsers.add_parser("edit", help="Edit a message")
@@ -1475,7 +1475,7 @@ class CatalogSubcommands:
         message_mqtt_edit.add_argument("--schemagroup", help="Schema group ID")
         message_mqtt_edit.add_argument("--schemaid", help="Schema ID")
         message_mqtt_edit.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_mqtt_edit)
+        add_authentication_arguments(message_mqtt_edit)
         message_mqtt_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             args.messagegroupid, args.messageid, "None", "MQTT/" + args.mqtt_version, args.schemaformat, args.schemagroup, args.schemaid,
             args.schemaurl, args.documentation, args.description, args.labels, args.name))
@@ -1483,7 +1483,7 @@ class CatalogSubcommands:
         message_mqtt_remove = message_mqtt_subparsers.add_parser("remove", help="Remove a message")
         message_mqtt_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_mqtt_remove.add_argument("--messageid", required=True, help="Message ID")
-        add_common_arguments(message_mqtt_remove)
+        add_authentication_arguments(message_mqtt_remove)
         message_mqtt_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_message(args.messagegroupid, args.messageid))
 
@@ -1497,7 +1497,7 @@ class CatalogSubcommands:
         message_mqtt_metadata_add.add_argument("--value", required=True, help="Metadata value")
         message_mqtt_metadata_add.add_argument("--description", help="Metadata description")
         message_mqtt_metadata_add.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_mqtt_metadata_add)
+        add_authentication_arguments(message_mqtt_metadata_add)
         message_mqtt_metadata_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_mqtt_message_metadata(
             args.messagegroupid, args.messageid, args.mqtt_version, args.name, args.type, args.value, args.description, args.required))
 
@@ -1511,7 +1511,7 @@ class CatalogSubcommands:
         message_mqtt_metadata_edit.add_argument("--value", help="Metadata value")
         message_mqtt_metadata_edit.add_argument("--description", help="Metadata description")
         message_mqtt_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_mqtt_metadata_edit)
+        add_authentication_arguments(message_mqtt_metadata_edit)
         message_mqtt_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_mqtt_message_metadata(
             args.messagegroupid, args.messageid, args.name, args.type, args.value, args.description, args.required))
 
@@ -1521,7 +1521,7 @@ class CatalogSubcommands:
         message_mqtt_metadata_remove.add_argument("--messageid", required=True, help="Message ID")
         message_mqtt_metadata_remove.add_argument("--section", required=False, choices=["properties", "topic"], help="Metadata section")
         message_mqtt_metadata_remove.add_argument("--name", required=True, help="Metadata name")
-        add_common_arguments(message_mqtt_metadata_remove)
+        add_authentication_arguments(message_mqtt_metadata_remove)
         message_mqtt_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_mqtt_message_metadata(args.messagegroupid, args.messageid, args.section, args.name))
 
@@ -1549,7 +1549,7 @@ class CatalogSubcommands:
         message_kafka_add.add_argument("--schemagroup", help="Schema group ID")
         message_kafka_add.add_argument("--schemaid", help="Schema ID")
         message_kafka_add.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_kafka_add)
+        add_authentication_arguments(message_kafka_add)
         message_kafka_add.set_defaults(func=_add_kafka_message)
 
         message_kafka_edit = message_kafka_subparsers.add_parser("edit", help="Edit a message")
@@ -1563,7 +1563,7 @@ class CatalogSubcommands:
         message_kafka_edit.add_argument("--schemagroup", help="Schema group ID")
         message_kafka_edit.add_argument("--schemaid", help="Schema ID")
         message_kafka_edit.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_kafka_edit)
+        add_authentication_arguments(message_kafka_edit)
         message_kafka_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             args.messagegroupid, args.messageid, "None", "KAFKA", args.schemaformat, args.schemagroup, args.schemaid,
             args.schemaurl, args.documentation, args.description, args.labels, args.name))
@@ -1571,7 +1571,7 @@ class CatalogSubcommands:
         message_kafka_remove = message_kafka_subparsers.add_parser("remove", help="Remove a message")
         message_kafka_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_kafka_remove.add_argument("--messageid", required=True, help="Message ID")
-        add_common_arguments(message_kafka_remove)
+        add_authentication_arguments(message_kafka_remove)
         message_kafka_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_message(args.messagegroupid, args.messageid))
 
@@ -1585,7 +1585,7 @@ class CatalogSubcommands:
         message_kafka_metadata_add.add_argument("--value", required=True, help="Metadata value")
         message_kafka_metadata_add.add_argument("--description", help="Metadata description")
         message_kafka_metadata_add.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_kafka_metadata_add)
+        add_authentication_arguments(message_kafka_metadata_add)
         message_kafka_metadata_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_kafka_message_metadata(
             args.messagegroupid, args.messageid, args.section, args.name, args.type, args.value, args.description, args.required))
 
@@ -1598,7 +1598,7 @@ class CatalogSubcommands:
         message_kafka_metadata_edit.add_argument("--value", help="Metadata value")
         message_kafka_metadata_edit.add_argument("--description", help="Metadata description")
         message_kafka_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_kafka_metadata_edit)
+        add_authentication_arguments(message_kafka_metadata_edit)
         message_kafka_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_kafka_message_metadata(
             args.messagegroupid, args.messageid, args.section, args.name, args.type, args.value, args.description, args.required))
 
@@ -1609,7 +1609,7 @@ class CatalogSubcommands:
         message_kafka_metadata_remove.add_argument("--name", required=True, help="Metadata name")
         message_kafka_metadata_remove.add_argument(
             "--section", required=True, choices=["headers"], help="Metadata section")
-        add_common_arguments(message_kafka_metadata_remove)
+        add_authentication_arguments(message_kafka_metadata_remove)
         message_kafka_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_kafka_message_metadata(args.messagegroupid, args.messageid, args.section, args.name))
 
@@ -1666,7 +1666,7 @@ class CatalogSubcommands:
         message_http_add.add_argument("--schemagroup", help="Schema group ID")
         message_http_add.add_argument("--schemaid", help="Schema ID")
         message_http_add.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_http_add)
+        add_authentication_arguments(message_http_add)
         message_http_add.set_defaults(func=_add_http_message)
 
         message_http_edit = message_http_subparsers.add_parser("edit", help="Edit a message")
@@ -1680,7 +1680,7 @@ class CatalogSubcommands:
         message_http_edit.add_argument("--schemagroup", help="Schema group ID")
         message_http_edit.add_argument("--schemaid", help="Schema ID")
         message_http_edit.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(message_http_edit)
+        add_authentication_arguments(message_http_edit)
         message_http_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
@@ -1699,7 +1699,7 @@ class CatalogSubcommands:
         message_http_remove = message_http_subparsers.add_parser("remove", help="Remove a message")
         message_http_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_http_remove.add_argument("--messageid", required=True, help="Message ID")
-        add_common_arguments(message_http_remove)
+        add_authentication_arguments(message_http_remove)
         message_http_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_message(args.messagegroupid, args.messageid))
 
@@ -1714,7 +1714,7 @@ class CatalogSubcommands:
         message_http_metadata_add.add_argument("--value", required=True, help="Metadata value")
         message_http_metadata_add.add_argument("--description", help="Metadata description")
         message_http_metadata_add.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_http_metadata_add)
+        add_authentication_arguments(message_http_metadata_add)
         message_http_metadata_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_http_message_metadata(
             groupid=args.messagegroupid, 
             messageid=args.messageid, 
@@ -1737,7 +1737,7 @@ class CatalogSubcommands:
         message_http_metadata_edit.add_argument("--value", help="Metadata value")
         message_http_metadata_edit.add_argument("--description", help="Metadata description")
         message_http_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
-        add_common_arguments(message_http_metadata_edit)
+        add_authentication_arguments(message_http_metadata_edit)
         message_http_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_http_message_metadata(
             groupid=args.messagegroupid, 
             messageid=args.messageid, 
@@ -1756,7 +1756,7 @@ class CatalogSubcommands:
         message_http_metadata_remove.add_argument("--name", required=True, help="Metadata key")
         message_http_metadata_remove.add_argument(
             "--section", required=False, choices=["headers", "query"], help="Metadata section")
-        add_common_arguments(message_http_metadata_remove)
+        add_authentication_arguments(message_http_metadata_remove)
         message_http_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).remove_http_message_metadata(
             messagegroupid=args.messagegroupid, 
             messageid=args.messageid, 
@@ -1768,7 +1768,7 @@ class CatalogSubcommands:
         message_show.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_show.add_argument("--messageid", required=True, help="Message ID")
         
-        add_common_arguments(message_show)
+        add_authentication_arguments(message_show)
         message_show.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).show_message(args.messagegroupid, args.messageid))
 
@@ -1777,25 +1777,34 @@ class CatalogSubcommands:
 
         schemagroup_add = schemagroup_subparsers.add_parser("add", help="Add a new schema group")
         schemagroup_add.add_argument("--schemagroupid", required=True, help="Schema group ID")
-        add_common_arguments(schemagroup_add)
+        schemagroup_add.add_argument("--description", help="Schema group description")
+        schemagroup_add.add_argument("--documentation", help="Schema group documentation URL")
+        schemagroup_add.add_argument("--format", required=True, help="Schema group format")
+        schemagroup_add.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Schema group labels (key=value pairs)")
+        schemagroup_add.add_argument("--name", help="Schema group name")
+        add_authentication_arguments(schemagroup_add)
         schemagroup_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_schemagroup(
             schemagroupid=args.schemagroupid, 
             description=args.description,
             documentation=args.documentation,
             format=args.format,
             labels=args.labels,
-            name=args.name,
-            schemas=args.schemas))
+            name=args.name))
 
         schemagroup_remove = schemagroup_subparsers.add_parser("remove", help="Remove a schema group")
         schemagroup_remove.add_argument("--schemagroupid", required=True, help="Schema group ID")
-        add_common_arguments(schemagroup_remove)
+        add_authentication_arguments(schemagroup_remove)
         schemagroup_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_schemagroup(args.schemagroupid))
 
         schemagroup_edit = schemagroup_subparsers.add_parser("edit", help="Edit a schema group")
         schemagroup_edit.add_argument("--schemagroupid", required=True, help="Schema group ID")
-        add_common_arguments(schemagroup_edit)
+        schemagroup_edit.add_argument("--description", help="Schema group description")
+        schemagroup_edit.add_argument("--format", help="Schema group format ('None' to clear format)")
+        schemagroup_edit.add_argument("--documentation", help="Schema group documentation URL")
+        schemagroup_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Schema group labels (key=value pairs)")
+        schemagroup_edit.add_argument("--name", help="Schema group name")
+        add_authentication_arguments(schemagroup_edit)
         schemagroup_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_schemagroup(
             schemagroupid=args.schemagroupid,
             documentation=args.documentation,
@@ -1806,12 +1815,12 @@ class CatalogSubcommands:
 
         schemagroup_show = schemagroup_subparsers.add_parser("show", help="Show a schema group")
         schemagroup_show.add_argument("--schemagroupid", required=True, help="Schema group ID")
-        add_common_arguments(schemagroup_show)
+        add_authentication_arguments(schemagroup_show)
         schemagroup_show.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).show_schemagroup(args.schemagroupid))
 
         schemagroup_apply = schemagroup_subparsers.add_parser("apply", help="Apply a schema group JSON")
         schemagroup_apply.add_argument("-f", "--file", required=True, help="JSON file containing schema group data")
-        add_common_arguments(schemagroup_apply)
+        add_authentication_arguments(schemagroup_apply)
         schemagroup_apply.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).apply_schemagroup(args.file))
 
@@ -1830,7 +1839,7 @@ class CatalogSubcommands:
         schema_add.add_argument("--schema", help="Inline schema")
         schema_add.add_argument("--schemaimport", help="Schema import file location or URL")
         schema_add.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(schema_add)
+        add_authentication_arguments(schema_add)
         schema_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_schemaversion(
             schemagroupid=args.schemagroupid,
             schemaid=args.schemaid,
@@ -1849,7 +1858,7 @@ class CatalogSubcommands:
         schema_remove.add_argument("--schemagroupid", required=True, help="Schema group ID")
         schema_remove.add_argument("--schemaid", required=True, help="Schema ID")
         schema_remove.add_argument("--versionid", required=True, help="Schema version ID")
-        add_common_arguments(schema_remove)
+        add_authentication_arguments(schema_remove)
         schema_remove.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).remove_schema(
             schemagroupid=args.schemagroupid,
             schemaid=args.schemaid,
@@ -1868,7 +1877,7 @@ class CatalogSubcommands:
         schema_edit.add_argument("--schema", help="Inline schema")
         schema_edit.add_argument("--schemaimport", help="Schema import file location or URL")
         schema_edit.add_argument("--schemaurl", help="Schema URL")
-        add_common_arguments(schema_edit)
+        add_authentication_arguments(schema_edit)
         schema_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_schemaversion(
             schemagroupid=args.schemagroupid,
             schemaid=args.schemaid,
@@ -1886,7 +1895,7 @@ class CatalogSubcommands:
         schema_show = schema_subparsers.add_parser("show", help="Show a schema")
         schema_show.add_argument("--schemagroupid", required=True, help="Schema group ID")
         schema_show.add_argument("--schemaid", required=True, help="Schema ID")
-        add_common_arguments(schema_show)
+        add_authentication_arguments(schema_show)
         schema_show.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).show_schema(
             schemagroupid=args.schemagroupid, 
             schemaid=args.schemaid
@@ -1894,5 +1903,5 @@ class CatalogSubcommands:
 
         schema_apply = schema_subparsers.add_parser("apply", help="Apply a schema JSON")
         schema_apply.add_argument("-f", "--file", required=True, help="JSON file containing schema data")
-        add_common_arguments(schema_apply)
+        add_authentication_arguments(schema_apply)
         schema_apply.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).apply_schema(args.file))

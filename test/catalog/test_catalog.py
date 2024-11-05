@@ -8,8 +8,11 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(project_root))
 
 from xregistry.commands.catalog import CatalogSubcommands
+# pylint: disable=import-error
+# mypy: ignore-errors
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
+# pylint: enable=import-error
 import logging
 import os
 import sys
@@ -334,7 +337,7 @@ def test_cli_add_schemagroup_and_schema():
     test_args = [
         'xregistry',
         'catalog',
-        'schema',
+        'schemaversion',
         'add',
         '--catalog', 'http://localhost:8080',
         '--schemagroupid', 'cli-schemagroup',
@@ -357,7 +360,7 @@ def test_cli_add_schemagroup_and_schema():
     test_args = [
         'xregistry',
         'catalog',
-        'schema',
+        'schemaversion',
         'remove',
         '--catalog', 'http://localhost:8080',
         '--schemagroupid', 'cli-schemagroup',
