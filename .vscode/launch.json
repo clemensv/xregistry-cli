@@ -20,8 +20,8 @@
       //"args": "generate generate --style kafkaproducer --language py --definitions c:\\git\\real-time-sources\\gtfs\\xreg\\gtfs.xreg.json --projectname gtfs_rt_producer --output c:\\temp\\gtfs_rt_producer"
       //"args": "generate --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\separate-schema\\cloudevent-avro-separate.json --projectname Sample --language cs --style amqpproducer --output c:\\temp\\outp\\cs1"
       //"args": "generate --style ehproducer --language cs --definitions C:\\temp\\kusto\\avro-avsc.xreg.json  --projectname Test --output c:\\temp\\outp\\SoccerTest"
-      //"args": "generate --style kafkaproducer --language py --definitions c:\\git\\cedisco-codegen\\samples\\message-definitions\\lightbulb.xreg.json  --projectname lightbulb-py-producer --output c:\\temp\\lightbulb-py-prod"
-      "args": "catalog"
+      "args": "generate --style kafkaproducer --language py --definitions http://localhost:8080/messagegroups/Fabrikam.Lumen  --projectname lightbulb-py-producer --output c:\\temp\\lightbulb-py-prod"
+      //"args": "catalog apply -f D:\\xregistry-cli\\samples\\message-definitions\\lightbulb.xreg.json --catalog http://localhost:8080"
     },
     {
       "name": "Python: Manifest",

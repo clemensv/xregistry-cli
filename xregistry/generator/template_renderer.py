@@ -17,6 +17,7 @@ import avrotize
 import jinja2
 import jsonpointer
 from jinja2 import Template, TemplateAssertionError, TemplateNotFound, TemplateRuntimeError, TemplateSyntaxError
+import urllib
 
 from xregistry.cli import logger
 from xregistry.generator.generator_context import GeneratorContext
@@ -56,7 +57,7 @@ class TemplateRenderer:
         self.template_args = template_args
         self.suppress_code_output = suppress_code_output
         self.suppress_schema_output = suppress_schema_output
-        self.templateinfo = {}
+        self.templateinfo: Dict[str, Any] = {}
         self.data_project_name = f"{project_name}_data"
         self.data_project_dir = self.data_project_name
         self.main_project_name = project_name
@@ -68,6 +69,17 @@ class TemplateRenderer:
 
     def generate(self) -> None:
         """Generate code and schemas from templates."""
+
+        self.ctx.base_uri = self.xreg_file_arg
+        if self.xreg_file_arg.startswith("http"):
+            parsed_uri = urllib.parse.urlparse(self.xreg_file_arg)
+            path_segments = parsed_uri.path.split('/')
+            groups_index = next((i for i, segment in enumerate(path_segments) if segment.endswith("groups")), None)
+            if groups_index is not None:
+                self.ctx.base_uri = urllib.parse.urlunparse(parsed_uri._replace(path='/'.join(path_segments[:groups_index])))
+            else:
+                self.ctx.base_uri = self.xreg_file_arg
+
         xreg_file, xregistry_document = self.ctx.loader.load(
             self.xreg_file_arg, self.headers, self.style == "schema", messagegroup_filter=self.ctx.messagegroup_filter)
         if not xreg_file or not xregistry_document:
@@ -153,6 +165,7 @@ class TemplateRenderer:
 
                     # If the scheme reference is a JSON Pointer reference, we resolve it
                     # to an object in the document. Remove a leading # if present
+                    schema_root = None
                     if schema_reference.startswith("#"):
                         path_elements = schema_reference.split('/')
                         if path_elements[-2] == "versions":
@@ -170,16 +183,23 @@ class TemplateRenderer:
                                 continue
                             schema_root = match
                         except jsonpointer.JsonPointerException as e:
-                            logger.error(
-                                "Error resolving JSON Pointer: %s", str(e))
-                            continue
-                    else:
+                            logger.error("Error resolving JSON Pointer: %s", str(e))
+                    
+                    if not schema_root:
+                        if schema_reference.startswith("#"):
+                            schema_reference = schema_reference[1:]
+
                         type_ref = ''
                         if '#' in schema_reference:
-                            schema_reference, type_ref = schema_reference.split(
-                                "#")
-                        schema_reference, xregistry_document = self.ctx.loader.load(
-                            schema_reference, self.headers, True, messagegroup_filter=self.ctx.messagegroup_filter)
+                            schema_reference, type_ref = schema_reference.split("#")
+                        if schema_reference.startswith("/"):
+                            schema_reference = urllib.parse.urljoin(self.ctx.base_uri, schema_reference)            
+                            schema_reference, fragment = urllib.parse.urldefrag(schema_reference)
+                        
+                        schema_reference, schema_root = self.ctx.loader.load(
+                            schema_reference, self.headers, True, 
+                            ignore_handled=True,
+                            messagegroup_filter=self.ctx.messagegroup_filter)
                         if type_ref:
                             try:
                                 match = jsonpointer.resolve_pointer(
@@ -228,18 +248,32 @@ class TemplateRenderer:
                         elif "schema" in schema_root or "schemaurl" in schema_root or "schema" in schema_root:
                             # the reference pointed to a schema version definition
                             schema_version = schema_root
-                            parent_reference = schema_reference.rsplit(
-                                "/", 1)[0]
-                            parent = jsonpointer.resolve_pointer(
-                                xregistry_document, parent_reference[1:])
-                            if parent and isinstance(parent, dict) and not class_name:
-                                class_name = parent.get("schemaid", class_name)
-                            parent_reference = parent_reference.rsplit(
-                                "/", 2)[0]
-                            parent = jsonpointer.resolve_pointer(
-                                xregistry_document, parent_reference[1:])
-                            if parent and isinstance(parent, dict):
-                                prefix = parent.get("schemagroupid", '')
+                            if "schemaid" not in schema_root:
+                                parent_reference = schema_reference.rsplit(
+                                    "/", 1)[0]
+                                parent = jsonpointer.resolve_pointer(
+                                    xregistry_document, parent_reference[1:])
+                                if parent and isinstance(parent, dict) and not class_name:
+                                    class_name = parent.get("schemaid", class_name)
+                            else:
+                                class_name = schema_root.get("schemaid", class_name)
+                            if "defaultversionurl" not in schema_root and "self" not in schema_root:
+                                parent_reference = parent_reference.rsplit(
+                                    "/", 2)[0]
+                                parent = jsonpointer.resolve_pointer(
+                                    xregistry_document, parent_reference[1:])
+                                if parent and isinstance(parent, dict):
+                                    prefix = parent.get("schemagroupid", '')
+                                    if not class_name.startswith(prefix):
+                                        class_name = prefix + '.' + class_name
+                            else:
+                                version_url = str(schema_root.get("defaultversionurl", schema_root.get("self", '')))
+                                # version url is {baseurl}/schemagroups/{schemagroupid}/schemas/{schemaid}/versions/{versionid}
+                                match = re.search(r"/schemagroups/([^/]+)/", version_url)
+                                if match:
+                                    prefix = match.group(1)
+                                else:
+                                    raise RuntimeError(f"Schema group ID not found in version URL: {version_url}")
                                 if not class_name.startswith(prefix):
                                     class_name = prefix + '.' + class_name
 

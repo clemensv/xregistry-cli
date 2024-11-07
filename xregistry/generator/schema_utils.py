@@ -57,11 +57,24 @@ class SchemaUtils:
         schema_obj: JsonNode = None
 
         def resolve_pointer(root: JsonNode, schema_ref: str) -> JsonNode:
-            obj = jsonpointer.resolve_pointer(root, schema_ref)
-            if isinstance(obj, (dict, list, str)):
-                return obj
+            if schema_ref.startswith("#"):
+                try:
+                    obj = jsonpointer.resolve_pointer(root, schema_ref)
+                    if isinstance(obj, (dict, list, str)):
+                        return obj
+                    else:
+                        raise RuntimeError(f"Schema not found: {schema_ref}")
+                except jsonpointer.JsonPointerException as jpe:
+                    raise RuntimeError(f"Schema not found: {schema_ref}") from jpe
             else:
-                raise RuntimeError(f"Schema not found: {schema_ref}")
+                if schema_ref.startswith("/"):
+                    schema_ref = urllib.parse.urljoin(ctx.base_uri, schema_ref)            
+                schema_ref, fragment = urllib.parse.urldefrag(schema_ref)
+                _, obj = ctx.loader.load(schema_ref, {}, True, True)
+                if fragment:
+                    fragment, class_name = fragment.split(":")
+                    obj = resolve_pointer(obj, fragment)
+                return obj
 
         if schema_format.lower().startswith("proto") and isinstance(schema_ref, str) and SchemaUtils.is_proto_doc(schema_ref):
             ptr = SchemaUtils.get_json_pointer(root, schema_ref)
@@ -79,7 +92,7 @@ class SchemaUtils:
                 schema_obj = resolve_pointer(root, schema_ref[1:])
             else:
                 schema_ref, fragment = urllib.parse.urldefrag(schema_ref)
-                _, schema_obj = ctx.loader.load(schema_ref, {}, True)
+                _, schema_obj = ctx.loader.load(schema_ref, {}, True, True)
                 if fragment:
                     fragment, class_name = fragment.split(":")
                     schema_obj = resolve_pointer(schema_obj, fragment)
@@ -96,23 +109,45 @@ class SchemaUtils:
                 if not class_name:
                     class_name = str(schema_obj.get("schemaid", ''))
                 parent_reference = schema_ref.rsplit("/", 2)[0]
-                parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
-                if parent and isinstance(parent, dict):
-                    prefix = parent.get("schemagroupid", '')
-                    if not class_name.startswith(prefix):
-                        class_name = prefix + '.' + class_name
-            elif isinstance(schema_obj, dict):
+                try:
+                    parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
+                    if parent and isinstance(parent, dict):
+                        prefix = parent.get("schemagroupid", '')
+                        if not class_name.startswith(prefix):
+                            class_name = prefix + '.' + class_name
+                except jsonpointer.JsonPointerException:
+                    raise RuntimeError(f"Schema not found: {parent_reference}")
+            elif isinstance(schema_obj, dict) and "versionid" in schema_obj:
                 schema_version = schema_obj
                 parent_reference = schema_ref.rsplit("/", 1)[0]
-                parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
-                if parent and isinstance(parent, dict) and not class_name:
-                    class_name = parent.get("schemaid", class_name)
-                parent_reference = parent_reference.rsplit("/", 2)[0]
-                parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
-                if parent and isinstance(parent, dict):
-                    prefix = parent.get("schemagroupid", '')
+                if "schemaid" not in schema_obj:
+                    parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
+                    if parent and isinstance(parent, dict) and not class_name:
+                        class_name = parent.get("schemaid", class_name)
+                else:
+                    class_name = str(schema_obj.get("schemaid", class_name))
+                # we now get the group to see whether we need to prefix the class name
+                if "defaultversionurl" not in schema_obj and "self" not in schema_obj:
+                    parent_reference = parent_reference.rsplit("/", 2)[0]
+                    try:
+                        parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
+                        if parent and isinstance(parent, dict):
+                            prefix = parent.get("schemagroupid", '')
+                            if not class_name.startswith(prefix):
+                                class_name = prefix + '.' + class_name
+                    except jsonpointer.JsonPointerException:
+                        raise RuntimeError(f"Schema not found: {parent_reference}")
+                else:
+                    version_url = str(schema_obj.get("defaultversionurl", schema_obj.get("self", '')))
+                    # version url is {baseurl}/schemagroups/{schemagroupid}/schemas/{schemaid}/versions/{versionid}
+                    match = re.search(r"/schemagroups/([^/]+)/", version_url)
+                    if match:
+                        prefix = match.group(1)
+                    else:
+                        raise RuntimeError(f"Schema group ID not found in version URL: {version_url}")
                     if not class_name.startswith(prefix):
                         class_name = prefix + '.' + class_name
+
             if not schema_version or not isinstance(schema_version, dict):
                 raise RuntimeError(f"Schema version not found: {schema_ref}")
             if not "format" in schema_version or not isinstance(schema_version["format"], str) or schema_format != schema_version["format"]:

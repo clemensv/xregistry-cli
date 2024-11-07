@@ -52,7 +52,7 @@ def main():
     generate_parser.add_argument("--language", dest="language", required=True, help="The language to use for the generated code")
     generate_parser.add_argument("--style", dest="style", required=True, help="The style of the generated code")
     generate_parser.add_argument("--output", dest="output_dir", required=True, help="The directory where the generated code should be saved")
-    generate_parser.add_argument("--definitions", dest="definitions_file", required=True, help="The file or URL containing the definitions")
+    generate_parser.add_argument("--definitions", "--url", dest="definitions_file", required=True, help="The file or URL containing the definitions")
     generate_parser.add_argument("--requestheaders", nargs="*", dest="headers", required=False,help="Extra HTTP headers in the format 'key=value'")
     generate_parser.add_argument("--templates", nargs="*", dest="template_dirs", required=False, help="Paths of extra directories containing custom templates")
     generate_parser.add_argument("--template-args", nargs="*", dest="template_args", required=False, help="Extra template arguments to pass to the code generator in the form 'key=value")

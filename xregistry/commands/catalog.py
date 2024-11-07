@@ -57,7 +57,15 @@ class CatalogSubcommands:
         response = requests.put(f"{self.base_url}/endpoints/{endpointid}", json=endpoint)
         if response.status_code != 201 and response.status_code != 200:
             raise ValueError(f"Failed to add endpoint: {response.text}")
-
+        
+    def apply_manifest(self, file: str) -> None:
+        """Applies a manifest from a file."""
+        with open(file, 'r', encoding='utf-8') as f:
+            manifest = json.load(f)
+            response = requests.put(f"{self.base_url}/?nested", json=manifest)
+            if response.status_code != 200 and response.status_code != 201:
+                raise ValueError(f"Failed to apply manifest {response.status_code}: {response.text}")
+   
     def remove_endpoint(self, endpointid: str) -> None:
         """Removes an endpoint from the catalog."""
         
@@ -428,11 +436,11 @@ class CatalogSubcommands:
             obj[name]["required"] = required
         
 
-    def remove_amqp_message_metadata(self, groupid: str, messageid: str, section: str|None, name: str) -> None:
+    def remove_amqp_message_metadata(self, messagegroupid: str, messageid: str, section: str|None, name: str) -> None:
         """Removes AMQP message metadata from a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -443,7 +451,7 @@ class CatalogSubcommands:
         self.remove_protocol_option(messageid, message, section, name)
         
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to remove AMQP message metadata: {response.text}")
 
@@ -466,11 +474,11 @@ class CatalogSubcommands:
         if response.status_code != 200:
             raise ValueError(f"Failed to add AMQP message metadata: {response.text}")
 
-    def edit_amqp_message_metadata(self, groupid: str, messageid: str, section: str|None, name: str, type: str, value: str, description: str, required: bool) -> None:
+    def edit_amqp_message_metadata(self, messagegroupid: str, messageid: str, section: str|None, name: str, type: str, value: str, description: str, required: bool) -> None:
         """Edits AMQP message metadata for a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -482,15 +490,15 @@ class CatalogSubcommands:
         self.set_protocol_option(message, section, name, type, value, description, required)
         
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to edit AMQP message metadata: {response.text}")
 
-    def add_mqtt_message_metadata(self, groupid: str, messageid: str, mqtt_version: str, name: str, type: str, value: str, description: str, required: bool) -> None:
+    def add_mqtt_message_metadata(self, messagegroupid: str, messageid: str, mqtt_version: str, name: str, type: str, value: str, description: str, required: bool) -> None:
         """Adds MQTT message metadata to a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -501,15 +509,15 @@ class CatalogSubcommands:
         self.set_protocol_option(message, None, name, type, value, description, required)
         
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to add MQTT message metadata: {response.text}")
 
-    def remove_mqtt_message_metadata(self, groupid: str, messageid: str, section:str|None, name: str) -> None:
+    def remove_mqtt_message_metadata(self, messagegroupid: str, messageid: str, section:str|None, name: str) -> None:
         """Removes MQTT message metadata from a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -520,15 +528,15 @@ class CatalogSubcommands:
         self.remove_protocol_option(messageid, message, section, name)
         
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to remove MQTT message metadata: {response.text}")
 
-    def edit_mqtt_message_metadata(self, groupid: str, messageid: str, name: str, type: str, value: str, description: str, required: bool) -> None:
+    def edit_mqtt_message_metadata(self, messagegroupid: str, messageid: str, name: str, type: str, value: str, description: str, required: bool) -> None:
         """Edits MQTT message metadata for a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -539,15 +547,15 @@ class CatalogSubcommands:
         self.set_protocol_option(message, None, name, type, value, description, required)
         
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to edit MQTT message metadata: {response.text}")
 
-    def add_kafka_message_metadata(self, groupid: str, messageid: str, section: Optional[str], name: str, type: str, value: str, description: str, required: bool) -> None:
+    def add_kafka_message_metadata(self, messagegroupid: str, messageid: str, section: Optional[str], name: str, type: str, value: str, description: str, required: bool) -> None:
         """Adds Kafka message metadata to a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -558,15 +566,15 @@ class CatalogSubcommands:
         self.set_protocol_option(message, section, name, type, value, description, required)
 
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to add Kafka message metadata: {response.text}")
 
-    def remove_kafka_message_metadata(self, groupid: str, messageid: str, section: Optional[str], name: str) -> None:
+    def remove_kafka_message_metadata(self, messagegroupid: str, messageid: str, section: Optional[str], name: str) -> None:
         """Removes Kafka message metadata from a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -577,7 +585,7 @@ class CatalogSubcommands:
         self.remove_protocol_option(messageid, message, section, name)
         
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to remove Kafka message metadata: {response.text}")
 
@@ -638,11 +646,11 @@ class CatalogSubcommands:
         if response.status_code != 200:
             raise ValueError(f"Failed to remove HTTP message metadata: {response.text}")
 
-    def edit_http_message_metadata(self, groupid: str, messageid: str, section: str | None, name: str, type: str, value: str, description: str, required: bool) -> None:
+    def edit_http_message_metadata(self, messagegroupid: str, messageid: str, section: str | None, name: str, type: str, value: str, description: str, required: bool) -> None:
         """Edits HTTP message metadata for a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -653,7 +661,7 @@ class CatalogSubcommands:
         self.set_protocol_option(message, section, name, type, value, description, required)        
        
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to edit HTTP message metadata: {response.text}")
 
@@ -688,11 +696,11 @@ class CatalogSubcommands:
             raise ValueError(f"No envelopemetadata found for message {messageid}")
         
 
-    def add_cloudevents_message_metadata(self, groupid: str, messageid: str, attribute: str, type: str, description: str, value: str, required: bool) -> None:
+    def add_cloudevents_message_metadata(self, messagegroupid: str, messageid: str, attribute: str, type: str, description: str, value: str, required: bool) -> None:
         """Adds CloudEvents message metadata to a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -703,15 +711,15 @@ class CatalogSubcommands:
         self.set_envelope_metadata(message, attribute, type, value, description, required)
         
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to add CloudEvents message metadata: {response.text}")
 
-    def edit_cloudevents_message_metadata(self, groupid: str, messageid: str, attribute: str, type: str, description: str, value: str, required: bool) -> None:
+    def edit_cloudevents_message_metadata(self, messagegroupid: str, messageid: str, attribute: str, type: str, description: str, value: str, required: bool) -> None:
         """Edits CloudEvents message metadata for a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -722,15 +730,15 @@ class CatalogSubcommands:
         self.remove_envelope_metadata(messageid, message, attribute)
 
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to edit CloudEvents message metadata: {response.text}")
 
-    def remove_cloudevents_message_metadata(self, groupid: str, messageid: str, attribute: str) -> None:
+    def remove_cloudevents_message_metadata(self, messagegroupid: str, messageid: str, attribute: str) -> None:
         """Removes CloudEvents message metadata from a message in a message group in the catalog."""
         
         # Fetch the current message
-        response = requests.get(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}")
+        response = requests.get(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}")
         if response.status_code != 200:
             raise ValueError(f"Failed to fetch message: {response.text}")
         message = response.json()
@@ -740,18 +748,18 @@ class CatalogSubcommands:
             message["metadata"] = [m for m in message["metadata"] if m["attribute"] != attribute]
         
         # Update the message with a PUT request
-        response = requests.put(f"{self.base_url}/messagegroups/{groupid}/messages/{messageid}", json=message)
+        response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}/messages/{messageid}", json=message)
         if response.status_code != 200:
             raise ValueError(f"Failed to remove CloudEvents message metadata: {response.text}")
 
-    def add_schema(self, groupid: str, schemaid: str, format: str, versionid: str = "1", schema: Optional[str] = None,
+    def add_schema(self, schemagroupid: str, schemaid: str, format: str, versionid: str = "1", schema: Optional[str] = None,
                    schemaimport: Optional[str] = None, schemaurl: Optional[str] = None, description: Optional[str] = None, documentation: Optional[str] = None,
                    labels: Optional[Dict[str, str]] = None, name: Optional[str] = None) -> None:
         """Adds a schema to a schemagroup in the catalog."""
         
-        response = requests.get(f"{self.base_url}/schemagroups/{groupid}")
+        response = requests.get(f"{self.base_url}/schemagroups/{schemagroupid}")
         if response.status_code != 200:
-            raise ValueError(f"Schemagroup with id {groupid} does not exist: {response.text}")
+            raise ValueError(f"Schemagroup with id {schemagroupid} does not exist: {response.text}")
         schemagroup = response.json()
 
         if not format:
@@ -793,7 +801,7 @@ class CatalogSubcommands:
             schemagroup["schemas"] = {}
         schemagroup["schemas"][schemaid] = schema_obj
 
-        response = requests.put(f"{self.base_url}/schemagroups/{groupid}", json=schemagroup)
+        response = requests.put(f"{self.base_url}/schemagroups/{schemagroupid}", json=schemagroup)
         if response.status_code != 200 and response.status_code != 201:
             raise ValueError(f"Failed to add schema: {response.text}")
 
@@ -895,16 +903,16 @@ class CatalogSubcommands:
         if response.status_code != 200:
             raise ValueError(f"Failed to edit schema version: {response.text}")
         
-    def remove_schemaversion(self, groupid: str, schemaid: str, versionid: str) -> None:
+    def remove_schemaversion(self, schemagroupid: str, schemaid: str, versionid: str) -> None:
         """Removes a schema version from a schemagroup in the catalog."""
         
-        response = requests.get(f"{self.base_url}/schemagroups/{groupid}")
+        response = requests.get(f"{self.base_url}/schemagroups/{schemagroupid}")
         if response.status_code != 200:
-            raise ValueError(f"Schemagroup with id {groupid} does not exist: {response.text}")
+            raise ValueError(f"Schemagroup with id {schemagroupid} does not exist: {response.text}")
         schemagroup = response.json()
 
         if "schemas" not in schemagroup or schemaid not in schemagroup["schemas"]:
-            raise ValueError(f"Schema with id {schemaid} does not exist in schemagroup {groupid}")
+            raise ValueError(f"Schema with id {schemaid} does not exist in schemagroup {schemagroupid}")
         
         if "versions" not in schemagroup["schemas"][schemaid] or versionid not in schemagroup["schemas"][schemaid]["versions"]:
             raise ValueError(f"Version with id {versionid} does not exist for schema {schemaid}")
@@ -913,7 +921,7 @@ class CatalogSubcommands:
         if not schemagroup["schemas"][schemaid]["versions"]:
             del schemagroup["schemas"][schemaid]
 
-        response = requests.put(f"{self.base_url}/schemagroups/{groupid}", json=schemagroup)
+        response = requests.put(f"{self.base_url}/schemagroups/{schemagroupid}", json=schemagroup)
         if response.status_code != 200:
             raise ValueError(f"Failed to remove schema version: {response.text}")
 
@@ -947,18 +955,18 @@ class CatalogSubcommands:
         if response.status_code != 200:
             raise ValueError(f"Failed to remove schema: {response.text}")
 
-    def edit_schema(self, groupid: str, schemaid: str, format: Optional[str] = None, versionid: str = "1", schema: Optional[str] = None,
+    def edit_schema(self, schemagroupid: str, schemaid: str, format: Optional[str] = None, versionid: str = "1", schema: Optional[str] = None,
                     schemaimport: Optional[str] = None, schemaurl: Optional[str] = None, description: Optional[str] = None, documentation: Optional[str] = None,
                     labels: Optional[Dict[str, str]] = None, name: Optional[str] = None) -> None:
         """Edits an existing schema in a schemagroup in the catalog."""
         
-        response = requests.get(f"{self.base_url}/schemagroups/{groupid}")
+        response = requests.get(f"{self.base_url}/schemagroups/{schemagroupid}")
         if response.status_code != 200:
-            raise ValueError(f"Schemagroup with id {groupid} does not exist: {response.text}")
+            raise ValueError(f"Schemagroup with id {schemagroupid} does not exist: {response.text}")
         schemagroup = response.json()
 
         if "schemas" not in schemagroup or schemaid not in schemagroup["schemas"]:
-            raise ValueError(f"Schema with id {schemaid} does not exist in schemagroup {groupid}")
+            raise ValueError(f"Schema with id {schemaid} does not exist in schemagroup {schemagroupid}")
 
         schema_obj = schemagroup["schemas"][schemaid]
         if format:
@@ -990,7 +998,7 @@ class CatalogSubcommands:
 
         schema_obj["modifiedat"] = current_time_iso()
         
-        response = requests.put(f"{self.base_url}/schemagroups/{groupid}", json=schemagroup)
+        response = requests.put(f"{self.base_url}/schemagroups/{schemagroupid}", json=schemagroup)
         if response.status_code != 200:
             raise ValueError(f"Failed to edit schema: {response.text}")
 
@@ -1041,7 +1049,7 @@ class CatalogSubcommands:
         """
 
         manifest_subparsers = manifest_parser.add_subparsers(help="Manifest commands")
-        
+
         def add_authentication_arguments(parser):
             """
             Add common arguments to the parser.
@@ -1055,6 +1063,11 @@ class CatalogSubcommands:
             parser.add_argument("--password", help="Password")
             parser.add_argument("--token", help="Bearer token")
         
+        apply_parser = manifest_subparsers.add_parser("apply", help="Apply a manifest JSON")
+        apply_parser.add_argument("-f", "--file", required=True, help="JSON file containing manifest data")
+        add_authentication_arguments(apply_parser)
+        apply_parser.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).apply_manifest(args.file))
+
         endpoint_subparsers = manifest_subparsers.add_parser("endpoint", help="Manage endpoints").add_subparsers(
             dest="endpoint_command", help="Endpoint commands")
 
@@ -1217,9 +1230,9 @@ class CatalogSubcommands:
         message_edit.add_argument("--documentation", help="Message documentation URL")
         message_edit.add_argument("--name", help="Message name")
         message_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")  
-        message_edit.add_argument("--envelope", choices=["CloudEvents/1.0", "None"], help="Message envelope")
+        message_edit.add_argument("--envelope", choices=["CloudEvents/1.0", "None"], help="Message envelope", default="CloudEvents/1.0")
         message_edit.add_argument("--protocol", choices=["AMQP/1.0", "MQTT/3.1.1", "MQTT/5.0",
-                                  "NATS", "HTTP", "KAFKA", "None"], help="Message protocol")
+                                  "NATS", "HTTP", "KAFKA", "None"], help="Message protocol", default="None")
         message_edit.add_argument("--schemaformat", help="Schema format")
         message_edit.add_argument("--schemagroup", help="Schema group ID")
         message_edit.add_argument("--schemaid", help="Schema ID")
@@ -1307,7 +1320,7 @@ class CatalogSubcommands:
             args.messagegroupid, args.messageid, args.attribute, args.type, args.description, args.value, args.required))
 
         message_cloudevent_metadata_edit = message_cloudevent_metadata_subparsers.add_parser(
-            "edit", help="Edit a metadata field")
+            "edit", help="Edit a MQTT metadata field")
         message_cloudevent_metadata_edit.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_cloudevent_metadata_edit.add_argument("--messageid", required=True, help="Message ID")
         message_cloudevent_metadata_edit.add_argument("--attribute", required=True, help="Attribute name")
@@ -1318,10 +1331,17 @@ class CatalogSubcommands:
         message_cloudevent_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
         add_authentication_arguments(message_cloudevent_metadata_edit)
         message_cloudevent_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_cloudevents_message_metadata(
-            args.messagegroupid, args.messageid, args.attribute, args.type, args.description, args.value, args.required))
+            messagegroupid=args.messagegroupid, 
+            messageid=args.messageid, 
+            attribute=args.attribute, 
+            type=args.type, 
+            description=args.description, 
+            value=args.value, 
+            required=args.required
+        ))
 
         message_cloudevent_metadata_remove = message_cloudevent_metadata_subparsers.add_parser(
-            "remove", help="Remove a metadata field")
+            "remove", help="Remove a MQTT metadata field")
         message_cloudevent_metadata_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_cloudevent_metadata_remove.add_argument("--messageid", required=True, help="Message ID")
         message_cloudevent_metadata_remove.add_argument("--attribute", required=True, help="CloudEvents attribute")
@@ -1330,14 +1350,26 @@ class CatalogSubcommands:
             args.catalog).remove_cloudevents_message_metadata(args.messagegroupid, args.messageid, args.key))
 
         message_amqp_subparsers = manifest_subparsers.add_parser(
-            "AMQP/1.0", help="Manage AMQP").add_subparsers(dest="amqp_command", help="AMQP commands")
+            "amqp", help="Manage AMQP messages").add_subparsers(dest="amqp_command", help="AMQP commands")
         message_amqp_metadata_subparsers = message_amqp_subparsers.add_parser(
-            "metadata", help="Manage message metadata").add_subparsers(dest="metadata_command", help="Metadata commands")
+            "metadata", help="Manage AMQP message metadata").add_subparsers(dest="metadata_command", help="Metadata commands")
 
         def _add_amqp_message(args):
             sc = CatalogSubcommands(args.catalog)
-            sc.add_message(args.messagegroupid, args.messageid, "None", "AMQP/1.0", args.schemaformat, args.schemagroup,
-                           args.schemaid, args.schemaurl, args.documentation, args.description, args.labels, args.name)
+            sc.add_message(
+                messagegroupid=args.messagegroupid,
+                messageid=args.messageid,
+                envelope="None",
+                protocol="AMQP/1.0",
+                schemaformat=args.schemaformat,
+                schemagroup=args.schemagroup,
+                schemaid=args.schemaid,
+                schemaurl=args.schemaurl,
+                documentation=args.documentation,
+                description=args.description,
+                labels=args.labels,
+                name=args.name
+            )
             sc.add_amqp_message_metadata(
                 messagegroupid=args.messagegroupid,
                 messageid=args.messageid,
@@ -1349,7 +1381,7 @@ class CatalogSubcommands:
                 required=True
             )
 
-        message_amqp_add = message_amqp_subparsers.add_parser("add", help="Add a new message")
+        message_amqp_add = message_amqp_subparsers.add_parser("add", help="Add a new AMQP message")
         message_amqp_add.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_amqp_add.add_argument("--messageid", required=True, help="Message ID")
         message_amqp_add.add_argument("--description", help="Message description")
@@ -1363,7 +1395,7 @@ class CatalogSubcommands:
         add_authentication_arguments(message_amqp_add)
         message_amqp_add.set_defaults(func=_add_amqp_message)
 
-        message_amqp_edit = message_amqp_subparsers.add_parser("edit", help="Edit a message")
+        message_amqp_edit = message_amqp_subparsers.add_parser("edit", help="Edit a Kafka message")
         message_amqp_edit.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_amqp_edit.add_argument("--messageid", required=True, help="Message ID")
         message_amqp_edit.add_argument("--description", help="Message description")
@@ -1390,14 +1422,14 @@ class CatalogSubcommands:
             name=args.name
         ))
 
-        message_amqp_remove = message_amqp_subparsers.add_parser("remove", help="Remove a message")
+        message_amqp_remove = message_amqp_subparsers.add_parser("remove", help="Remove an AMQP message")
         message_amqp_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_amqp_remove.add_argument("--messageid", required=True, help="Message ID")
         add_authentication_arguments(message_amqp_remove)
         message_amqp_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_message(args.messagegroupid, args.messageid))
 
-        message_amqp_metadata_add = message_amqp_metadata_subparsers.add_parser("add", help="Add a new metadata field")
+        message_amqp_metadata_add = message_amqp_metadata_subparsers.add_parser("add", help="Add a new AMQP metadata field")
         message_amqp_metadata_add.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_amqp_metadata_add.add_argument("--messageid", required=True, help="Message ID")
         message_amqp_metadata_add.add_argument("--section", required=True, choices=[
@@ -1411,7 +1443,7 @@ class CatalogSubcommands:
         message_amqp_metadata_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_amqp_message_metadata(
             messagegroupid=args.messagegroupid, messageid=args.messageid, section=args.section, name=args.name, type=args.type, value=args.value, description=args.description, required=args.required))
 
-        message_amqp_metadata_edit = message_amqp_metadata_subparsers.add_parser("edit", help="Edit a metadata field")
+        message_amqp_metadata_edit = message_amqp_metadata_subparsers.add_parser("edit", help="Edit an AMQP metadata field")
         message_amqp_metadata_edit.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_amqp_metadata_edit.add_argument("--messageid", required=True, help="Message ID")
         message_amqp_metadata_edit.add_argument("--section", required=True, choices=[
@@ -1426,7 +1458,7 @@ class CatalogSubcommands:
             args.messagegroupid, args.messageid, args.section, args.name, args.type, args.value, args.description, args.required))
 
         message_amqp_metadata_remove = message_amqp_metadata_subparsers.add_parser(
-            "remove", help="Remove a metadata field")
+            "remove", help="Remove an AMQP metadata field")
         message_amqp_metadata_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_amqp_metadata_remove.add_argument("--messageid", required=True, help="Message ID")
         message_amqp_metadata_remove.add_argument("--section", required=True, choices=[
@@ -1436,7 +1468,7 @@ class CatalogSubcommands:
         message_amqp_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(
             args.catalog).remove_amqp_message_metadata(args.messagegroupid, args.messageid, args.name, args.section))
 
-        message_mqtt_subparsers = manifest_subparsers.add_parser("mqtt", help="Manage MQTT").add_subparsers(dest="mqtt_command", help="MQTT commands")
+        message_mqtt_subparsers = manifest_subparsers.add_parser("mqtt", help="Manage MQTT messages").add_subparsers(dest="mqtt_command", help="MQTT commands")
         message_mqtt_metadata_subparsers = message_mqtt_subparsers.add_parser(
             "metadata", help="Manage message metadata").add_subparsers(dest="metadata_command", help="Metadata commands")
 
@@ -1448,37 +1480,50 @@ class CatalogSubcommands:
             sc.add_mqtt_message_metadata(args.messagegroupid, args.messageid, args.mqtt_version, "topic",
                                          "string", "{topic}/"+args.messageid,  "MQTT topic", True)
 
-        message_mqtt_add = message_mqtt_subparsers.add_parser("add", help="Add a new message")
+        message_mqtt_add = message_mqtt_subparsers.add_parser("add", help="Add a new MQTT message")
         message_mqtt_add.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_mqtt_add.add_argument("--messageid", required=True, help="Message ID")
         message_mqtt_add.add_argument("--description", help="Message description")
         message_mqtt_add.add_argument("--documentation", help="Message documentation URL")
         message_mqtt_add.add_argument("--name", help="Message name")
         message_mqtt_add.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_mqtt_add.add_argument("--mqtt_version", required=True,
-                                      choices=["3", "5", "3.1.1", "5.0"], help="MQTT version")
+        message_mqtt_add.add_argument("--mqtt-version", required=True,
+                                      choices=["3", "5", "3.1.1", "5.0"], help="MQTT version", default="5.0")
         message_mqtt_add.add_argument("--schemaformat", help="Schema format")
         message_mqtt_add.add_argument("--schemagroup", help="Schema group ID")
         message_mqtt_add.add_argument("--schemaid", help="Schema ID")
         message_mqtt_add.add_argument("--schemaurl", help="Schema URL")
         add_authentication_arguments(message_mqtt_add)
-        message_mqtt_add.set_defaults(func=_add_amqp_message)
+        message_mqtt_add.set_defaults(func=_add_mqtt_message)
 
-        message_mqtt_edit = message_mqtt_subparsers.add_parser("edit", help="Edit a message")
+        message_mqtt_edit = message_mqtt_subparsers.add_parser("edit", help="Edit a MQTT message")
         message_mqtt_edit.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_mqtt_edit.add_argument("--messageid", required=True, help="Message ID")
         message_mqtt_edit.add_argument("--description", help="Message description")
         message_mqtt_edit.add_argument("--documentation", help="Message documentation URL")
         message_mqtt_edit.add_argument("--name", help="Message name")
         message_mqtt_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
+        message_mqtt_edit.add_argument("--mqtt-version", required=True, 
+                                        choices=["3", "5", "3.1.1", "5.0"], help="MQTT version", default="5.0")
         message_mqtt_edit.add_argument("--schemaformat", help="Schema format")
         message_mqtt_edit.add_argument("--schemagroup", help="Schema group ID")
         message_mqtt_edit.add_argument("--schemaid", help="Schema ID")
         message_mqtt_edit.add_argument("--schemaurl", help="Schema URL")
         add_authentication_arguments(message_mqtt_edit)
         message_mqtt_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
-            args.messagegroupid, args.messageid, "None", "MQTT/" + args.mqtt_version, args.schemaformat, args.schemagroup, args.schemaid,
-            args.schemaurl, args.documentation, args.description, args.labels, args.name))
+            messagegroupid=args.messagegroupid,
+            messageid=args.messageid,
+            envelope="None",
+            protocol="MQTT/" + args.mqtt_version,
+            schemaformat=args.schemaformat,
+            schemagroup=args.schemagroup,
+            schemaid=args.schemaid,
+            schemaurl=args.schemaurl,
+            documentation=args.documentation,
+            description=args.description,
+            labels=args.labels,
+            name=args.name
+        ))
 
         message_mqtt_remove = message_mqtt_subparsers.add_parser("remove", help="Remove a message")
         message_mqtt_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
@@ -1490,8 +1535,8 @@ class CatalogSubcommands:
         message_mqtt_metadata_add = message_mqtt_metadata_subparsers.add_parser("add", help="Add a new metadata field")
         message_mqtt_metadata_add.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_mqtt_metadata_add.add_argument("--messageid", required=True, help="Message ID")
-        message_mqtt_metadata_add.add_argument("--mqtt_version", required=True,
-                                               choices=["3", "5", "3.1.1", "5.0"], help="MQTT version")
+        message_mqtt_metadata_add.add_argument("--mqtt-version", required=True,
+                                               choices=["3", "5", "3.1.1", "5.0"], help="MQTT version", default="5.0")
         message_mqtt_metadata_add.add_argument("--name", required=True, help="Metadata name")
         message_mqtt_metadata_add.add_argument("--type", required=True, choices=PROPERTY_TYPES, help="Metadata type")
         message_mqtt_metadata_add.add_argument("--value", required=True, help="Metadata value")
@@ -1499,7 +1544,15 @@ class CatalogSubcommands:
         message_mqtt_metadata_add.add_argument("--required", type=bool, help="Metadata required status")
         add_authentication_arguments(message_mqtt_metadata_add)
         message_mqtt_metadata_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_mqtt_message_metadata(
-            args.messagegroupid, args.messageid, args.mqtt_version, args.name, args.type, args.value, args.description, args.required))
+            messagegroupid=args.messagegroupid, 
+            messageid=args.messageid, 
+            mqtt_version=args.mqtt_version, 
+            name=args.name, 
+            type=args.type, 
+            value=args.value, 
+            description=args.description, 
+            required=args.required
+        ))
 
         message_mqtt_metadata_edit = message_mqtt_metadata_subparsers.add_parser("edit", help="Edit a metadata field")
         message_mqtt_metadata_edit.add_argument("--messagegroupid", required=True, help="Message group ID")
@@ -1513,7 +1566,14 @@ class CatalogSubcommands:
         message_mqtt_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
         add_authentication_arguments(message_mqtt_metadata_edit)
         message_mqtt_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_mqtt_message_metadata(
-            args.messagegroupid, args.messageid, args.name, args.type, args.value, args.description, args.required))
+            messagegroupid=args.messagegroupid, 
+            messageid=args.messageid, 
+            name=args.name, 
+            type=args.type, 
+            value=args.value, 
+            description=args.description, 
+            required=args.required
+        ))
 
         message_mqtt_metadata_remove = message_mqtt_metadata_subparsers.add_parser(
             "remove", help="Remove a metadata field")
@@ -1522,23 +1582,56 @@ class CatalogSubcommands:
         message_mqtt_metadata_remove.add_argument("--section", required=False, choices=["properties", "topic"], help="Metadata section")
         message_mqtt_metadata_remove.add_argument("--name", required=True, help="Metadata name")
         add_authentication_arguments(message_mqtt_metadata_remove)
-        message_mqtt_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(
-            args.catalog).remove_mqtt_message_metadata(args.messagegroupid, args.messageid, args.section, args.name))
+        message_mqtt_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).remove_mqtt_message_metadata(
+            messagegroupid=args.messagegroupid, 
+            messageid=args.messageid, 
+            section=args.section, 
+            name=args.name
+        ))
 
         message_kafka_subparsers = manifest_subparsers.add_parser(
-            "KAFKA", help="Manage Kafka").add_subparsers(dest="kafka_command", help="Kafka commands")
+            "kafka", help="Manage Kafka messages").add_subparsers(dest="kafka_command", help="Kafka commands")
         message_kafka_metadata_subparsers = message_kafka_subparsers.add_parser(
-            "metadata", help="Manage message metadata").add_subparsers(dest="metadata_command", help="Metadata commands")
+            "metadata", help="Manage Kafka message metadata").add_subparsers(dest="metadata_command", help="Metadata commands")
 
         def _add_kafka_message(args):
             sc = CatalogSubcommands(args.catalog)
-            sc.add_message(args.messagegroupid, args.messageid, "None", "KAFKA", args.schemaformat, args.schemagroup, args.schemaid,
-                           args.schemaurl, args.documentation, args.description, args.labels, args.name)
-            sc.add_kafka_message_metadata(args.messagegroupid, args.messageid, "headers", "message_type",
-                                          "string", args.messageid, "Message ID", True)
-            sc.add_kafka_message_metadata(args.messagegroupid, args.messageid, None, "key", "string", "{key}", "Message key", False)
+            sc.add_message(
+                messagegroupid=args.messagegroupid,
+                messageid=args.messageid,
+                envelope="None",
+                protocol="KAFKA",
+                schemaformat=args.schemaformat,
+                schemagroup=args.schemagroup,
+                schemaid=args.schemaid,
+                schemaurl=args.schemaurl,
+                documentation=args.documentation,
+                description=args.description,
+                labels=args.labels,
+                name=args.name
+            )
+            sc.add_kafka_message_metadata(
+                messagegroupid=args.messagegroupid,
+                messageid=args.messageid,
+                section="headers",
+                name="message_type",
+                type="string",
+                value=args.messageid,
+                description="Message ID",
+                required=True
+            )
+            sc.add_kafka_message_metadata(
+                messagegroupid=args.messagegroupid,
+                messageid=args.messageid,
+                section=None,
+                name="key",
+                type="string",
+                value="{key}",
+                description="Message key",
+                required=False
+            )
 
-        message_kafka_add = message_kafka_subparsers.add_parser("add", help="Add a new message")
+        message_kafka_add = message_kafka_subparsers.add_parser("add", help="Add a new Kafka message")
         message_kafka_add.add_argument("--messagegroupid", required=True, help="Message group ID")
         message_kafka_add.add_argument("--messageid", required=True, help="Message ID")
         message_kafka_add.add_argument("--description", help="Message description")
@@ -1565,8 +1658,19 @@ class CatalogSubcommands:
         message_kafka_edit.add_argument("--schemaurl", help="Schema URL")
         add_authentication_arguments(message_kafka_edit)
         message_kafka_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
-            args.messagegroupid, args.messageid, "None", "KAFKA", args.schemaformat, args.schemagroup, args.schemaid,
-            args.schemaurl, args.documentation, args.description, args.labels, args.name))
+            messagegroupid=args.messagegroupid,
+            messageid=args.messageid,
+            envelope="None",
+            protocol="KAFKA",
+            schemaformat=args.schemaformat,
+            schemagroup=args.schemagroup,
+            schemaid=args.schemaid,
+            schemaurl=args.schemaurl,
+            documentation=args.documentation,
+            description=args.description,
+            labels=args.labels,
+            name=args.name
+        ))
 
         message_kafka_remove = message_kafka_subparsers.add_parser("remove", help="Remove a message")
         message_kafka_remove.add_argument("--messagegroupid", required=True, help="Message group ID")
@@ -1587,7 +1691,15 @@ class CatalogSubcommands:
         message_kafka_metadata_add.add_argument("--required", type=bool, help="Metadata required status")
         add_authentication_arguments(message_kafka_metadata_add)
         message_kafka_metadata_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_kafka_message_metadata(
-            args.messagegroupid, args.messageid, args.section, args.name, args.type, args.value, args.description, args.required))
+            messagegroupid=args.messagegroupid, 
+            messageid=args.messageid, 
+            section=args.section, 
+            name=args.name, 
+            type=args.type, 
+            value=args.value, 
+            description=args.description, 
+            required=args.required
+        ))
 
         message_kafka_metadata_edit = message_kafka_metadata_subparsers.add_parser("edit", help="Edit a metadata field")
         message_kafka_metadata_edit.add_argument("--messagegroupid", required=True, help="Message group ID")
@@ -1600,7 +1712,15 @@ class CatalogSubcommands:
         message_kafka_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
         add_authentication_arguments(message_kafka_metadata_edit)
         message_kafka_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_kafka_message_metadata(
-            args.messagegroupid, args.messageid, args.section, args.name, args.type, args.value, args.description, args.required))
+            groupid=args.messagegroupid, 
+            messageid=args.messageid, 
+            section=args.section, 
+            name=args.name, 
+            type=args.type, 
+            value=args.value, 
+            description=args.description, 
+            required=args.required
+        ))
 
         message_kafka_metadata_remove = message_kafka_metadata_subparsers.add_parser(
             "remove", help="Remove a metadata field")
@@ -1610,8 +1730,12 @@ class CatalogSubcommands:
         message_kafka_metadata_remove.add_argument(
             "--section", required=True, choices=["headers"], help="Metadata section")
         add_authentication_arguments(message_kafka_metadata_remove)
-        message_kafka_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(
-            args.catalog).remove_kafka_message_metadata(args.messagegroupid, args.messageid, args.section, args.name))
+        message_kafka_metadata_remove.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).remove_kafka_message_metadata(
+            messagegroupid=args.messagegroupid, 
+            messageid=args.messageid, 
+            section=args.section, 
+            name=args.name
+        ))
 
         message_http_subparsers = manifest_subparsers.add_parser(
             "http", help="Manage HTTP").add_subparsers(dest="http_command", help="HTTP commands")
@@ -1739,7 +1863,7 @@ class CatalogSubcommands:
         message_http_metadata_edit.add_argument("--required", type=bool, help="Metadata required status")
         add_authentication_arguments(message_http_metadata_edit)
         message_http_metadata_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_http_message_metadata(
-            groupid=args.messagegroupid, 
+            messagegroupid=args.messagegroupid, 
             messageid=args.messageid, 
             section=args.section, 
             name=args.name, 

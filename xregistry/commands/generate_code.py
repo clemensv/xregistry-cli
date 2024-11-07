@@ -33,8 +33,10 @@ def generate_code(args: Any) -> int:
     generator_context.loader.set_current_url(None)
 
     try:
-        if validate(args.definitions_file, headers, False) != 0:
-            return 1
+        # if the definitions file is a URL, we skip the validation
+        if not args.definitions_file.startswith("http"):
+            if validate(args.definitions_file, headers, False) != 0:
+                return 1
         
         renderer = TemplateRenderer(generator_context,
             args.project_name, args.language, args.style, args.output_dir,

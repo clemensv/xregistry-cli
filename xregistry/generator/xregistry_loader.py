@@ -37,39 +37,63 @@ class XRegistryLoader:
         """ Get the set of schemas handled"""
         return self.schemas_handled
 
-    def _load_core(self, definitions_file: str, headers: dict, ignore_handled: bool = False) -> Tuple[str|None, JsonNode]:
+    def _load_core(self, definition_uri: str, headers: dict, ignore_handled: bool = False) -> Tuple[str|None, JsonNode]:
         """ Load the definition file, which may be a JSON Schema"""
         docroot: JsonNode = {}
         try:
-            if definitions_file.startswith("http"):
-                req = urllib.request.Request(definitions_file, headers=headers)
+            if definition_uri.startswith("http"):
+                parsed_uri = urllib.parse.urlparse(definition_uri)
+                query = urllib.parse.parse_qs(parsed_uri.query)
+                if "inline" not in query:
+                    query["inline"] = ["*"]
+                new_query = urllib.parse.urlencode(query, doseq=True)
+                definition_uri = urllib.parse.urlunparse(parsed_uri._replace(query=new_query))
+                req = urllib.request.Request(definition_uri, headers=headers)
                 with urllib.request.urlopen(req) as url:
                     # URIs may redirect and we only want to handle each file once
                     self.current_url = url.url
                     parsed_url = urllib.parse.urlparse(url.url)
-                    definitions_file = urllib.parse.urlunparse(
+                    definition_uri = urllib.parse.urlunparse(
                         parsed_url._replace(fragment=''))
                     if not ignore_handled:
-                        if definitions_file not in self.schemas_handled:
-                            self.schemas_handled.add(definitions_file)
+                        if definition_uri not in self.schemas_handled:
+                            self.schemas_handled.add(definition_uri)
                         else:
                             return None, None
                     text_doc = url.read().decode()
-                    try:
-                        docroot = json.loads(text_doc)
-                    except json.decoder.JSONDecodeError:
+                    response_headers = dict(url.info())
+                    if 'xRegistry-schemaid' in response_headers:
+                        new_docroot = {}
+                        for header, value in response_headers.items():
+                            if header.startswith('xRegistry-'):
+                                key = header[len('xRegistry-'):]
+                                if key == "defaultversionid":
+                                    key = "versionid"
+                                new_docroot[key] = value
                         try:
-                            # if the JSON is invalid, try to parse it as YAML
-                            docroot = yaml.safe_load(text_doc)
-                        except yaml.YAMLError:
-                            docroot = text_doc
+                            new_docroot['schema'] = json.loads(text_doc)
+                        except json.decoder.JSONDecodeError:
+                            try:
+                                new_docroot['schema'] = yaml.safe_load(text_doc)
+                            except yaml.YAMLError:
+                                new_docroot['schema'] = text_doc
+                        docroot = new_docroot
+                    else:
+                        try:
+                            docroot = json.loads(text_doc)
+                        except json.decoder.JSONDecodeError:
+                            try:
+                                # if the JSON is invalid, try to parse it as YAML
+                                docroot = yaml.safe_load(text_doc)
+                            except yaml.YAMLError:
+                                docroot = text_doc
             else:
                 if not ignore_handled:
-                    if definitions_file not in self.schemas_handled:
-                        self.schemas_handled.add(definitions_file)
+                    if definition_uri not in self.schemas_handled:
+                        self.schemas_handled.add(definition_uri)
                     else:
                         return None, None
-                with open(os.path.join(os.getcwd(), definitions_file), "r", encoding='utf-8') as f:
+                with open(os.path.join(os.getcwd(), definition_uri), "r", encoding='utf-8') as f:
                     text_doc = f.read()
                     try:
                         docroot = json.loads(text_doc)
@@ -89,38 +113,51 @@ class XRegistryLoader:
             print("An error occurred while trying to access the file: ", e)
             return None, None
 
-        return definitions_file, docroot
+        return definition_uri, docroot
 
 
-    def load(self, definitions_file: str, headers: dict, load_schema: bool = False, ignore_handled: bool = False, messagegroup_filter: str|None = None ) -> Tuple[str|None, JsonNode]:
+    def load(self, definition_uri: str, headers: dict, load_schema: bool = False, ignore_handled: bool = False, messagegroup_filter: str|None = None ) -> Tuple[str|None, JsonNode]:
         """ Load the definition file, which may be a JSON Schema """
         # for a CloudEvents message definition group, we
         # normalize the document to be a messagegroups doc
-        _definitions_file, docroot = self._load_core(definitions_file, headers, ignore_handled)
+        _definitions_file, docroot = self._load_core(definition_uri, headers, ignore_handled)
         if docroot is None:
             return None, None
         if _definitions_file:
-            definitions_file = _definitions_file
+            definition_uri = _definitions_file
         if load_schema:
-            return definitions_file, docroot
+            return definition_uri, docroot
 
         # if "$schema" in docroot:
         #     if docroot["$schema"] != "https://cloudevents.io/schemas/registry":
         #         print("unsupported schema:" + docroot["$schema"])
         #         return None, None
-        if isinstance(docroot, dict):
-            if "messagegroupsurl" in docroot and isinstance(docroot["messagegroupsurl"], str):
-                _, subroot = self._load_core(docroot["messagegroupsurl"], headers)
-                docroot["messagegroups"] = subroot
-                docroot["messagegroupsurl"] = None
-            if "schemagroupsurl" in docroot and isinstance(docroot["schemagroupsurl"], str):
-                _, subroot = self._load_core(docroot["schemagroupsurl"], headers)
-                docroot["schemagroups"] = subroot
-                docroot["schemagroupsurl"] = None
-            if "endpointsurl" in docroot and isinstance(docroot["endpointsurl"], str):
-                _, subroot = self._load_core(docroot["endpointsurl"], headers)
-                docroot["endpoints"] = subroot
-                docroot["endpointsurl"] = None
+        if not isinstance(docroot, dict):
+            raise ValueError("Document is not valid")
+        
+        newdocroot : Dict[str, JsonNode] = {}
+        if "messagegroupid" in docroot and isinstance(docroot["messagegroupid"], str):
+            newdocroot["messagegroups"] = {docroot["messagegroupid"]: docroot}
+            docroot = newdocroot
+        if "schemagroupid" in docroot and isinstance(docroot["schemagroupid"], str):
+            newdocroot["schemagroups"] = {docroot["schemagroupid"]: docroot}
+            docroot = newdocroot
+        if "endpointid" in docroot and isinstance(docroot["endpointid"], str):
+            newdocroot["endpoints"] = {docroot["endpointid"]: docroot}
+            docroot = newdocroot
+        
+        if "messagegroups" not in docroot and "messagegroupsurl" in docroot and isinstance(docroot["messagegroupsurl"], str):
+            _, subroot = self._load_core(docroot["messagegroupsurl"], headers)
+            docroot["messagegroups"] = subroot
+            del docroot["messagegroupsurl"]
+        if "schemagroups" not in docroot and "schemagroupsurl" in docroot and isinstance(docroot["schemagroupsurl"], str):
+            _, subroot = self._load_core(docroot["schemagroupsurl"], headers)
+            docroot["schemagroups"] = subroot
+            del docroot["schemagroupsurl"]
+        if "endpoints" not in docroot and "endpointsurl" in docroot and isinstance(docroot["endpointsurl"], str):
+            _, subroot = self._load_core(docroot["endpointsurl"], headers)
+            docroot["endpoints"] = subroot
+            del docroot["endpointsurl"]
 
         self.preprocess_manifest(docroot)
 
@@ -140,7 +177,7 @@ class XRegistryLoader:
                 print("document is not a dict")
                 return None, None
 
-        return definitions_file, docroot
+        return definition_uri, docroot
 
     def preprocess_manifest(self, xreg_doc: JsonNode):
         """ Preprocess the manifest document """
