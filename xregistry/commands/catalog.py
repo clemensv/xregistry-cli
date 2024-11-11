@@ -848,7 +848,7 @@ class CatalogSubcommands:
         if name:
             schema_version["name"] = name
 
-        response = requests.put(f"{self.base_url}/schemagroups/{schemagroupid}/schemas/{schemaid}/versions/{versionid}$meta", json=schema_version)
+        response = requests.put(f"{self.base_url}/schemagroups/{schemagroupid}/schemas/{schemaid}/versions/{versionid}$structure", json=schema_version)
         if response.status_code != 200 and response.status_code != 201:
             raise ValueError(f"Failed to add schema version: {response.text}")
         return response.json()

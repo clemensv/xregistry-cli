@@ -59,22 +59,21 @@ class SchemaUtils:
         def resolve_pointer(root: JsonNode, schema_ref: str) -> JsonNode:
             if schema_ref.startswith("#"):
                 try:
-                    obj = jsonpointer.resolve_pointer(root, schema_ref)
+                    obj = jsonpointer.resolve_pointer(root, schema_ref[1:])
                     if isinstance(obj, (dict, list, str)):
                         return obj
                     else:
                         raise RuntimeError(f"Schema not found: {schema_ref}")
                 except jsonpointer.JsonPointerException as jpe:
-                    raise RuntimeError(f"Schema not found: {schema_ref}") from jpe
-            else:
-                if schema_ref.startswith("/"):
-                    schema_ref = urllib.parse.urljoin(ctx.base_uri, schema_ref)            
-                schema_ref, fragment = urllib.parse.urldefrag(schema_ref)
-                _, obj = ctx.loader.load(schema_ref, {}, True, True)
-                if fragment:
-                    fragment, class_name = fragment.split(":")
-                    obj = resolve_pointer(obj, fragment)
-                return obj
+                    schema_ref = schema_ref[1:]
+            if schema_ref.startswith("/"):
+                schema_ref = urllib.parse.urljoin(ctx.base_uri, schema_ref)            
+            schema_ref, fragment = urllib.parse.urldefrag(schema_ref)
+            _, obj = ctx.loader.load(schema_ref, {}, True, True)
+            if fragment:
+                fragment, class_name = fragment.split(":")
+                obj = resolve_pointer(obj, fragment)
+            return obj
 
         if schema_format.lower().startswith("proto") and isinstance(schema_ref, str) and SchemaUtils.is_proto_doc(schema_ref):
             ptr = SchemaUtils.get_json_pointer(root, schema_ref)
@@ -89,7 +88,7 @@ class SchemaUtils:
             if schema_ref.startswith("#"):
                 if schema_ref not in SchemaUtils.schema_references_collected:
                     SchemaUtils.schema_references_collected.add(schema_ref)
-                schema_obj = resolve_pointer(root, schema_ref[1:])
+                schema_obj = resolve_pointer(root, schema_ref)
             else:
                 schema_ref, fragment = urllib.parse.urldefrag(schema_ref)
                 _, schema_obj = ctx.loader.load(schema_ref, {}, True, True)
