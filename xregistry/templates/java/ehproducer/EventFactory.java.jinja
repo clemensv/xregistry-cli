@@ -1,0 +1,116 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+
+{%- macro MessageGroupEventFactory(root, project_name, messagegroup, messagegroupname) -%}
+{{ util.CommonFileHeader() }}
+
+package {{ (main_project_name|lower)+"."+(messagegroupname|lower) }};
+
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
+import io.cloudevents.core.format.EventFormat;
+import io.cloudevents.jackson.JsonFormat;
+import com.azure.messaging.eventhubs.EventData;
+import java.net.URI;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import java.util.function.BiFunction;
+
+/**
+ * Factory class to create Azure Event Hubs EventData for the messages declared in the {{ messagegroupid }} message group.
+ */
+public class {{ messagegroupname | strip_namespace }}EventFactory {
+    private static final String CE_PREFIX = "cloudEvents_";
+    private static final EventFormat defaultFormatter = new JsonFormat();
+    private static final String APPLICATION_OCTET_STREAM = "application/octet-stream";
+
+    @FunctionalInterface
+    private interface Serializer<T> {
+        byte[] serialize(T data, String contentType);
+    }
+
+    /**
+     * Create an EventData instance for the specified message.
+     */
+    private static <T> EventData createEventData(CloudEvent cloudEvent, T data, String contentType, Serializer<T> bodySerializer, EventFormat formatter) throws RuntimeException {
+        try {
+            boolean isRawBytes = data instanceof byte[];
+            if (bodySerializer == null && !isRawBytes) {
+                throw new IllegalArgumentException("bodySerializer cannot be null for non-byte[] data");
+            }
+            byte[] eventPayload = isRawBytes ? (byte[]) data : bodySerializer.serialize(data, contentType);
+
+            if (formatter == null) {
+                EventData eventData = new EventData(eventPayload);
+                eventData.getProperties().put("content-type", contentType);
+                
+                if (cloudEvent != null) {
+                    cloudEvent.getAttributeNames().forEach(attr -> {
+                        Object attrValue = cloudEvent.getAttribute(attr);
+                        if (attrValue instanceof URI) {
+                            attrValue = attrValue.toString();
+                        }
+                        if (attrValue != null) {
+                            eventData.getProperties().put(CE_PREFIX + attr, attrValue);
+                        }
+                    });
+                }
+                return eventData;
+            } else {
+                // Handle structured mode with formatter
+                CloudEventBuilder builder = CloudEventBuilder.v1(cloudEvent).withData(contentType, eventPayload);
+                byte[] eventBody = formatter.serialize(builder.build());
+                EventData eventData = new EventData(eventBody);
+                eventData.getProperties().put("content-type", formatter.serializedContentType());
+                return eventData;
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    {% for messageid, message in messagegroup.messages.items() %}
+    /**
+     * Create an EventData instance for the {{ messageid }} event
+     {% if message.description %}
+     * Event description: {{ message.description }}
+     {% endif %}
+     */
+    public static EventData create{{ messageid | strip_dots | pascal }}Event(
+            {{ util.body_type(data_project_name, root, message) }} data
+            {%- if cloudEvents.isCloudEvent(message) %}
+            {{- cloudEvents.DeclareUriTemplateArguments(message) }},
+            {%- endif %}
+            String contentType,
+            EventFormat formatter) throws RuntimeException{
+        try {
+            Serializer<{{ util.body_type(data_project_name, root, message) }}> bodySerializer = 
+                formatter != null ? null : (d, ct) -> {
+                    try {
+                        return d.toByteArray(ct);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                };
+            {% if cloudEvents.isCloudEvent(message) %}
+            {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", "data", message, "contentType") | indent(8) }}
+            return createEventData(cloudEvent, data, contentType, bodySerializer, formatter);
+            {% else %}
+            return createEventData(null, data, contentType, bodySerializer, null);
+            {% endif %}
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+    {% endfor %}
+}
+{%- endmacro %}
+
+{% for messagegroupname, messagegroup in root.messagegroups.items() %}
+{%- set filename = "src/main/java/"+(main_project_name|lower).replace(".", "/")+"/"+(messagegroupname|lower).replace(".", "/") + "/" + (messagegroupname|strip_namespace) + "EventFactory.java" %}
+{{ MessageGroupEventFactory(root, project_name, messagegroup, messagegroupname) | pushfile(filename) }}
+{% endfor %}
+
+{# Exit this template #}
+{% exit %}

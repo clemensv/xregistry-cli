@@ -1,0 +1,131 @@
+{%- set uses_protobuf = uses_protobuf | default(false) -%}
+{%- set uses_avro = uses_avro | default(false) -%}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_amqp_message = (root | exists("protocol","AMQP/1.0")) %}
+{%- set uses_amqp_endpoint = (root | exists("protocol","AMQP/1.0")) %}
+{%- set uses_mqtt_message = (root | exists( "protocol", "mqtt" )) %}
+{%- set uses_mqtt_endpoint = (root | exists("protocol", "mqtt" )) %}
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <version>1.0-SNAPSHOT</version>
+  <groupId>{{ project_name | lower }}</groupId>
+  <artifactId>{{ main_project_name }}</artifactId>
+  <properties>
+    {%- if uses_avro %}
+    <avro.version>1.11.3</avro.version>
+    {%- endif %}
+    {%- if uses_protobuf %}
+    <protobuf.version>3.11.4</protobuf.version>
+    {%- endif %}
+    <log4j.version>2.23.1</log4j.version>
+    <io.cloudevents.version>4.0.1</io.cloudevents.version>
+    <azure-messaging-eventhubs.version>5.19.1</azure-messaging-eventhubs.version>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>{{ data_project_name }}</groupId>
+      <artifactId>{{ data_project_name }}</artifactId>
+      <version>1.0-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
+     <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <version>${log4j.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${log4j.version}</version>
+      <scope>provided</scope>
+    </dependency>
+     <dependency>
+      <groupId>io.cloudevents</groupId>
+      <artifactId>cloudevents-http-basic</artifactId>
+      <version>${io.cloudevents.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.cloudevents</groupId>
+      <artifactId>cloudevents-api</artifactId>
+      <version>${io.cloudevents.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>io.cloudevents</groupId>
+        <artifactId>cloudevents-json-jackson</artifactId>
+        <version>${io.cloudevents.version}</version>
+    </dependency>
+    {%- if uses_protobuf %}
+    <dependency>
+      <groupId>io.cloudevents</groupId>
+      <artifactId>cloudevents-protobuf</artifactId>
+      <version>${io.cloudevents.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+      <version>${protobuf.version}</version>
+    </dependency>
+    {%- endif %}
+    {%- if uses_avro %}
+    <!-- :-( No Avro support in the CloudEvents SDK yet      
+     <dependency>
+      <groupId>io.cloudevents</groupId>
+      <artifactId>cloudevents-avro</artifactId>
+      <version>${io.cloudevents.version}</version>
+     </dependency> -->
+     <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>${avro.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro-maven-plugin</artifactId>
+      <version>${avro.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro-compiler</artifactId>
+      <version>${avro.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro-ipc</artifactId>
+      <version>${avro.version}</version>
+    </dependency>
+    {%- endif %}
+      <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-messaging-eventhubs</artifactId>
+        <version>${azure-messaging-eventhubs.version}</version>
+    </dependency>
+    <!-- Test dependencies -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <version>5.7.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <version>1.16.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.7.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.azure</groupId>
+      <artifactId>azure-storage-blob</artifactId>
+      <version>12.14.2</version>
+    </dependency>
+  </dependencies>
+</project>

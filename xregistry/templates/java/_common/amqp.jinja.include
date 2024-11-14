@@ -1,5 +1,23 @@
 {#- AMQP macros -#}
 
+{%- macro is_amqp(message) -%}
+{%- if message.protocol and message.protocol.lower().startswith("amqp") -%}
+true
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro uses_amqp_protocol(root) %}
+{%- if (root.messagegroups | exists("protocol","AMQP/1.0")) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro uses_amqp_endpoint(root) %}
+{%- if (root.endpoints | exists("protocol","AMQP/1.0")) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
 {%- macro AmqpImports() -%}
 import com.azure.amqp;
 {%- endmacro -%}

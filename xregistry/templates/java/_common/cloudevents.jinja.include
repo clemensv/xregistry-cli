@@ -1,5 +1,17 @@
 {#- CloudEvents macros -#}
 
+{%- macro isCloudEvent(message) %}
+{%- if message.envelope and message.envelope.lower().startswith("cloudevents") -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro usesCloudEvents(root) %}
+{%- if (root.messagegroups | exists("envelope","CloudEvents/1.0")) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
 {%- for attrname in message.envelopemetadata -%}
@@ -17,7 +29,7 @@
 
 {#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as message -#}
 {%- macro DeclareCloudNativeCloudEvent(variable, data, message, contentType) -%}
-CloudEvent {{ variable }} = new CloudEventBuilder()
+CloudEvent {{ variable }} = CloudEventBuilder.v1()
 {%- for attrname in message.envelopemetadata -%}
 {%- set attribute = message.envelopemetadata[attrname] -%}
 {%- if attrname in ["subject", "type", "datacontenttype"] -%}
@@ -58,9 +70,6 @@ CloudEvent {{ variable }} = new CloudEventBuilder()
     {%- else -%}{{ attrname }}{%- endif -%})
 {%- endif -%}
 {%- endfor %}
-    .withData({%- if message.envelopemetadata.datacontenttype -%}"{{ message.envelopemetadata.datacontenttype.value }}", 
-              {%- elif contentType -%}{{ contentType }}, {% endif -%}
-              {%- if message.envelopemetadata.dataschema -%}"{{ message.envelopemetadata.dataschema }}", {% endif -%} {{ data }} )
     .build();
 {%- endmacro -%}
 

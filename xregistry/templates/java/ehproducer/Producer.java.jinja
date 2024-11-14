@@ -1,0 +1,121 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+
+{%- macro MessageGroupProducer(root, project_name, messagegroup, messagegroupname) -%}
+
+{{ util.CommonFileHeader() }}
+
+package {{ (main_project_name|lower)+"."+(messagegroupname|lower) }};
+
+import com.azure.messaging.eventhubs.EventData;
+import com.azure.messaging.eventhubs.EventDataBatch;
+import com.azure.messaging.eventhubs.EventHubProducerClient;
+import io.cloudevents.core.format.EventFormat;
+import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Producer class to send events in the {{ messagegroupid }} message group.
+ */
+public class {{ messagegroupname | strip_namespace }}Producer {
+    private final EventHubProducerClient client;
+
+    /**
+     * Constructor
+     */
+    public {{ messagegroupname | strip_namespace }}Producer(EventHubProducerClient client) {
+        this.client = client;
+    }
+
+    /**
+     * Get the Event Hub producer client
+     */
+    public EventHubProducerClient getClient() {
+        return client;
+    }
+
+    {% for messageid, message in messagegroup.messages.items() %}
+    /**
+     * Send a {{ messageid }} event
+     {% if message.description %}
+     * Event description: {{ message.description }}
+     {% endif %}
+     */
+    public CompletableFuture<Void> send{{ messageid | strip_dots | pascal }}Async(
+            {{ util.body_type(data_project_name, root, message) }} data
+            {%- if cloudEvents.isCloudEvent(message) %}
+            {{- cloudEvents.DeclareUriTemplateArguments(message) }},
+            {%- endif %}
+            String contentType,
+            EventFormat formatter) throws RuntimeException {
+        try {
+            EventData eventData = {{ messagegroupname | strip_namespace }}EventFactory.create{{ messageid | strip_dots | pascal }}Event(
+                data
+                {%- if cloudEvents.isCloudEvent(message) %}
+                {%- for arg in cloudEvents.DeclareUriTemplateArguments(message).split(', ') %}
+                {{- arg.split(' ')[1] }},
+                {%- endfor %}
+                {%- endif %}
+                contentType,
+                formatter
+            );
+            return CompletableFuture.runAsync(() -> client.send(Collections.singleton(eventData)));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Send a batch of {{ messageid }} events
+     {% if message.description %}
+     * Event description: {{ message.description }}
+     {% endif %}
+     */
+    public CompletableFuture<Void> send{{ messageid | strip_dots | pascal }}BatchAsync(
+            {{ util.body_type(data_project_name, root, message) }}[] data
+            {%- if cloudEvents.isCloudEvent(message) %}
+            {{- cloudEvents.DeclareUriTemplateArguments(message) }},
+            {%- endif %}
+            String contentType,
+            EventFormat formatter) throws RuntimeException {
+        
+        return CompletableFuture.runAsync(() -> {
+            try {
+                EventDataBatch batch = client.createBatch();
+                for (var record : data) {
+                    EventData eventData = {{ messagegroupname | strip_namespace }}EventFactory.create{{ messageid | strip_dots | pascal }}Event(
+                        record
+                        {%- if cloudEvents.isCloudEvent(message) %}
+                        {%- for arg in cloudEvents.DeclareUriTemplateArguments(message).split(', ') %}
+                        {{- arg.split(' ')[1] }},
+                        {%- endfor %}
+                        {%- endif %}
+                        contentType,
+                        formatter
+                    );
+                    if (!batch.tryAdd(eventData)) {
+                        client.send(batch);
+                        batch = client.createBatch();
+                        batch.tryAdd(eventData);
+                    }
+                }
+                if (batch.getCount() > 0) {
+                    client.send(batch);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+    {% endfor %}
+}
+{% endmacro %}
+
+{% for messagegroupname, messagegroup in root.messagegroups.items() %}
+{%- set filename = "src/main/java/"+(main_project_name|lower).replace(".", "/")+"/"+(messagegroupname|lower).replace(".", "/") + "/" + (messagegroupname|strip_namespace) + "Producer.java" %}
+{{ MessageGroupProducer(root, project_name, messagegroup, messagegroupname) | pushfile(filename) }}
+{% endfor %}
+
+{# Exit this template #}
+{% exit %}

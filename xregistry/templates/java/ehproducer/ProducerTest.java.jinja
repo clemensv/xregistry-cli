@@ -1,0 +1,172 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+
+{%- macro MessageGroupProducer(root, project_name, messagegroup, messagegroupname) -%}
+{{ util.CommonFileHeader() }}
+
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_amqp_message = amqp.uses_amqp_protocol(root) %}
+{%- set uses_amqp_endpoint = amqp.uses_amqp_endpoint(root) %}
+
+// Changes to this file may cause incorrect behavior and will be lost if the code is regenerated.
+
+package {{ main_project_name | lower }}.{{messagegroupname | lower }};
+
+import {{ main_project_name | lower }}.EventHubFixture;
+import com.azure.messaging.eventhubs.EventHubClientBuilder;
+import com.azure.messaging.eventhubs.EventHubProducerClient;
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobContainerClientBuilder;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.StandardOpenOption;
+
+{% if uses_cloudevents_message %}
+import io.cloudevents.core.format.EventFormat;
+import io.cloudevents.core.provider.EventFormatProvider;
+{% endif %}
+
+{%- set class_name = ( messagegroupname | strip_namespace )+"Producer"%}
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class {{ messagegroupname | strip_namespace }}ProducerTest {
+
+    private static final Logger logger = LoggerFactory.getLogger({{ messagegroupname | strip_namespace }}ProducerTest.class);
+    private EventHubProducerClient eventHubClient;
+    private {{ class_name }} producer;
+    private EventHubFixture fixture;
+
+    @BeforeAll
+    public void setup() {
+        fixture = new EventHubFixture();
+        fixture.initialize();
+
+        eventHubClient = new EventHubClientBuilder()
+                .connectionString(fixture.getEventHubConnectionString())
+                .buildProducerClient();
+
+        producer = new {{ class_name }}(eventHubClient);
+    }
+
+    @AfterAll
+    public void teardown() {
+        if (eventHubClient != null) {
+            eventHubClient.close();
+        }
+        fixture.cleanup();
+    }
+
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | strip_dots | pascal %}
+    {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+    {%- set is_amqp = amqp.is_amqp(message) %}
+
+    @Test
+    public void test{{ messagename }}Message() {
+        logger.info("Starting test{{ messagename }}Message");
+        try {
+            {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+            {%- if isCloudEvent %}
+            {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
+            {%- elif is_amqp %}
+            {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
+            {%- endif %}
+            {%- if message_body_type != "byte[]" %}
+            // Assuming there's a test class for the message body type
+            {{ message_body_type }}Test eventDataTest = new {{ message_body_type }}Test();
+            {{ message_body_type }} eventDataInstance = eventDataTest.createInstance();
+            producer.send{{ messagename }}Async(
+                    eventDataInstance
+                    {%- if uriargs -%}
+                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                    , "{{ arg.strip().split(' ')[1] }}"
+                    {%- endfor -%}
+                    {%- endif -%}
+                    , "application/json"
+                    , EventFormatProvider.getInstance().resolveFormat("application/cloudevents+json")
+            ).join();
+            {%- else %}
+            producer.send{{ messagename }}Async(
+                    new byte[0]
+                    {%- if uriargs -%}
+                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                    , "{{ arg.strip().split(' ')[1] }}"
+                    {%- endfor -%}
+                    {%- endif -%}
+                    , "application/json"
+                    , EventFormatProvider.getInstance().resolveFormat("application/cloudevents+json")
+            ).join();
+            {%- endif %}
+            logger.info("Test event sent");
+        } catch (Exception ex) {
+            logger.error("An error occurred during test{{ messagename }}Message", ex);
+            throw new RuntimeException(ex);
+        }
+    }
+
+    @Test
+    public void test{{ messagename }}Batch() {
+        logger.info("Starting test{{ messagename }}Batch");
+        try {
+            {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+            {%- if isCloudEvent %}
+            {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
+            {%- elif is_amqp %}
+            {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
+            {%- endif %}
+            {%- if message_body_type != "byte[]" %}
+            // Assuming there's a test class for the message body type
+            {{ message_body_type }}Test eventDataTest = new {{ message_body_type }}Test();
+            {{ message_body_type }}[] eventDataInstances = new {{ message_body_type }}[10];
+            for (int i = 0; i < 10; i++) {
+                eventDataInstances[i] = eventDataTest.createInstance();
+            }
+            producer.send{{ messagename }}BatchAsync(
+                    eventDataInstances
+                    {%- if uriargs -%}
+                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                    , "{{ arg.strip().split(' ')[1] }}"
+                    {%- endfor -%}
+                    {%- endif -%}
+                    , "application/json"
+                    , EventFormatProvider.getInstance().resolveFormat("application/cloudevents+json")
+            ).join();
+            {%- else %}
+            byte[][] eventDataInstances = new byte[10][];
+            for (int i = 0; i < 10; i++) {
+                eventDataInstances[i] = new byte[0];
+            }
+            producer.send{{ messagename }}BatchAsync(
+                    eventDataInstances
+                    {%- if uriargs -%}
+                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                    , "{{ arg.strip().split(' ')[1] }}"
+                    {%- endfor -%}
+                    {%- endif -%}
+                    , "application/json"
+                    , EventFormatProvider.getInstance().resolveFormat("application/cloudevents+json")
+            ).join();
+            {%- endif %}
+            logger.info("Test batch event sent");
+        } catch (Exception ex) {
+            logger.error("An error occurred during test{{ messagename }}Batch", ex);
+            throw new RuntimeException(ex);
+        }
+    }
+    {%- endfor %}
+}
+{% endmacro %}
+
+{% for messagegroupname, messagegroup in root.messagegroups.items() %}
+{%- set filename = "src/test/java/"+(main_project_name|lower).replace(".", "/")+"/"+(messagegroupname|lower).replace(".", "/") + "/" + (messagegroupname|strip_namespace) + "ProducerTest.java" %}
+{{ MessageGroupProducer(root, project_name, messagegroup, messagegroupname) | pushfile(filename) }}
+{% endfor %}
+
+{# Exit this template #}
+{% exit %}

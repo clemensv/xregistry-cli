@@ -1,0 +1,146 @@
+{%- import "util.jinja.include" as util -%}
+
+{%- macro EventHubFixture(main_project_name) -%}
+{{ util.CommonFileHeader() }}
+
+// Changes to this file may cause incorrect behavior and will be lost if the code is regenerated.
+
+package {{ main_project_name | lower }};
+
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobContainerClientBuilder;
+import org.junit.jupiter.api.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.StandardOpenOption;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.containers.wait.strategy.Wait;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class EventHubFixture {
+    private static final Logger logger = LoggerFactory.getLogger(EventHubFixture.class);
+
+    private GenericContainer<?> azuriteContainer;
+    private GenericContainer<?> emulatorContainer;
+    private Network network;
+    private String eventHubConnectionString;
+    private String blobStorageConnectionString;
+    private BlobContainerClient blobClient;
+    private String emulatorConfigFilePath;
+    private final String emulatorConfig = "{\n" +
+            "  \"UserConfig\": {\n" +
+            "    \"NamespaceConfig\": [\n" +
+            "      {\n" +
+            "        \"Type\": \"EventHub\",\n" +
+            "        \"Name\": \"emulatorNs1\",\n" +
+            "        \"Entities\": [\n" +
+            "          {\n" +
+            "            \"Name\": \"eh1\",\n" +
+            "            \"PartitionCount\": \"2\",\n" +
+            "            \"ConsumerGroups\": [\n" +
+            "              {\n" +
+            "                \"Name\": \"cg1\"\n" +
+            "              }\n" +
+            "            ]\n" +
+            "          }\n" +
+            "        ]\n" +
+            "      }\n" +
+            "    ],\n" +
+            "    \"LoggingConfig\": {\n" +
+            "      \"Type\": \"File\"\n" +
+            "    }\n" +
+            "  }\n" +
+            "}";
+
+    @SuppressWarnings("resource")
+    @BeforeAll
+    public void initialize() {
+        try {
+            network = Network.newNetwork();
+            emulatorConfigFilePath = Files.createTempFile("emulatorConfig", ".json").toString();
+            Files.write(Paths.get(emulatorConfigFilePath), emulatorConfig.getBytes(StandardCharsets.UTF_8), StandardOpenOption.WRITE);
+
+            azuriteContainer = new GenericContainer<>(DockerImageName.parse("mcr.microsoft.com/azure-storage/azurite:latest"))
+                    .withCommand("--skipApiVersionCheck")
+                    .withNetwork(network)
+                    .withNetworkAliases("azurite")
+                    .waitingFor(Wait.forLogMessage(".*Azurite Blob service is successfully listening.*", 1));
+
+            emulatorContainer = new GenericContainer<>(DockerImageName.parse("mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest"))
+                    .withFileSystemBind(emulatorConfigFilePath, "/Eventhubs_Emulator/ConfigFiles/Config.json")
+                    .withExposedPorts(5672)
+                    .withNetwork(network)
+                    .withNetworkAliases("eventhubs-emulator")
+                    .withEnv("BLOB_SERVER", "azurite")
+                    .withEnv("METADATA_SERVER", "azurite")
+                    .withEnv("ACCEPT_EULA", "Y")
+                    .waitingFor(Wait.forLogMessage(".*Emulator is launching with config.*", 1));
+
+            azuriteContainer.start();
+            emulatorContainer.start();
+
+            eventHubConnectionString = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;EntityPath=eh1;";
+            blobStorageConnectionString = String.format("DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/fake-key;BlobEndpoint=http://%s:%d/devstoreaccount1;", azuriteContainer.getHost(), azuriteContainer.getMappedPort(10000));
+
+            blobClient = new BlobContainerClientBuilder()
+                    .connectionString(blobStorageConnectionString)
+                    .containerName("eventhub-checkpoints")
+                    .buildClient();
+
+            if (!blobClient.exists()) {
+                blobClient.create();
+                if (!blobClient.exists()) {
+                    throw new RuntimeException("Blob container not created");
+                }
+            }
+        } catch (Exception ex) {
+            logger.error("An error occurred during initialize", ex);
+            throw new RuntimeException(ex);
+        }
+    }
+
+    @AfterAll
+    public void cleanup() {
+        try {
+            if (emulatorContainer != null) {
+                emulatorContainer.close();
+            }
+            if (azuriteContainer != null) {
+                azuriteContainer.close();
+            }
+            if (network != null) {
+                network.close();
+            }
+        } catch (Exception ex) {
+            logger.error("An error occurred during cleanup", ex);
+        } finally {
+            try {
+                if (emulatorConfigFilePath != null) {
+                    Files.deleteIfExists(Paths.get(emulatorConfigFilePath));
+                }
+            } catch (Exception e) {
+                logger.error("Failed to delete emulator config file", e);
+            }
+        }
+    }
+
+    public String getEventHubConnectionString() {
+        return eventHubConnectionString;
+    }
+
+    public Logger getLogger() {
+        return logger;
+    }
+}
+{%- endmacro %}
+
+{%- set filename = "src/test/java/"+(main_project_name|lower).replace(".", "/")+"/"+ "EventHubFixture.java" %}
+{{ EventHubFixture(main_project_name) | pushfile(filename) }}
+
+{# Exit this template #}
+{% exit %}

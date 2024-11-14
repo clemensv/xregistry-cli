@@ -1,13 +1,14 @@
 # pylint: disable=line-too-long
 
 """Generate code from the given arguments. """
-
+import os
 from typing import Any, Dict, List, Union
 from xregistry.cli import logger
 from xregistry.generator.generator_context import GeneratorContext
 from xregistry.generator.schema_utils import SchemaUtils
 from xregistry.generator.template_renderer import TemplateRenderer
 from .validate_definitions import validate
+
 
 JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, None]
 
@@ -55,6 +56,9 @@ def generate_code(args: Any) -> int:
 
         if generator_context.stacks.stack("files"):
             for file, content in generator_context.stacks.stack("files"):
+                file = file.replace("/", os.sep).replace("\\", os.sep)
+                if not os.path.exists(os.path.dirname(file)):
+                    os.makedirs(os.path.dirname(file))
                 with open(file, "w", encoding='utf-8') as f:
                     f.write(content)
     except SystemExit:

@@ -1,0 +1,40 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <packaging>pom</packaging>
+  <groupId>{{ project_name | lower }}</groupId>
+  <artifactId>{{ project_name }}</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <properties>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+  </properties>
+  <modules>
+    <module>{{ main_project_name }}</module>
+    <module>{{ data_project_name }}</module>
+  </modules>
+  <build>
+      <defaultGoal>clean package install</defaultGoal>
+      <sourceDirectory>main</sourceDirectory>
+      <plugins>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-resources-plugin</artifactId>
+            <version>3.3.1</version>
+            <configuration>
+               <encoding>UTF-8</encoding>
+               <defaultEncoding>UTF-8</defaultEncoding>
+            </configuration>
+         </plugin>
+         <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.13.0</version>
+            <configuration>
+               <release>21</release>
+              <encoding>UTF-8</encoding>             
+            </configuration>
+          </plugin>
+      </plugins>
+   </build>
+</project>
