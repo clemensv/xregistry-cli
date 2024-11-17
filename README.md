@@ -86,9 +86,17 @@ instructions in [Development Environment](docs/development_environment.md).
 
 The tool is invoked as `xregistry` and supports the following subcommands:
 
+- `xregistry manifest`: Generate a manifest document (a file-based catalog) for a s et of schemas and definitions
+- `xregistry catalog`: Interact with a catalog service (specifically [https://github.com/duglin/xreg-github/](https://github.com/duglin/xreg-github/) at the moment; no authNZ supported yet)
 - `xregistry generate`: Generate code
 - `xregistry validate`: Validate a definition
 - `xregistry list`: List available templates
+
+### Manifest and Catalog commands
+
+The `manifest` and `catalog` commands allow you to interact with the xRegistry catalog service and manage manifests, endpoints, message groups, messages, and schemas.
+
+Run `xregistry manifest --help` or `xregistry catalog --help` for more information.
 
 ### Generate
 
