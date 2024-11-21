@@ -196,7 +196,7 @@ namespace {{ project_name | pascal }}.Test
                     Assert.NotNull(message);
                     {%- if cloudEvents.isCloudEvent(message) %}
                     Assert.NotNull(cloudEvent);
-                    Assert.Equal("{{ messageid }}", cloudEvent?.Type);
+                    Assert.Equal("{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}", cloudEvent?.Type);
                     {%- endif %}
                     Assert.NotNull(eventData);
 
@@ -213,7 +213,7 @@ namespace {{ project_name | pascal }}.Test
 
             var processor = {{project_name | pascal}}.{{ pascal_group_name }}.{{ pascal_group_name | strip_namespace}}EventDispatcher.CreateServiceBusProcessor(
                 _client,
-                "queue1",
+                "myqueue",
                 new ServiceBusProcessorOptions(),
                 dispatcher
             );
@@ -226,12 +226,19 @@ namespace {{ project_name | pascal }}.Test
             _logger.LogInformation("Processor started for {{ messagename }} event.");
 
             // Send test message
-            var sender = _client.CreateSender("queue1");
-            var eventData = new {{ util.body_type(data_project_name, root, message) }}(); // Populate with test data
+            var sender = _client.CreateSender("myqueue");
+            {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+            {%- if message_body_type != "byte[]" %}
+            var eventDataTest = new {{ message_body_type }}Tests();
+            var eventData = eventDataTest.CreateInstance();
+            {%- else %}
+            var eventData = new BinaryData("");
+            {%- endif %}
             var cloudEvent = new CloudEvent
             {
-                Type = "{{ messageid }}",
-                Source = new Uri("/test/source"),
+                Id = Guid.NewGuid().ToString(),
+                Type = "{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}",
+                Source = new Uri("/test/source", UriKind.RelativeOrAbsolute),
                 Data = eventData.ToByteArray("application/json"),
                 DataContentType = "application/json"
             };
