@@ -185,7 +185,7 @@ namespace {{ project_name | pascal }}.Test
         [Fact]
         public async Task Test{{ messagename }}Message()
         {
-            var dispatcher = new {{project_name | pascal}}.{{ pascal_group_name }}.{{ pascal_group_name | strip_namespace}}EventDispatcher();
+            var dispatcher = new global::{{project_name | pascal}}.{{ pascal_group_name }}.{{ pascal_group_name | strip_namespace}}EventDispatcher();
             var messageHandled = new TaskCompletionSource<bool>();
 
             dispatcher.{{ messagename }}Async += async (message, cloudEvent, eventData) =>
@@ -211,7 +211,7 @@ namespace {{ project_name | pascal }}.Test
                 await Task.CompletedTask;
             };
 
-            var processor = {{project_name | pascal}}.{{ pascal_group_name }}.{{ pascal_group_name | strip_namespace}}EventDispatcher.CreateServiceBusProcessor(
+            var processor = global::{{project_name | pascal}}.{{ pascal_group_name }}.{{ pascal_group_name | strip_namespace}}EventDispatcher.CreateServiceBusProcessor(
                 _client,
                 "myqueue",
                 new ServiceBusProcessorOptions(),
@@ -230,7 +230,7 @@ namespace {{ project_name | pascal }}.Test
             {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
             {%- if message_body_type != "byte[]" %}
             var eventDataTest = new {{ message_body_type }}Tests();
-            var eventData = eventDataTest.CreateInstance();
+            var eventData = eventDataTest.CreateInstance().ToByteArray("application/json");
             {%- else %}
             var eventData = new BinaryData("");
             {%- endif %}
@@ -239,7 +239,7 @@ namespace {{ project_name | pascal }}.Test
                 Id = Guid.NewGuid().ToString(),
                 Type = "{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}",
                 Source = new Uri("/test/source", UriKind.RelativeOrAbsolute),
-                Data = eventData.ToByteArray("application/json"),
+                Data = eventData,
                 DataContentType = "application/json"
             };
             JsonEventFormatter fm = new JsonEventFormatter();

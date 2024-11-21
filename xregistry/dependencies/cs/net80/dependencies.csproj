@@ -3,41 +3,42 @@
         <TargetFramework>net8.0</TargetFramework>
     </PropertyGroup>
     <ItemGroup>
-      <PackageReference Include="AMQPNetLite" Version="2.4.10" />
-      <PackageReference Include="Apache.Avro" Version="1.11.3" />
-      <PackageReference Include="Azure.Core" Version="1.40.0" />
-      <PackageReference Include="Azure.Core.Amqp" Version="1.3.0" />
-      <PackageReference Include="Azure.Messaging.EventGrid" Version="4.24.0" />
-      <PackageReference Include="Azure.Messaging.EventHubs" Version="5.11.3" />
-      <PackageReference Include="Azure.Messaging.EventHubs.Processor" Version="5.11.3" />
+      <PackageReference Include="AMQPNetLite" Version="2.4.11" />
+      <PackageReference Include="Apache.Avro" Version="1.12.0" />
+      <PackageReference Include="Azure.Core" Version="1.44.1" />
+      <PackageReference Include="Azure.Core.Amqp" Version="1.3.1" />
+      <PackageReference Include="Azure.Messaging.EventGrid" Version="4.28.0" />
+      <PackageReference Include="Azure.Messaging.EventHubs" Version="5.11.5" />
+      <PackageReference Include="Azure.Messaging.EventHubs.Processor" Version="5.11.5" />
       <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.18.2" />
-      <PackageReference Include="Azure.Storage.Blobs" Version="12.20.0" />
-      <PackageReference Include="CloudNative.CloudEvents" Version="2.7.1" />
-      <PackageReference Include="CloudNative.CloudEvents.Amqp" Version="2.7.1" />
-      <PackageReference Include="CloudNative.CloudEvents.AspNetCore" Version="2.7.1" />
-      <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.7.1" />
-      <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.7.1" />
-      <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.7.1" />
-      <PackageReference Include="Confluent.Kafka" Version="2.4.0" />
+      <PackageReference Include="Azure.Storage.Blobs" Version="12.21.1" />
+      <PackageReference Include="CloudNative.CloudEvents" Version="2.8.0" />
+      <PackageReference Include="CloudNative.CloudEvents.Amqp" Version="2.8.0" />
+      <PackageReference Include="CloudNative.CloudEvents.AspNetCore" Version="2.8.0" />
+      <PackageReference Include="CloudNative.CloudEvents.Avro" Version="2.8.0" />
+      <PackageReference Include="CloudNative.CloudEvents.Protobuf" Version="2.8.0" />
+      <PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.8.0" />
+      <PackageReference Include="Confluent.Kafka" Version="2.6.1" />
       <PackageReference Include="Google.Protobuf" Version="3.27.1" />
-      <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.22.0" />
+      <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.0.0" />
       <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.2.0" />
-      <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.ServiceBus" Version="5.20.0" />
+      <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.ServiceBus" Version="5.22.0" />
       <PackageReference Include="Microsoft.Azure.Messaging.EventGrid.CloudNativeCloudEvents" Version="1.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
       <PackageReference Include="Moq" Version="4.20.70" />
       <PackageReference Include="MQTTnet" Version="4.3.6.1152" />
       <PackageReference Include="System.Memory.Data" Version="8.0.0" />
       <PackageReference Include="System.Text.Json" Version="8.0.5" />
-      <PackageReference Include="Testcontainers" Version="3.9.0" />
-      <PackageReference Include="Testcontainers.ActiveMq" Version="3.9.0" />
-      <PackageReference Include="Testcontainers.Azurite" Version="3.9.0" />
-      <PackageReference Include="Testcontainers.Kafka" Version="3.9.0" />
-      <PackageReference Include="xunit" Version="2.8.1" />
-      <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1">
+      <PackageReference Include="Testcontainers" Version="3.10.0" />
+      <PackageReference Include="Testcontainers.ActiveMq" Version="3.10.0" />
+      <PackageReference Include="Testcontainers.Azurite" Version="3.10.0" />
+      <PackageReference Include="Testcontainers.Kafka" Version="3.10.0" />
+      <PackageReference Include="xunit" Version="2.9.2" />
+      <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
