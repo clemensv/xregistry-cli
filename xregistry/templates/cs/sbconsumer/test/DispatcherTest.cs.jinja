@@ -165,7 +165,7 @@ namespace {{ project_name | pascal }}.Test
     {%- set class_name = "global::" + (pascal_group_name | concat_namespace(project_name | pascal)) + "." + (pascal_group_name | strip_namespace) + "Dispatcher" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"DispatcherTests" %}
     [Collection("Service Bus emulator")]
-    public class {{ test_class_name }} 
+    public class {{ test_class_name }} : IAsyncLifetime
     {
         private readonly {{ project_name | pascal | strip_dots }}Fixture _fixture;
         private readonly ILogger _logger;
@@ -178,6 +178,17 @@ namespace {{ project_name | pascal }}.Test
             _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();
             _client = new ServiceBusClient(_fixture.ServiceBusConnectionString);
             _sender = _client.CreateSender("myqueue"); // Adjust based on queue/topic naming convention
+        }
+
+        public Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        async Task IAsyncLifetime.DisposeAsync()
+        {
+            await _sender.DisposeAsync();
+            await _client.DisposeAsync();
         }
 
 #pragma warning disable CS8604 // init takes care of nullables 
@@ -200,7 +211,10 @@ namespace {{ project_name | pascal }}.Test
                     Assert.NotNull(cloudEvent);
                     Assert.Equal("{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}", cloudEvent?.Type);
                     {%- endif %}
+                    {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+                    {%- if message_body_type != "byte[]" %}
                     Assert.NotNull(eventData);
+                    {%- endif %}
 
                     messageHandled.SetResult(true);
                 }
@@ -234,7 +248,7 @@ namespace {{ project_name | pascal }}.Test
             var eventDataTest = new {{ message_body_type }}Tests();
             var eventData = eventDataTest.CreateInstance().ToByteArray("application/json");
             {%- else %}
-            var eventData = new BinaryData("");
+            byte[] eventData = null;
             {%- endif %}
             var cloudEvent = new CloudEvent
             {
@@ -242,7 +256,7 @@ namespace {{ project_name | pascal }}.Test
                 Type = "{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}",
                 Source = new Uri("/test/source", UriKind.RelativeOrAbsolute),
                 Data = eventData,
-                DataContentType = "application/json"
+                DataContentType = {{ cloudEvents.GetDataContentType(message, '"application/json"' if message_body_type != "byte[]" else "null") }}
             };
             JsonEventFormatter fm = new JsonEventFormatter();
 
@@ -256,6 +270,7 @@ namespace {{ project_name | pascal }}.Test
 
             await processor.StopProcessingAsync();
             _logger.LogInformation("Processor stopped for {{ messagename }} event.");
+            await processor.DisposeAsync();
         }
         {%- endfor %}
     }

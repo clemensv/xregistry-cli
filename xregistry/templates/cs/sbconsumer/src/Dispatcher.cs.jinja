@@ -83,14 +83,14 @@ namespace {{ messagegroupname | concat_namespace(project_name) | pascal }}
                 {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
                 {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                 case "{{ messageid }}":
-                    if ({{ messagename | strip_namespace }}Async != null && cloudEvent.Data != null) 
+                    if ({{ messagename | strip_namespace }}Async != null) 
                         {
                             await Task.WhenAll(Array.ConvertAll({{ messagename | strip_namespace }}Async.GetInvocationList(), e => (Task)(e.DynamicInvoke(message,
                             {%- if isCloudEvent %}cloudEvent, {%- endif -%}
                             {%- if message_body_type != "byte[]" -%}
                             {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)
                             {%- else -%}
-                            cloudEvent.Data is BinaryData binaryData ? binaryData.ToArray() : null
+                            (cloudEvent.Data != null && cloudEvent.Data is BinaryData binaryData) ? binaryData.ToArray() : null
                             {%- endif %})??Task.CompletedTask)));
                         }
                         break;

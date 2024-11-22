@@ -83,6 +83,16 @@ cloudEvent.SetAttributeFromString("{{ attrname }}",{%- if attribute.value -%}"{{
 {%- endfor -%}
 {%- endmacro -%}
 
+{#- get the the datacontenttype attribute value from the message declaration if it exists #}
+{%- macro GetDataContentType(message, default) -%}
+{%- if message.envelope == "CloudEvents/1.0" and "envelopemetadata" in message and "datacontentype" in message.envelopemetadata and "value" in message.envelopemetadata["datacontenttype"] -%}
+"{{ message.envelopemetadata["datacontenttype"].value }}"
+{%- else -%}
+{{ default }}
+{%- endif -%}
+{%- endmacro -%}
+
+
 {#- Generates a CloudNative.CloudEvents.CloudEvent object from cloudEventDefinition as message -#}
 {%- macro DeclareCloudNativeCloudEventFromJson(variable, json, message) -%}
 };

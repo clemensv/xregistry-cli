@@ -163,7 +163,7 @@ namespace {{ project_name | pascal }}.Test
     {%- set class_name = "global::" + (pascal_group_name | concat_namespace(project_name | pascal)) + "." + (pascal_group_name | strip_namespace) + "Producer" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"ProducerTests" %}
     [Collection("Service Bus emulator")]
-    public class {{ test_class_name }} 
+    public class {{ test_class_name }} : IAsyncLifetime
     {
         private readonly {{ project_name | pascal | strip_dots }}Fixture _fixture;
         private readonly ILogger _logger;
@@ -176,6 +176,17 @@ namespace {{ project_name | pascal }}.Test
             _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();
             _client = new ServiceBusClient(_fixture.ServiceBusConnectionString);
             _sender = _client.CreateSender("myqueue"); // Adjust based on queue/topic naming convention
+        }
+
+        public Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        async Task IAsyncLifetime.DisposeAsync()
+        {
+            await _sender.DisposeAsync();
+            await _client.DisposeAsync();
         }
 
 #pragma warning disable CS8604 // init takes care of nullables 
