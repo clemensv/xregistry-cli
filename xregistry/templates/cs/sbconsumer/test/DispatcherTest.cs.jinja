@@ -111,6 +111,8 @@ namespace {{ project_name | pascal }}.Test
                 await SqlEdgeContainer.StartAsync();
                 await EmulatorContainer.StartAsync();
 
+                await Task.Delay(5000); // Wait for emulator to be settled
+
                 ServiceBusConnectionString = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;";
             }
             catch (Exception ex)
