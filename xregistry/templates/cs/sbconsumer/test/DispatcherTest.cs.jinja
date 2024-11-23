@@ -126,19 +126,20 @@ namespace {{ project_name | pascal }}.Test
         {
             try
             {
+                var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
                 if (EmulatorContainer != null)
                 {
-                    await EmulatorContainer.StopAsync();
+                    await EmulatorContainer.StopAsync(cts.Token);
                 }
 
                 if (SqlEdgeContainer != null)
                 {
-                    await SqlEdgeContainer.StopAsync();
+                    await SqlEdgeContainer.StopAsync(cts.Token);
                 }
 
                 if (Network != null)
                 {
-                    await Network.DeleteAsync();
+                    await Network.DeleteAsync(cts.Token);
                 }
             }
             catch (Exception ex)
