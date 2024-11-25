@@ -87,6 +87,7 @@ namespace {{ project_name | pascal }}.Test
                 emulatorConfigFilePath = Path.GetTempFileName();
                 File.WriteAllText(emulatorConfigFilePath, emulatorConfig);
 
+                var outputConsumer = Consume.RedirectStdoutAndStderrToConsole();
                 SqlEdgeContainer = new ContainerBuilder()
                     .WithImage("mcr.microsoft.com/azure-sql-edge:latest")
                     .WithEnvironment("ACCEPT_EULA", "Y")
@@ -94,6 +95,7 @@ namespace {{ project_name | pascal }}.Test
                     .WithNetwork(Network)
                     .WithNetworkAliases("sqledge")
                     .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(1431))
+                    .WithOutputConsumer(outputConsumer)
                     .Build();
 
                 EmulatorContainer = new ContainerBuilder()
@@ -106,6 +108,7 @@ namespace {{ project_name | pascal }}.Test
                     .WithEnvironment("MSSQL_SA_PASSWORD", "StrongPassword!1")
                     .WithEnvironment("ACCEPT_EULA", "Y")
                     .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*Emulator Service is Successfully Up!"))
+                    .WithOutputConsumer(outputConsumer)
                     .Build();
 
                 await Network.CreateAsync(cts.Token);

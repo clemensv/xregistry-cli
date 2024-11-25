@@ -191,7 +191,7 @@ def test_mqttclient_lightbulb_cs():
             project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "mqttclient")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
+#@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbproducer_contoso_erp_cs():
     """ Test the Service Bus producer for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
