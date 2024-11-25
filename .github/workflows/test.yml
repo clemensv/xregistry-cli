@@ -61,5 +61,5 @@ jobs:
         npm install -g @openapitools/openapi-generator-cli      
     - name: Run tests
       run: |
-        pytest -rE -vv
+        pytest -rE -vv --capture=tee-sys
 
