@@ -1,0 +1,283 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_amqp_message = amqp.uses_amqp_protocol(root) %}
+{%- set uses_amqp_endpoint = amqp.uses_amqp_endpoint(root) %}
+
+#nullable enable
+
+using System;
+using System.IO;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Threading;
+using Azure.Messaging.ServiceBus;
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.SystemTextJson;
+using Xunit;
+using Microsoft.Extensions.Logging;
+using DotNet.Testcontainers.Containers;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Networks;
+
+namespace {{ project_name | pascal }}.Test
+{
+    public class {{ project_name | pascal | strip_dots}}Fixture : IAsyncLifetime
+    {
+        public IContainer? EmulatorContainer { get; protected set; }
+        public IContainer? SqlEdgeContainer { get; protected set; }
+        public INetwork? Network { get; protected set; }
+        public string? ServiceBusConnectionString { get; protected set; }
+        private ILoggerFactory _loggerFactory;
+        private ILogger _logger;
+
+        public ILoggerFactory GetLoggerFactory()
+        {
+            return _loggerFactory;
+        }
+
+        private string? emulatorConfigFilePath = null;
+        private const string emulatorConfig = @"{
+            ""UserConfig"": {
+                ""Namespaces"": [
+                    {
+                        ""Name"": ""sbemulatorns"",
+                        ""Queues"": [
+                            {
+                                ""Name"": ""myqueue"",
+                                ""Properties"": {
+                                    ""DeadLetteringOnMessageExpiration"": false,
+                                    ""DefaultMessageTimeToLive"": ""PT1H"",
+                                    ""LockDuration"": ""PT1M"",
+                                    ""MaxDeliveryCount"": 10,
+                                    ""RequiresDuplicateDetection"": false,
+                                    ""RequiresSession"": false
+                                }
+                            }
+                        ]
+                    }
+                ],
+                ""Logging"": {
+                    ""Type"": ""File""
+                }
+            }
+        }";
+
+        public {{ project_name | pascal | strip_dots}}Fixture()
+        {
+            _loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder.AddDebug().AddConsole();
+            });
+            _logger = _loggerFactory.CreateLogger<{{ project_name | pascal | strip_dots}}Fixture>();
+        }
+
+        public async Task InitializeAsync()
+        {
+            try
+            {
+                CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                Network = new NetworkBuilder()
+                    .WithName(Guid.NewGuid().ToString("D"))
+                    .Build();
+
+                emulatorConfigFilePath = Path.GetTempFileName();
+                File.WriteAllText(emulatorConfigFilePath, emulatorConfig);
+
+                var outputConsumer = Consume.RedirectStdoutAndStderrToConsole();
+                SqlEdgeContainer = new ContainerBuilder()
+                    .WithImage("mcr.microsoft.com/azure-sql-edge:latest")
+                    .WithEnvironment("ACCEPT_EULA", "Y")
+                    .WithEnvironment("MSSQL_SA_PASSWORD", "StrongPassword!1")
+                    .WithNetwork(Network)
+                    .WithNetworkAliases("sqledge")
+                    .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(1431))
+                    .WithOutputConsumer(outputConsumer)
+                    .Build();
+
+                EmulatorContainer = new ContainerBuilder()
+                    .WithImage("mcr.microsoft.com/azure-messaging/servicebus-emulator:latest")
+                    .WithBindMount(emulatorConfigFilePath, "/ServiceBus_Emulator/ConfigFiles/Config.json")
+                    .WithPortBinding(5672, false)
+                    .WithNetwork(Network)
+                    .WithNetworkAliases("sb-emulator")
+                    .WithEnvironment("SQL_SERVER", "sqledge")
+                    .WithEnvironment("MSSQL_SA_PASSWORD", "StrongPassword!1")
+                    .WithEnvironment("ACCEPT_EULA", "Y")
+                    .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*Emulator Service is Successfully Up!"))
+                    .WithOutputConsumer(outputConsumer)
+                    .Build();
+
+                await Network.CreateAsync(cts.Token);
+                await SqlEdgeContainer.StartAsync(cts.Token);
+                await EmulatorContainer.StartAsync(cts.Token);
+
+                await Task.Delay(5000); // Wait for emulator to be settled
+
+                ServiceBusConnectionString = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during InitializeAsync");
+                throw;
+            }
+        }
+
+        public async Task DisposeAsync()
+        {
+            try
+            {
+                var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                if (EmulatorContainer != null)
+                {
+                    await EmulatorContainer.StopAsync(cts.Token);
+                }
+
+                if (SqlEdgeContainer != null)
+                {
+                    await SqlEdgeContainer.StopAsync(cts.Token);
+                }
+
+                if (Network != null)
+                {
+                    await Network.DeleteAsync(cts.Token);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred during DisposeAsync: {ex.Message}");
+            }
+            finally
+            {
+                if (emulatorConfigFilePath != null && File.Exists(emulatorConfigFilePath))
+                {
+                    File.Delete(emulatorConfigFilePath);
+                }
+            }
+        }
+    }
+
+    [CollectionDefinition("Service Bus emulator")]
+    public class {{ project_name | pascal | strip_dots}}CollectionFixture : ICollectionFixture<{{ project_name | pascal | strip_dots}}Fixture>
+    {
+    }
+
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroupid | pascal %}
+    {%- set class_name = "global::" + (pascal_group_name | concat_namespace(project_name | pascal)) + "." + (pascal_group_name | strip_namespace) + "Dispatcher" %}
+    {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"DispatcherTests" %}
+    [Collection("Service Bus emulator")]
+    public class {{ test_class_name }} : IAsyncLifetime
+    {
+        private readonly {{ project_name | pascal | strip_dots }}Fixture _fixture;
+        private readonly ILogger _logger;
+        private readonly ServiceBusSender _sender;
+        private readonly ServiceBusClient _client;
+
+        public {{ test_class_name }}({{ project_name | pascal | strip_dots }}Fixture fixture)
+        {
+            _fixture = fixture;
+            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();
+            _client = new ServiceBusClient(_fixture.ServiceBusConnectionString);
+            _sender = _client.CreateSender("myqueue"); // Adjust based on queue/topic naming convention
+        }
+
+        public Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        async Task IAsyncLifetime.DisposeAsync()
+        {
+            await _sender.DisposeAsync();
+            await _client.DisposeAsync();
+        }
+
+#pragma warning disable CS8604 // init takes care of nullables 
+
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_namespace | pascal %}
+        [Fact]
+        public async Task Test{{ messagename }}Message()
+        {
+            var dispatcher = new global::{{project_name | pascal}}.{{ pascal_group_name }}.{{ pascal_group_name | strip_namespace}}EventDispatcher();
+            var messageHandled = new TaskCompletionSource<bool>();
+
+            dispatcher.{{ messagename }}Async += async (message, cloudEvent, eventData) =>
+            {
+                try
+                {
+                    _logger.LogInformation("Processing {{ messagename }} event.");
+                    Assert.NotNull(message);
+                    {%- if cloudEvents.isCloudEvent(message) %}
+                    Assert.NotNull(cloudEvent);
+                    Assert.Equal("{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}", cloudEvent?.Type);
+                    {%- endif %}
+                    {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+                    {%- if message_body_type != "byte[]" %}
+                    Assert.NotNull(eventData);
+                    {%- endif %}
+
+                    messageHandled.SetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during {{ messagename }} event processing.");
+                    messageHandled.SetException(ex);
+                }
+
+                await Task.CompletedTask;
+            };
+
+            var processor = global::{{project_name | pascal}}.{{ pascal_group_name }}.{{ pascal_group_name | strip_namespace}}EventDispatcher.CreateServiceBusProcessor(
+                _client,
+                "myqueue",
+                new ServiceBusProcessorOptions(),
+                dispatcher
+            );
+            processor.ProcessErrorAsync += args =>
+            {
+                _logger.LogError(args.Exception, "Error occurred during processing.");
+                return Task.CompletedTask;
+            };
+            await processor.StartProcessingAsync();
+            _logger.LogInformation("Processor started for {{ messagename }} event.");
+
+            // Send test message
+            var sender = _client.CreateSender("myqueue");
+            {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+            {%- if message_body_type != "byte[]" %}
+            var eventDataTest = new {{ message_body_type }}Tests();
+            var eventData = eventDataTest.CreateInstance().ToByteArray("application/json");
+            {%- else %}
+            byte[] eventData = null;
+            {%- endif %}
+            var cloudEvent = new CloudEvent
+            {
+                Id = Guid.NewGuid().ToString(),
+                Type = "{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}",
+                Source = new Uri("/test/source", UriKind.RelativeOrAbsolute),
+                Data = eventData,
+                DataContentType = {{ cloudEvents.GetDataContentType(message, '"application/json"' if message_body_type != "byte[]" else "null") }}
+            };
+            JsonEventFormatter fm = new JsonEventFormatter();
+
+            var message = new ServiceBusMessage(fm.EncodeStructuredModeMessage(cloudEvent, out var ct));
+            message.ContentType = ct.ToString();
+            await sender.SendMessageAsync(message);
+
+            // Wait for the message to be processed
+            var completedTask = await Task.WhenAny(messageHandled.Task, Task.Delay(10000));
+            Assert.True(messageHandled.Task.IsCompletedSuccessfully, "The message was not handled within the timeout.");
+
+            await processor.StopProcessingAsync();
+            _logger.LogInformation("Processor stopped for {{ messagename }} event.");
+            await processor.DisposeAsync();
+        }
+        {%- endfor %}
+    }
+    {%- endfor %}
+}
