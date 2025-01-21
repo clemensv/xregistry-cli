@@ -4,8 +4,8 @@
 
 
 {%- macro body_type(data_project_name, root, message) -%}
- {%- if message.schemauri or message.schema -%}
-global::{{ (message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal }}
+ {%- if message.dataschemauri or message.dataschema -%}
+global::{{ (message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat) | pascal }}
 {%- else -%}
 byte[]
 {%- endif %} 

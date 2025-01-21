@@ -38,7 +38,7 @@
                             "required": true
                         }
                     },
-                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreatedEventData#/definitions/StorageBlobCreatedEventData",
+                    "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreatedEventData#/definitions/StorageBlobCreatedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.BlobCreated",
@@ -80,7 +80,7 @@
                             "required": true
                         }
                     },
-                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeletedEventData#/definitions/StorageBlobDeletedEventData",
+                    "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeletedEventData#/definitions/StorageBlobDeletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.BlobDeleted",
@@ -302,7 +302,7 @@
                             "required": true
                         }
                     },
-                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompletedEventData#/definitions/StorageBlobInventoryPolicyCompletedEventData",
+                    "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompletedEventData#/definitions/StorageBlobInventoryPolicyCompletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.BlobInventoryPolicyCompleted",
@@ -344,7 +344,7 @@
                             "required": true
                         }
                     },
-                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiatedEventData#/definitions/StorageAsyncOperationInitiatedEventData",
+                    "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiatedEventData#/definitions/StorageAsyncOperationInitiatedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.AsyncOperationInitiated",
@@ -386,7 +386,7 @@
                             "required": true
                         }
                     },
-                    "schemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompletedEventData#/definitions/StorageLifecyclePolicyCompletedEventData",
+                    "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompletedEventData#/definitions/StorageLifecyclePolicyCompletedEventData",
                     "groupId": "Microsoft.Storage",
                     "version": 133179207676972370,
                     "self": "#/messagegroups/Microsoft.Storage/Microsoft.Storage.LifecyclePolicyCompleted",

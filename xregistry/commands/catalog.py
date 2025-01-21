@@ -316,8 +316,8 @@ class CatalogSubcommands:
             else:
                 self.add_schemagroup(**schemagroup)
 
-    def add_message(self, messagegroupid: str, messageid: str, envelope: str, protocol: str, schemaformat: Optional[str] = None,
-                    schemagroup: Optional[str] = None, schemaid: Optional[str] = None, schemaurl: Optional[str] = None,
+    def add_message(self, messagegroupid: str, messageid: str, envelope: str, protocol: str, dataschemaformat: Optional[str] = None,
+                    dataschemagroup: Optional[str] = None, dataschemaid: Optional[str] = None, dataschemauri: Optional[str] = None,
                     documentation: Optional[str] = None, description: Optional[str] = None, labels: Optional[Dict[str, str]] = None,
                     name: Optional[str] = None) -> None:
         """Adds a message to a message group in the catalog."""
@@ -330,14 +330,14 @@ class CatalogSubcommands:
             "modifiedat": current_time_iso(),
             "epoch": 0
         }
-        if schemaformat:
-            message["schemaformat"] = schemaformat
-        if schemagroup:
-            message["schemagroup"] = schemagroup
-        if schemaid:
-            message["schemaid"] = schemaid
-        if schemaurl:
-            message["schemaurl"] = schemaurl
+        if dataschemaformat:
+            message["dataschemaformat"] = dataschemaformat
+        if dataschemagroup:
+            message["dataschemagroup"] = dataschemagroup
+        if dataschemaid:
+            message["dataschemaid"] = dataschemaid
+        if dataschemauri:
+            message["dataschemauri"] = dataschemauri
         if documentation:
             message["documentation"] = documentation
         if description:
@@ -366,8 +366,8 @@ class CatalogSubcommands:
         if response.status_code != 204:
             raise ValueError(f"Failed to remove message: {response.text}")
 
-    def edit_message(self, messagegroupid: str, messageid: str, envelope: Optional[str] = None, protocol: Optional[str] = None, schemaformat: Optional[str] = None,
-                     schemagroup: Optional[str] = None, schemaid: Optional[str] = None, schemaurl: Optional[str] = None,
+    def edit_message(self, messagegroupid: str, messageid: str, envelope: Optional[str] = None, protocol: Optional[str] = None, dataschemaformat: Optional[str] = None,
+                     dataschemagroup: Optional[str] = None, dataschemaid: Optional[str] = None, dataschemauri: Optional[str] = None,
                      documentation: Optional[str] = None, description: Optional[str] = None, labels: Optional[Dict[str, str]] = None,
                      name: Optional[str] = None) -> None:
         """Edits an existing message in a message group in the catalog."""
@@ -380,14 +380,14 @@ class CatalogSubcommands:
             message["envelope"] = envelope
         if protocol:
             message["protocol"] = protocol
-        if schemaformat:
-            message["schemaformat"] = schemaformat
-        if schemagroup:
-            message["schemagroup"] = schemagroup
-        if schemaid:
-            message["schemaid"] = schemaid
-        if schemaurl:
-            message["schemaurl"] = schemaurl
+        if dataschemaformat:
+            message["dataschemaformat"] = dataschemaformat
+        if dataschemagroup:
+            message["dataschemagroup"] = dataschemagroup
+        if dataschemaid:
+            message["dataschemaid"] = dataschemaid
+        if dataschemauri:
+            message["dataschemauri"] = dataschemauri
         if documentation:
             message["documentation"] = documentation
         if description:
@@ -1197,20 +1197,20 @@ class CatalogSubcommands:
                                  help="Message envelope", default="CloudEvents/1.0")
         message_add.add_argument("--protocol", choices=["AMQP/1.0", "MQTT/3.1.1", "MQTT/5.0", "NATS",
                                  "HTTP", "KAFKA", "None"], help="Message protocol", default="None")
-        message_add.add_argument("--schemaformat", help="Schema format")
-        message_add.add_argument("--schemagroup", help="Schema group ID")
-        message_add.add_argument("--schemaid", help="Schema ID")
-        message_add.add_argument("--schemaurl", help="Schema URL")
+        message_add.add_argument("--dataschemaformat", help="Schema format")
+        message_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_add.add_argument("--dataschemaid", help="Schema ID")
+        message_add.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_add)
         message_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
             envelope=args.envelope,
             protocol=args.protocol,
-            schemaformat=args.schemaformat,
-            schemagroup=args.schemagroup,
-            schemaid=args.schemaid,
-            schemaurl=args.schemaurl,
+            dataschemaformat=args.dataschemaformat,
+            dataschemagroup=args.dataschemagroup,
+            dataschemaid=args.dataschemaid,
+            dataschemauri=args.dataschemauri,
             documentation=args.documentation,
             description=args.description,
             labels=args.labels,
@@ -1233,20 +1233,20 @@ class CatalogSubcommands:
         message_edit.add_argument("--envelope", choices=["CloudEvents/1.0", "None"], help="Message envelope", default="CloudEvents/1.0")
         message_edit.add_argument("--protocol", choices=["AMQP/1.0", "MQTT/3.1.1", "MQTT/5.0",
                                   "NATS", "HTTP", "KAFKA", "None"], help="Message protocol", default="None")
-        message_edit.add_argument("--schemaformat", help="Schema format")
-        message_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_edit.add_argument("--schemaid", help="Schema ID")
-        message_edit.add_argument("--schemaurl", help="Schema URL")
+        message_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_edit.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_edit)
         message_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
             envelope=args.envelope,
             protocol=args.protocol,
-            schemaformat=args.schemaformat,
-            schemagroup=args.schemagroup,
-            schemaid=args.schemaid,
-            schemaurl=args.schemaurl,
+            dataschemaformat=args.dataschemaformat,
+            dataschemagroup=args.dataschemagroup,
+            dataschemaid=args.dataschemaid,
+            dataschemauri=args.dataschemauri,
             documentation=args.documentation,
             description=args.description,
             labels=args.labels,
@@ -1261,17 +1261,17 @@ class CatalogSubcommands:
         message_cloudevent_add.add_argument("--documentation", help="Message documentation URL")
         message_cloudevent_add.add_argument("--name", help="Message name")
         message_cloudevent_add.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_cloudevent_add.add_argument("--schemaformat", help="Schema format")
-        message_cloudevent_add.add_argument("--schemagroup", help="Schema group ID")
-        message_cloudevent_add.add_argument("--schemaid", help="Schema ID")
-        message_cloudevent_add.add_argument("--schemaurl", help="Schema URL")
+        message_cloudevent_add.add_argument("--dataschemaformat", help="Schema format")
+        message_cloudevent_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_cloudevent_add.add_argument("--dataschemaid", help="Schema ID")
+        message_cloudevent_add.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_cloudevent_add)
 
         def _add_cloudevent(args):
             sc = CatalogSubcommands(args.catalog)
             sc.add_message(
-                args.messagegroupid, args.messageid, "CloudEvents/1.0", "None", args.schemaformat, args.schemagroup, args.schemaid,
-                args.schemaurl, args.documentation, args.description, args.labels, args.name)
+                args.messagegroupid, args.messageid, "CloudEvents/1.0", "None", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+                args.dataschemauri, args.documentation, args.description, args.labels, args.name)
             sc.add_cloudevents_message_metadata(args.messagegroupid, args.messageid, "specversion",
                                                 "string", "CloudEvents version", "1.0", True)
             sc.add_cloudevents_message_metadata(args.messagegroupid, args.messageid, "type", "string", "Event type", args.messageid, True)
@@ -1287,14 +1287,14 @@ class CatalogSubcommands:
         message_cloudevent_edit.add_argument("--documentation", help="Message documentation URL")
         message_cloudevent_edit.add_argument("--name", help="Message name")
         message_cloudevent_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_cloudevent_edit.add_argument("--schemaformat", help="Schema format")
-        message_cloudevent_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_cloudevent_edit.add_argument("--schemaid", help="Schema ID")
-        message_cloudevent_edit.add_argument("--schemaurl", help="Schema URL")
+        message_cloudevent_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_cloudevent_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_cloudevent_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_cloudevent_edit.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_cloudevent_edit)
         message_cloudevent_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
-            args.messagegroupid, args.messageid, "CloudEvents/1.0", "None", args.schemaformat, args.schemagroup, args.schemaid,
-            args.schemaurl, args.documentation, args.description, args.labels, args.name))
+            args.messagegroupid, args.messageid, "CloudEvents/1.0", "None", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+            args.dataschemauri, args.documentation, args.description, args.labels, args.name))
 
         message_cloudevent_remove = message_cloudevent_subparsers.add_parser("remove", help="Remove a CloudEvent")
         message_cloudevent_remove.add_argument("--messagegroupid", required=True, help="Message group ID", type=str)
@@ -1361,10 +1361,10 @@ class CatalogSubcommands:
                 messageid=args.messageid,
                 envelope="None",
                 protocol="AMQP/1.0",
-                schemaformat=args.schemaformat,
-                schemagroup=args.schemagroup,
-                schemaid=args.schemaid,
-                schemaurl=args.schemaurl,
+                dataschemaformat=args.dataschemaformat,
+                dataschemagroup=args.dataschemagroup,
+                dataschemaid=args.dataschemaid,
+                dataschemauri=args.dataschemauri,
                 documentation=args.documentation,
                 description=args.description,
                 labels=args.labels,
@@ -1388,10 +1388,10 @@ class CatalogSubcommands:
         message_amqp_add.add_argument("--documentation", help="Message documentation URL")
         message_amqp_add.add_argument("--name", help="Message name")
         message_amqp_add.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_amqp_add.add_argument("--schemaformat", help="Schema format")
-        message_amqp_add.add_argument("--schemagroup", help="Schema group ID")
-        message_amqp_add.add_argument("--schemaid", help="Schema ID")
-        message_amqp_add.add_argument("--schemaurl", help="Schema URL")
+        message_amqp_add.add_argument("--dataschemaformat", help="Schema format")
+        message_amqp_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_amqp_add.add_argument("--dataschemaid", help="Schema ID")
+        message_amqp_add.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_amqp_add)
         message_amqp_add.set_defaults(func=_add_amqp_message)
 
@@ -1402,20 +1402,20 @@ class CatalogSubcommands:
         message_amqp_edit.add_argument("--documentation", help="Message documentation URL")
         message_amqp_edit.add_argument("--name", help="Message name")
         message_amqp_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_amqp_edit.add_argument("--schemaformat", help="Schema format")
-        message_amqp_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_amqp_edit.add_argument("--schemaid", help="Schema ID")
-        message_amqp_edit.add_argument("--schemaurl", help="Schema URL")
+        message_amqp_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_amqp_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_amqp_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_amqp_edit.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_amqp_edit)
         message_amqp_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
             envelope="None",
             protocol="AMQP/1.0",
-            schemaformat=args.schemaformat,
-            schemagroup=args.schemagroup,
-            schemaid=args.schemaid,
-            schemaurl=args.schemaurl,
+            dataschemaformat=args.dataschemaformat,
+            dataschemagroup=args.dataschemagroup,
+            dataschemaid=args.dataschemaid,
+            dataschemauri=args.dataschemauri,
             documentation=args.documentation,
             description=args.description,
             labels=args.labels,
@@ -1475,8 +1475,8 @@ class CatalogSubcommands:
         def _add_mqtt_message(args):
             sc = CatalogSubcommands(args.catalog)
             sc.add_message(
-                args.messagegroupid, args.messageid, "None", "MQTT/" + args.mqtt_version, args.schemaformat, args.schemagroup, args.schemaid,
-                args.schemaurl, args.documentation, args.description, args.labels, args.name)
+                args.messagegroupid, args.messageid, "None", "MQTT/" + args.mqtt_version, args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+                args.dataschemauri, args.documentation, args.description, args.labels, args.name)
             sc.add_mqtt_message_metadata(args.messagegroupid, args.messageid, args.mqtt_version, "topic",
                                          "string", "{topic}/"+args.messageid,  "MQTT topic", True)
 
@@ -1489,10 +1489,10 @@ class CatalogSubcommands:
         message_mqtt_add.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
         message_mqtt_add.add_argument("--mqtt-version", required=True,
                                       choices=["3", "5", "3.1.1", "5.0"], help="MQTT version", default="5.0")
-        message_mqtt_add.add_argument("--schemaformat", help="Schema format")
-        message_mqtt_add.add_argument("--schemagroup", help="Schema group ID")
-        message_mqtt_add.add_argument("--schemaid", help="Schema ID")
-        message_mqtt_add.add_argument("--schemaurl", help="Schema URL")
+        message_mqtt_add.add_argument("--dataschemaformat", help="Schema format")
+        message_mqtt_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_mqtt_add.add_argument("--dataschemaid", help="Schema ID")
+        message_mqtt_add.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_mqtt_add)
         message_mqtt_add.set_defaults(func=_add_mqtt_message)
 
@@ -1505,20 +1505,20 @@ class CatalogSubcommands:
         message_mqtt_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
         message_mqtt_edit.add_argument("--mqtt-version", required=True, 
                                         choices=["3", "5", "3.1.1", "5.0"], help="MQTT version", default="5.0")
-        message_mqtt_edit.add_argument("--schemaformat", help="Schema format")
-        message_mqtt_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_mqtt_edit.add_argument("--schemaid", help="Schema ID")
-        message_mqtt_edit.add_argument("--schemaurl", help="Schema URL")
+        message_mqtt_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_mqtt_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_mqtt_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_mqtt_edit.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_mqtt_edit)
         message_mqtt_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
             envelope="None",
             protocol="MQTT/" + args.mqtt_version,
-            schemaformat=args.schemaformat,
-            schemagroup=args.schemagroup,
-            schemaid=args.schemaid,
-            schemaurl=args.schemaurl,
+            dataschemaformat=args.dataschemaformat,
+            dataschemagroup=args.dataschemagroup,
+            dataschemaid=args.dataschemaid,
+            dataschemauri=args.dataschemauri,
             documentation=args.documentation,
             description=args.description,
             labels=args.labels,
@@ -1601,10 +1601,10 @@ class CatalogSubcommands:
                 messageid=args.messageid,
                 envelope="None",
                 protocol="KAFKA",
-                schemaformat=args.schemaformat,
-                schemagroup=args.schemagroup,
-                schemaid=args.schemaid,
-                schemaurl=args.schemaurl,
+                dataschemaformat=args.dataschemaformat,
+                dataschemagroup=args.dataschemagroup,
+                dataschemaid=args.dataschemaid,
+                dataschemauri=args.dataschemauri,
                 documentation=args.documentation,
                 description=args.description,
                 labels=args.labels,
@@ -1638,10 +1638,10 @@ class CatalogSubcommands:
         message_kafka_add.add_argument("--documentation", help="Message documentation URL")
         message_kafka_add.add_argument("--name", help="Message name")
         message_kafka_add.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_kafka_add.add_argument("--schemaformat", help="Schema format")
-        message_kafka_add.add_argument("--schemagroup", help="Schema group ID")
-        message_kafka_add.add_argument("--schemaid", help="Schema ID")
-        message_kafka_add.add_argument("--schemaurl", help="Schema URL")
+        message_kafka_add.add_argument("--dataschemaformat", help="Schema format")
+        message_kafka_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_kafka_add.add_argument("--dataschemaid", help="Schema ID")
+        message_kafka_add.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_kafka_add)
         message_kafka_add.set_defaults(func=_add_kafka_message)
 
@@ -1652,20 +1652,20 @@ class CatalogSubcommands:
         message_kafka_edit.add_argument("--documentation", help="Message documentation URL")
         message_kafka_edit.add_argument("--name", help="Message name")
         message_kafka_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_kafka_edit.add_argument("--schemaformat", help="Schema format")
-        message_kafka_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_kafka_edit.add_argument("--schemaid", help="Schema ID")
-        message_kafka_edit.add_argument("--schemaurl", help="Schema URL")
+        message_kafka_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_kafka_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_kafka_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_kafka_edit.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_kafka_edit)
         message_kafka_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
             envelope="None",
             protocol="KAFKA",
-            schemaformat=args.schemaformat,
-            schemagroup=args.schemagroup,
-            schemaid=args.schemaid,
-            schemaurl=args.schemaurl,
+            dataschemaformat=args.dataschemaformat,
+            dataschemagroup=args.dataschemagroup,
+            dataschemaid=args.dataschemaid,
+            dataschemauri=args.dataschemauri,
             documentation=args.documentation,
             description=args.description,
             labels=args.labels,
@@ -1749,10 +1749,10 @@ class CatalogSubcommands:
                 messageid=args.messageid,
                 envelope="None",
                 protocol="HTTP",
-                schemaformat=args.schemaformat,
-                schemagroup=args.schemagroup,
-                schemaid=args.schemaid,
-                schemaurl=args.schemaurl,
+                dataschemaformat=args.dataschemaformat,
+                dataschemagroup=args.dataschemagroup,
+                dataschemaid=args.dataschemaid,
+                dataschemauri=args.dataschemauri,
                 documentation=args.documentation,
                 description=args.description,
                 labels=args.labels,
@@ -1786,10 +1786,10 @@ class CatalogSubcommands:
         message_http_add.add_argument("--documentation", help="Message documentation URL")
         message_http_add.add_argument("--name", help="Message name")
         message_http_add.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_http_add.add_argument("--schemaformat", help="Schema format")
-        message_http_add.add_argument("--schemagroup", help="Schema group ID")
-        message_http_add.add_argument("--schemaid", help="Schema ID")
-        message_http_add.add_argument("--schemaurl", help="Schema URL")
+        message_http_add.add_argument("--dataschemaformat", help="Schema format")
+        message_http_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_http_add.add_argument("--dataschemaid", help="Schema ID")
+        message_http_add.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_http_add)
         message_http_add.set_defaults(func=_add_http_message)
 
@@ -1800,20 +1800,20 @@ class CatalogSubcommands:
         message_http_edit.add_argument("--documentation", help="Message documentation URL")
         message_http_edit.add_argument("--name", help="Message name")
         message_http_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Message labels (key=value pairs)")
-        message_http_edit.add_argument("--schemaformat", help="Schema format")
-        message_http_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_http_edit.add_argument("--schemaid", help="Schema ID")
-        message_http_edit.add_argument("--schemaurl", help="Schema URL")
+        message_http_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_http_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_http_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_http_edit.add_argument("--dataschemauri", help="Schema URL")
         add_authentication_arguments(message_http_edit)
         message_http_edit.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).edit_message(
             messagegroupid=args.messagegroupid,
             messageid=args.messageid,
             envelope="None",
             protocol="HTTP",
-            schemaformat=args.schemaformat,
-            schemagroup=args.schemagroup,
-            schemaid=args.schemaid,
-            schemaurl=args.schemaurl,
+            dataschemaformat=args.dataschemaformat,
+            dataschemagroup=args.dataschemagroup,
+            dataschemaid=args.dataschemaid,
+            dataschemauri=args.dataschemauri,
             documentation=args.documentation,
             description=args.description,
             labels=args.labels,

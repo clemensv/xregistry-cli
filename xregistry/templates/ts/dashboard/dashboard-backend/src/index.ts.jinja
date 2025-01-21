@@ -63,8 +63,8 @@ const eventTypeTableMap = {
 {%- for message_id, message in messagegroup.messages.items() -%}
 {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
 {%- if isCloudEvent %}
-{%- if message.schemauri or message.schema -%}
-{%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace ) %}
+{%- if message.dataschemauri or message.dataschema -%}
+{%- set dataType = ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | strip_namespace ) %}
 '{{ message.envelopemetadata["type"]["value"] }}': '{{ dataType }}',
 {%- endif %}
 {%- endif %}

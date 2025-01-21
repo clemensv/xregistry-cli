@@ -124,8 +124,8 @@ switch (messageSubject)
          if ( this.{{ handlerName }} != null )
          {
             await this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-               {%- if message.schemauri or message.schema -%}
-            global::{{( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
+               {%- if message.dataschemauri or message.dataschema -%}
+            global::{{( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
             {%- else -%}
             {{ message }}.Data
             {%- endif %});
@@ -154,8 +154,8 @@ switch (messageSubject)
          if ( this.{{ handlerName }} != null )
          {
             await this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-               {%- if message.schemauri or message.schema -%}
-            global::{{( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
+               {%- if message.dataschemauri or message.dataschema -%}
+            global::{{( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat)  | pascal }}.FromData({{ message }}.Value, {{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes() != null ? Encoding.UTF8.GetString({{ message }}.Headers.FirstOrDefault(h => h.Key == "content-type")?.GetValueBytes()) : null)
             {%- else -%}
             {{ message }}.Data
             {%- endif %});
@@ -185,8 +185,8 @@ namespace {{ messagegroupname | concat_namespace(project_name) | pascal }}
    {
       {%- for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "kafka" )) -%}
       {%- set messagename = messageid | strip_namespace | pascal -%}
-      {%- if message.schemauri or message.schema -%}
-      {%- set dataType = 'global::' + (( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
+      {%- if message.dataschemauri or message.dataschema -%}
+      {%- set dataType = 'global::' + (( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat)  | pascal) -%}
       {%- else -%}
       {%- set dataType = "object" -%}
       {%- endif %}

@@ -13,8 +13,8 @@ import {
 {%- for messageid, message in messagegroup.messages.items() -%}
 {%- set messagename = messageid | pascal %}
 {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
-{%- if message.schemauri or message.schema -%}
-{%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
+{%- if message.dataschemauri or message.dataschema -%}
+{%- set dataType = ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat) | pascal) %}
 {{- dataType | dotunderscore }}{% if not loop.last %},{% endif -%}
 {%- endif -%}
 {%- endfor -%}
@@ -34,8 +34,8 @@ export class AppComponent implements OnInit, OnDestroy {
   {%- for message_id, message in messagegroup.messages.items() -%}
   {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
   {%- if isCloudEvent %}
-  {%- if message.schemauri or message.schema -%}
-  {%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
+  {%- if message.dataschemauri or message.dataschema -%}
+  {%- set dataType = ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat) | pascal) %}
   {{ dataType | dotunderscore | camel }}Listener!: EventStreamListener<{{ dataType | dotunderscore }}>;
   {%- endif %}
   {%- endif %}
@@ -129,7 +129,7 @@ export class AppComponent implements OnInit, OnDestroy {
     {%- for message_id, message in messagegroup.messages.items() -%}
     {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
     {%- if isCloudEvent %}
-    {%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
+    {%- set dataType = ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat) | pascal) %}
     this.{{ dataType | dotunderscore | camel }}Listener = new EventStreamListener<{{ dataType | dotunderscore}}>(
       '{{ message.envelopemetadata["type"]["value"] }}', '', '',
       this.socketService, new TypedJSON({{ dataType | dotunderscore }})
@@ -149,7 +149,7 @@ export class AppComponent implements OnInit, OnDestroy {
     {%- for message_id, message in messagegroup.messages.items() -%}
     {%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
     {%- if isCloudEvent %}
-    {%- set dataType = ((message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal) %}
+    {%- set dataType = ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat) | pascal) %}
     this.{{ dataType | dotunderscore | camel }}Listener.close();
     {%- endif %}
     {%- endfor %}

@@ -27,7 +27,7 @@
                             "description": "Id of the sensor that scanned the vehicle"
                         }
                     },
-                    "schemauri": "#/schemagroups/Microsoft.Samples.TollRecordEvents/schemas/TollRecordEventData"
+                    "dataschemauri": "#/schemagroups/Microsoft.Samples.TollRecordEvents/schemas/TollRecordEventData"
                 }
             }
         }

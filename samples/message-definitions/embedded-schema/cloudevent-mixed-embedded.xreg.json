@@ -13,7 +13,7 @@
                             "value": "com.example.group1.event1"
                         }
                     },
-                    "schemaformat": "AVRO/1.11.2",
+                    "dataschemaformat": "AVRO/1.11.2",
                     "schema": {
                         "type": "record",
                         "namespace": "Com.Example.Group1.Event1",
@@ -33,7 +33,7 @@
                             "value": "com.example.group1.event2"
                         }
                     },
-                    "schemaformat": "Proto/3",
+                    "dataschemaformat": "Proto/3",
                     "schema": "syntax = \"proto3\"; message Example { string example = 1; }"
                 },
                 "com.example.group1.event3": {
@@ -43,7 +43,7 @@
                             "value": "com.example.group1.event3"
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
+                    "dataschemaformat": "JSONSchema/draft-07",
                     "schema": {
                         "$schema": "http://json-schema.org/draft-07/schema",
                         "type": "object",

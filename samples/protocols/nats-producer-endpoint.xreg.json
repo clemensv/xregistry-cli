@@ -40,8 +40,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.0",
-                    "schemauri": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
+                    "dataschemaformat": "Avro/1.11.0",
+                    "dataschemauri": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
                 }
             }
         }

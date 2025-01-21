@@ -53,8 +53,8 @@
                             }
                         }
                     },
-                    "schemaformat": "JsonSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                    "dataschemaformat": "JsonSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }

@@ -13,7 +13,7 @@
                             "value": "com.example.group1.event1"
                         }
                     },
-                    "schemaformat": "Proto/3",
+                    "dataschemaformat": "Proto/3",
                     "schema": "syntax = \"proto3\"; message Example { string example = 1; }"
                 }
             }

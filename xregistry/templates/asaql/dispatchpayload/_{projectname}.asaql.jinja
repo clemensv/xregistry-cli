@@ -20,7 +20,7 @@ WITH {% for messagegroupid, messagegroup in root.messagegroups.items() -%}
 {%- for messageid, message in messagegroup.messages.items() %}
 {%- if not loop.first -%},
 {% endif %}{{ messageid | strip_dots  | pascal }} AS (
-    SELECT type, {% if message.schemauri or message.schema -%}data AS {{ (message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace  | pascal }}, {% endif -%} *
+    SELECT type, {% if message.dataschemauri or message.dataschema -%}data AS {{ (message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | strip_namespace  | pascal }}, {% endif -%} *
     FROM [input]
     WHERE type = '{{messageid}}'
 )
@@ -29,20 +29,20 @@ WITH {% for messagegroupid, messagegroup in root.messagegroups.items() -%}
 
 {%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
 {%- for messageid, message in messagegroup.messages.items() %}
-{%- if message.schemauri %}
+{%- if message.dataschemauri %}
 SELECT {% for attrname, attribute in message.envelopemetadata.items() %}
 {%- if not loop.first-%},{%- endif -%}event.{{ attrname }}{%- endfor -%}
-{%- set schemalist = get("select:"+((message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat))).split(",") -%}
+{%- set schemalist = get("select:"+((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat))).split(",") -%}
 {%- for item in schemalist if item.strip() -%}
 ,event.{{ item }}
 {%- endfor -%}
-{%- set itemlist= get("selectitem:"+((message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat))).split(",") %}
+{%- set itemlist= get("selectitem:"+((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat))).split(",") %}
 {%- for item in itemlist if item.strip() -%}
 ,{{ item }}
 {%- endfor %}
 INTO [output{{ messageid | strip_namespace | pascal }}]
 FROM {{ messageid | strip_dots  | pascal }} as event
-{% set apply = get("apply:"+((message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat))) %}
+{% set apply = get("apply:"+((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat))) %}
 {%- if apply -%}
 CROSS APPLY
     {{ apply }}

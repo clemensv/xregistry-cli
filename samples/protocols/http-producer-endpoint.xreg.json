@@ -53,8 +53,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JsonSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
+                    "dataschemaformat": "JsonSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 }
             }
         }

@@ -32,7 +32,7 @@
                             "value": "application/json"
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
+                    "dataschemaformat": "Avro/1.11.1",
                     "schemaurl": "/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOnEventData"
                 },
                 "Fabrikam.Lumen.TurnedOff": {
@@ -59,7 +59,7 @@
                             "value": "application/json"
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
+                    "dataschemaformat": "Avro/1.11.1",
                     "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOffEventData"
                 },
                 "Fabrikam.Lumen.BrightnessChanged": {
@@ -85,7 +85,7 @@
                             }
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
+                    "dataschemaformat": "Avro/1.11.1",
                     "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.BrightnessChangedEventData"
                 },
                 "Fabrikam.Lumen.ColorChanged": {
@@ -114,7 +114,7 @@
                             }
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
+                    "dataschemaformat": "Avro/1.11.1",
                     "schemaurl": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.ColorChangedEventData"
                 }
             }

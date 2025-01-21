@@ -29,7 +29,7 @@
                             "required": true
                         }
                     },
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
                 }
             }
         }

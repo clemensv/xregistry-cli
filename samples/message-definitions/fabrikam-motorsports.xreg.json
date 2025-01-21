@@ -23,8 +23,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "AVRO/1.11.1",
-                    "schemauri": "#/schemagroups/net.fabrikam.telemetry/schemas/net.fabrikam.telemetry.channel"
+                    "dataschemaformat": "AVRO/1.11.1",
+                    "dataschemauri": "#/schemagroups/net.fabrikam.telemetry/schemas/net.fabrikam.telemetry.channel"
                 }
             }
         }

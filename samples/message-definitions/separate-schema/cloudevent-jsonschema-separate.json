@@ -15,7 +15,7 @@
                             "value": "com.example.group1.event1"
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
+                    "dataschemaformat": "JSONSchema/draft-07",
                     "schemaurl": "#/schemagroups/com.example.group1/schemas/com.example.group1.schema1"
                 }
             }

@@ -13,7 +13,7 @@
                             "value": "com.example.group1.event1"
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
+                    "dataschemaformat": "JSONSchema/draft-07",
                     "schema": {
                         "$schema": "http://json-schema.org/draft-07/schema",
                         "type": "object",

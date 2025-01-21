@@ -31,8 +31,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobStartedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobStartedEventData"
                 },
                 "Fabrikam.InkJetPrinter.PrintJobCompleted": {
                     "description": "Event for when a print job is completed",
@@ -58,8 +58,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobCompletedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobCompletedEventData"
                 },
                 "Fabrikam.InkJetPrinter.InkLow": {
                     "description": "Event for when ink levels are low",
@@ -85,8 +85,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.InkLowEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.InkLowEventData"
                 },
                 "Fabrikam.InkJetPrinter.PaperJam": {
                     "description": "Event for when a paper jam occurs",
@@ -112,8 +112,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PaperJamEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PaperJamEventData"
                 },
                 "Fabrikam.InkJetPrinter.MaintenanceRequired": {
                     "description": "Event for when the printer requires maintenance",
@@ -139,8 +139,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.MaintenanceRequiredEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.MaintenanceRequiredEventData"
                 }
             }
         }

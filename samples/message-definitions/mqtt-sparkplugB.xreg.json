@@ -98,7 +98,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
                 },
                 "NDATA": {
                     "description": "Data payload for Sparkplug Edge Nodes",
@@ -119,7 +119,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
                 },
                 "NDEATH": {
                     "description": "Death certificate for Sparkplug Edge Nodes",
@@ -140,7 +140,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
                 }
             }
         },
@@ -167,7 +167,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
                 },
                 "DDEATH": {
                     "description": "Death certificate for Sparkplug Devices",
@@ -188,7 +188,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
                 },
                 "DDATA": {
                     "description": "Data payload for Sparkplug Devices",
@@ -209,7 +209,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
                 }
             }
         },
@@ -235,7 +235,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.JSON/versions/v1.0:definitions/STATEDeath"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.JSON/versions/v1.0:definitions/STATEDeath"
                 },
                 "STATE.Birth": {
                     "protocol": "MQTT/3.1.1",
@@ -255,7 +255,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.JSON/versions/v1.0:definitions/STATEBirth"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.JSON/versions/v1.0:definitions/STATEBirth"
                 }
             }
         },
@@ -281,7 +281,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
                 }
             }
         },
@@ -307,7 +307,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
+                    "dataschemauri": "#/schemagroups/Sparkplug/schemas/SparkplugB.Protobuf/versions/v1.0:Payload"
                 }
             }
         }

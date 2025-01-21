@@ -31,8 +31,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TurnedOnEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TurnedOnEventData"
                 },
                 "Fabrikam.SmartOven.TurnedOff": {
                     "description": "Event for when the oven is turned off",
@@ -58,8 +58,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TurnedOffEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TurnedOffEventData"
                 },
                 "Fabrikam.SmartOven.TimerSet": {
                     "description": "Event for when a timer is set on the oven",
@@ -85,8 +85,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TimerSetEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TimerSetEventData"
                 },
                 "Fabrikam.SmartOven.TimerCompleted": {
                     "description": "Event for when a timer completes",
@@ -112,8 +112,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TimerCompletedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.TimerCompletedEventData"
                 },
                 "Fabrikam.SmartOven.PreheatingFinished": {
                     "description": "Event for when preheating is finished",
@@ -139,8 +139,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.PreheatingFinishedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.SmartOven/schemas/Fabrikam.SmartOven.PreheatingFinishedEventData"
                 }
             }
         }

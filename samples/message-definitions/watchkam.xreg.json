@@ -31,8 +31,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionDetectedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionDetectedEventData"
                 },
                 "Fabrikam.Watchkam.MotionEnded": {
                     "description": "Event for when detected motion has ended",
@@ -58,8 +58,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionEndedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionEndedEventData"
                 }
             }
         }

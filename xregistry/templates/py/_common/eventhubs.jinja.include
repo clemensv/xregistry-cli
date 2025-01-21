@@ -117,8 +117,8 @@ switcher = {
     {%- for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
     {%- set messagename = messageid | pascal %}
     "{{ messageid }}": lambda: self.{{ messagegroupid | strip_namespace | camel }}_eventhub_dispatcher.on_{{ messagename | strip_namespace }}_async({{ message }},
-    {%- if message.schemauri or message.schema -%}
-    {{ ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.body, {{ message }}.content_type)
+    {%- if message.dataschemauri or message.dataschema -%}
+    {{ ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal }}.from_data({{ message }}.body, {{ message }}.content_type)
     {%- else -%}
     {{ message }}.data
     {%- endif %})
@@ -143,8 +143,8 @@ switcher = {
     {%- for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
     {%- set messagename = messageid | pascal %}
     "{{ messageid }}": lambda: self.{{ messagegroupid  | strip_namespace | camel }}_eventhub_dispatcher.on_{{ messagename | strip_namespace }}_async({{ message }},
-    {%- if message.schemauri or message.schema -%}
-    {{ ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ message }}.body, {{ message }}.content_type)
+    {%- if message.dataschemauri or message.dataschema -%}
+    {{ ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal }}.from_data({{ message }}.body, {{ message }}.content_type)
     {%- else -%}
     {{ message }}.data
     {%- endif %})
@@ -174,8 +174,8 @@ from azure.eventhub import EventData
 class I{{ messagegroupname | strip_namespace }}EventHubDispatcher:
     {%- for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
     {%- set messagename = messageid | strip_namespace | pascal %}
-    {%- if message.schemauri or message.schema -%}
-    {%- set dataType = (message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+    {%- if message.dataschemauri or message.dataschema -%}
+    {%- set dataType = (message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
     {%- else -%}
     {%- set dataType = "object" %}
     {%- endif %}

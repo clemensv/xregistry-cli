@@ -85,8 +85,8 @@ Below is a list of events and how to subscribe to them:
 
 {%- for messageid, message in messagegroup.messages.items() %}
 {%- set messagename = messageid | strip_namespace | pascal %}
-{%- if message.schemauri or message.schema %}
-{%- set dataType = 'global::' + (( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal) %}
+{%- if message.dataschemauri or message.dataschema %}
+{%- set dataType = 'global::' + (( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal) %}
 {%- else %}
 {%- set dataType = "object" %}
 {%- endif %}

@@ -75,7 +75,7 @@
           "format": "uri",
           "description": "Reference to a base definition for this definition, either via a (relative) URL or a fragment identifier. The base definition is overridden by this definition. If not present, this definition does not override any base definition"
         },
-        "schemaformat": {
+        "dataschemaformat": {
           "type": "string",
           "description": "The schema format applicable to the message payload, equivalent to the 'format' attribute of the schema registry"
         },
@@ -83,7 +83,7 @@
           "type": "object",
           "description": "The inline schema for the message payload, equivalent to the 'schema' attribute of the schema registry"
         },
-        "schemauri": {
+        "dataschemauri": {
           "type": "string",
           "format": "uri",
           "description": "The URI of the schema for the message payload, equivalent to the 'schemaurl' attribute of the schema registry"

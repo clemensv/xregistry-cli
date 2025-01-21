@@ -44,8 +44,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData"
                 },
                 "Contoso.ERP.Events.PaymentsReceived": {
                     "envelope": "CloudEvents/1.0",
@@ -70,8 +70,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/paymentData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/paymentData"
                 },
                 "Contoso.ERP.Events.ShipmentAccepted": {
                     "description": "A shipment has been accepted",
@@ -96,8 +96,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
                 },
                 "Contoso.ERP.Events.ShipmentRejected": {
                     "description": "A shipment has been rejected",
@@ -122,8 +122,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/shipmentData"
                 },
                 "Contoso.ERP.Events.ReturnRequested": {
                     "description": "A return has been requested",
@@ -148,8 +148,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/returnData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/returnData"
                 },
                 "Contoso.ERP.Events.ReservationCancelled": {
                     "description": "A reservation has been cancelled",
@@ -174,8 +174,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/cancellationData"
                 },
                 "Contoso.ERP.Events.ReservationRefunded": {
                     "description": "A reservation has been refunded",
@@ -200,8 +200,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/refundData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/refundData"
                 },
                 "Contoso.ERP.Events.InventoryUpdated": {
                     "description": "Inventory has been updated",
@@ -228,8 +228,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/inventoryData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/inventoryData"
                 },
                 "Contoso.ERP.Events.ProductAdded": {
                     "description": "A product has been added",
@@ -254,8 +254,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/productData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/productData"
                 },
                 "Contoso.ERP.Events.ProductDeleted": {
                     "description": "A product has been deleted",
@@ -280,8 +280,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/productDeletionData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/productDeletionData"
                 },
                 "Contoso.ERP.Events.ProductUpdated": {
                     "description": "A product has been updated",
@@ -306,8 +306,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/productUpdatedData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/productUpdatedData"
                 },
                 "Contoso.ERP.Events.EmployeeAdded": {
                     "envelope": "CloudEvents/1.0",
@@ -331,8 +331,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/employeeData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/employeeData"
                 },
                 "Contoso.ERP.Events.EmployeeDeleted": {
                     "envelope": "CloudEvents/1.0",
@@ -356,8 +356,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/employeeDeletionData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/employeeDeletionData"
                 },
                 "Contoso.ERP.Events.EmployeeUpdated": {
                     "envelope": "CloudEvents/1.0",
@@ -381,8 +381,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/employeeUpdatedData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/employeeUpdatedData"
                 },
                 "Contoso.ERP.Events.PurchaseOrderCreated": {
                     "envelope": "CloudEvents/1.0",
@@ -406,8 +406,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderData"
                 },
                 "Contoso.ERP.Events.PurchaseOrderUpdated": {
                     "envelope": "CloudEvents/1.0",
@@ -431,8 +431,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "JSONSchema/draft-07",
-                    "schemauri": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderUpdatedData"
+                    "dataschemaformat": "JSONSchema/draft-07",
+                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/purchaseOrderUpdatedData"
                 },
                 "Contoso.ERP.Events.PurchaseOrderDeleted": {
                     "envelope": "CloudEvents/1.0",

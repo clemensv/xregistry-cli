@@ -81,11 +81,11 @@ components:
           {%- endif %}
         {%- endfor %}
         data:
-        {%- if message.schemauri %}
-            {%- if message.schemauri.startswith('#') %}
-            $ref: "#/components/schemas/{{ message.schemauri[1:].split('/')[-3] | pascal }}.{{ message.schemauri[1:].split('/')[-1] | pascal }}"
+        {%- if message.dataschemauri %}
+            {%- if message.dataschemauri.startswith('#') %}
+            $ref: "#/components/schemas/{{ message.dataschemauri[1:].split('/')[-3] | pascal }}.{{ message.dataschemauri[1:].split('/')[-1] | pascal }}"
             {%- else %}
-            $ref: "{{ message.schemauri }}"
+            $ref: "{{ message.dataschemauri }}"
             {%- endif %}
         {%- else %}
             type: "object"

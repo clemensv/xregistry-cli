@@ -15,7 +15,7 @@
                             }
                         }
                     },
-                    "schemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+                    "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
                 }
             }
         }

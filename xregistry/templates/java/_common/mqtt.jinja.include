@@ -155,8 +155,8 @@ try {
    if (match.Success)
    {
       return this._{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-      {%- if message.schemauri or message.schema -%}
-      {%- set type = ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+      {%- if message.dataschemauri or message.dataschema -%}
+      {%- set type = ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
       {%- set typePackage = type | namespace | lower %}
       {%- set typeName = type | strip_namespace | pascal %}
       {%- set dataType = typePackage + '.' + typeName -%}
@@ -186,8 +186,8 @@ public interface {{ interfaceName }}
 {
     {%- for messageid, message in messagegroup.messages.items() if (message | exists( "protocol", "mqtt" )) -%}
     {%- set messagename = messageid | strip_namespace | pascal -%}
-    {%- if message.schemauri or message.schema -%}
-    {%- set type = ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+    {%- if message.dataschemauri or message.dataschema -%}
+    {%- set type = ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
     {%- set typePackage = type | namespace | lower %}
     {%- set typeName = type | strip_namespace | pascal %}
     {%- set dataType = typePackage + '.' + typeName -%}

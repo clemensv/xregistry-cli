@@ -110,8 +110,8 @@ try {
             if ( this._{{ messagegroupid | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher != null )
             {
                 return this._{{ messagegroupid | default(definitiongroup_key) | strip_namespace | camel }}Dispatcher.on{{ messagename | strip_namespace }}Async({{ cloudEvent }},
-                {%- if message.schemauri or message.schema -%}
-                {%- set type = ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+                {%- if message.dataschemauri or message.dataschema -%}
+                {%- set type = ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
                 {%- set typePackage = type | namespace | lower %}
                 {%- set typeName = type | strip_namespace | pascal %}
                 {{ typePackage }}.{{ typeName }}.fromData({{ cloudEvent }}.getData())
@@ -143,8 +143,8 @@ public interface I{{ messagegroupname | strip_namespace }}Dispatcher
 {
     {%- for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
     {%- set messagename = messageid | strip_namespace | pascal -%}
-    {%- if message.schemauri or message.schema -%}
-    {%- set type = ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+    {%- if message.dataschemauri or message.dataschema -%}
+    {%- set type = ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
     {%- set typePackage = type | namespace | lower %}
     {%- set typeName = type | strip_namespace | pascal %}
     {%- set dataType = typePackage + '.' + typeName -%}

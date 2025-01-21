@@ -22,7 +22,7 @@
 {%- macro DeclareCloudNativeCloudEvent(variable, message) -%}
 cloud_event = {
     "datacontenttype": content_type,
-    "dataschema": "{{message.schemauri.lstrip('#/')}}" if "{{message.schemauri}}" else None,
+    "dataschema": "{{message.dataschemauri.lstrip('#/')}}" if "{{message.dataschemauri}}" else None,
     "subject": "{{message.envelopemetadata['subject'].value}}" if "{{message.envelopemetadata['subject'].value}}" else subject,
     "type": "{{message.envelopemetadata['type'].value}}" if "{{message.envelopemetadata['type'].value}}" else type,
     "source": "{{message.envelopemetadata['source'].value}}" if "{{message.envelopemetadata['source'].value}}" else source,
@@ -82,8 +82,8 @@ switcher = {
     {%- for messageid, message in messagegroup.messages.items() -%}
     {% set messagename = messageid | pascal %}
     "{{ messageid }}": lambda: self.{{ messagegroupid | strip_namespace | camel }}_dispatcher.on_{{ messagename | strip_namespace }}_async({{ cloudEvent }},
-    {%- if message.schemauri or message.schema -%}
-    {{ ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ cloudEvent }}['data'], {{cloudEvent}}['datacontenttype'])
+    {%- if message.dataschemauri or message.dataschema -%}
+    {{ ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal }}.from_data({{ cloudEvent }}['data'], {{cloudEvent}}['datacontenttype'])
     {%- else -%}
     {{ cloudEvent }}['data']
     {%- endif %})
@@ -108,8 +108,8 @@ switcher = {
     {%- for messageid, message in messagegroup.messages.items() -%}
     {% set messagename = messageid | pascal %}
     "{{ messageid }}": lambda: self.{{ messagegroupid  | strip_namespace | camel }}_dispatcher.on_{{ messagename | strip_namespace }}_async({{ cloudEvent }},
-    {%- if message.schemauri or message.schema -%}
-    {{ ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.from_data({{ cloudEvent }}['data'], {{cloudEvent}}['datacontenttype'])
+    {%- if message.dataschemauri or message.dataschema -%}
+    {{ ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal }}.from_data({{ cloudEvent }}['data'], {{cloudEvent}}['datacontenttype'])
     {%- else -%}
     {{ cloudEvent }}['data']
     {%- endif %})
@@ -143,8 +143,8 @@ from cloudevents.sdk.event import v1 as CloudEvent
 class I{{ messagegroupname | strip_namespace }}Dispatcher:
     {%- for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
     {%- set messagename = messageid | strip_namespace | pascal %}
-    {%- if message.schemauri or message.schema -%}
-    {%- set dataType = (message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+    {%- if message.dataschemauri or message.dataschema -%}
+    {%- set dataType = (message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
     {%- else -%}
     {%- set dataType = "object" %}
     {%- endif %}

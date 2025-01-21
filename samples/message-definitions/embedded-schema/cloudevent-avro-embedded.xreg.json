@@ -13,7 +13,7 @@
                             "value": "com.example.group1.event1"
                         }
                     },
-                    "schemaformat": "AVRO/1.11.2",
+                    "dataschemaformat": "AVRO/1.11.2",
                     "schema": {
                         "type": "record",
                         "namespace": "Com.Example.Group1",

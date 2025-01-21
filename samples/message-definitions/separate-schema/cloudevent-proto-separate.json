@@ -15,7 +15,7 @@
                             "value": "com.example.group1.event1"
                         }
                     },
-                    "schemaformat": "Proto/3",
+                    "dataschemaformat": "Proto/3",
                     "schemaurl": "#/schemagroups/com.example.group1/schemas/com.example.group1.example"
                 }
             }

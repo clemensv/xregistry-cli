@@ -33,9 +33,9 @@ public class {{ className | strip_namespace }}
     {%- set is_amqp = not isCloudEvent and message.envelope.lower().startswith("amqp") %}
     {%- set isMqtt = not isCloudEvent and message.envelope.lower().startswith("mqtt") %}
     public {% if isCloudEvent %}CloudEvent{% elif is_amqp %}Amqp.Message{% elif isMqtt %}MqttMessageV5{% endif %} create{{ messagename | strip_namespace }}(
-    {%- if message.schemauri -%}
+    {%- if message.dataschemauri -%}
     {%- set toBytes="data.toByteArray(contentType)" -%}
-    {%- set type = (message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) %}
+    {%- set type = (message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
     {%- set typePackage = type | namespace | lower %}
     {%- set typeName = type | strip_namespace | pascal %}    
     {{- typePackage }}.{{ typeName }} data

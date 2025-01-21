@@ -315,8 +315,8 @@ class ManifestSubcommands:
         self.save_manifest()
 
     def add_message(self, group_id: str, message_id: str, envelope: Optional[str] = None, protocol: Optional[str] = None,
-                    schemaformat: Optional[str] = None, schemagroup: Optional[str] = None, schemaid: Optional[str] = None,
-                    schemaurl: Optional[str] = None, documentation: Optional[str] = None,
+                    dataschemaformat: Optional[str] = None, dataschemagroup: Optional[str] = None, dataschemaid: Optional[str] = None,
+                    dataschemauri: Optional[str] = None, documentation: Optional[str] = None,
                     description: Optional[str] = None, labels: Optional[List[str]] = None, name: Optional[str] = None):
         """
         Add a message to a message group in the manifest.
@@ -326,10 +326,10 @@ class ManifestSubcommands:
             message_id (str): The unique identifier for the message.
             format (Optional[str]): The format of the message (CloudEvents or None).
             protocol (Optional[str]): The protocol of the message (AMQP, MQTT, NATS, HTTP, Kafka, or None).
-            schemaformat (Optional[str]): The schema format of the message.
-            schemagroup (Optional[str]): The schema group identifier.
-            schemaid (Optional[str]): The schema identifier.
-            schemaurl (Optional[str]): The URL of the schema.
+            dataschemaformat (Optional[str]): The schema format of the message.
+            dataschemagroup (Optional[str]): The schema group identifier.
+            dataschemaid (Optional[str]): The schema identifier.
+            dataschemauri (Optional[str]): The URI of the schema.
             documentation (Optional[str]): URL to the documentation.
             description (Optional[str]): Description of the message.
             labels (Optional[List[str]]): A list of key=value pairs for labels.
@@ -362,12 +362,12 @@ class ManifestSubcommands:
             message['protocol'] = protocol.capitalize()
             if protocol.lower() != 'none':
                 message['message'] = {}
-        if schemaformat:
-            message['schemaformat'] = schemaformat
-        if schemagroup and schemaid:
-            message['schemauri'] = f"#/schemagroups/{schemagroup}/schemas/{schemaid}"
-        elif schemaurl:
-            message['schemauri'] = schemaurl
+        if dataschemaformat:
+            message['dataschemaformat'] = dataschemaformat
+        if dataschemagroup and dataschemaid:
+            message['dataschemauri'] = f"#/schemagroups/{dataschemagroup}/schemas/{dataschemaid}"
+        elif dataschemauri:
+            message['dataschemauri'] = dataschemauri
         self._set_common_fields(message, description,
                                 documentation, labels, name, initial=True)
         messagegroup['messages'][message_id] = message
@@ -390,8 +390,8 @@ class ManifestSubcommands:
         self.save_manifest()
 
     def edit_message(self, group_id: str, message_id: str, envelope: Optional[str] = None, protocol: Optional[str] = None,
-                     schemaformat: Optional[str] = None, schemagroup: Optional[str] = None, schemaid: Optional[str] = None,
-                     schemaurl: Optional[str] = None, documentation: Optional[str] = None,
+                     dataschemaformat: Optional[str] = None, dataschemagroup: Optional[str] = None, dataschemaid: Optional[str] = None,
+                     dataschemauri: Optional[str] = None, documentation: Optional[str] = None,
                      description: Optional[str] = None, labels: Optional[List[str]] = None, name: Optional[str] = None):
         """
         Edit an existing message in a message group in the manifest.
@@ -401,10 +401,10 @@ class ManifestSubcommands:
             message_id (str): The unique identifier for the message.
             envelope (Optional[str]): The format of the message (CloudEvents or None).
             protocol (Optional[str]): The protocol of the message (AMQP, MQTT, NATS, HTTP, Kafka, or None).
-            schemaformat (Optional[str]): The schema format of the message.
-            schemagroup (Optional[str]): The schema group identifier.
-            schemaid (Optional[str]): The schema identifier.
-            schemaurl (Optional[str]): The URL of the schema.
+            dataschemaformat (Optional[str]): The schema format of the message.
+            dataschemagroup (Optional[str]): The schema group identifier.
+            dataschemaid (Optional[str]): The schema identifier.
+            dataschemauri (Optional[str]): The URL of the schema.
             documentation (Optional[str]): URL to the documentation.
             description (Optional[str]): Description of the message.
             labels (Optional[List[str]]): A list of key=value pairs for labels.
@@ -429,12 +429,12 @@ class ManifestSubcommands:
             message['protocol'] = protocol.capitalize()
             if protocol.lower() != 'none':
                 message['message'] = {}
-        if schemaformat:
-            message['schemaformat'] = schemaformat
-        if schemagroup and schemaid:
-            message['schemaurl'] = f"#/schemagroups/{schemagroup}/schemas/{schemaid}"
-        elif schemaurl:
-            message['schemaurl'] = schemaurl
+        if dataschemaformat:
+            message['dataschemaformat'] = dataschemaformat
+        if dataschemagroup and dataschemaid:
+            message['dataschemauri'] = f"#/schemagroups/{dataschemagroup}/schemas/{dataschemaid}"
+        elif dataschemauri:
+            message['dataschemauri'] = dataschemauri
         self._set_common_fields(message, description,
                                 documentation, labels, name)
         if 'epoch' not in message:
@@ -1377,7 +1377,7 @@ class ManifestSubcommands:
         self.manifest['schemagroups'][group_id] = schemagroup_data
         self.save_manifest()
 
-    def add_schemaversion(self, group_id: str, schema_id: str, schemaformat: str, version_id: Optional[str] = None, schema: Optional[str] = None,
+    def add_schemaversion(self, group_id: str, schema_id: str, format: str, version_id: Optional[str] = None, schema: Optional[str] = None,
                    schemaimport: Optional[str] = None, schemaurl: Optional[str] = None, documentation: Optional[str] = None,
                    description: Optional[str] = None, labels: Optional[List[str]] = None, name: Optional[str] = None):
         """
@@ -1404,7 +1404,7 @@ class ManifestSubcommands:
         else:
             schema_data = {
                 "schemaid": schema_id,
-                "format": schemaformat,
+                "format": format,
                 "versions": {}
             }
         if version_id and version_id in schema_data['versions']:
@@ -1417,7 +1417,7 @@ class ManifestSubcommands:
         version_data = {
             "schemaid": schema_id,
             "versionid": version_id,
-            "format": schemaformat
+            "format": format
         }
         if schema:
             try:
@@ -1462,7 +1462,7 @@ class ManifestSubcommands:
             del schemagroup['schemas'][schema_id]
         self.save_manifest()
 
-    def edit_schemaversion(self, group_id: str, schema_id: str, version_id: str, schemaformat: Optional[str] = None,
+    def edit_schemaversion(self, group_id: str, schema_id: str, version_id: str, format: Optional[str] = None,
                     schema: Optional[str] = None, schemaimport: Optional[str] = None, schemaurl: Optional[str] = None,
                     documentation: Optional[str] = None, description: Optional[str] = None, labels: Optional[List[str]] = None,
                     name: Optional[str] = None, confirm_edit: bool = False):
@@ -1496,8 +1496,8 @@ class ManifestSubcommands:
             if response.lower() != 'y':
                 return
         version_data = schemagroup['schemas'][schema_id]
-        if schemaformat:
-            version_data['format'] = schemaformat
+        if format:
+            version_data['format'] = format
         if version_id:
             version_data['version'] = version_id
         if schema:
@@ -1675,13 +1675,13 @@ class ManifestSubcommands:
                                  help="Message format", default="CloudEvents")
         message_add.add_argument("--protocol", choices=["AMQP", "MQTT", "NATS",
                                  "HTTP", "Kafka", "None"], help="Message protocol", default="None")
-        message_add.add_argument("--schemaformat", help="Schema format")
-        message_add.add_argument("--schemagroup", help="Schema group ID")
-        message_add.add_argument("--schemaid", help="Schema ID")
-        message_add.add_argument("--schemaurl", help="Schema URL")
+        message_add.add_argument("--dataschemaformat", help="Schema format")
+        message_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_add.add_argument("--dataschemaid", help="Schema ID")
+        message_add.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_add)
-        message_add.set_defaults(func=lambda args: ManifestSubcommands(args.filename).add_message(args.groupid, args.id, args.format, args.protocol, args.schemaformat, args.schemagroup, args.schemaid,
-                                                                                                  args.schemaurl, args.documentation, args.description, args.labels, args.name
+        message_add.set_defaults(func=lambda args: ManifestSubcommands(args.filename).add_message(args.groupid, args.id, args.format, args.protocol, args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+                                                                                                  args.dataschemauri, args.documentation, args.description, args.labels, args.name
                                                                                                   ))
 
         message_remove = message_subparsers.add_parser("remove", help="Remove a message")
@@ -1696,30 +1696,30 @@ class ManifestSubcommands:
         message_edit.add_argument("--format", choices=["CloudEvents", "None"], help="Message format")
         message_edit.add_argument("--protocol", choices=["AMQP", "MQTT",
                                   "NATS", "HTTP", "Kafka", "None"], help="Message protocol")
-        message_edit.add_argument("--schemaformat", help="Schema format")
-        message_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_edit.add_argument("--schemaid", help="Schema ID")
-        message_edit.add_argument("--schemaurl", help="Schema URL")
+        message_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_edit.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_edit)
-        message_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(args.groupid, args.id, args.format, args.protocol, args.schemaformat, args.schemagroup, args.schemaid,
-                                                                                                    args.schemaurl, args.documentation, args.description, args.labels, args.name))
+        message_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(args.groupid, args.id, args.format, args.protocol, args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+                                                                                                    args.dataschemauri, args.documentation, args.description, args.labels, args.name))
 
         message_cloudevent_subparsers = manifest_subparsers.add_parser(
             "cloudevent", help="Manage CloudEvents").add_subparsers(dest="cloudevents_command", help="CloudEvents commands")
         message_cloudevent_add = message_cloudevent_subparsers.add_parser("add", help="Add a new CloudEvent")
         message_cloudevent_add.add_argument("--groupid", required=True, help="Message group ID")
         message_cloudevent_add.add_argument("--id", required=True, help="Message ID and CloudEvents type")
-        message_cloudevent_add.add_argument("--schemaformat", help="Schema format")
-        message_cloudevent_add.add_argument("--schemagroup", help="Schema group ID")
-        message_cloudevent_add.add_argument("--schemaid", help="Schema ID")
-        message_cloudevent_add.add_argument("--schemaurl", help="Schema URL")
+        message_cloudevent_add.add_argument("--dataschemaformat", help="Schema format")
+        message_cloudevent_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_cloudevent_add.add_argument("--dataschemaid", help="Schema ID")
+        message_cloudevent_add.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_cloudevent_add)
 
         def _add_cloudevent(args):
             sc = ManifestSubcommands(args.filename)
             sc.add_message(
-                args.groupid, args.id, "CloudEvents/1.0", "None", args.schemaformat, args.schemagroup, args.schemaid,
-                args.schemaurl, args.documentation, args.description, args.labels, args.name)
+                args.groupid, args.id, "CloudEvents/1.0", "None", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+                args.dataschemauri, args.documentation, args.description, args.labels, args.name)
             sc.add_cloudevents_message_metadata(args.groupid, args.id, "specversion",
                                                 "string", "CloudEvents version", "1.0", True)
             sc.add_cloudevents_message_metadata(args.groupid, args.id, "type", "string", "Event type", args.id, True)
@@ -1731,14 +1731,14 @@ class ManifestSubcommands:
         message_cloudevent_edit = message_cloudevent_subparsers.add_parser("edit", help="Edit a CloudEvent")
         message_cloudevent_edit.add_argument("--groupid", required=True, help="Message group ID")
         message_cloudevent_edit.add_argument("--id", required=True, help="Message ID and CloudEvents type")
-        message_cloudevent_edit.add_argument("--schemaformat", help="Schema format")
-        message_cloudevent_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_cloudevent_edit.add_argument("--schemaid", help="Schema ID")
-        message_cloudevent_edit.add_argument("--schemaurl", help="Schema URL")
+        message_cloudevent_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_cloudevent_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_cloudevent_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_cloudevent_edit.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_cloudevent_edit)
         message_cloudevent_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(
-            args.groupid, args.id, "CloudEvents/1.0", "None", args.schemaformat, args.schemagroup, args.schemaid,
-            args.schemaurl, args.documentation, args.description, args.labels, args.name))
+            args.groupid, args.id, "CloudEvents/1.0", "None", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+            args.dataschemauri, args.documentation, args.description, args.labels, args.name))
 
         message_cloudevent_remove = message_cloudevent_subparsers.add_parser("remove", help="Remove a CloudEvent")
         message_cloudevent_remove.add_argument("--groupid", required=True, help="Message group ID", type=str)
@@ -1790,31 +1790,31 @@ class ManifestSubcommands:
 
         def _add_amqp_message(args):
             sc = ManifestSubcommands(args.filename)
-            sc.add_message(args.groupid, args.id, "None", "AMQP/1.0", args.schemaformat, args.schemagroup,
-                           args.schemaid, args.schemaurl, args.documentation, args.description, args.labels, args.name)
+            sc.add_message(args.groupid, args.id, "None", "AMQP/1.0", args.dataschemaformat, args.dataschemagroup,
+                           args.dataschemaid, args.dataschemauri, args.documentation, args.description, args.labels, args.name)
             sc.add_amqp_message_metadata(args.groupid, args.id, "properties",
                                          "subject", "string", args.id, "Subject", True)
 
         message_amqp_add = message_amqp_subparsers.add_parser("add", help="Add a new message")
         message_amqp_add.add_argument("--groupid", required=True, help="Message group ID")
         message_amqp_add.add_argument("--id", required=True, help="Message ID")
-        message_amqp_add.add_argument("--schemaformat", help="Schema format")
-        message_amqp_add.add_argument("--schemagroup", help="Schema group ID")
-        message_amqp_add.add_argument("--schemaid", help="Schema ID")
-        message_amqp_add.add_argument("--schemaurl", help="Schema URL")
+        message_amqp_add.add_argument("--dataschemaformat", help="Schema format")
+        message_amqp_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_amqp_add.add_argument("--dataschemaid", help="Schema ID")
+        message_amqp_add.add_argument("--dataschemauri", help="Schema URL")
         message_amqp_add.set_defaults(func=_add_amqp_message)
 
         message_amqp_edit = message_amqp_subparsers.add_parser("edit", help="Edit a message")
         message_amqp_edit.add_argument("--groupid", required=True, help="Message group ID")
         message_amqp_edit.add_argument("--id", required=True, help="Message ID")
-        message_amqp_edit.add_argument("--schemaformat", help="Schema format")
-        message_amqp_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_amqp_edit.add_argument("--schemaid", help="Schema ID")
-        message_amqp_edit.add_argument("--schemaurl", help="Schema URL")
+        message_amqp_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_amqp_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_amqp_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_amqp_edit.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_amqp_edit)
         message_amqp_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(
-            args.groupid, args.id, "None", "AMQP/1.0", args.schemaformat, args.schemagroup, args.schemaid,
-            args.schemaurl, args.documentation, args.description, args.labels, args.name))
+            args.groupid, args.id, "None", "AMQP/1.0", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+            args.dataschemauri, args.documentation, args.description, args.labels, args.name))
 
         message_amqp_remove = message_amqp_subparsers.add_parser("remove", help="Remove a message")
         message_amqp_remove.add_argument("--groupid", required=True, help="Message group ID")
@@ -1864,8 +1864,8 @@ class ManifestSubcommands:
         def _add_mqtt_message(args):
             sc = ManifestSubcommands(args.filename)
             sc.add_message(
-                args.groupid, args.id, "None", "MQTT/" + args.mqtt_version, args.schemaformat, args.schemagroup, args.schemaid,
-                args.schemaurl, args.documentation, args.description, args.labels, args.name)
+                args.groupid, args.id, "None", "MQTT/" + args.mqtt_version, args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+                args.dataschemauri, args.documentation, args.description, args.labels, args.name)
             sc.add_mqtt_message_metadata(args.groupid, args.id, args.mqtt_version, "topic",
                                          "string", "{topic}/"+args.id,  "MQTT topic", True)
 
@@ -1874,24 +1874,24 @@ class ManifestSubcommands:
         message_mqtt_add.add_argument("--id", required=True, help="Message ID")
         message_mqtt_add.add_argument("--mqtt_version", required=True,
                                       choices=["3", "5", "3.1.1", "5.0"], help="MQTT version")
-        message_mqtt_add.add_argument("--schemaformat", help="Schema format")
-        message_mqtt_add.add_argument("--schemagroup", help="Schema group ID")
-        message_mqtt_add.add_argument("--schemaid", help="Schema ID")
-        message_mqtt_add.add_argument("--schemaurl", help="Schema URL")
+        message_mqtt_add.add_argument("--dataschemaformat", help="Schema format")
+        message_mqtt_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_mqtt_add.add_argument("--dataschemaid", help="Schema ID")
+        message_mqtt_add.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_mqtt_add)
-        message_mqtt_add.set_defaults(func=_add_amqp_message)
+        message_mqtt_add.set_defaults(func=_add_mqtt_message)
 
         message_mqtt_edit = message_mqtt_subparsers.add_parser("edit", help="Edit a message")
         message_mqtt_edit.add_argument("--groupid", required=True, help="Message group ID")
         message_mqtt_edit.add_argument("--id", required=True, help="Message ID")
-        message_mqtt_edit.add_argument("--schemaformat", help="Schema format")
-        message_mqtt_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_mqtt_edit.add_argument("--schemaid", help="Schema ID")
-        message_mqtt_edit.add_argument("--schemaurl", help="Schema URL")
+        message_mqtt_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_mqtt_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_mqtt_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_mqtt_edit.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_mqtt_edit)
         message_mqtt_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(
-            args.groupid, args.id, "None", "MQTT/" + args.mqtt_version, args.schemaformat, args.schemagroup, args.schemaid,
-            args.schemaurl, args.documentation, args.description, args.labels, args.name))
+            args.groupid, args.id, "None", "MQTT/" + args.mqtt_version, args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+            args.dataschemauri, args.documentation, args.description, args.labels, args.name))
 
         message_mqtt_remove = message_mqtt_subparsers.add_parser("remove", help="Remove a message")
         message_mqtt_remove.add_argument("--groupid", required=True, help="Message group ID")
@@ -1940,8 +1940,8 @@ class ManifestSubcommands:
 
         def _add_kafka_message(args):
             sc = ManifestSubcommands(args.filename)
-            sc.add_message(args.groupid, args.id, "None", "Kafka", args.schemaformat, args.schemagroup, args.schemaid,
-                           args.schemaurl, args.documentation, args.description, args.labels, args.name)
+            sc.add_message(args.groupid, args.id, "None", "Kafka", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+                           args.dataschemauri, args.documentation, args.description, args.labels, args.name)
             sc.add_kafka_message_metadata(args.groupid, args.id, "headers", "message_type",
                                           "string", args.id, "Message ID", True)
             sc.add_kafka_message_metadata(args.groupid, args.id, None, "key", "string", "{key}", "Message key", False)
@@ -1949,24 +1949,24 @@ class ManifestSubcommands:
         message_kafka_add = message_kafka_subparsers.add_parser("add", help="Add a new message")
         message_kafka_add.add_argument("--groupid", required=True, help="Message group ID")
         message_kafka_add.add_argument("--id", required=True, help="Message ID")
-        message_kafka_add.add_argument("--schemaformat", help="Schema format")
-        message_kafka_add.add_argument("--schemagroup", help="Schema group ID")
-        message_kafka_add.add_argument("--schemaid", help="Schema ID")
-        message_kafka_add.add_argument("--schemaurl", help="Schema URL")
+        message_kafka_add.add_argument("--dataschemaformat", help="Schema format")
+        message_kafka_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_kafka_add.add_argument("--dataschemaid", help="Schema ID")
+        message_kafka_add.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_kafka_add)
         message_kafka_add.set_defaults(func=_add_kafka_message)
 
         message_kafka_edit = message_kafka_subparsers.add_parser("edit", help="Edit a message")
         message_kafka_edit.add_argument("--groupid", required=True, help="Message group ID")
         message_kafka_edit.add_argument("--id", required=True, help="Message ID")
-        message_kafka_edit.add_argument("--schemaformat", help="Schema format")
-        message_kafka_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_kafka_edit.add_argument("--schemaid", help="Schema ID")
-        message_kafka_edit.add_argument("--schemaurl", help="Schema URL")
+        message_kafka_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_kafka_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_kafka_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_kafka_edit.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_kafka_edit)
         message_kafka_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(
-            args.groupid, args.id, "None", "Kafka", args.schemaformat, args.schemagroup, args.schemaid,
-            args.schemaurl, args.documentation, args.description, args.labels, args.name))
+            args.groupid, args.id, "None", "Kafka", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+            args.dataschemauri, args.documentation, args.description, args.labels, args.name))
 
         message_kafka_remove = message_kafka_subparsers.add_parser("remove", help="Remove a message")
         message_kafka_remove.add_argument("--groupid", required=True, help="Message group ID")
@@ -2012,8 +2012,8 @@ class ManifestSubcommands:
 
         def _add_http_message(args):
             sc = ManifestSubcommands(args.filename)
-            sc.add_message(args.groupid, args.id, "None", "HTTP", args.schemaformat, args.schemagroup, args.schemaid,
-                           args.schemaurl, args.documentation, args.description, args.labels, args.name)
+            sc.add_message(args.groupid, args.id, "None", "HTTP", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+                           args.dataschemauri, args.documentation, args.description, args.labels, args.name)
             sc.add_http_message_metadata(args.groupid, args.id, "headers", "content-type",
                                          "string", "application/json", "Content type", True)
             sc.add_http_message_metadata(args.groupid, args.id, None, "method", "string", "POST", "HTTP method", True)
@@ -2021,24 +2021,24 @@ class ManifestSubcommands:
         message_http_add = message_http_subparsers.add_parser("add", help="Add a new message")
         message_http_add.add_argument("--groupid", required=True, help="Message group ID")
         message_http_add.add_argument("--id", required=True, help="Message ID")
-        message_http_add.add_argument("--schemaformat", help="Schema format")
-        message_http_add.add_argument("--schemagroup", help="Schema group ID")
-        message_http_add.add_argument("--schemaid", help="Schema ID")
-        message_http_add.add_argument("--schemaurl", help="Schema URL")
+        message_http_add.add_argument("--dataschemaformat", help="Schema format")
+        message_http_add.add_argument("--dataschemagroup", help="Schema group ID")
+        message_http_add.add_argument("--dataschemaid", help="Schema ID")
+        message_http_add.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_http_add)
         message_http_add.set_defaults(func=_add_http_message)
 
         message_http_edit = message_http_subparsers.add_parser("edit", help="Edit a message")
         message_http_edit.add_argument("--groupid", required=True, help="Message group ID")
         message_http_edit.add_argument("--id", required=True, help="Message ID")
-        message_http_edit.add_argument("--schemaformat", help="Schema format")
-        message_http_edit.add_argument("--schemagroup", help="Schema group ID")
-        message_http_edit.add_argument("--schemaid", help="Schema ID")
-        message_http_edit.add_argument("--schemaurl", help="Schema URL")
+        message_http_edit.add_argument("--dataschemaformat", help="Schema format")
+        message_http_edit.add_argument("--dataschemagroup", help="Schema group ID")
+        message_http_edit.add_argument("--dataschemaid", help="Schema ID")
+        message_http_edit.add_argument("--dataschemauri", help="Schema URL")
         add_common_arguments(message_http_edit)
         message_http_edit.set_defaults(func=lambda args: ManifestSubcommands(args.filename).edit_message(
-            args.groupid, args.id, "None", "HTTP", args.schemaformat, args.schemagroup, args.schemaid,
-            args.schemaurl, args.documentation, args.description, args.labels, args.name))
+            args.groupid, args.id, "None", "HTTP", args.dataschemaformat, args.dataschemagroup, args.dataschemaid,
+            args.dataschemauri, args.documentation, args.description, args.labels, args.name))
 
         message_http_remove = message_http_subparsers.add_parser("remove", help="Remove a message")
         message_http_remove.add_argument("--groupid", required=True, help="Message group ID")

@@ -31,8 +31,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.StartedCleaningEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.StartedCleaningEventData"
                 },
                 "Fabrikam.RoboVac.StoppedCleaning": {
                     "description": "Event for when the vacuum stops a cleaning session",
@@ -58,8 +58,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.StoppedCleaningEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.StoppedCleaningEventData"
                 },
                 "Fabrikam.RoboVac.Docked": {
                     "description": "Event for when the vacuum returns to its docking station",
@@ -85,8 +85,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.DockedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.DockedEventData"
                 },
                 "Fabrikam.RoboVac.ErrorOccurred": {
                     "description": "Event for when an error occurs during the vacuum's operation",
@@ -112,8 +112,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.ErrorOccurredEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.ErrorOccurredEventData"
                 },
                 "Fabrikam.RoboVac.Condition": {
                     "description": "Event for when the vacuum reports its current condition",
@@ -139,8 +139,8 @@
                             "required": true
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.ConditionEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.RoboVac/schemas/Fabrikam.RoboVac.ConditionEventData"
                 }
             }
         }

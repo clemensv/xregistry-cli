@@ -279,9 +279,9 @@ class TemplateRenderer:
 
                         if schema_version and isinstance(schema_version, dict):
                             schema_format = ''
-                            if "schemaformat" in schema_version:
+                            if "dataschemaformat" in schema_version:
                                 schema_format = str(
-                                    schema_version["schemaformat"])
+                                    schema_version["dataschemaformat"])
                             elif "format" in schema_version:
                                 schema_format = str(schema_version["format"])
 

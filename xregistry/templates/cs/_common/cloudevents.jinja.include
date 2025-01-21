@@ -48,8 +48,8 @@ CloudEvent {{ variable }} = new CloudEvent()
 {%- if attrname in ["datacontenttype"] %}
     DataContentType = contentType,
 {%- endif -%}
-{%- if attrname in ["dataschema"] and message.schemauri %}
-    DataSchema = new Uri("xreg:{{message.schemauri.lstrip('#/')}}", UriKind.RelativeOrAbsolute),
+{%- if attrname in ["dataschema"] and message.dataschemauri %}
+    DataSchema = new Uri("xreg:{{message.dataschemauri.lstrip('#/')}}", UriKind.RelativeOrAbsolute),
 {%- endif -%}
 {%- if attrname in ["subject", "type"] %}
     {%- set attrProp = attrname | pascal %}
@@ -175,8 +175,8 @@ switch (cloudEventType)
         if ( this.{{ messagegroup.messagegroupid | strip_namespace | camel }}Dispatcher != null )
         {
             await this.{{ messagegroup.messagegroupid | strip_namespace | camel }}Dispatcher.On{{ messagename | strip_namespace }}Async({{ cloudEvent }},
-            {%- if message.schemauri or message.schema -%}
-            global::{{ ( message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | pascal }}.FromData({{ cloudEvent }}.Data, {{cloudEvent}}.DataContentType)
+            {%- if message.dataschemauri or message.dataschema -%}
+            global::{{ ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal }}.FromData({{ cloudEvent }}.Data, {{cloudEvent}}.DataContentType)
             {%- else -%}
             {{ cloudEvent }}.Data
             {%- endif %});
@@ -203,8 +203,8 @@ switch (cloudEventType)
         if ( this.{{ messagegroupid  | strip_namespace | camel }}Dispatcher != null )
         {
             await this.{{ messagegroupid  | strip_namespace | camel }}Dispatcher.On{{ messagename | strip_namespace }}Async({{ cloudEvent }},
-            {%- if message.schemauri or message.schema -%}
-            global::{{ ( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat) | pascal }}.FromData({{ cloudEvent }}.Data, {{cloudEvent}}.DataContentType)
+            {%- if message.dataschemauri or message.dataschema -%}
+            global::{{ ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat) | pascal }}.FromData({{ cloudEvent }}.Data, {{cloudEvent}}.DataContentType)
             {%- else -%}
             {{ cloudEvent }}.Data
             {%- endif %});
@@ -238,8 +238,8 @@ namespace {{ messagegroupname | concat_namespace(project_name) | pascal }}
     {
         {%- for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
         {%- set messagename = messageid | strip_namespace | pascal -%}
-        {%- if message.schemauri or message.schema -%}
-        {%- set dataType = 'global::' + (( message.schemauri if message.schemauri else message.schema) | schema_type( data_project_name, root, message.schemaformat)  | pascal) -%}
+        {%- if message.dataschemauri or message.dataschema -%}
+        {%- set dataType = 'global::' + (( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat)  | pascal) -%}
         {%- else -%}
         {%- set dataType = "object" -%}
         {%- endif %}   

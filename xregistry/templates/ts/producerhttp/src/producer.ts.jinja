@@ -60,8 +60,8 @@ export class {{ groupname | strip_dots }}EventProducer
    {%- set is_amqp = not isCloudEvent and message.envelope.lower().startswith("amqp") %}
    {%- set isMqtt = not isCloudEvent and message.envelope.lower().startswith("mqtt") %}
    async send{{ messagename | strip_namespace }}Async(
-   {%- if message.schemauri or message.schema -%}
-   {% set dataType = "types." + ((message.schemauri if message.schemauri else message.schema) | schema_type( project_name, root, message.schemaformat) | strip_namespace | pascal) %}
+   {%- if message.dataschemauri or message.dataschema -%}
+   {% set dataType = "types." + ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | strip_namespace | pascal) %}
    {%- else -%}
    {% set dataType = "any" %}
    {%- endif %}    

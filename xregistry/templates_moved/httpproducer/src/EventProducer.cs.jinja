@@ -83,8 +83,8 @@ namespace {{ project_name | pascal }}
         {
             {% if isCloudEvent %}
             {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12)}}
-            cloudEvent.Data = {% if message.schemauri -%}
-            {%- set schemaObj = schema_object(root, message.schemauri ) -%}
+            cloudEvent.Data = {% if message.dataschemauri -%}
+            {%- set schemaObj = schema_object(root, message.dataschemauri ) -%}
             {%- if schemaObj and "format" in schemaObj and not schemaObj.format.lower().startswith("json") -%}
             data.ToByteArray(contentType)
             {%- else -%}

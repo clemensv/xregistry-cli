@@ -69,7 +69,7 @@ namespace {{ project_name | pascal }}.Tests
             {%- set messagename = messageid | pascal %}
             {%- set message_body_type = util.body_type(data_project_name, root, message) %}
             _{{ messagegroupid | strip_namespace | camel }}DispatcherMock.Verify(
-                {% if message.schemauri or message.schema -%}
+                {% if message.dataschemauri or message.dataschema -%}
                 x => x.On{{ messageid | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<{{ message_body_type }}>()),
                 {%- else %}
                 x => x.On{{ messageid | strip_namespace | pascal }}Async(It.IsAny<CloudNative.CloudEvents.CloudEvent>(), It.IsAny<object>()),

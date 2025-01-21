@@ -30,8 +30,8 @@
                             "value": "application/json"
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOnEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOnEventData"
                 },
                 "Fabrikam.Lumen.TurnedOff": {
                     "description": "Event for when the bulb is turned off",
@@ -56,8 +56,8 @@
                             "value": "application/json"
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOffEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.TurnedOffEventData"
                 },
                 "Fabrikam.Lumen.BrightnessChanged": {
                     "description": "Event for when the bulb's brightness changes",
@@ -79,8 +79,8 @@
                             "value": "application/json"
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.BrightnessChangedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.BrightnessChangedEventData"
                 },
                 "Fabrikam.Lumen.ColorChanged": {
                     "description": "Event for when the bulb's color changes",
@@ -105,8 +105,8 @@
                             "value": "application/json"
                         }
                     },
-                    "schemaformat": "Avro/1.11.1",
-                    "schemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.ColorChangedEventData"
+                    "dataschemaformat": "Avro/1.11.1",
+                    "dataschemauri": "#/schemagroups/Fabrikam.Lumen/schemas/Fabrikam.Lumen.ColorChangedEventData"
                 }
             }
         }
