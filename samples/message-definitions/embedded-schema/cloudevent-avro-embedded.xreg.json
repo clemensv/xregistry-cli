@@ -14,7 +14,7 @@
                         }
                     },
                     "dataschemaformat": "AVRO/1.11.2",
-                    "schema": {
+                    "dataschema": {
                         "type": "record",
                         "namespace": "Com.Example.Group1",
                         "name": "Event1Data",

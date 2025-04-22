@@ -14,7 +14,7 @@
                         }
                     },
                     "dataschemaformat": "Proto/3",
-                    "schema": "syntax = \"proto3\"; message Example { string example = 1; }"
+                    "dataschema": "syntax = \"proto3\"; message Example { string example = 1; }"
                 }
             }
         }
