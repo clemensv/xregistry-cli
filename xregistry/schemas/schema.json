@@ -1,0 +1,45 @@
+{
+  "groups": {
+    "schemagroups": {
+      "singular": "schemagroup",
+      "modelversion": "1.0-rc1",
+      "compatiblewith": "https://xregistry.io/xreg/domains/schema/specs/model.json",
+
+      "attributes": {
+        "*": {
+          "name": "*",
+          "type": "any"
+        }
+      },
+
+      "resources": {
+        "schemas": {
+          "singular": "schema",
+          "modelversion": "1.0-rc1",
+          "compatiblewith": "https://xregistry.io/xreg/domains/schema/specs/model.json",
+
+          "attributes": {
+            "format": {
+              "name": "format",
+              "type": "string",
+              "description": "Schema format identifier for this schema version"
+            },
+            "*": {
+              "name": "*",
+              "type": "any"
+            }
+          },
+          "metaattributes": {
+            "validation": {
+              "name": "validation",
+              "type": "boolean",
+              "description": "Verify compliance with specified schema 'format'",
+              "required": true,
+              "default": false
+            }
+          }
+        }
+      }
+    }
+  }
+}
