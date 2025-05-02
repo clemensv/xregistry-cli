@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import pytest
 import json
 import requests
@@ -34,12 +35,61 @@ console_handler.setFormatter(formatter)
 logging.getLogger().addHandler(console_handler)
 
 
+CATALOG_PORT = 8080
+CATALOG_URL = "http://localhost:8080"
+IMAGE_NAME = "ghcr.io/xregistry/xrserver-all:latest" # Corrected image name
+CONTAINER_NAME = "xregistry-catalog-test"
+STARTUP_TIMEOUT = 180 # Increased timeout
+
 @pytest.fixture(scope="module")
 def catalog_container():
-    with DockerContainer("duglin/xreg-server-all") \
-        .with_bind_ports(8080, 8080) as container:
-        wait_for_logs(container, "Listening on 8080")
+    with DockerContainer(IMAGE_NAME) \
+        .with_command("--recreatedb") \
+        .with_bind_ports(CATALOG_PORT, CATALOG_PORT) as container:
+        wait_for_logs(container, "/xrserver")
+        # wait for the server to be available
+        timeout = time.time() + STARTUP_TIMEOUT
+        while True:
+            try:
+                response = requests.get(CATALOG_URL)
+                if response.status_code == 200:
+                    break
+            except Exception:
+                pass
+            if time.time() > timeout:
+                raise Exception("Catalog container did not start in time: HTTP service not available on port 8080")
+            time.sleep(1)
+        # load /xregistry/schemas/_model.json, GET /model from the server, merge the local model with the remote model, and PUT the merged model back to the server
+        local_model_path = os.path.join(project_root, "xregistry", "schemas", "_model.json")
+        with open(local_model_path, "r") as local_model_file:
+            local_model = json.load(local_model_file)
+        remote_model = None
+        try:
+            # Fetch the current model from the catalog
+            get_response = requests.get(f"{CATALOG_URL}/model")
+            get_response.raise_for_status()
+            remote_model = get_response.json()
+
+            # Merge the remote model with the local model (local takes precedence)
+            merged_model = {**remote_model, **local_model}
+
+            # Update the catalog with the merged model via PUT
+            put_response = requests.put(f"{CATALOG_URL}/model", json=merged_model)
+            put_response.raise_for_status()
+            print("Model merged and updated successfully.")
+        except Exception as e:
+            print(f"Error during model merge: {e}")
+            # Try to get logs if container exists
+            if container:
+                try:
+                    logs = container.get_logs()
+                    print("Container logs:\n", logs[0].decode() if logs[0] else "", logs[1].decode() if logs[1] else "")
+                except Exception as log_e:
+                    print(f"Could not retrieve container logs: {log_e}")
+            pytest.fail(f"Failed to start catalog container: {e}")
+        
         yield container
+
 
 """ this file tests the catalog subcommands in #file: """
 
