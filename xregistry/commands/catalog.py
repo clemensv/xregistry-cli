@@ -34,10 +34,15 @@ class CatalogSubcommands:
             "modifiedat": current_time_iso(),
             "epoch": 0
         }
-        if endpoints:
-            endpoint["endpoints"] = endpoints
-        if options:
-            endpoint["options"] = options
+        # Move endpoints and options into protocoloptions per model
+        if endpoints or options:
+            proto_opts = endpoint.setdefault("protocoloptions", {})
+            if endpoints:
+                # map list of URIs into objects with 'url'
+                proto_opts["endpoints"] = [{"url": uri} for uri in endpoints]
+            if options:
+                # merge other options into protocoloptions
+                proto_opts.update(options)
         if messagegroups:
             endpoint["messagegroups"] = messagegroups
         if deployed:
@@ -47,7 +52,7 @@ class CatalogSubcommands:
         if description:
             endpoint["description"] = description
         if labels:
-            endpoint["labels"] = labels
+            endpoint["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             endpoint["name"] = name
         if channel:
@@ -95,10 +100,12 @@ class CatalogSubcommands:
             endpoint["usage"] = usage
         if protocol:
             endpoint["protocol"] = protocol
-        if endpoints:
-            endpoint["endpoints"] = endpoints
-        if options:
-            endpoint["options"] = options
+        if endpoints or options:
+            proto_opts = endpoint.setdefault("protocoloptions", {})
+            if endpoints:
+                proto_opts["endpoints"] = [{"url": uri} for uri in endpoints]
+            if options:
+                proto_opts.update(options)
         if messagegroups:
             endpoint["messagegroups"] = messagegroups
         if deployed is not None:
@@ -108,7 +115,7 @@ class CatalogSubcommands:
         if description:
             endpoint["description"] = description
         if labels:
-            endpoint["labels"] = labels
+            endpoint["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             endpoint["name"] = name
         if channel:
@@ -160,7 +167,7 @@ class CatalogSubcommands:
         if documentation:
             messagegroup["documentation"] = documentation
         if labels:
-            messagegroup["labels"] = labels
+            messagegroup["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             messagegroup["name"] = name
         response = requests.put(f"{self.base_url}/messagegroups/{messagegroupid}", json=messagegroup)
@@ -202,7 +209,7 @@ class CatalogSubcommands:
         if documentation:
             messagegroup["documentation"] = documentation
         if labels:
-            messagegroup["labels"] = labels
+            messagegroup["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             messagegroup["name"] = name
         messagegroup["modifiedat"] = current_time_iso()
@@ -248,7 +255,7 @@ class CatalogSubcommands:
         if documentation:
             schemagroup["documentation"] = documentation
         if labels:
-            schemagroup["labels"] = labels
+            schemagroup["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             schemagroup["name"] = name
         response = requests.put(f"{self.base_url}/schemagroups/{schemagroupid}", json=schemagroup)
@@ -288,7 +295,7 @@ class CatalogSubcommands:
         if documentation:
             schemagroup["documentation"] = documentation
         if labels:
-            schemagroup["labels"] = labels
+            schemagroup["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             schemagroup["name"] = name
         schemagroup["modifiedat"] = current_time_iso()
@@ -343,7 +350,7 @@ class CatalogSubcommands:
         if description:
             message["description"] = description
         if labels:
-            message["labels"] = labels
+            message["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             message["name"] = name
 
@@ -393,7 +400,7 @@ class CatalogSubcommands:
         if description:
             message["description"] = description
         if labels:
-            message["labels"] = labels
+            message["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             message["name"] = name
         message["modifiedat"] = current_time_iso()
@@ -793,7 +800,7 @@ class CatalogSubcommands:
         if documentation:
             schema_obj["documentation"] = documentation
         if labels:
-            schema_obj["labels"] = labels
+            schema_obj["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             schema_obj["name"] = name
 
@@ -844,7 +851,7 @@ class CatalogSubcommands:
         if documentation:
             schema_version["documentation"] = documentation
         if labels:
-            schema_version["labels"] = labels
+            schema_version["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             schema_version["name"] = name
 
@@ -893,7 +900,7 @@ class CatalogSubcommands:
         if documentation:
             schema_obj["documentation"] = documentation
         if labels:
-            schema_obj["labels"] = labels
+            schema_obj["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             schema_obj["name"] = name
 
@@ -992,7 +999,7 @@ class CatalogSubcommands:
         if documentation:
             schema_obj["documentation"] = documentation
         if labels:
-            schema_obj["labels"] = labels
+            schema_obj["labels"] = dict(item.split("=", 1) for item in labels)
         if name:
             schema_obj["name"] = name
 
@@ -1087,8 +1094,8 @@ class CatalogSubcommands:
         endpoint_add.add_argument("--channel", help="Channel identifier")
         endpoint_add.add_argument("--deprecated", help="Deprecation information")
         add_authentication_arguments(endpoint_add)
-        endpoint_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_endpoint(args.endpointid, args.usage, args.protocol, args.deployed, args.endpoints, args.options,
-                                                                                                    args.messagegroups, args.documentation, args.description, args.labels, args.name,
+        endpoint_add.set_defaults(func=lambda args: CatalogSubcommands(args.catalog).add_endpoint(args.endpointid, args.usage, args.protocol, args.endpoints, args.options,
+                                                                                                    args.messagegroups, args.deployed, args.documentation, args.description, args.labels, args.name,
                                                                                                     args.channel, args.deprecated
                                                                                                     ))
 
@@ -1102,6 +1109,7 @@ class CatalogSubcommands:
         endpoint_edit.add_argument("--description", help="Endpoint description")
         endpoint_edit.add_argument("--documentation", help="Endpoint documentation URL")
         endpoint_edit.add_argument("--name", help="Endpoint name")
+        endpoint_edit.add_argument("--labels", nargs='*', metavar='KEY=VALUE', help="Endpoint labels (key=value pairs)")
         endpoint_edit.add_argument("--usage", choices=["subscriber", "producer", "consumer"], help="Usage type")
         endpoint_edit.add_argument("--protocol", choices=["HTTP", "AMQP/1.0", "MQTT/3.1.1", "MQTT/5.0", "KAFKA", "NATS"], help="Protocol")
         endpoint_edit.add_argument("--deployed", type=bool, help="Deployed status")

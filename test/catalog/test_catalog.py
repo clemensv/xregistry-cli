@@ -95,21 +95,26 @@ def catalog_container():
 
 @pytest.mark.usefixtures("catalog_container")
 def test_catalog_endpoint_operations():
-    catalog = CatalogSubcommands("http://localhost:8080")
-    
-    # Add endpoint
-    catalog.add_endpoint(
-        "test-endpoint",
-        "producer", 
-        "AMQP/1.0",
-        endpoints=["amqp://localhost:5672"],
-        options={"key": "value"},
-        messagegroups=["test-group"],
-        description="Test endpoint",
-        documentation="http://docs",
-        labels={"env": "test"},
-        name="Test Endpoint"
-    )
+    # Add endpoint via CLI
+    add_endpoint_args = [
+        'xregistry',
+        'catalog',
+        'endpoint',
+        'add',
+        '--catalog', 'http://localhost:8080',
+        '--endpointid', 'test-endpoint',
+        '--usage', 'producer',
+        '--protocol', 'AMQP/1.0',
+        '--endpoints', 'amqp://localhost:5672',
+        '--messagegroups', 'test-group',
+        '--description', 'Test endpoint',
+        '--documentation', 'http://docs',
+        '--labels', 'env=test', # key=value format for labels
+        '--name', 'Test Endpoint'
+    ]
+    with patch.object(sys, 'argv', add_endpoint_args):
+        result = cli()
+        assert result == 0
 
     # Verify endpoint was added
     response = requests.get("http://localhost:8080/endpoints/test-endpoint")
@@ -118,13 +123,29 @@ def test_catalog_endpoint_operations():
     assert endpoint["endpointid"] == "test-endpoint"
     assert endpoint["usage"] == "producer"
     assert endpoint["protocol"] == "AMQP/1.0"
+    # protocoloptions should include endpoints and other options
+    proto_opts = endpoint["protocoloptions"]
+    assert proto_opts["endpoints"] == [{"url": "amqp://localhost:5672"}]
+    assert endpoint["messagegroups"] == ["test-group"]
+    assert endpoint["description"] == "Test endpoint"
+    assert endpoint["documentation"] == "http://docs"
+    assert endpoint["labels"] == {"env": "test"}
+    assert endpoint["name"] == "Test Endpoint"
 
-    # Edit endpoint
-    catalog.edit_endpoint(
-        "test-endpoint",
-        description="Updated endpoint",
-        labels={"env": "prod"}
-    )
+    # Edit endpoint via CLI
+    edit_endpoint_args = [
+        'xregistry',
+        'catalog',
+        'endpoint',
+        'edit',
+        '--catalog', 'http://localhost:8080',
+        '--endpointid', 'test-endpoint',
+        '--description', 'Updated endpoint',
+        '--labels', 'env=prod' # key=value format for labels
+    ]
+    with patch.object(sys, 'argv', edit_endpoint_args):
+        result = cli()
+        assert result == 0
 
     # Verify endpoint was updated
     response = requests.get("http://localhost:8080/endpoints/test-endpoint")
@@ -133,16 +154,24 @@ def test_catalog_endpoint_operations():
     assert endpoint["description"] == "Updated endpoint"
     assert endpoint["labels"]["env"] == "prod"
 
-    # Add message group
-    catalog.add_messagegroup(
-        "test-group",
-        "CloudEvents/1.0",
-        "amqp",
-        description="Test message group",
-        documentation="http://docs",
-        labels={"env": "test"},
-        name="Test Group"
-    )
+    # Add message group via CLI
+    add_group_args = [
+        'xregistry',
+        'catalog',
+        'messagegroup',
+        'add',
+        '--catalog', 'http://localhost:8080',
+        '--messagegroupid', 'test-group',
+        '--envelope', 'CloudEvents/1.0',
+        '--protocol', 'amqp',
+        '--description', 'Test message group',
+        '--documentation', 'http://docs',
+        '--labels', 'env=test', # key=value format for labels
+        '--name', 'Test Group'
+    ]
+    with patch.object(sys, 'argv', add_group_args):
+        result = cli()
+        assert result == 0
 
     # Verify message group was added
     response = requests.get("http://localhost:8080/messagegroups/test-group")
@@ -150,35 +179,52 @@ def test_catalog_endpoint_operations():
     group = response.json()
     assert group["messagegroupid"] == "test-group"
     assert group["envelope"] == "CloudEvents/1.0"
+    assert group["protocol"] == "amqp"
 
-    # Add message to group
-    catalog.add_message(
-        "test-group",
-        "test-message",
-        "CloudEvents/1.0",
-        "AMQP/1.0",
-        description="Test message",
-        documentation="http://docs",
-        labels={"type": "event"},
-        name="Test Message"
-    )
+    # Add message to group via CLI
+    add_message_args = [
+        'xregistry',
+        'catalog',
+        'message',
+        'add',
+        '--catalog', 'http://localhost:8080',
+        '--messagegroupid', 'test-group',
+        '--messageid', 'test-message',
+        '--envelope', 'CloudEvents/1.0',
+        '--protocol', 'AMQP/1.0',
+        '--description', 'Test message',
+        '--documentation', 'http://docs',
+        '--labels', 'type=event', # key=value format for labels
+        '--name', 'Test Message'
+    ]
+    with patch.object(sys, 'argv', add_message_args):
+        result = cli()
+        assert result == 0
 
     # Verify message was added
-    response = requests.get("http://localhost:8080/messagegroups/test-group/messages/test-message") 
+    response = requests.get("http://localhost:8080/messagegroups/test-group/messages/test-message")
     assert response.status_code == 200
     message = response.json()
     assert message["messageid"] == "test-message"
     assert message["envelope"] == "CloudEvents/1.0"
 
-    # Add schema group
-    catalog.add_schemagroup(
-        "test-schemas",
-        "avro",
-        description="Test schema group",
-        documentation="http://docs",
-        labels={"type": "schemas"},
-        name="Test Schemas"
-    )
+    # Add schema group via CLI
+    add_schemagroup_args = [
+        'xregistry',
+        'catalog',
+        'schemagroup',
+        'add',
+        '--catalog', 'http://localhost:8080',
+        '--schemagroupid', 'test-schemas',
+        '--format', 'avro',
+        '--description', 'Test schema group',
+        '--documentation', 'http://docs',
+        '--labels', 'type=schemas', # key=value format for labels
+        '--name', 'Test Schemas'
+    ]
+    with patch.object(sys, 'argv', add_schemagroup_args):
+        result = cli()
+        assert result == 0
 
     # Verify schema group was added
     response = requests.get("http://localhost:8080/schemagroups/test-schemas")
@@ -186,30 +232,92 @@ def test_catalog_endpoint_operations():
     schemas = response.json()
     assert schemas["schemagroupid"] == "test-schemas"
 
-    # Add schema version
-    catalog.add_schemaversion(
-        "test-schemas",
-        "test-schema",
-        "avro",
-        schema='{"type": "string"}',
-        versionid="1.0",
-        description="Test schema",
-        documentation="http://docs",
-        labels={"type": "schema"},
-        name="Test Schema"
-    )
+    # Add schema version via CLI
+    add_schemaversion_args = [
+        'xregistry',
+        'catalog',
+        'schemaversion',
+        'add',
+        '--catalog', 'http://localhost:8080',
+        '--schemagroupid', 'test-schemas',
+        '--schemaid', 'test-schema',
+        '--format', 'avro',
+        '--schema', '{\"type\": \"string\"}', # JSON string for schema
+        '--versionid', '1.0',
+        '--description', 'Test schema',
+        '--documentation', 'http://docs',
+        '--labels', 'type=schema', # key=value format for labels
+        '--name', 'Test Schema'
+    ]
+    with patch.object(sys, 'argv', add_schemaversion_args):
+        result = cli()
+        assert result == 0
 
     # Verify schema was added
-    response = requests.get("http://localhost:8080/schemagroups/test-schemas?inline=schemas,schemas.versions,schemas.versions.schema") 
+    response = requests.get("http://localhost:8080/schemagroups/test-schemas?inline=schemas,schemas.versions,schemas.versions.schema")
     assert response.status_code == 200
     schemas = response.json()
     assert "test-schema" in schemas["schemas"]
     assert schemas["schemas"]["test-schema"]["versions"]["1.0"]["schema"]["type"] == "string"
 
-    # Clean up
-    catalog.remove_schemagroup("test-schemas")
-    catalog.remove_messagegroup("test-group") 
-    catalog.remove_endpoint("test-endpoint")
+    # Clean up via CLI
+    remove_schemaversion_args = [
+        'xregistry',
+        'catalog',
+        'schemaversion',
+        'remove',
+        '--catalog', 'http://localhost:8080',
+        '--schemagroupid', 'test-schemas',
+        '--schemaid', 'test-schema',
+        '--versionid', '1.0'
+    ]
+    with patch.object(sys, 'argv', remove_schemaversion_args):
+        cli() # Ignore result for cleanup
+
+    remove_schemagroup_args = [
+        'xregistry',
+        'catalog',
+        'schemagroup',
+        'remove',
+        '--catalog', 'http://localhost:8080',
+        '--schemagroupid', 'test-schemas'
+    ]
+    with patch.object(sys, 'argv', remove_schemagroup_args):
+        cli() # Ignore result for cleanup
+
+    remove_message_args = [
+        'xregistry',
+        'catalog',
+        'message',
+        'remove',
+        '--catalog', 'http://localhost:8080',
+        '--messagegroupid', 'test-group',
+        '--messageid', 'test-message'
+    ]
+    with patch.object(sys, 'argv', remove_message_args):
+        cli() # Ignore result for cleanup
+
+    remove_messagegroup_args = [
+        'xregistry',
+        'catalog',
+        'messagegroup',
+        'remove',
+        '--catalog', 'http://localhost:8080',
+        '--messagegroupid', 'test-group'
+    ]
+    with patch.object(sys, 'argv', remove_messagegroup_args):
+        cli() # Ignore result for cleanup
+
+    remove_endpoint_args = [
+        'xregistry',
+        'catalog',
+        'endpoint',
+        'remove',
+        '--catalog', 'http://localhost:8080',
+        '--endpointid', 'test-endpoint'
+    ]
+    with patch.object(sys, 'argv', remove_endpoint_args):
+        cli() # Ignore result for cleanup
 
     # Verify cleanup
     response = requests.get("http://localhost:8080/endpoints/test-endpoint")
@@ -218,9 +326,6 @@ def test_catalog_endpoint_operations():
     assert response.status_code == 404
     response = requests.get("http://localhost:8080/schemagroups/test-schemas")
     assert response.status_code == 404
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-    sys.path.append(os.path.join(project_root))
-
 
 @pytest.mark.usefixtures("catalog_container")
 def test_cli_add_endpoint():
