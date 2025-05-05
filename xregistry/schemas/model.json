@@ -1043,7 +1043,8 @@
             "ancestor": {
               "name": "ancestor",
               "type": "string",
-              "required": true
+              "required": true,
+              "default": null
             },
             "contenttype": {
               "name": "contenttype",
@@ -2663,7 +2664,8 @@
             "ancestor": {
               "name": "ancestor",
               "type": "string",
-              "required": true
+              "required": true,
+              "default": null
             },
             "contenttype": {
               "name": "contenttype",
@@ -4185,6 +4187,11 @@
           "type": "timestamp",
           "required": true
         },
+        "format": {
+          "name": "format",
+          "type": "string",
+          "description": "Schema format identifier for this schema group"
+        },
         "*": {
           "name": "*",
           "type": "any"
@@ -4273,7 +4280,8 @@
             "ancestor": {
               "name": "ancestor",
               "type": "string",
-              "required": true
+              "required": true,
+              "default": null
             },
             "contenttype": {
               "name": "contenttype",

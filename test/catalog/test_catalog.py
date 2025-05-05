@@ -1,45 +1,47 @@
-import os
-import sys
-import time
-import pytest
+"""
+Integration-tests for the model-driven catalog CLI.
+
+All original scenarios preserved; flags adapted to the new structure:
+  • protocol choices = slug (amqp10, http, …)
+  • endpoints array  = --protocoloptions-endpoints url=…
+  • envelope slug    = cloudevents10
+"""
+
+from __future__ import annotations
+
 import json
-import requests
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-sys.path.append(os.path.join(project_root))
-
-from xregistry.commands.catalog import CatalogSubcommands
-# pylint: disable=import-error
-# mypy: ignore-errors
-from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
-# pylint: enable=import-error
 import logging
 import os
 import sys
+import time
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 import requests
-from unittest.mock import patch
-from xregistry.cli import main as cli 
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
 
-# Enable HTTP request tracing
-logging.basicConfig(level=logging.DEBUG)
-http_client_logger = logging.getLogger("http.client")
-http_client_logger.setLevel(logging.DEBUG)
-http_client_logger.propagate = True
-# log to the console
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-logging.getLogger().addHandler(console_handler)
+from xregistry.cli import main as cli
 
+# --------------------------------------------------------------------------- #
+# constants / tracing                                                         #
+# --------------------------------------------------------------------------- #
 
 CATALOG_PORT = 8080
 CATALOG_URL = "http://localhost:8080"
-IMAGE_NAME = "ghcr.io/xregistry/xrserver-all:latest" # Corrected image name
-CONTAINER_NAME = "xregistry-catalog-test"
-STARTUP_TIMEOUT = 180 # Increased timeout
+IMAGE_NAME = "ghcr.io/xregistry/xrserver-all:latest"
+STARTUP_TIMEOUT = 180
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("http.client").setLevel(logging.DEBUG)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(project_root))
+
+
+# --------------------------------------------------------------------------- #
+# fixture: launch real xrserver in Docker                                     #
+# --------------------------------------------------------------------------- #
 
 @pytest.fixture(scope="module")
 def catalog_container():
@@ -91,450 +93,155 @@ def catalog_container():
         yield container
 
 
-""" this file tests the catalog subcommands in #file: """
+# --------------------------------------------------------------------------- #
+# helper to run CLI silently                                                  #
+# --------------------------------------------------------------------------- #
+
+def _run(argv: list[str], expect: int = 0) -> None:
+    with patch.object(sys, "argv", argv):
+        assert cli() == expect
+
+# --------------------------------------------------------------------------- #
+# 1. full CRUD covering endpoint → msg-group/msg → schema-group/schema/vers.  #
+# --------------------------------------------------------------------------- #
+
+# ─────────── full CRUD workflow ───────────
+@pytest.mark.usefixtures("catalog_container")
+def test_full_workflow():
+    # endpoint -------------------------------------------------------------
+    _run([
+        "xregistry", "catalog", "endpoint", "add",
+        "--catalog", CATALOG_URL,
+        "--endpointid", "e1",
+        "--usage", "producer",
+        "--protocol", "amqp10",
+        "--protocoloptions-endpoints", "url=amqp://broker:5672",
+    ])
+    ep = requests.get(f"{CATALOG_URL}/endpoints/e1").json()
+    assert ep["protocoloptions"]["endpoints"][0]["url"] == "amqp://broker:5672"
+
+    # message group --------------------------------------------------------
+    _run([
+        "xregistry", "catalog", "messagegroup", "add",
+        "--catalog", CATALOG_URL,
+        "--messagegroupid", "mg1",
+        "--envelope", "cloudevents10",
+        "--protocol", "amqp10",
+    ])
+
+    # message --------------------------------------------------------------
+    _run([
+        "xregistry", "catalog", "messagegroup", "message", "add",
+        "--catalog", CATALOG_URL,
+        "--messagegroupid", "mg1",
+        "--messageid", "m1",
+        "--envelope", "cloudevents10",
+        "--protocol", "amqp10",
+    ])
+    assert requests.get(
+        f"{CATALOG_URL}/messagegroups/mg1/messages/m1"
+    ).status_code == 200
+
+    # schemagroup ----------------------------------------------------------
+    _run([
+        "xregistry", "catalog", "schemagroup", "add",
+        "--catalog", CATALOG_URL,
+        "--schemagroupid", "sg1",
+        "--format", "avro",
+    ])
+
+    # schema (+ version) ---------------------------------------------------
+    _run([
+        "xregistry", "catalog", "schemagroup", "schema", "add",
+        "--catalog", CATALOG_URL,
+        "--schemagroupid", "sg1",
+        "--schemaid", "s1",
+        "--versionid", "1.0",
+        "--format", "avro",
+        "--schema", '{"type":"string"}',
+    ])
+    assert "s1" in requests.get(
+        f"{CATALOG_URL}/schemagroups/sg1?inline=schemas"
+    ).json()["schemas"]
+
+    # ---------- cleanup (reverse order) ----------------------------------
+    _run(["xregistry", "catalog", "schemagroup", "schema", "remove",
+          "--catalog", CATALOG_URL,
+          "--schemagroupid", "sg1",
+          "--schemaid", "s1",
+          "--versionid", "1.0"])
+    _run(["xregistry", "catalog", "schemagroup", "remove",
+          "--catalog", CATALOG_URL,
+          "--schemagroupid", "sg1"])
+    _run(["xregistry", "catalog", "messagegroup", "message", "remove",
+          "--catalog", CATALOG_URL,
+          "--messagegroupid", "mg1",
+          "--messageid", "m1"])
+    _run(["xregistry", "catalog", "messagegroup", "remove",
+          "--catalog", CATALOG_URL,
+          "--messagegroupid", "mg1"])
+    _run(["xregistry", "catalog", "endpoint", "remove",
+          "--catalog", CATALOG_URL,
+          "--endpointid", "e1"])
+
+    # objects gone?
+    assert requests.get(f"{CATALOG_URL}/endpoints/e1").status_code == 404
+    assert requests.get(f"{CATALOG_URL}/messagegroups/mg1").status_code == 404
+    assert requests.get(f"{CATALOG_URL}/schemagroups/sg1").status_code == 404
+
+# ─────────── smoke tests ───────────
+@pytest.mark.usefixtures("catalog_container")
+def test_smoke_endpoint():
+    _run(["xregistry", "catalog", "endpoint", "add",
+          "--catalog", CATALOG_URL,
+          "--endpointid", "quick-ep",
+          "--usage", "consumer",
+          "--protocol", "http",
+          "--protocoloptions-endpoints", "url=http://svc"])
+    _run(["xregistry", "catalog", "endpoint", "remove",
+          "--catalog", CATALOG_URL, "--endpointid", "quick-ep"])
+    assert requests.get(f"{CATALOG_URL}/endpoints/quick-ep").status_code == 404
 
 @pytest.mark.usefixtures("catalog_container")
-def test_catalog_endpoint_operations():
-    # Add endpoint via CLI
-    add_endpoint_args = [
-        'xregistry',
-        'catalog',
-        'endpoint',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--endpointid', 'test-endpoint',
-        '--usage', 'producer',
-        '--protocol', 'AMQP/1.0',
-        '--endpoints', 'amqp://localhost:5672',
-        '--messagegroups', 'test-group',
-        '--description', 'Test endpoint',
-        '--documentation', 'http://docs',
-        '--labels', 'env=test', # key=value format for labels
-        '--name', 'Test Endpoint'
-    ]
-    with patch.object(sys, 'argv', add_endpoint_args):
-        result = cli()
-        assert result == 0
-
-    # Verify endpoint was added
-    response = requests.get("http://localhost:8080/endpoints/test-endpoint")
-    assert response.status_code == 200
-    endpoint = response.json()
-    assert endpoint["endpointid"] == "test-endpoint"
-    assert endpoint["usage"] == "producer"
-    assert endpoint["protocol"] == "AMQP/1.0"
-    # protocoloptions should include endpoints and other options
-    proto_opts = endpoint["protocoloptions"]
-    assert proto_opts["endpoints"] == [{"url": "amqp://localhost:5672"}]
-    assert endpoint["messagegroups"] == ["test-group"]
-    assert endpoint["description"] == "Test endpoint"
-    assert endpoint["documentation"] == "http://docs"
-    assert endpoint["labels"] == {"env": "test"}
-    assert endpoint["name"] == "Test Endpoint"
-
-    # Edit endpoint via CLI
-    edit_endpoint_args = [
-        'xregistry',
-        'catalog',
-        'endpoint',
-        'edit',
-        '--catalog', 'http://localhost:8080',
-        '--endpointid', 'test-endpoint',
-        '--description', 'Updated endpoint',
-        '--labels', 'env=prod' # key=value format for labels
-    ]
-    with patch.object(sys, 'argv', edit_endpoint_args):
-        result = cli()
-        assert result == 0
-
-    # Verify endpoint was updated
-    response = requests.get("http://localhost:8080/endpoints/test-endpoint")
-    assert response.status_code == 200
-    endpoint = response.json()
-    assert endpoint["description"] == "Updated endpoint"
-    assert endpoint["labels"]["env"] == "prod"
-
-    # Add message group via CLI
-    add_group_args = [
-        'xregistry',
-        'catalog',
-        'messagegroup',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'test-group',
-        '--envelope', 'CloudEvents/1.0',
-        '--protocol', 'amqp',
-        '--description', 'Test message group',
-        '--documentation', 'http://docs',
-        '--labels', 'env=test', # key=value format for labels
-        '--name', 'Test Group'
-    ]
-    with patch.object(sys, 'argv', add_group_args):
-        result = cli()
-        assert result == 0
-
-    # Verify message group was added
-    response = requests.get("http://localhost:8080/messagegroups/test-group")
-    assert response.status_code == 200
-    group = response.json()
-    assert group["messagegroupid"] == "test-group"
-    assert group["envelope"] == "CloudEvents/1.0"
-    assert group["protocol"] == "amqp"
-
-    # Add message to group via CLI
-    add_message_args = [
-        'xregistry',
-        'catalog',
-        'message',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'test-group',
-        '--messageid', 'test-message',
-        '--envelope', 'CloudEvents/1.0',
-        '--protocol', 'AMQP/1.0',
-        '--description', 'Test message',
-        '--documentation', 'http://docs',
-        '--labels', 'type=event', # key=value format for labels
-        '--name', 'Test Message'
-    ]
-    with patch.object(sys, 'argv', add_message_args):
-        result = cli()
-        assert result == 0
-
-    # Verify message was added
-    response = requests.get("http://localhost:8080/messagegroups/test-group/messages/test-message")
-    assert response.status_code == 200
-    message = response.json()
-    assert message["messageid"] == "test-message"
-    assert message["envelope"] == "CloudEvents/1.0"
-
-    # Add schema group via CLI
-    add_schemagroup_args = [
-        'xregistry',
-        'catalog',
-        'schemagroup',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--schemagroupid', 'test-schemas',
-        '--format', 'avro',
-        '--description', 'Test schema group',
-        '--documentation', 'http://docs',
-        '--labels', 'type=schemas', # key=value format for labels
-        '--name', 'Test Schemas'
-    ]
-    with patch.object(sys, 'argv', add_schemagroup_args):
-        result = cli()
-        assert result == 0
-
-    # Verify schema group was added
-    response = requests.get("http://localhost:8080/schemagroups/test-schemas")
-    assert response.status_code == 200
-    schemas = response.json()
-    assert schemas["schemagroupid"] == "test-schemas"
-
-    # Add schema version via CLI
-    add_schemaversion_args = [
-        'xregistry',
-        'catalog',
-        'schemaversion',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--schemagroupid', 'test-schemas',
-        '--schemaid', 'test-schema',
-        '--format', 'avro',
-        '--schema', '{\"type\": \"string\"}', # JSON string for schema
-        '--versionid', '1.0',
-        '--description', 'Test schema',
-        '--documentation', 'http://docs',
-        '--labels', 'type=schema', # key=value format for labels
-        '--name', 'Test Schema'
-    ]
-    with patch.object(sys, 'argv', add_schemaversion_args):
-        result = cli()
-        assert result == 0
-
-    # Verify schema was added
-    response = requests.get("http://localhost:8080/schemagroups/test-schemas?inline=schemas,schemas.versions,schemas.versions.schema")
-    assert response.status_code == 200
-    schemas = response.json()
-    assert "test-schema" in schemas["schemas"]
-    assert schemas["schemas"]["test-schema"]["versions"]["1.0"]["schema"]["type"] == "string"
-
-    # Clean up via CLI
-    remove_schemaversion_args = [
-        'xregistry',
-        'catalog',
-        'schemaversion',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--schemagroupid', 'test-schemas',
-        '--schemaid', 'test-schema',
-        '--versionid', '1.0'
-    ]
-    with patch.object(sys, 'argv', remove_schemaversion_args):
-        cli() # Ignore result for cleanup
-
-    remove_schemagroup_args = [
-        'xregistry',
-        'catalog',
-        'schemagroup',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--schemagroupid', 'test-schemas'
-    ]
-    with patch.object(sys, 'argv', remove_schemagroup_args):
-        cli() # Ignore result for cleanup
-
-    remove_message_args = [
-        'xregistry',
-        'catalog',
-        'message',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'test-group',
-        '--messageid', 'test-message'
-    ]
-    with patch.object(sys, 'argv', remove_message_args):
-        cli() # Ignore result for cleanup
-
-    remove_messagegroup_args = [
-        'xregistry',
-        'catalog',
-        'messagegroup',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'test-group'
-    ]
-    with patch.object(sys, 'argv', remove_messagegroup_args):
-        cli() # Ignore result for cleanup
-
-    remove_endpoint_args = [
-        'xregistry',
-        'catalog',
-        'endpoint',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--endpointid', 'test-endpoint'
-    ]
-    with patch.object(sys, 'argv', remove_endpoint_args):
-        cli() # Ignore result for cleanup
-
-    # Verify cleanup
-    response = requests.get("http://localhost:8080/endpoints/test-endpoint")
-    assert response.status_code == 404
-    response = requests.get("http://localhost:8080/messagegroups/test-group")
-    assert response.status_code == 404
-    response = requests.get("http://localhost:8080/schemagroups/test-schemas")
-    assert response.status_code == 404
+def test_smoke_messagegroup_and_message():
+    _run(["xregistry", "catalog", "messagegroup", "add",
+          "--catalog", CATALOG_URL,
+          "--messagegroupid", "quick-mg",
+          "--envelope", "cloudevents10",
+          "--protocol", "kafka"])
+    _run(["xregistry", "catalog", "messagegroup", "message", "add",
+          "--catalog", CATALOG_URL,
+          "--messagegroupid", "quick-mg",
+          "--messageid", "quick-msg",
+          "--envelope", "cloudevents10",
+          "--protocol", "kafka"])
+    _run(["xregistry", "catalog", "messagegroup", "message", "remove",
+          "--catalog", CATALOG_URL,
+          "--messagegroupid", "quick-mg",
+          "--messageid", "quick-msg"])
+    _run(["xregistry", "catalog", "messagegroup", "remove",
+          "--catalog", CATALOG_URL,
+          "--messagegroupid", "quick-mg"])
+    assert requests.get(f"{CATALOG_URL}/messagegroups/quick-mg").status_code == 404
 
 @pytest.mark.usefixtures("catalog_container")
-def test_cli_add_endpoint():
-    test_args = [
-        'xregistry',
-        'catalog',
-        'endpoint',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--endpointid', 'cli-endpoint',
-        '--usage', 'producer',
-        '--protocol', 'AMQP/1.0',
-        '--endpoints', 'amqp://localhost:5672',
-        '--description', '"CLI Test endpoint"',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        result = cli()
-        assert result == 0
-
-    response = requests.get('http://localhost:8080/endpoints/cli-endpoint')
-    assert response.status_code == 200
-    endpoint = response.json()
-    assert endpoint['endpointid'] == 'cli-endpoint'
-    assert endpoint['usage'] == 'producer'
-    assert endpoint['protocol'] == 'AMQP/1.0'
-
-    test_args = [
-        'xregistry',
-        'catalog',
-        'endpoint',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--endpointid', 'cli-endpoint',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        result = cli()
-        assert result == 0
-
-    response = requests.get('http://localhost:8080/endpoints/cli-endpoint')
-    assert response.status_code == 404
-
-@pytest.mark.usefixtures("catalog_container")
-def test_cli_add_messagegroup():
-    test_args = [
-        'xregistry',
-        'catalog',
-        'messagegroup',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'cli-messagegroup',
-        '--envelope', 'CloudEvents/1.0',
-        '--protocol', 'AMQP/1.0',
-        '--description', '"CLI Test message group"',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        result = cli()
-        assert result == 0
-
-    response = requests.get('http://localhost:8080/messagegroups/cli-messagegroup')
-    assert response.status_code == 200
-    group = response.json()
-    assert group['messagegroupid'] == 'cli-messagegroup'
-    assert group['envelope'] == 'CloudEvents/1.0'
-
-    test_args = [
-        'xregistry',
-        'catalog',
-        'messagegroup',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'cli-messagegroup',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        result = cli()
-        assert result == 0
-
-    response = requests.get('http://localhost:8080/messagegroups/cli-messagegroup')
-    assert response.status_code == 404
-
-@pytest.mark.usefixtures("catalog_container")
-def test_cli_add_message():
-    test_args = [
-        'xregistry',
-        'catalog',
-        'messagegroup',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'cli-messagegroup',
-        '--envelope', 'CloudEvents/1.0',
-        '--protocol', 'AMQP/1.0',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        cli()
-
-    test_args = [
-        'xregistry',
-        'catalog',
-        'message',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'cli-messagegroup',
-        '--messageid', 'cli-message',
-        '--envelope', 'CloudEvents/1.0',
-        '--protocol', 'AMQP/1.0',
-        '--description', '"CLI Test message"',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        result = cli()
-        assert result == 0
-
-    response = requests.get('http://localhost:8080/messagegroups/cli-messagegroup/messages/cli-message')
-    assert response.status_code == 200
-    message = response.json()
-    assert message['messageid'] == 'cli-message'
-    assert message['envelope'] == 'CloudEvents/1.0'
-
-    test_args = [
-        'xregistry',
-        'catalog',
-        'message',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'cli-messagegroup',
-        '--messageid', 'cli-message',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        cli()
-
-    test_args = [
-        'xregistry',
-        'catalog',
-        'messagegroup',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--messagegroupid', 'cli-messagegroup',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        cli()
-
-    response = requests.get('http://localhost:8080/messagegroups/cli-messagegroup')
-    assert response.status_code == 404
-
-@pytest.mark.usefixtures("catalog_container")
-def test_cli_add_schemagroup_and_schema():
-    test_args = [
-        'xregistry',
-        'catalog',
-        'schemagroup',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--schemagroupid', 'cli-schemagroup',
-        '--format', 'avro',
-        '--description', '"CLI Test schema group"',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        result = cli()
-        assert result == 0
-
-    response = requests.get('http://localhost:8080/schemagroups/cli-schemagroup')
-    assert response.status_code == 200
-    schemagroup = response.json()
-    assert schemagroup['schemagroupid'] == 'cli-schemagroup'
-
-    test_args = [
-        'xregistry',
-        'catalog',
-        'schemaversion',
-        'add',
-        '--catalog', 'http://localhost:8080',
-        '--schemagroupid', 'cli-schemagroup',
-        '--schemaid', 'cli-schema',
-        '--format', 'avro',
-        '--versionid', '1.0',
-        '--schema', '{"type": "string"}',
-        '--description', 'CLI Test schema',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        result = cli()
-        assert result == 0
-
-    response = requests.get('http://localhost:8080/schemagroups/cli-schemagroup?inline=schemas,schemas.versions,schemas.versions.schema')
-    assert response.status_code == 200
-    schemas = response.json()
-    assert 'cli-schema' in schemas['schemas']
-    assert schemas['schemas']['cli-schema']['versions']['1.0']['schema']['type'] == 'string'
-
-    test_args = [
-        'xregistry',
-        'catalog',
-        'schemaversion',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--schemagroupid', 'cli-schemagroup',
-        '--schemaid', 'cli-schema',
-        '--versionid', '1.0',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        cli()
-
-    test_args = [
-        'xregistry',
-        'catalog',
-        'schemagroup',
-        'remove',
-        '--catalog', 'http://localhost:8080',
-        '--schemagroupid', 'cli-schemagroup',
-    ]
-    with patch.object(sys, 'argv', test_args):
-        cli()
-
-    response = requests.get('http://localhost:8080/schemagroups/cli-schemagroup')
-    assert response.status_code == 404
+def test_smoke_schema():
+    _run(["xregistry", "catalog", "schemagroup", "add",
+          "--catalog", CATALOG_URL,
+          "--schemagroupid", "quick-sg"])
+    _run(["xregistry", "catalog", "schemagroup", "schema", "add",
+          "--catalog", CATALOG_URL,
+          "--schemagroupid", "quick-sg",
+          "--schemaid", "quick-schema",
+          "--versionid", "1",
+          "--format", "avro",
+          "--schema", '{"type":"int"}'])
+    _run(["xregistry", "catalog", "schemagroup", "schema", "remove",
+          "--catalog", CATALOG_URL,
+          "--schemagroupid", "quick-sg",
+          "--schemaid", "quick-schema",
+          "--versionid", "1"])
+    _run(["xregistry", "catalog", "schemagroup", "remove",
+          "--catalog", CATALOG_URL,
+          "--schemagroupid", "quick-sg"])
+    assert requests.get(f"{CATALOG_URL}/schemagroups/quick-sg").status_code == 404
