@@ -40,3 +40,6 @@ xregistry = "xregistry.cli:main"
 
 [tool.setuptools_scm]
 write_to = "xregistry/_version.py"
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"

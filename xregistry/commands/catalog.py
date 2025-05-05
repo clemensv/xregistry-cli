@@ -17,10 +17,12 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+from pathlib import Path
 import re
 import unicodedata as _ud
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
+from pyrsistent import b
 import requests
 
 from .model import Model
@@ -61,28 +63,22 @@ def _iv(spec: Mapping[str, Any]) -> Dict[str, Any]:
 
 # ────────────────────────── HTTP façade (generic) ─────────────────────────
 
-class CatalogSubcommands:
+class RegistrySubcommandsBase:
     def __init__(self, base_url: str) -> None:
         self.url = base_url.rstrip("/")
         self.model = Model()
-
+    
+     # CLI entry -------------------------------------------------------------
+    @classmethod
+    def add_parsers(cls, root: argparse.ArgumentParser) -> None:
+        grp_sp = root.add_subparsers(dest="group", required=True)
+        for g in Model().groups.values():
+            _emit_group(grp_sp, g)
+            
     def _req(self, verb: str, path: str, **kw) -> requests.Response:
-        full_url = f"{self.url}/{path}"
-        try:
-            response = getattr(requests, verb)(full_url, **kw)
-            if response.status_code >= 400:
-                response_body = response.content.decode("utf-8") if response.content else ""
-                logging.error(
-                    f"Request failed. URL: {full_url}, "
-                    f"Status: {response.status_code}, Response: {response_body}"
-                )
-                raise RuntimeError(f"Request failed: {response.status_code}")
-            return response
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Exception on {verb.upper()} request to {full_url}: {e}")
-            raise RuntimeError(f"{verb.upper()} request to {full_url} failed: {e}, {e.response.content if e.response else ''}") from e
-
-    # CRUD helpers ----------------------------------------------------------
+        raise NotImplementedError("Subclasses must implement _req() method")
+    
+     # CRUD helpers ----------------------------------------------------------
     def create(self, p: str, body: Dict[str, Any]) -> None:
         response = self._req("put", p, json=body)
         if response.status_code not in (200, 201):
@@ -119,13 +115,110 @@ class CatalogSubcommands:
                 f"Status: {response.status_code}, Response: {response.text}"
             )
             raise RuntimeError("delete failed")
+            
 
-    # CLI entry -------------------------------------------------------------
-    @classmethod
-    def add_parsers(cls, root: argparse.ArgumentParser) -> None:
-        grp_sp = root.add_subparsers(dest="group", required=True)
-        for g in Model().groups.values():
-            _emit_group(grp_sp, g)
+class CatalogSubcommands(RegistrySubcommandsBase):
+    def __init__(self, base_url: str) -> None:
+        super().__init__(base_url)
+
+    def _req(self, verb: str, path: str, **kw) -> requests.Response:
+        full_url = f"{self.url}/{path}"
+        try:
+            kw.pop("singular", None)
+            response = getattr(requests, verb)(full_url, **kw)
+            if response.status_code >= 400:
+                response_body = response.content.decode("utf-8") if response.content else ""
+                logging.error(
+                    f"Request failed. URL: {full_url}, "
+                    f"Status: {response.status_code}, Response: {response_body}"
+                )
+                raise RuntimeError(f"Request failed: {response.status_code}")
+            return response
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Exception on {verb.upper()} request to {full_url}: {e}")
+            raise RuntimeError(f"{verb.upper()} request to {full_url} failed: {e}, {e.response.content if e.response else ''}") from e
+
+   
+
+class ManifestSubcommands(RegistrySubcommandsBase):
+    def __init__(self, base_url: str) -> None:
+        super().__init__(base_url)
+
+    def _req(self, verb: str, path: str, **kw):
+        """
+        File-backed equivalent to HTTP _req:
+          - load self.filename JSON
+          - apply verb at 'path'
+          - save on mutating verbs
+          - return a minimal Response-like object with .status_code, .json(), .content/.text
+        """
+        fp = Path(self.url)   # self.url holds the manifest filename
+        singular = kw.get("singular", None)
+        manifest = json.loads(fp.read_text(encoding="utf-8"))
+        segments = path.split("/")
+        # navigate to parent container and key
+        def _locate(man, segs):
+            node = man
+            for s in segs[:-1]:
+                node = node.setdefault(s, {})
+            return node, segs[-1]
+
+        class _Resp:
+            def __init__(self, data, code):
+                self._data = data
+                self.status_code = code
+                self.content = (json.dumps(data).encode() if data is not None else b"")
+                self.text = (json.dumps(data) if data is not None else "")
+            def json(self):
+                return self._data
+
+        if verb.lower() == "get":
+            # drill all segments and return 404 if a segment is not found
+            node = manifest
+            for s in segments:
+                if s not in node:
+                    return _Resp(None, 404)
+                node = node[s]
+            return _Resp(node, 200)
+
+        elif verb.lower() in ("put", "post"):
+            body = kw.get("json") or {}
+            if not body:
+                headers = kw.get("headers", {})
+                body = {key[len("xRegistry-"):].lower(): value for key, value in headers.items() if key.lower().startswith("xregistry-")}
+                if kw.get("data") and singular:
+                    body[singular] = kw.get("data", b"{}").decode("utf-8")
+            if "versions" not in segments and "versionid" in body:
+                # versioned resource; add versionid to path
+                segments = segments + ["versions", str(body["versionid"])]
+            parent, key = _locate(manifest, segments)
+            parent[key] = body
+            fp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            # HTTP: PUT→201/200, POST→201; we choose 201
+            return _Resp(None, 201)
+
+        elif verb.lower() == "patch":
+            parent, key = _locate(manifest, segments)
+            existing = parent.get(key, {})
+            patch = kw.get("json") or {}
+            # merge shallow
+            existing.update(patch)
+            parent[key] = existing
+            fp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            return _Resp(None, 200)
+
+        elif verb.lower() == "delete":
+            parent, key = _locate(manifest, segments)
+            if key in parent:
+                del parent[key]
+                fp.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+                return _Resp(None, 204)
+            else:
+                # missing → 404
+                return _Resp(None, 404)
+
+        else:
+            raise RuntimeError(f"Unsupported verb {verb}")
 
 
 # ────────────────────────── argparse generation ──────────────────────────
@@ -555,7 +648,10 @@ def _get_resource(gdef: Mapping[str, Any], ns: argparse.Namespace) -> Mapping[st
 # --------------------------------------------------------------------------- #
 
 def _dispatch(ns: argparse.Namespace) -> int:
-    sc = CatalogSubcommands(ns.catalog)
+    if ns.command == "manifest":
+        sc = ManifestSubcommands(ns.catalog)
+    else:
+        sc = CatalogSubcommands(ns.catalog)
 
     # ------------- collect CLI args into initial dict -------------------- #
     body: dict[str, Any] = {
@@ -683,5 +779,6 @@ def _dispatch(ns: argparse.Namespace) -> int:
     sc._req(verb, path,
             data=payload if is_doc and ns.resource is not None else None,
             json=None if is_doc and ns.resource is not None else payload,
-            headers=headers)
+            headers=headers,
+            singular=singular)
     return 0

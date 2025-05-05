@@ -245,3 +245,186 @@ def test_smoke_schema():
           "--catalog", CATALOG_URL,
           "--schemagroupid", "quick-sg"])
     assert requests.get(f"{CATALOG_URL}/schemagroups/quick-sg").status_code == 404
+    
+
+
+@pytest.fixture
+def manifest_file(tmp_path: Path) -> Path:
+    file_path = tmp_path / "manifest.json"
+    # initialize with an empty manifest structure
+    file_path.write_text(json.dumps({}))
+    return file_path
+
+
+def test_full_workflow_manifest(manifest_file: Path) -> None:
+    # endpoint addition
+    _run([
+        "xregistry", "manifest", "endpoint", "add",
+        "--catalog", str(manifest_file),
+        "--endpointid", "e1",
+        "--usage", "producer",
+        "--protocol", "amqp10",
+        "--protocoloptions-endpoints", "url=amqp://broker:5672",
+    ])
+    data = json.loads(manifest_file.read_text())
+    assert data.get("endpoints", {}).get("e1", {}) \
+        .get("protocoloptions", {}) \
+        .get("endpoints", [])[0]["url"] == "amqp://broker:5672"
+
+    # message group addition
+    _run([
+        "xregistry", "manifest", "messagegroup", "add",
+        "--catalog", str(manifest_file),
+        "--messagegroupid", "mg1",
+        "--envelope", "cloudevents10",
+        "--protocol", "amqp10",
+    ])
+
+    # message addition
+    _run([
+        "xregistry", "manifest", "messagegroup", "message", "add",
+        "--catalog", str(manifest_file),
+        "--messagegroupid", "mg1",
+        "--messageid", "m1",
+        "--envelope", "cloudevents10",
+        "--protocol", "amqp10",
+    ])
+    data = json.loads(manifest_file.read_text())
+    assert "m1" in data.get("messagegroups", {}).get("mg1", {}) \
+        .get("messages", {})
+
+    # schemagroup addition
+    _run([
+        "xregistry", "manifest", "schemagroup", "add",
+        "--catalog", str(manifest_file),
+        "--schemagroupid", "sg1",
+        "--format", "avro",
+    ])
+
+    # schema (and version) addition
+    _run([
+        "xregistry", "manifest", "schemagroup", "schema", "add",
+        "--catalog", str(manifest_file),
+        "--schemagroupid", "sg1",
+        "--schemaid", "s1",
+        "--versionid", "1.0",
+        "--format", "avro",
+        "--schema", '{"type":"string"}',
+    ])
+    data = json.loads(manifest_file.read_text())
+    assert "s1" in data.get("schemagroups", {}).get("sg1", {}) \
+        .get("schemas", {})
+
+    # Cleanup in reverse order
+    _run([
+        "xregistry", "manifest", "schemagroup", "schema", "remove",
+        "--catalog", str(manifest_file),
+        "--schemagroupid", "sg1",
+        "--schemaid", "s1",
+        "--versionid", "1.0",
+    ])
+    _run([
+        "xregistry", "manifest", "schemagroup", "remove",
+        "--catalog", str(manifest_file),
+        "--schemagroupid", "sg1",
+    ])
+    _run([
+        "xregistry", "manifest", "messagegroup", "message", "remove",
+        "--catalog", str(manifest_file),
+        "--messagegroupid", "mg1",
+        "--messageid", "m1",
+    ])
+    _run([
+        "xregistry", "manifest", "messagegroup", "remove",
+        "--catalog", str(manifest_file),
+        "--messagegroupid", "mg1",
+    ])
+    _run([
+        "xregistry", "manifest", "endpoint", "remove",
+        "--catalog", str(manifest_file),
+        "--endpointid", "e1",
+    ])
+    data = json.loads(manifest_file.read_text())
+    assert "e1" not in data.get("endpoints", {})
+    assert "mg1" not in data.get("messagegroups", {})
+    assert "sg1" not in data.get("schemagroups", {})
+
+
+def test_smoke_endpoint_manifest(manifest_file: Path) -> None:
+    _run([
+        "xregistry", "manifest", "endpoint", "add",
+        "--catalog", str(manifest_file),
+        "--endpointid", "quick-ep",
+        "--usage", "consumer",
+        "--protocol", "http",
+        "--protocoloptions-endpoints", "url=http://svc",
+    ])
+    _run([
+        "xregistry", "manifest", "endpoint", "remove",
+        "--catalog", str(manifest_file),
+        "--endpointid", "quick-ep",
+    ])
+    data = json.loads(manifest_file.read_text())
+    assert "quick-ep" not in data.get("endpoints", {})
+
+
+def test_smoke_messagegroup_and_message_manifest(manifest_file: Path) -> None:
+    _run([
+        "xregistry", "manifest", "messagegroup", "add",
+        "--catalog", str(manifest_file),
+        "--messagegroupid", "quick-mg",
+        "--envelope", "cloudevents10",
+        "--protocol", "kafka",
+    ])
+    _run([
+        "xregistry", "manifest", "messagegroup", "message", "add",
+        "--catalog", str(manifest_file),
+        "--messagegroupid", "quick-mg",
+        "--messageid", "quick-msg",
+        "--envelope", "cloudevents10",
+        "--protocol", "kafka",
+    ])
+    _run([
+        "xregistry", "manifest", "messagegroup", "message", "remove",
+        "--catalog", str(manifest_file),
+        "--messagegroupid", "quick-mg",
+        "--messageid", "quick-msg",
+    ])
+    _run([
+        "xregistry", "manifest", "messagegroup", "remove",
+        "--catalog", str(manifest_file),
+        "--messagegroupid", "quick-mg",
+    ])
+    data = json.loads(manifest_file.read_text())
+    assert "quick-mg" not in data.get("messagegroups", {})
+
+
+def test_smoke_schema_manifest(manifest_file: Path) -> None:
+    _run([
+        "xregistry", "manifest", "schemagroup", "add",
+        "--catalog", str(manifest_file),
+        "--schemagroupid", "quick-sg",
+    ])
+    _run([
+        "xregistry", "manifest", "schemagroup", "schema", "add",
+        "--catalog", str(manifest_file),
+        "--schemagroupid", "quick-sg",
+        "--schemaid", "quick-schema",
+        "--versionid", "1",
+        "--format", "avro",
+        "--schema", '{"type":"int"}',
+    ])
+    _run([
+        "xregistry", "manifest", "schemagroup", "schema", "remove",
+        "--catalog", str(manifest_file),
+        "--schemagroupid", "quick-sg",
+        "--schemaid", "quick-schema",
+        "--versionid", "1",
+    ])
+    _run([
+        "xregistry", "manifest", "schemagroup", "remove",
+        "--catalog", str(manifest_file),
+        "--schemagroupid", "quick-sg",
+    ])
+    data = json.loads(manifest_file.read_text())
+    assert "quick-sg" not in data.get("schemagroups", {})

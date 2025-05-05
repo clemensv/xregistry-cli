@@ -7,7 +7,7 @@ import logging
 import sys
 
 from xregistry.commands import catalog
-from xregistry.commands.catalog import CatalogSubcommands
+from xregistry.commands.catalog import CatalogSubcommands, ManifestSubcommands
 
 logging.basicConfig(level=logging.DEBUG if sys.gettrace() is not None else logging.ERROR, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 from .commands.validate_definitions import validate_definition
 from .commands.generate_code import generate_code
 from .commands.list_templates import list_templates
-from .commands.manifest import ManifestSubcommands
+#from .commands.manifest import ManifestSubcommands
 
 def main():
     """ Main function for the xregistry command line interface"""
@@ -39,7 +39,6 @@ def main():
     list_parser.set_defaults(func=list_templates)
     manifest_parser = subparsers_parser.add_parser("manifest", help="Manage the manifest file")
     ManifestSubcommands.add_parsers(manifest_parser)
-    manifest_parser.add_argument("filename", help="The manifest file to use")
     subparsers_parser.required = True
     catalog_parser = subparsers_parser.add_parser("catalog", help="Manage the catalog")
     CatalogSubcommands.add_parsers(catalog_parser)
