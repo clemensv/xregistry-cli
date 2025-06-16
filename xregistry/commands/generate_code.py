@@ -7,12 +7,47 @@ from xregistry.cli import logger
 from xregistry.generator.generator_context import GeneratorContext
 from xregistry.generator.schema_utils import SchemaUtils
 from xregistry.generator.template_renderer import TemplateRenderer
+from xregistry.common.config import config_manager
 from .validate_definitions import validate
 
 JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, None]
 
 def generate_code(args: Any) -> int:
     """Generate code from the given arguments."""
+    # Load configuration for potential defaults
+    config = config_manager.load_config()
+    
+    # Apply configuration defaults where CLI arguments are not provided
+    project_name = args.project_name
+    if not project_name and config.defaults.project_name:
+        project_name = config.defaults.project_name
+        logger.info(f"Using project name from config: {project_name}")
+    
+    language = args.language
+    if not language and config.defaults.language:
+        language = config.defaults.language
+        logger.info(f"Using language from config: {language}")
+    
+    style = args.style  
+    if not style and config.defaults.style:
+        style = config.defaults.style
+        logger.info(f"Using style from config: {style}")
+    
+    output_dir = args.output_dir
+    if not output_dir and config.defaults.output_dir:
+        output_dir = config.defaults.output_dir
+        logger.info(f"Using output directory from config: {output_dir}")
+    
+    # Validate that all required arguments are provided (either via CLI or config)
+    if not project_name:
+        raise ValueError("Project name is required. Provide via --projectname or set defaults.project_name in config.")
+    if not language:
+        raise ValueError("Language is required. Provide via --language or set defaults.language in config.")
+    if not style:
+        raise ValueError("Style is required. Provide via --style or set defaults.style in config.")
+    if not output_dir:
+        raise ValueError("Output directory is required. Provide via --output or set defaults.output_dir in config.")
+    
     suppress_schema_output = args.no_schema
     suppress_code_output = args.no_code
     messagegroup_filter = args.messagegroup
@@ -25,7 +60,7 @@ def generate_code(args: Any) -> int:
             key, value = arg.split("=", 1)
             template_args[key] = value
 
-    generator_context = GeneratorContext(args.output_dir, messagegroup_filter)
+    generator_context = GeneratorContext(output_dir, messagegroup_filter, getattr(args, 'model', None))
 
     SchemaUtils.schema_files_collected = set()
     generator_context.loader.reset_schemas_handled()
@@ -39,7 +74,7 @@ def generate_code(args: Any) -> int:
                 return 1
         
         renderer = TemplateRenderer(generator_context,
-            args.project_name, args.language, args.style, args.output_dir,
+            project_name, language, style, output_dir,
             args.definitions_file, headers, args.template_dirs, template_args,
             suppress_code_output, suppress_schema_output
         )
@@ -47,7 +82,7 @@ def generate_code(args: Any) -> int:
 
         for schema in SchemaUtils.schema_files_collected:
             renderer = TemplateRenderer(generator_context,
-                args.project_name, args.language, args.style, args.output_dir,
+                project_name, language, style, output_dir,
                 schema, headers, args.template_dirs, template_args,
                 suppress_code_output, suppress_schema_output
             )

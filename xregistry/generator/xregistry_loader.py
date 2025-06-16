@@ -2,20 +2,24 @@
 
 import json
 import os
+from pyexpat import model
 from typing import Any, Dict, List, Tuple, Union
 import urllib.request
 import urllib.parse
 import urllib.error
 from pydantic import Json
+from pydash import url
 import yaml
+from ..common.model import Model
 
 JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, bool, int, float, None]
 
 class XRegistryLoader:
     """ Class to handle the loading of definitions """
-    def __init__(self):
+    def __init__(self, model_path: str | None = None):
         self.schemas_handled = set()
         self.current_url = ""
+        self.model = Model(model_path=model_path)
 
     def add_schema_to_handled(self, url):
         """ Add a schema URL to the set of schemas handled"""
@@ -136,28 +140,20 @@ class XRegistryLoader:
             raise ValueError("Document is not valid")
         
         newdocroot : Dict[str, JsonNode] = {}
-        if "messagegroupid" in docroot and isinstance(docroot["messagegroupid"], str):
-            newdocroot["messagegroups"] = {docroot["messagegroupid"]: docroot}
-            docroot = newdocroot
-        if "schemagroupid" in docroot and isinstance(docroot["schemagroupid"], str):
-            newdocroot["schemagroups"] = {docroot["schemagroupid"]: docroot}
-            docroot = newdocroot
-        if "endpointid" in docroot and isinstance(docroot["endpointid"], str):
-            newdocroot["endpoints"] = {docroot["endpointid"]: docroot}
-            docroot = newdocroot
-        
-        if "messagegroups" not in docroot and "messagegroupsurl" in docroot and isinstance(docroot["messagegroupsurl"], str):
-            _, subroot = self._load_core(docroot["messagegroupsurl"], headers)
-            docroot["messagegroups"] = subroot
-            del docroot["messagegroupsurl"]
-        if "schemagroups" not in docroot and "schemagroupsurl" in docroot and isinstance(docroot["schemagroupsurl"], str):
-            _, subroot = self._load_core(docroot["schemagroupsurl"], headers)
-            docroot["schemagroups"] = subroot
-            del docroot["schemagroupsurl"]
-        if "endpoints" not in docroot and "endpointsurl" in docroot and isinstance(docroot["endpointsurl"], str):
-            _, subroot = self._load_core(docroot["endpointsurl"], headers)
-            docroot["endpoints"] = subroot
-            del docroot["endpointsurl"]
+        for key, group in self.model.groups.items():
+            id_key:str = group["singular"] + "id"
+            plural_key:str = group["plural"]
+            if id_key in docroot and isinstance(docroot[id_key], str):
+                newdocroot[plural_key] = {str(docroot[id_key]): docroot}
+                
+        for key, group in self.model.groups.items():
+            plural_key:str = group["plural"]
+            url_key:str = plural_key + "url"
+            if plural_key not in docroot and url_key in docroot and isinstance(docroot[url_key], str):
+                _, subroot = self._load_core(str(docroot[url_key]), headers)
+                if subroot is not None:
+                    newdocroot[plural_key] = subroot
+                del docroot[url_key] 
 
         self.preprocess_manifest(docroot)
 
@@ -202,6 +198,7 @@ class XRegistryLoader:
 
 
         if isinstance(xreg_doc, dict):
+            
             if "messagegroups" in xreg_doc:
                 if isinstance(xreg_doc["messagegroups"], dict):
                     for messagegroupid, messagegroup in xreg_doc["messagegroups"].items():

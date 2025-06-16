@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import os
 from pathlib import Path
 import re
 import unicodedata as _ud
@@ -25,7 +26,7 @@ from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence,
 from pyrsistent import b
 import requests
 
-from .model import Model
+from ..common.model import Model
 import logging
 
 # ────────────────────────── registries for repeatable flags ──────────────
@@ -64,15 +65,15 @@ def _iv(spec: Mapping[str, Any]) -> Dict[str, Any]:
 # ────────────────────────── HTTP façade (generic) ─────────────────────────
 
 class RegistrySubcommandsBase:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, model_path: Optional[str] = None) -> None:
         self.url = base_url.rstrip("/")
-        self.model = Model()
-    
-     # CLI entry -------------------------------------------------------------
+        self.model = Model(model_path=model_path)     # CLI entry -------------------------------------------------------------
     @classmethod
     def add_parsers(cls, root: argparse.ArgumentParser) -> None:
         grp_sp = root.add_subparsers(dest="group", required=True)
-        for g in Model().groups.values():
+        # Use environment variable or default for CLI building
+        model = Model(model_path=os.getenv("XREGISTRY_MODEL_PATH"))
+        for g in model.groups.values():
             _emit_group(grp_sp, g)
             
     def _req(self, verb: str, path: str, **kw) -> requests.Response:
@@ -118,8 +119,8 @@ class RegistrySubcommandsBase:
             
 
 class CatalogSubcommands(RegistrySubcommandsBase):
-    def __init__(self, base_url: str) -> None:
-        super().__init__(base_url)
+    def __init__(self, base_url: str, model_path: Optional[str] = None) -> None:
+        super().__init__(base_url, model_path)
 
     def _req(self, verb: str, path: str, **kw) -> requests.Response:
         full_url = f"{self.url}/{path}"
@@ -141,8 +142,8 @@ class CatalogSubcommands(RegistrySubcommandsBase):
    
 
 class ManifestSubcommands(RegistrySubcommandsBase):
-    def __init__(self, base_url: str) -> None:
-        super().__init__(base_url)
+    def __init__(self, base_url: str, model_path: Optional[str] = None) -> None:
+        super().__init__(base_url, model_path)
 
     def _req(self, verb: str, path: str, **kw):
         """
@@ -648,10 +649,11 @@ def _get_resource(gdef: Mapping[str, Any], ns: argparse.Namespace) -> Mapping[st
 # --------------------------------------------------------------------------- #
 
 def _dispatch(ns: argparse.Namespace) -> int:
+    model_path = getattr(ns, 'model', None)
     if ns.command == "manifest":
-        sc = ManifestSubcommands(ns.catalog)
+        sc = ManifestSubcommands(ns.catalog, model_path)
     else:
-        sc = CatalogSubcommands(ns.catalog)
+        sc = CatalogSubcommands(ns.catalog, model_path)
 
     # ------------- collect CLI args into initial dict -------------------- #
     body: dict[str, Any] = {

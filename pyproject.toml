@@ -26,7 +26,8 @@ dependencies = [
     "pydot>=2.0.0",
     "anytree>=2.12.1",
     "avrotize>=2.0.11",
-    "toml>=0.10.2"
+    "toml>=0.10.2",
+    "platformdirs>=4.0.0"
 ]
 
 [project.optional-dependencies]
