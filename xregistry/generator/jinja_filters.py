@@ -260,9 +260,13 @@ class JinjaFilters:
         proto_text = re.sub(r"\n{3,}", "\n\n", proto_text)
         return proto_text
 
+    # Resource handling filters for template-driven resource management
+    
     @staticmethod
     def mark_handled(resource_reference: str, resource_processor=None) -> str:
         """Mark a resource as handled by templates.
+        
+        Usage in templates: {{ "#/schemas/myschema" | mark_handled }}
         
         Args:
             resource_reference: Reference to the resource to mark as handled
@@ -272,13 +276,15 @@ class JinjaFilters:
             The resource reference (for chaining in templates)
         """
         logger.debug("Template filter marking resource as handled: %s", resource_reference)
-        if resource_processor:
+        if resource_processor and hasattr(resource_processor, 'mark_handled'):
             resource_processor.mark_handled(resource_reference)
         return resource_reference
 
     @staticmethod
     def is_handled(resource_reference: str, resource_processor=None) -> bool:
         """Check if a resource has been marked as handled.
+        
+        Usage in templates: {% if "#/schemas/myschema" | is_handled %}...{% endif %}
         
         Args:
             resource_reference: Reference to the resource
@@ -287,6 +293,6 @@ class JinjaFilters:
         Returns:
             True if the resource has been marked as handled
         """
-        if resource_processor:
+        if resource_processor and hasattr(resource_processor, 'is_handled'):
             return resource_processor.is_handled(resource_reference)
         return False
