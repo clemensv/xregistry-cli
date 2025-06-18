@@ -334,6 +334,7 @@
                                         "willmessage": {
                                             "name": "willmessage",
                                             "type": "xid",
+                                            "target": "/messagegroups/messages",
                                             "description": "The MQTT will message definition to configure for publishers on this endpoint. This MUST be a reference to a message definition"
                                         },
                                         "*": {
@@ -812,7 +813,8 @@
                     "type": "array",
                     "description": "The message groups that are supported by this endpoint",
                     "item": {
-                        "type": "uri"
+                        "type": "xid",
+                        "target": "/messagegroups/messages"
                     }
                 },
                 "*": {
@@ -2220,7 +2222,8 @@
                         "dataschemauri": {
                             "name": "dataschemauri",
                             "description": "The URI of the schema for the message payload, equivalent to the 'schemauri' attribute of the schema registry",
-                            "type": "uri"
+                            "type": "xid",
+                            "target": "/messagegroups/messages"
                         },
                         "datacontenttype": {
                             "name": "datacontenttype",

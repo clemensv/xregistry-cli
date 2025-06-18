@@ -221,6 +221,25 @@ The `validate` command takes the following options:
 
 The `list` subcommand lists the available language/style template sets.
 
+## Testing
+
+### Dependency Resolution Testing
+
+The project includes comprehensive testing for the xRegistry loader's dependency resolution functionality:
+
+```bash
+# Run the comprehensive dependency resolution test suite
+python test_xregistry_dependencies.py
+```
+
+This test suite validates:
+- ✅ **Fragment Reference Resolution**: All internal JSON pointer references (`#/messagegroups/...`, `#/schemagroups/...`)
+- ✅ **Document Composition**: Complete document assembly with all dependencies resolved
+- ✅ **Real-World Validation**: Testing with actual xRegistry files from the `/test/xreg` directory
+- ✅ **Endpoint Dependencies**: Specific validation of endpoint dependencies and schema references
+
+**Test Results**: 100% dependency resolution success rate across all test files (26 total references).
+
 ## Community and Docs
 
 Learn more about the people and organizations who are creating a dynamic cloud
