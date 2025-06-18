@@ -1,0 +1,1 @@
+"""xRegistry generator module."""

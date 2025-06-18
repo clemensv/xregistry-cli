@@ -18,6 +18,7 @@ import jinja2
 import jsonpointer
 from jinja2 import Template, TemplateAssertionError, TemplateNotFound, TemplateRuntimeError, TemplateSyntaxError
 import urllib
+import urllib.parse
 
 from xregistry.cli import logger
 from xregistry.generator.generator_context import GeneratorContext
@@ -62,6 +63,9 @@ class TemplateRenderer:
         self.data_project_dir = self.data_project_name
         self.main_project_name = project_name
         self.src_layout = False
+
+        # Add resource handling for the refactoring
+        self.handled_resources: set[str] = set()
 
         self.ctx.uses_avro = False
         self.ctx.uses_protobuf = False
@@ -195,10 +199,8 @@ class TemplateRenderer:
                         if schema_reference.startswith("/"):
                             schema_reference = urllib.parse.urljoin(self.ctx.base_uri, schema_reference)            
                             schema_reference, fragment = urllib.parse.urldefrag(schema_reference)
-                        
-                        schema_reference, schema_root = self.ctx.loader.load(
-                            schema_reference, self.headers, True, 
-                            ignore_handled=True,
+                          schema_reference, schema_root = self.ctx.loader.load(
+                            schema_reference, self.headers, True,
                             messagegroup_filter=self.ctx.messagegroup_filter)
                         if type_ref:
                             try:
@@ -920,8 +922,6 @@ class TemplateRenderer:
         env.filters['pushfile'] = self.ctx.stacks.push_file
         env.filters['save'] = self.ctx.stacks.save
         env.globals['pop'] = self.ctx.stacks.pop
-        env.globals['stack'] = self.ctx.stacks.stack
-        env.globals['get'] = self.ctx.stacks.get
         env.globals['schema_object'] = SchemaUtils.schema_object
         env.globals['latest_dict_entry'] = SchemaUtils.latest_dict_entry
         env.globals['geturlhost'] = URLUtils.get_url_host
