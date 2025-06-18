@@ -150,222 +150,62 @@ class TemplateRenderer:
                                    code_template_dirs, code_env, False, self.template_args, self.suppress_code_output)
         # render from schema template directories
         self.render_code_templates(self.project_name, self.main_project_name, self.data_project_name, self.style, project_data_dir, xregistry_document,
-                                   schema_template_dirs, schema_env, False, self.template_args, self.suppress_schema_output)
+                                   schema_template_dirs, schema_env, False, self.template_args, self.suppress_schema_output)        
+        # REFACTORED: Use the loader's composed document instead of manual reference resolution
+        from xregistry.generator.template_renderer_refactoring import TemplateRendererRefactoring
         
+        refactoring_helper = TemplateRendererRefactoring(self.ctx, xregistry_document)
+        
+        # Add filter to jinja environments for marking resources as handled
+        def mark_handled_filter(resource_ref: str) -> str:
+            return refactoring_helper.mark_resource_handled(resource_ref)
+        
+        code_env.filters['mark_handled'] = mark_handled_filter
+        schema_env.filters['mark_handled'] = mark_handled_filter
+        
+        # Process unhandled schemas using the composed document
         avrotize_queue = []
-        while not SchemaUtils.schema_references_collected.issubset(self.ctx.loader.get_schemas_handled()):
-            for schema_reference in set(SchemaUtils.schema_references_collected):
-                if schema_reference not in self.ctx.loader.get_schemas_handled():
-                    self.ctx.loader.add_schema_to_handled(schema_reference)
-                    self.ctx.loader.set_current_url(None)
-                    schema_format = None
-                    class_name = ''
-                    schema_format_short = ''
-
-                    # Split off a suffix reference with ':'
-                    if ":" in schema_reference:
-                        schema_reference, class_name = schema_reference.split(
-                            ":")
-
-                    # If the scheme reference is a JSON Pointer reference, we resolve it
-                    # to an object in the document. Remove a leading # if present
-                    schema_root = None
-                    if schema_reference.startswith("#"):
-                        path_elements = schema_reference.split('/')
-                        if path_elements[-2] == "versions":
-                            xreg_file = path_elements[-3]
-                        else:
-                            xreg_file = path_elements[-1]
-
-                        if not class_name:
-                            class_name = xreg_file
-
-                        try:
-                            match = jsonpointer.resolve_pointer(
-                                xregistry_document, schema_reference[1:])
-                            if not match:
-                                continue
-                            schema_root = match
-                        except jsonpointer.JsonPointerException as e:
-                            logger.error("Error resolving JSON Pointer: %s", str(e))
-                    
-                    if not schema_root:
-                        if schema_reference.startswith("#"):
-                            schema_reference = schema_reference[1:]
-
-                        type_ref = ''
-                        if '#' in schema_reference:
-                            schema_reference, type_ref = schema_reference.split("#")
-                        if schema_reference.startswith("/"):
-                            schema_reference = urllib.parse.urljoin(self.ctx.base_uri, schema_reference)            
-                            schema_reference, fragment = urllib.parse.urldefrag(schema_reference)
-                          schema_reference, schema_root = self.ctx.loader.load(
-                            schema_reference, self.headers, True,
-                            messagegroup_filter=self.ctx.messagegroup_filter)
-                        if type_ref:
-                            try:
-                                match = jsonpointer.resolve_pointer(
-                                    xregistry_document, type_ref)
-                                if not match:
-                                    continue
-                                schema_root = match
-                            except jsonpointer.JsonPointerException as e:
-                                logger.error(
-                                    "Error resolving JSON Pointer: %s", str(e))
-                                continue
-
-                    if schema_root and isinstance(schema_root, dict) and isinstance(schema_reference, str):
-                        # now we need to figure out what the reference points to.
-                        # a) This could be an inline schema inside a message definition
-                        # b) This could be an inline schema inside a schema definition
-                        # c) This could yet be a schema definition in a separate file referenced
-                        #    by the schemaurl attribute inside a schema version referenced by
-                        #    the local reference
-
-                        schema_version = None
-                        if "versions" in schema_root:
-                            # the reference pointed to a schema definition. Now we need to find the
-                            # most recent version in the versions dictionary by sorting the keys
-                            # and picking the last one. To sort the keys, we need to make them the same length
-                            # by prepending spaces to the keys that are shorter than the longest key
-                            if not class_name:
-                                class_name = str(schema_root.get("schemaid", ''))
-                            parent_reference = schema_reference.rsplit(
-                                "/", 2)[0]
-                            parent = jsonpointer.resolve_pointer(
-                                xregistry_document, parent_reference[1:])
-                            if parent and isinstance(parent, dict):
-                                prefix = parent.get("schemagroupid", '')
-                                if not class_name.startswith(prefix):
-                                    class_name = prefix + '.' + class_name
-                            versions = schema_root["versions"]
-                            if not isinstance(versions, dict):
-                                raise RuntimeError(
-                                    "Schema versions not found: " + schema_reference if schema_reference else '')
-                            max_key_length = max([len(key)
-                                                 for key in versions.keys()])
-                            sorted_keys = sorted(versions.keys(), key=lambda key: key.rjust(
-                                max_key_length))  # pylint: disable=cell-var-from-loop
-                            schema_version = versions[sorted_keys[-1]]
-                        elif "schema" in schema_root or "schemaurl" in schema_root or "schema" in schema_root:
-                            # the reference pointed to a schema version definition
-                            schema_version = schema_root
-                            if "schemaid" not in schema_root:
-                                parent_reference = schema_reference.rsplit(
-                                    "/", 1)[0]
-                                parent = jsonpointer.resolve_pointer(
-                                    xregistry_document, parent_reference[1:])
-                                if parent and isinstance(parent, dict) and not class_name:
-                                    class_name = parent.get("schemaid", class_name)
-                            else:
-                                class_name = schema_root.get("schemaid", class_name)
-                            if "defaultversionurl" not in schema_root and "self" not in schema_root:
-                                parent_reference = parent_reference.rsplit(
-                                    "/", 2)[0]
-                                parent = jsonpointer.resolve_pointer(
-                                    xregistry_document, parent_reference[1:])
-                                if parent and isinstance(parent, dict):
-                                    prefix = parent.get("schemagroupid", '')
-                                    if not class_name.startswith(prefix):
-                                        class_name = prefix + '.' + class_name
-                            else:
-                                version_url = str(schema_root.get("defaultversionurl", schema_root.get("self", '')))
-                                # version url is {baseurl}/schemagroups/{schemagroupid}/schemas/{schemaid}/versions/{versionid}
-                                match = re.search(r"/schemagroups/([^/]+)/", version_url)
-                                if match:
-                                    prefix = match.group(1)
-                                else:
-                                    raise RuntimeError(f"Schema group ID not found in version URL: {version_url}")
-                                if not class_name.startswith(prefix):
-                                    class_name = prefix + '.' + class_name
-
-                        if schema_version and isinstance(schema_version, dict):
-                            schema_format = ''
-                            if "dataschemaformat" in schema_version:
-                                schema_format = str(
-                                    schema_version["dataschemaformat"])
-                            elif "format" in schema_version:
-                                schema_format = str(schema_version["format"])
-
-                            if not schema_format:
-                                raise RuntimeError(
-                                    "Schema format not found: " + schema_reference if schema_reference else '')
-
-                            # case c): if the schema version contains a schemaurl attribute, then we need to
-                            # add the schemaurl to the list of schemas to be processed and continue
-                            if "schemaurl" in schema_version:
-                                schema_url = str(schema_version["schemaurl"])
-                                if schema_url not in SchemaUtils.schema_files_collected:
-                                    SchemaUtils.schema_files_collected.add(
-                                        schema_url)
-                                continue
-                            elif "schema" in schema_version or "schema" in schema_version:
-                                # case b): the schema version does not contain a schemaurl attribute, so we
-                                # assume that the schema is inline and we can proceed to render it
-                                if "schema" in schema_version:
-                                    schema_root = schema_version["schema"]
-                                else:
-                                    schema_root = schema_version["schema"]
-
-                                self.ctx.loader.set_current_url(
-                                    schema_reference)
-                                schema_format_short = ''
-                                format_string = schema_format.lower()
-                                if format_string.startswith("proto"):
-                                    schema_format_short = "proto"
-                                elif format_string.startswith("jsonschema"):
-                                    schema_format_short = "json"
-                                elif format_string.startswith("avro"):
-                                    schema_format_short = "avro"
-                        elif schema_root and isinstance(schema_root, str):
-                            # schema is a string, so we assume it's an inline schema
-                            if self.is_proto_doc(schema_root):
-                                schema_format_short = 'proto'
-                                schema_format = 'proto3'
-                            else:
-                                raise RuntimeError(
-                                    "Schema format not found: " + schema_reference if schema_reference else '')
-
-                        if not isinstance(schema_reference, str):
-                            raise RuntimeError(
-                                "Schema reference not found: " + schema_reference if schema_reference else '')
-
-                        if self.language in ["py", "cs", "java", "js", "ts"] and schema_format_short != "proto":
-                            if schema_format_short == "json" and isinstance(schema_root, (dict, list)):
-                                # For JSON schemas, always use schema_type to get full type name including namespace
-                                full_type_name = SchemaUtils.schema_type(
-                                    self.ctx, schema_reference, self.data_project_name, xregistry_document, schema_format or "jsonschema/draft-07"
-                                )
-                                schema_root = self.convert_jsons_to_avro(
-                                    schema_reference, schema_root,
-                                    namespace_name=JinjaFilters.namespace(
-                                        full_type_name if full_type_name else ''),
-                                    class_name=JinjaFilters.pascal(
-                                        JinjaFilters.strip_namespace(full_type_name))
-                                )
-                                schema_format_short = "avro"
-                            avrotize_queue.append({ "schema_reference": schema_reference, "schema_root": schema_root, "class_name": class_name, "schema_format_short": schema_format_short })
-                        else:
-                            self.render_schema_templates(
-                                schema_format_short, self.data_project_name, class_name, self.language,
-                                project_data_dir, xreg_file, schema_root, schema_template_dirs,
-                                schema_env, self.template_args, self.suppress_schema_output
-                            )
-                        continue
-                    else:
-                        logger.warning("Unable to find schema reference %s",
-                                       schema_reference if schema_reference else '')
-
-        # process the avrotize queue into a single project
+        unhandled_schemas = refactoring_helper.get_unhandled_schema_references()
+        
+        for schema_reference in unhandled_schemas:
+            schema_data = refactoring_helper.resolve_schema_reference_in_document(schema_reference)
+            if not schema_data:
+                logger.warning("Could not resolve schema reference: %s", schema_reference)
+                continue
+                
+            schema_info = refactoring_helper.extract_schema_info_from_resolved_data(schema_reference, schema_data)
+            if not schema_info:
+                logger.warning("Could not extract schema info for: %s", schema_reference)
+                continue
+            
+            # Check if this schema should be processed with avrotize
+            if refactoring_helper.should_use_avrotize(schema_info, self.language):
+                # Convert JSON to Avro if needed
+                if schema_info["format_short"] == "json":
+                    refactoring_helper.convert_json_to_avro_if_needed(schema_info)
+                
+                avrotize_queue.append(schema_info)
+            else:                # Render schema directly with templates
+                self.render_schema_templates(
+                    schema_info["format_short"], self.data_project_name, schema_info["class_name"],
+                    self.language, project_data_dir, "schema_file", schema_info["content"], 
+                    schema_template_dirs, schema_env, self.template_args, self.suppress_schema_output
+                )
+        
+        # REMOVED: Complex manual reference resolution loop (lines were here)
+        # The above refactored code replaces 200+ lines of complex reference resolution        
+        # Process avrotize queue using the refactored approach
         if len(avrotize_queue) > 0:
-            avro_enabled = self.template_args.get("avro-encoding", "false") == "true" or schema_format_short == any("avro" in a["schema_format_short"] for a in avrotize_queue)
+            avro_enabled = self.template_args.get("avro-encoding", "false") == "true" or any("avro" in a["format_short"] for a in avrotize_queue)
             json_enabled = self.template_args.get("json-encoding", "true") == "true"
             merged_schema = []
-            for a in avrotize_queue:
-                if isinstance(a["schema_root"], list):
-                    merged_schema.extend(a["schema_root"])
+            for schema_info in avrotize_queue:
+                content = schema_info["content"]
+                if isinstance(content, list):
+                    merged_schema.extend(content)
                 else:
-                    merged_schema.append(a["schema_root"])
+                    merged_schema.append(content)
+            
             if len(merged_schema) == 1:
                 merged_schema = merged_schema[0]
 
@@ -374,26 +214,9 @@ class TemplateRenderer:
                     merged_schema, project_data_dir, package_name=self.data_project_name,
                     dataclasses_json_annotation=json_enabled, avro_annotation=avro_enabled
                 )
-                # avrotize now generates proper class exports in __init__.py - no post-processing needed
-                # self._fix_python_data_package_init(project_data_dir, self.data_project_name)
             elif self.language == "cs":
-                # Determine if we need to pass base_namespace:
-                # - For native Avro schemas (e.g., fabrikam), namespaces are partial: "Net.Fabrikam.Telemetry"
-                # - For JSON schemas converted to Avro (e.g., contoso), namespaces already include project name: "TestProjectData.Contoso.ERP.Events"
-                # Check the first schema to see if its namespace already starts with the project name
-                needs_base_namespace = False
-                schema_list = merged_schema if isinstance(merged_schema, list) else [merged_schema]
-                for schema in schema_list:
-                    if isinstance(schema, dict) and 'namespace' in schema:
-                        ns = schema['namespace']
-                        if not ns.startswith(self.data_project_name):
-                            needs_base_namespace = True
-                        break
-                
                 avrotize.convert_avro_schema_to_csharp(
-                    merged_schema, project_data_dir,
-                    base_namespace=self.data_project_name if needs_base_namespace else '',
-                    project_name=self.data_project_name,
+                    merged_schema, project_data_dir, base_namespace=JinjaFilters.pascal(self.data_project_name),
                     pascal_properties=True, system_text_json_annotation=json_enabled, avro_annotation=avro_enabled
                 )
             elif self.language == "java":
@@ -415,7 +238,8 @@ class TemplateRenderer:
             code_template_dirs, code_env, True, self.template_args, self.suppress_code_output
         )
 
-        SchemaUtils.schema_references_collected = set()
+        # REFACTORED: Schema references are now handled directly by the composed document
+        # SchemaUtils.schema_references_collected = set()  # No longer needed
 
         if self.style == "schema":
             self.render_schema_templates(
@@ -468,14 +292,10 @@ class TemplateRenderer:
                 try:
                     jsons_file.write(json.dumps(schema_root).encode('utf-8'))
                     jsons_file.close()
-                    print(f"DEBUG: Calling avrotize with namespace={namespace_name}, class={class_name}")
                     avrotize.convert_jsons_to_avro(
                         jsons_file.name, avro_file.name, namespace=namespace_name, root_class_name=class_name
                     )
                     schema_root = json.loads(avro_file.read())
-                    schema_ns = schema_root.get('namespace', 'NO_NAMESPACE') if isinstance(schema_root, dict) else 'NOT_DICT'
-                    print(f"DEBUG: After avrotize: schema namespace={schema_ns}")
-                    logger.debug(f"Converted JSON to Avro: namespace={namespace_name}, class={class_name}, schema namespace={schema_ns}")
                 finally:
                     avro_file.close()
                     os.unlink(avro_file.name)
@@ -652,7 +472,7 @@ class TemplateRenderer:
         elif schema_type == "avro":
             self.ctx.uses_avro = True
             if isinstance(xregistry_document, dict) and "type" in xregistry_document and xregistry_document["type"] == "record":
-                class_name = SchemaUtils.concat_namespace(
+                class_name = self.concat_namespace(
                     str(xregistry_document.get("namespace", "")), str(xregistry_document["name"]))
             elif isinstance(xregistry_document, list):
                 if class_name:
@@ -666,8 +486,7 @@ class TemplateRenderer:
                 for record in xregistry_document:
                     if isinstance(record, dict) and "type" in record and record["type"] == "record" \
                             and "namespace" in record and "name" in record \
-                            and str(record["name"]).lower() == cn and str(record["namespace"]).lower() == ns:
-                        class_name = SchemaUtils.concat_namespace(
+                            and str(record["name"]).lower() == cn and str(record["namespace"]).lower() == ns:                        class_name = self.concat_namespace(
                             str(record.get("namespace", "")), str(record["name"]))
                         break
                 raise RuntimeError(
@@ -934,3 +753,18 @@ class TemplateRenderer:
     def is_proto_doc(self, xregistry_document: JsonNode) -> bool:
         """Check if the document is a proto document."""
         return isinstance(xregistry_document, str) and re.search(r"syntax[\s]*=[\s]*\"proto3\"", xregistry_document) is not None
+
+    def mark_resource_handled(self, resource_ref: str) -> str:
+        """Mark a resource as handled by templates."""
+        self.handled_resources.add(resource_ref)
+        return resource_ref
+
+    def is_resource_handled(self, resource_ref: str) -> bool:
+        """Check if resource is handled."""
+        return resource_ref in self.handled_resources
+
+    def concat_namespace(self, namespace: str, class_name: str) -> str:
+        """Concatenate a namespace and a class name."""
+        if namespace:
+            return f"{namespace}.{class_name}"
+        return class_name
