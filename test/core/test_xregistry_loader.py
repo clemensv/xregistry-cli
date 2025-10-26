@@ -393,11 +393,12 @@ class TestXRegistryLoader(unittest.TestCase):
     @patch('urllib.request.urlopen')
     def test_load_from_url(self, mock_urlopen):
         """Test loading from HTTP URL."""
+        from unittest.mock import MagicMock
         test_data = {"test": "data"}
         test_json = json.dumps(test_data)
         
-        # Mock HTTP response
-        mock_response = Mock()
+        # Mock HTTP response - use MagicMock to support context manager protocol
+        mock_response = MagicMock()
         mock_response.read.return_value = test_json.encode('utf-8')
         mock_response.__enter__.return_value = mock_response
         mock_response.__exit__.return_value = None
@@ -411,11 +412,12 @@ class TestXRegistryLoader(unittest.TestCase):
     @patch('urllib.request.urlopen')
     def test_load_from_url_with_headers(self, mock_urlopen):
         """Test loading from HTTP URL with custom headers."""
+        from unittest.mock import MagicMock
         test_data = {"test": "data"}
         test_json = json.dumps(test_data)
         
-        # Mock HTTP response
-        mock_response = Mock()
+        # Mock HTTP response - use MagicMock to support context manager protocol
+        mock_response = MagicMock()
         mock_response.read.return_value = test_json.encode('utf-8')
         mock_response.__enter__.return_value = mock_response
         mock_response.__exit__.return_value = None

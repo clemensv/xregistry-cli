@@ -25,16 +25,31 @@ class XRegistryUrlParser:
         self.base_url = f"{self.parsed.scheme}://{self.parsed.netloc}"
         self.path_parts = [p for p in self.parsed.path.strip('/').split('/') if p]
         
+        # Track if this is a registry-level URL
+        self.is_registry_root = False
+        
+        # File paths (no scheme) default to registry level
+        if not self.parsed.scheme or not self.parsed.netloc:
+            self.is_registry_root = True
+            # Keep path_parts for potential file path handling, but mark as registry
+        # If URL starts with /registry, strip it and mark as registry root if that's all there is
+        elif self.path_parts and self.path_parts[0] == 'registry':
+            if len(self.path_parts) == 1:
+                # Just /registry - this is the registry root
+                self.is_registry_root = True
+                self.path_parts = []
+            else:
+                # /registry/something - strip registry prefix
+                self.path_parts = self.path_parts[1:]
+        
     def get_base_url(self) -> str:
         """Get the base registry URL."""
         return self.base_url
     
     def get_entry_type(self) -> str:
         """Determine the type of entry point."""
-        # For URLs like https://example.com/registry, we want registry level
-        # For URLs like https://example.com/registry/schemagroups, we want group_type
-        # So we need to check for the registry root differently
-        if not self.path_parts or (len(self.path_parts) == 1 and self.path_parts[0] in ['registry', '']):
+        # Check for registry root first
+        if self.is_registry_root or not self.path_parts:
             return "registry"
         elif len(self.path_parts) == 1:
             return "group_type"
@@ -53,7 +68,7 @@ class XRegistryUrlParser:
     
     def get_group_type(self) -> Optional[str]:
         """Get the group type (e.g., 'messagegroups', 'schemagroups')."""
-        return self.path_parts[0] if self.path_parts else None
+        return self.path_parts[0] if self.path_parts and not self.is_registry_root else None
     
     def get_group_id(self) -> Optional[str]:
         """Get the group instance ID."""
@@ -100,8 +115,15 @@ class DependencyResolver:
                 
         elif isinstance(data, list):
             for item in data:
-                nested_refs = self.find_xid_references(item, group_type)
-                references.extend(nested_refs)
+                # Check if list item is a string that looks like an xRegistry URL
+                if isinstance(item, str):
+                    # Only include external URLs, not fragment references starting with #
+                    if not item.startswith("#") and any(pattern in item for pattern in group_patterns):
+                        references.append(item)
+                else:
+                    # Recursively check nested structures
+                    nested_refs = self.find_xid_references(item, group_type)
+                    references.extend(nested_refs)
         
         return references
     
