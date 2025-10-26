@@ -111,37 +111,37 @@ cloudEvent.SetAttributeFromString("{{ attrname }}",{%- if attribute.value -%}"{{
 {%- endfor %}
 {%- endmacro-%}
 
-{%- macro DeclareDispatchObjectField(project_name,messagegroup) %}
-{%- set messagegroupname = messagegroup.messagegroupid | pascal %}
-global::{{ messagegroupname | concat_namespace(project_name) | pascal }}.I{{ messagegroupname | strip_namespace }}Dispatcher {{ messagegroup.messagegroupid | strip_namespace | camel }}Dispatcher;
+{%- macro DeclareDispatchObjectField(project_name,messagegroupid,messagegroup) %}
+{%- set messagegroupname = messagegroupid | pascal %}
+global::{{ messagegroupname | concat_namespace(project_name) | pascal }}.I{{ messagegroupname | strip_namespace }}Dispatcher {{ messagegroupid | strip_namespace | camel }}Dispatcher;
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectsFields(project_name,messagegroups) %}
 {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("envelope","CloudEvents/1.0")) -%}
-{{ DeclareDispatchObjectField( project_name, messagegroup )}}
+{{ DeclareDispatchObjectField( project_name, messagegroupid, messagegroup )}}
 {%- endfor %}
 {%- endmacro-%}
 
 
-{%- macro DeclareDispatchObjectMock(project_name,messagegroup) %}
-{%- set messagegroupname = messagegroup.messagegroupid | pascal %}
-private Mock<global::{{ messagegroupname | concat_namespace(project_name) | pascal }}.I{{ messagegroupname | strip_namespace }}Dispatcher> _{{ messagegroup.messagegroupid | strip_namespace | camel }}DispatcherMock;
+{%- macro DeclareDispatchObjectMock(project_name,messagegroupid,messagegroup) %}
+{%- set messagegroupname = messagegroupid | pascal %}
+private Mock<global::{{ messagegroupname | concat_namespace(project_name) | pascal }}.I{{ messagegroupname | strip_namespace }}Dispatcher> _{{ messagegroupid | strip_namespace | camel }}DispatcherMock;
 {%- endmacro-%}
 
-{%- macro SetupDispatchObjectMock(project_name,messagegroup) %}
-{%- set messagegroupname = messagegroup.messagegroupid | pascal %}
-_{{ messagegroup.messagegroupid | strip_namespace | camel }}DispatcherMock = new Mock<global::{{ messagegroupname | concat_namespace(project_name) | pascal }}.I{{ messagegroupname | strip_namespace }}Dispatcher>();
+{%- macro SetupDispatchObjectMock(project_name,messagegroupid,messagegroup) %}
+{%- set messagegroupname = messagegroupid | pascal %}
+_{{ messagegroupid | strip_namespace | camel }}DispatcherMock = new Mock<global::{{ messagegroupname | concat_namespace(project_name) | pascal }}.I{{ messagegroupname | strip_namespace }}Dispatcher>();
 {%- endmacro-%}
 
 {%- macro SetupDispatchObjectMocks(project_name,messagegroups) %}
 {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("envelope","CloudEvents/1.0")) -%}
-{{ SetupDispatchObjectMock( project_name, messagegroup )}}
+{{ SetupDispatchObjectMock( project_name, messagegroupid, messagegroup )}}
 {%- endfor %}
 {%- endmacro-%}
 
 {%- macro DeclareDispatchObjectMocks(project_name,messagegroups) %}
 {%- for messagegroupid, messagegroup in messagegroups.items() if (messagegroup | exists("envelope","CloudEvents/1.0")) -%}
-{{ DeclareDispatchObjectMock( project_name, messagegroup )}}
+{{ DeclareDispatchObjectMock( project_name, messagegroupid, messagegroup )}}
 {%- endfor %}
 {%- endmacro-%}
 
@@ -165,16 +165,16 @@ public {{ class_name }}( {{ args }}{%- if args %}, {%- endif -%}
 {% endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObject(project_name, data_project_name, root, cloudEvent, messagegroup, logger) -%}
+{%- macro DispatchToDispatchObject(project_name, data_project_name, root, cloudEvent, messagegroupid, messagegroup, logger) -%}
 var cloudEventType = {{ cloudEvent }}.Type;
 switch (cloudEventType)
 {
     {% for messageid, message in messagegroup.messages.items() -%}
     {% set messagename = messageid | pascal %}
     case "{{ messageid }}":
-        if ( this.{{ messagegroup.messagegroupid | strip_namespace | camel }}Dispatcher != null )
+        if ( this.{{ messagegroupid | strip_namespace | camel }}Dispatcher != null )
         {
-            await this.{{ messagegroup.messagegroupid | strip_namespace | camel }}Dispatcher.On{{ messagename | strip_namespace }}Async({{ cloudEvent }},
+            await this.{{ messagegroupid | strip_namespace | camel }}Dispatcher.On{{ messagename | strip_namespace }}Async({{ cloudEvent }},
             {%- if message.dataschemauri or message.dataschema -%}
             global::{{ ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal }}.FromData({{ cloudEvent }}.Data, {{cloudEvent}}.DataContentType)
             {%- else -%}

@@ -24,7 +24,8 @@ from cloudevents.http import from_http, CloudEvent
 {%- for _, message in messagegroup.messages.items() -%}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
-{%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace %}
+{%- set class_name = type_name | strip_namespace %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + class_name %}
 {%- if import_statement not in imports %}
 {%- set _ = imports.append(import_statement) %}
 {{ import_statement }}

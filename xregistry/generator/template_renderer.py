@@ -330,12 +330,16 @@ class TemplateRenderer:
 
                         if self.language in ["py", "cs", "java", "js", "ts"] and schema_format_short != "proto":
                             if schema_format_short == "json" and isinstance(schema_root, (dict, list)):
+                                # For JSON schemas, always use schema_type to get full type name including namespace
+                                full_type_name = SchemaUtils.schema_type(
+                                    self.ctx, schema_reference, self.data_project_name, xregistry_document, schema_format or "jsonschema/draft-07"
+                                )
                                 schema_root = self.convert_jsons_to_avro(
                                     schema_reference, schema_root,
                                     namespace_name=JinjaFilters.namespace(
-                                        class_name if class_name else ''),
+                                        full_type_name if full_type_name else ''),
                                     class_name=JinjaFilters.pascal(
-                                        JinjaFilters.strip_namespace(class_name))
+                                        JinjaFilters.strip_namespace(full_type_name))
                                 )
                                 schema_format_short = "avro"
                             avrotize_queue.append({ "schema_reference": schema_reference, "schema_root": schema_root, "class_name": class_name, "schema_format_short": schema_format_short })
@@ -368,10 +372,26 @@ class TemplateRenderer:
                     merged_schema, project_data_dir, package_name=self.data_project_name,
                     dataclasses_json_annotation=json_enabled, avro_annotation=avro_enabled
                 )
+                # avrotize now generates proper class exports in __init__.py - no post-processing needed
+                # self._fix_python_data_package_init(project_data_dir, self.data_project_name)
             elif self.language == "cs":
+                # Determine if we need to pass base_namespace:
+                # - For native Avro schemas (e.g., fabrikam), namespaces are partial: "Net.Fabrikam.Telemetry"
+                # - For JSON schemas converted to Avro (e.g., contoso), namespaces already include project name: "TestProjectData.Contoso.ERP.Events"
+                # Check the first schema to see if its namespace already starts with the project name
+                needs_base_namespace = False
+                schema_list = merged_schema if isinstance(merged_schema, list) else [merged_schema]
+                for schema in schema_list:
+                    if isinstance(schema, dict) and 'namespace' in schema:
+                        ns = schema['namespace']
+                        if not ns.startswith(self.data_project_name):
+                            needs_base_namespace = True
+                        break
+                
                 avrotize.convert_avro_schema_to_csharp(
-                    merged_schema, project_data_dir, base_namespace=JinjaFilters.pascal(
-                        self.data_project_name),
+                    merged_schema, project_data_dir,
+                    base_namespace=self.data_project_name if needs_base_namespace else '',
+                    project_name=self.data_project_name,
                     pascal_properties=True, system_text_json_annotation=json_enabled, avro_annotation=avro_enabled
                 )
             elif self.language == "java":
@@ -446,10 +466,14 @@ class TemplateRenderer:
                 try:
                     jsons_file.write(json.dumps(schema_root).encode('utf-8'))
                     jsons_file.close()
+                    print(f"DEBUG: Calling avrotize with namespace={namespace_name}, class={class_name}")
                     avrotize.convert_jsons_to_avro(
                         jsons_file.name, avro_file.name, namespace=namespace_name, root_class_name=class_name
                     )
                     schema_root = json.loads(avro_file.read())
+                    schema_ns = schema_root.get('namespace', 'NO_NAMESPACE') if isinstance(schema_root, dict) else 'NOT_DICT'
+                    print(f"DEBUG: After avrotize: schema namespace={schema_ns}")
+                    logger.debug(f"Converted JSON to Avro: namespace={namespace_name}, class={class_name}, schema namespace={schema_ns}")
                 finally:
                     avro_file.close()
                     os.unlink(avro_file.name)

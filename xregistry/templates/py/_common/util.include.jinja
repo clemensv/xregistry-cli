@@ -1,7 +1,12 @@
 {%- macro DeclareDataType(project_name, root, message) -%}
 {%- if message.dataschemauri or message.dataschema -%}
 {%- set dataType = ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) ) -%}
-{%- set dataType = ( dataType | namespace | lower )+'.'+(dataType | strip_namespace | pascal) %}
+{%- set ns = dataType | namespace | lower -%}
+{%- if ns -%}
+{%- set dataType = ns + '.' + (dataType | strip_namespace | pascal) -%}
+{%- else -%}
+{%- set dataType = dataType | strip_namespace | pascal -%}
+{%- endif -%}
 {%- else -%}
 {%- set dataType = "object" -%}
 {%- endif -%}

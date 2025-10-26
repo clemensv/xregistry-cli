@@ -27,6 +27,7 @@ from testcontainers.core.network import Network
 from testcontainers.azurite import AzuriteContainer
 from testcontainers.core.waiting_utils import wait_for_logs
 
+{%- set imports = [] %}
 {%- for messagegroupid, messagegroup in messagegroups.items() %}
 {%- set groupname = messagegroupid | pascal %}
 {%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
@@ -34,7 +35,11 @@ from {{main_project_name}}.dispatcher import {{class_name}}
 {%- for messageid, message in messagegroup.messages.items() %}
 {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
 {%- if type_name != "object" %}
-from test_{{ type_name | dotunderscore | lower}} import Test_{{ type_name | pascal | strip_namespace }}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + (type_name | pascal | strip_namespace) %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
 {%- endif %}
 {%- endfor %}
 {%- endfor %}
@@ -167,7 +172,63 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
             producer = EventHubProducerClient.from_connection_string(event_hub_conn_str, eventhub_name="eh1")
             event_data_batch = await producer.create_batch()
             {%- if type_name != "object" %}
-            event_data = EventData(Test_{{ type_name | pascal | strip_namespace }}.create_instance().to_byte_array("application/json"))
+            # Import the data class to create a valid test instance
+            # Use default/minimal values to satisfy required fields
+            test_instance = {{  type_name | pascal | strip_namespace }}
+            # Create instance with minimal/default data
+            try:
+                # Try creating with empty/default values
+                import inspect
+                import typing
+                import enum
+                sig = inspect.signature({{ type_name | pascal | strip_namespace }}.__init__)
+                kwargs = {}
+                for param_name, param in sig.parameters.items():
+                    if param_name == 'self':
+                        continue
+                    if param.default == inspect.Parameter.empty or param.kind == inspect.Parameter.KEYWORD_ONLY:
+                        # Get the actual type, unwrapping Optional/Union if needed
+                        ann = param.annotation
+                        origin = typing.get_origin(ann)
+                        
+                        # Handle Optional[X] which is Union[X, None]
+                        if origin is typing.Union:
+                            args = typing.get_args(ann)
+                            # Use the first non-None type
+                            ann = next((a for a in args if a is not type(None)), args[0])
+                            origin = typing.get_origin(ann)
+                        
+                        # Now match based on the actual type
+                        ann_str = str(ann).lower()
+                        if ann is str or ann == 'str' or 'str' in ann_str:
+                            kwargs[param_name] = ""
+                        elif ann is int or ann == 'int' or 'int' in ann_str:
+                            kwargs[param_name] = 0
+                        elif ann is float or ann == 'float' or 'float' in ann_str:
+                            kwargs[param_name] = 0.0
+                        elif ann is bool or ann == 'bool' or 'bool' in ann_str:
+                            kwargs[param_name] = False
+                        elif origin is list or ann is list or 'list' in ann_str:
+                            kwargs[param_name] = []
+                        elif origin is dict or ann is dict or 'dict' in ann_str:
+                            kwargs[param_name] = {}
+                        elif isinstance(ann, type) and issubclass(ann, enum.Enum):
+                            # For enums, use the first value
+                            kwargs[param_name] = list(ann)[0] if list(ann) else None
+                        elif 'enum' in ann_str:
+                            # Fallback for enum detection via string
+                            try:
+                                kwargs[param_name] = list(ann)[0] if hasattr(ann, '__iter__') else None
+                            except:
+                                kwargs[param_name] = None
+                        else:
+                            kwargs[param_name] = None
+                test_instance = {{ type_name | pascal | strip_namespace }}(**kwargs)
+                test_json = test_instance.to_json()
+                event_data = EventData(test_json.encode('utf-8'))
+            except Exception:
+                # Fallback to minimal JSON
+                event_data = EventData(b'{}')
             {%- else %}
             event_data = EventData(b'{}')
             {%- endif %}

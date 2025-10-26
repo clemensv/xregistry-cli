@@ -107,12 +107,27 @@ class SchemaUtils:
                 schema_version = schema_obj['versions'][latestversion]
                 if not class_name:
                     class_name = str(schema_obj.get("schemaid", ''))
+                if not class_name:
+                    # Extract schema name from the reference path (e.g., /schemagroups/.../schemas/orderData)
+                    path_elements = schema_ref.split('/')
+                    if len(path_elements) >= 2 and path_elements[-2] == 'schemas':
+                        class_name = path_elements[-1]
                 parent_reference = schema_ref.rsplit("/", 2)[0]
                 try:
                     parent = jsonpointer.resolve_pointer(root, parent_reference[1:])
                     if parent and isinstance(parent, dict):
+                        # Try to get schema group ID from the parent object
                         prefix = parent.get("schemagroupid", '')
-                        if not class_name.startswith(prefix):
+                        if not prefix:
+                            # If not in the object, extract from the reference path
+                            # e.g., #/schemagroups/Contoso.ERP.Events/schemas/orderData → parent_reference = #/schemagroups/Contoso.ERP.Events/schemas
+                            # We want "Contoso.ERP.Events"
+                            path_elements = schema_ref.split('/')
+                            for i, elem in enumerate(path_elements):
+                                if elem == 'schemas' and i > 0:
+                                    prefix = path_elements[i - 1]
+                                    break
+                        if class_name and prefix and not class_name.startswith(prefix):
                             class_name = prefix + '.' + class_name
                 except jsonpointer.JsonPointerException:
                     raise RuntimeError(f"Schema not found: {parent_reference}")

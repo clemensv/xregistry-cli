@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -8,12 +8,12 @@
     <ProjectReference Include="..\..\{{ data_project_name }}\src\{{data_project_name}}.csproj" />
   </ItemGroup>
   <ItemGroup>
-    {{- dependency( 'cs','net80', 'Microsoft.Azure.Functions.Worker.Extensions.Http') }}
-    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents') }}
-    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.AspNetCore') }}
-    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.SystemTextJson') }}
-    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Avro') }}
-    {{- dependency( 'cs','net80', 'CloudNative.CloudEvents.Protobuf') }}
-    {{- dependency( 'cs','net80', 'Microsoft.Azure.Functions.Worker') }}
+    {{- dependency( 'cs','net90', 'Microsoft.Azure.Functions.Worker.Extensions.Http') }}
+    {{- dependency( 'cs','net90', 'CloudNative.CloudEvents') }}
+    {{- dependency( 'cs','net90', 'CloudNative.CloudEvents.AspNetCore') }}
+    {{- dependency( 'cs','net90', 'CloudNative.CloudEvents.SystemTextJson') }}
+    {{- dependency( 'cs','net90', 'CloudNative.CloudEvents.Avro') }}
+    {{- dependency( 'cs','net90', 'CloudNative.CloudEvents.Protobuf') }}
+    {{- dependency( 'cs','net90', 'Microsoft.Azure.Functions.Worker') }}
   </ItemGroup>
 </Project>

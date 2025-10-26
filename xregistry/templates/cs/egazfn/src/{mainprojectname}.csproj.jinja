@@ -1,17 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\{{ data_project_name }}\src\{{data_project_name | pascal}}.csproj" />
   </ItemGroup>
   <ItemGroup>
-      {{- dependency( 'cs','net80', 'Azure.Core') }}
-      {{- dependency( 'cs','net80', 'Azure.Core.Amqp') }}
-      {{- dependency( 'cs','net80', 'Azure.Messaging.EventGrid') }}
-      {{- dependency( 'cs','net80', 'Microsoft.Extensions.Logging') }}
-      {{- dependency( 'cs','net80', 'System.Text.Json') }}
+      {{- dependency( 'cs','net90', 'Azure.Core') }}
+      {{- dependency( 'cs','net90', 'Azure.Core.Amqp') }}
+      {{- dependency( 'cs','net90', 'Azure.Messaging.EventGrid') }}
+      {{- dependency( 'cs','net90', 'Microsoft.Extensions.Logging') }}
+      {{- dependency( 'cs','net90', 'System.Text.Json') }}
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">

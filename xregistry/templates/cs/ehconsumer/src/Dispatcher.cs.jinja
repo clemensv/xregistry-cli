@@ -255,7 +255,8 @@ namespace {{ project_name | pascal }}
     {%- for uri in messagegroupuris %}
     {%- set messagegroup = schema_object( root, uri ) -%}
     {%- if messagegroup %}
-    {%- set messagegroupname = messagegroup.messagegroupid | pascal -%}
+    {%- set messagegroupid = uri.split('/')[-1] -%}
+    {%- set messagegroupname = messagegroupid | pascal -%}
     global::{{ messagegroupname | concat_namespace(project_name) | pascal }}.{{ messagegroupname | strip_namespace }}EventDispatcher? {{ messagegroupname | strip_namespace | camel }}Dispatcher = null
     {%- if not loop.last -%}, {%- endif -%}
     {%- endif %}
@@ -267,7 +268,8 @@ namespace {{ project_name | pascal }}
     {%- for uri in messagegroupuris %}
     {%- set messagegroup = schema_object( root, uri ) -%}
     {% if messagegroup %}
-    {%- set messagegroupname = messagegroup.messagegroupid | pascal -%}
+    {%- set messagegroupid = uri.split('/')[-1] -%}
+    {%- set messagegroupname = messagegroupid | pascal -%}
     {{- messagegroupname | strip_namespace | camel }}Dispatcher != null?{{- messagegroupname | strip_namespace | camel }}Dispatcher.ProcessEventAsync({{ arg }}):Task.CompletedTask
     {%- if not loop.last -%}, {%- endif -%}
     {%- endif %}
