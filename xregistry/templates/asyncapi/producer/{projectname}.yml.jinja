@@ -136,14 +136,14 @@ components:
           schema:
               $ref: "#/components/schemas/{{ message.dataschemauri[1:].split('/')[-3] | pascal }}.{{ message.dataschemauri[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
-                  {%- set fileName = (schemaObj.schemaid | lower | snake) +".proto" -%}
+                  {%- set fileName = (message.dataschemauri.split('/')[-1].split(':')[-1] | lower | snake) +".proto" -%}
                   {%- set x = schemaVersion.schema | pushfile(fileName) %}
       payload:
         schemaFormat: "application/vnd.google.protobuf;version={{schemaObj.format.split('/')[-1]}};type=proto"
         schema:
             $ref: "{{ fileName }}"
                   {%- elif schemaObj.format.lower().startswith("avro")%}
-                  {%- set fileName = (schemaObj.schemaid | lower | snake) +".avsc" -%}
+                  {%- set fileName = (message.dataschemauri.split('/')[-1].split(':')[-1] | lower | snake) +".avsc" -%}
                   {%- set x = schemaVersion.schema | tojson | pushfile(fileName) %}
       payload:
         schemaFormat: "application/vnd.apache.avro;version={{schemaObj.format.split('/')[-1]}}"
@@ -207,11 +207,11 @@ components:
                   {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
                   $ref: "#/components/schemas/{{ message.dataschemauri[1:].split('/')[-3] | pascal }}.{{ message.dataschemauri[1:].split('/')[-1] | pascal }}"
                   {%- elif schemaObj.format.lower().startswith("protobuf")%}
-                  {%- set x = schemaVersion.schema | pushfile(schemaObj.schemaid+".proto") %}
+                  {%- set x = schemaVersion.schema | pushfile(message.dataschemauri.split('/')[-1].split(':')[-1]+".proto") %}
                   type: string
                   format: binary
                   {%- elif schemaObj.format.lower().startswith("avro")%}
-                  {%- set x = schemaVersion.schema | tojson | pushfile(schemaObj.schemaid+".avsc") %}
+                  {%- set x = schemaVersion.schema | tojson | pushfile(message.dataschemauri.split('/')[-1].split(':')[-1]+".avsc") %}
                   type: string
                   format: binary
                   {%- endif -%}
