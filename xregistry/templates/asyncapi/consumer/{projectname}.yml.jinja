@@ -63,12 +63,12 @@ channels:
 operations:
 {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
   {%- for messageid, message in messagegroup.messages.items() %}
-  {{ messageid | strip_dots | pascal }}Send:
-    action: send
+  {{ messageid | strip_dots | pascal }}Receive:
+    action: receive
     channel:
       $ref: "#/channels/{{ messagegroupid | strip_dots }}"
-    title: "Send {{ messageid }}"
-    summary: "Send {{ message.description }}"
+    title: "Receive {{ messageid }}"
+    summary: "Receive {{ message.description }}"
     messages:
       - $ref: "#/channels/{{ messagegroupid | strip_dots }}/messages/{{ messageid | strip_dots | pascal }}"
   {%- endfor %}
