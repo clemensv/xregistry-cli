@@ -61,14 +61,14 @@ def catalog_container():
             if time.time() > timeout:
                 raise Exception("Catalog container did not start in time: HTTP service not available on port 8080")
             time.sleep(1)
-        # load /xregistry/schemas/_model.json, GET /model from the server, merge the local model with the remote model, and PUT the merged model back to the server
+        # load /xregistry/schemas/_model.json, GET /modelsource from the server, merge the local model with the remote model, and PUT the merged model back to the server
         local_model_path = os.path.join(project_root, "xregistry", "schemas", "_model.json")
         with open(local_model_path, "r") as local_model_file:
             local_model = json.load(local_model_file)
         remote_model = None
         try:
             # Fetch the current model from the catalog
-            get_response = requests.get(f"{CATALOG_URL}/model")
+            get_response = requests.get(f"{CATALOG_URL}/modelsource")
             get_response.raise_for_status()
             remote_model = get_response.json()
 
@@ -76,11 +76,18 @@ def catalog_container():
             merged_model = {**remote_model, **local_model}
 
             # Update the catalog with the merged model via PUT
-            put_response = requests.put(f"{CATALOG_URL}/model", json=merged_model)
+            put_response = requests.put(f"{CATALOG_URL}/modelsource", json=merged_model)
+            if put_response.status_code != 200:
+                print(f"PUT /model failed with status {put_response.status_code}")
+                print(f"Response body: {put_response.text}")
             put_response.raise_for_status()
             print("Model merged and updated successfully.")
         except Exception as e:
             print(f"Error during model merge: {e}")
+            # Print response details if available
+            if 'put_response' in locals():
+                print(f"Response status: {put_response.status_code}")
+                print(f"Response body: {put_response.text}")
             # Try to get logs if container exists
             if container:
                 try:
