@@ -1,38 +1,38 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
-    "messagegroups": {
-        "Contoso.MyGroup": {
-            "protocol": "AMQP/1.0",
-            "messages": {
-                "Contoso.MyGroup.MyEvent": {
-                    "protocol": "AMQP/1.0",
-                    "protocoloptions": {
-                        "properties": {
-                            "subject": {
-                                "type": "string",
-                                "value": "myvalue"
-                            }
-                        }
-                    },
-                    "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
-                }
+  "$schema": "https://cloudevents.io/schemas/registry",
+  "specversion": "1.0-rc2",
+  "messagegroups": {
+    "Contoso.MyGroup": {
+      "protocol": "AMQP/1.0",
+      "messages": {
+        "Contoso.MyGroup.MyEvent": {
+          "protocol": "AMQP/1.0",
+          "protocoloptions": {
+            "properties": {
+              "subject": {
+                "type": "string",
+                "value": "myvalue"
+              }
             }
+          },
+          "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
         }
-    },
-    "schemagroups": {
-        "Contoso.MyEvents": {
-            "schemas": {
-                "MyEventData": {
-                    "format": "XSD/1.0",
-                    "versions": {
-                        "1.0": {
-                            "format": "XSD/1.0",
-                            "schemaurl": "  https://contoso.com/schemas/myeventdata/1.0.xsd"
-                        }
-                    }
-                }
-            }
-        }
+      }
     }
+  },
+  "schemagroups": {
+    "Contoso.MyEvents": {
+      "schemas": {
+        "MyEventData": {
+          "format": "XSD/1.0",
+          "versions": {
+            "1.0": {
+              "format": "XSD/1.0",
+              "schemaurl": "  https://contoso.com/schemas/myeventdata/1.0.xsd"
+            }
+          }
+        }
+      }
+    }
+  }
 }

@@ -1,30 +1,32 @@
 {
-    "$schema": "http://xregistry.io/schema/endpoints-messagegroups-schemagroups",
-    "specversion": "0.5-wip",
-    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "messagegroups": {
-        "com.example.group1": {
-            "envelope": "CloudEvents/1.0",
-            "messages": {
-                "com.example.group1.event1": {
-                    "envelope": "CloudEvents/1.0",
-                    "envelopemetadata": {
-                        "type": {
-                            "value": "com.example.group1.event1"
-                        }
-                    },
-                    "dataschemaformat": "JSONSchema/draft-07",
-                    "dataschema": {
-                        "$schema": "http://json-schema.org/draft-07/schema",
-                        "type": "object",
-                        "properties": {
-                            "a": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
+  "$schema": "http://xregistry.io/schema/endpoints-messagegroups-schemagroups",
+  "specversion": "1.0-rc2",
+  "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
+  "messagegroups": {
+    "com.example.group1": {
+      "envelope": "CloudEvents/1.0",
+      "messages": {
+        "com.example.group1.event1": {
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "attributes": {
+              "type": {
+                "value": "com.example.group1.event1"
+              }
             }
+          },
+          "dataschemaformat": "JSONSchema/draft-07",
+          "dataschema": {
+            "$schema": "http://json-schema.org/draft-07/schema",
+            "type": "object",
+            "properties": {
+              "a": {
+                "type": "string"
+              }
+            }
+          }
         }
+      }
     }
+  }
 }

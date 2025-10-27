@@ -1,51 +1,51 @@
 {
-    "$schema": "http://xregistry.io/schema/endpoints-messagegroups-schemagroups",
-    "specversion": "0.5-wip",
-    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "messagegroups": {
-        "com.example.group1": {
-            "id": "com.example.group1",
-            "format": "CloudEvents/1.0",
-            "messages": {
-                "com.example.group1.event1": {
-                    "id": "com.example.group1.event1",
-                    "format": "CloudEvents/1.0",
-                    "metadata": {
-                        "type": {
-                            "value": "com.example.group1.event1"
-                        }
-                    },
-                    "dataschemaformat": "JSONSchema/draft-07",
-                    "schemaurl": "#/schemagroups/com.example.group1/schemas/com.example.group1.schema1"
-                }
+  "$schema": "http://xregistry.io/schema/endpoints-messagegroups-schemagroups",
+  "specversion": "1.0-rc2",
+  "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
+  "messagegroups": {
+    "com.example.group1": {
+      "id": "com.example.group1",
+      "format": "CloudEvents/1.0",
+      "messages": {
+        "com.example.group1.event1": {
+          "id": "com.example.group1.event1",
+          "format": "CloudEvents/1.0",
+          "metadata": {
+            "type": {
+              "value": "com.example.group1.event1"
             }
+          },
+          "dataschemaformat": "JSONSchema/draft-07",
+          "schemaurl": "#/schemagroups/com.example.group1/schemas/com.example.group1.schema1"
         }
-    },
-    "schemagroups": {
-        "com.example.group1": {
-            "id": "com.example.group1",
-            "format": "JSONSchema/draft-07",
-            "schemas": {
-                "com.example.group1.schema1": {
-                    "id": "com.example.group1.schema1",
-                    "defaultversionid": "1",
-                    "versions": {
-                        "1": {
-                            "id": "1",
-                            "format": "JSONSchema/draft-07",
-                            "schema": {
-                                "$schema": "http://json-schema.org/draft-07/schema",
-                                "type": "object",
-                                "properties": {
-                                    "a": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+      }
     }
+  },
+  "schemagroups": {
+    "com.example.group1": {
+      "id": "com.example.group1",
+      "format": "JSONSchema/draft-07",
+      "schemas": {
+        "com.example.group1.schema1": {
+          "id": "com.example.group1.schema1",
+          "defaultversionid": "1",
+          "versions": {
+            "1": {
+              "id": "1",
+              "format": "JSONSchema/draft-07",
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema",
+                "type": "object",
+                "properties": {
+                  "a": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

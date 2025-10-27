@@ -1,174 +1,176 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "messagegroups": {
-        "net.fabrikam.telemetry": {
-            "envelope": "CloudEvents/1.0",
-            "messages": {
-                "net.fabrikam.telemetry.channel": {
-                    "description": "Channel Timeseries Event",
-                    "envelope": "CloudEvents/1.0",
-                    "envelopemetadata": {
-                        "type": {
-                            "value": "net.fabrikam.telemetry.channel"
-                        },
-                        "source": {
-                            "type": "uritemplate",
-                            "value": "fza://{tenantid}/{carId}"
-                        },
-                        "subject": {
-                            "type": "uritemplate",
-                            "value": "{channelId}"
-                        },
-                        "time": {
-                            "required": true
-                        }
-                    },
-                    "dataschemaformat": "AVRO/1.11.1",
-                    "dataschemauri": "#/schemagroups/net.fabrikam.telemetry/schemas/net.fabrikam.telemetry.channel"
-                }
+  "$schema": "https://cloudevents.io/schemas/registry",
+  "messagegroups": {
+    "net.fabrikam.telemetry": {
+      "envelope": "CloudEvents/1.0",
+      "messages": {
+        "net.fabrikam.telemetry.channel": {
+          "description": "Channel Timeseries Event",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "attributes": {
+              "type": {
+                "value": "net.fabrikam.telemetry.channel"
+              },
+              "source": {
+                "type": "uritemplate",
+                "value": "fza://{tenantid}/{carId}"
+              },
+              "subject": {
+                "type": "uritemplate",
+                "value": "{channelId}"
+              },
+              "time": {
+                "required": true
+              }
             }
+          },
+          "dataschemaformat": "AVRO/1.11.1",
+          "dataschemauri": "#/schemagroups/net.fabrikam.telemetry/schemas/net.fabrikam.telemetry.channel"
         }
-    },
-    "schemagroups": {
-        "net.fabrikam.telemetry": {
-            "schemas": {
-                "net.fabrikam.telemetry.channel": {
-                    "description": "Channel Timeseries Event Data",
-                    "defaultversionid": "1",
-                    "versions": {
-                        "1": {
-                            "format": "AVRO/1.11.1",
-                            "schema": {
-                                "name": "Channel",
-                                "type": "record",
-                                "namespace": "Net.Fabrikam.Telemetry",
-                                "fields": [
-                                    {
-                                        "name": "ChannelId",
-                                        "doc": "The unique identifier of the channel",
-                                        "type": {
-                                            "name": "ChannelType",
-                                            "type": "enum",
-                                            "symbols": [
-                                                "EngineMaxRpm",
-                                                "EngineIdleRpm",
-                                                "CurrentEngineRpm",
-                                                "AccelerationX",
-                                                "AccelerationY",
-                                                "AccelerationZ",
-                                                "VelocityX",
-                                                "VelocityY",
-                                                "VelocityZ",
-                                                "AngularVelocityX",
-                                                "AngularVelocityY",
-                                                "AngularVelocityZ",
-                                                "Yaw",
-                                                "Pitch",
-                                                "Roll",
-                                                "NormalizedSuspensionTravelFrontLeft",
-                                                "NormalizedSuspensionTravelFrontRight",
-                                                "NormalizedSuspensionTravelRearLeft",
-                                                "NormalizedSuspensionTravelRearRight",
-                                                "TireSlipRatioFrontLeft",
-                                                "TireSlipRatioFrontRight",
-                                                "TireSlipRatioRearLeft",
-                                                "TireSlipRatioRearRight",
-                                                "WheelRotationSpeedFrontLeft",
-                                                "WheelRotationSpeedFrontRight",
-                                                "WheelRotationSpeedRearLeft",
-                                                "WheelRotationSpeedRearRight",
-                                                "WheelOnRumbleStripFrontLeft",
-                                                "WheelOnRumbleStripFrontRight",
-                                                "WheelOnRumbleStripRearLeft",
-                                                "WheelOnRumbleStripRearRight",
-                                                "WheelInPuddleDepthFrontLeft",
-                                                "WheelInPuddleDepthFrontRight",
-                                                "WheelInPuddleDepthRearLeft",
-                                                "WheelInPuddleDepthRearRight",
-                                                "SurfaceRumbleFrontLeft",
-                                                "SurfaceRumbleFrontRight",
-                                                "SurfaceRumbleRearLeft",
-                                                "SurfaceRumbleRearRight",
-                                                "TireSlipAngleFrontLeft",
-                                                "TireSlipAngleFrontRight",
-                                                "TireSlipAngleRearLeft",
-                                                "TireSlipAngleRearRight",
-                                                "TireCombinedSlipFrontLeft",
-                                                "TireCombinedSlipFrontRight",
-                                                "TireCombinedSlipRearLeft",
-                                                "TireCombinedSlipRearRight",
-                                                "SuspensionTravelMetersFrontLeft",
-                                                "SuspensionTravelMetersFrontRight",
-                                                "SuspensionTravelMetersRearLeft",
-                                                "SuspensionTravelMetersRearRight"
-                                            ]
-                                        }
-                                    },
-                                    {
-                                        "name": "CarId",
-                                        "doc": "The unique identifier of the car",
-                                        "type": [
-                                            "null",
-                                            "string"
-                                        ]
-                                    },
-                                    {
-                                        "name": "SessionId",
-                                        "doc": "The unique identifier of the session",
-                                        "type": [
-                                            "null",
-                                            "string"
-                                        ]
-                                    },
-                                    {
-                                        "name": "LapId",
-                                        "type": [
-                                            "null",
-                                            "string"
-                                        ]
-                                    },
-                                    {
-                                        "name": "SampleCount",
-                                        "doc": "The number of samples in this batch",
-                                        "type": "long"
-                                    },
-                                    {
-                                        "name": "Frequency",
-                                        "doc": "The frequency of the channel",
-                                        "type": "long"
-                                    },
-                                    {
-                                        "name": "Timespan",
-                                        "type": {
-                                            "name": "BatchTimespan",
-                                            "type": "record",
-                                            "fields": [
-                                                {
-                                                    "name": "StartTS",
-                                                    "type": "long",
-                                                    "logicalType": "timestamp-millis"
-                                                },
-                                                {
-                                                    "name": "EndTS",
-                                                    "type": "long",
-                                                    "logicalType": "timestamp-millis"
-                                                }
-                                            ]
-                                        }
-                                    },
-                                    {
-                                        "name": "Data",
-                                        "type": {
-                                            "type": "array",
-                                            "items": "double"
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-            }
-        }
+      }
     }
+  },
+  "schemagroups": {
+    "net.fabrikam.telemetry": {
+      "schemas": {
+        "net.fabrikam.telemetry.channel": {
+          "description": "Channel Timeseries Event Data",
+          "defaultversionid": "1",
+          "versions": {
+            "1": {
+              "format": "AVRO/1.11.1",
+              "schema": {
+                "name": "Channel",
+                "type": "record",
+                "namespace": "Net.Fabrikam.Telemetry",
+                "fields": [
+                  {
+                    "name": "ChannelId",
+                    "doc": "The unique identifier of the channel",
+                    "type": {
+                      "name": "ChannelType",
+                      "type": "enum",
+                      "symbols": [
+                        "EngineMaxRpm",
+                        "EngineIdleRpm",
+                        "CurrentEngineRpm",
+                        "AccelerationX",
+                        "AccelerationY",
+                        "AccelerationZ",
+                        "VelocityX",
+                        "VelocityY",
+                        "VelocityZ",
+                        "AngularVelocityX",
+                        "AngularVelocityY",
+                        "AngularVelocityZ",
+                        "Yaw",
+                        "Pitch",
+                        "Roll",
+                        "NormalizedSuspensionTravelFrontLeft",
+                        "NormalizedSuspensionTravelFrontRight",
+                        "NormalizedSuspensionTravelRearLeft",
+                        "NormalizedSuspensionTravelRearRight",
+                        "TireSlipRatioFrontLeft",
+                        "TireSlipRatioFrontRight",
+                        "TireSlipRatioRearLeft",
+                        "TireSlipRatioRearRight",
+                        "WheelRotationSpeedFrontLeft",
+                        "WheelRotationSpeedFrontRight",
+                        "WheelRotationSpeedRearLeft",
+                        "WheelRotationSpeedRearRight",
+                        "WheelOnRumbleStripFrontLeft",
+                        "WheelOnRumbleStripFrontRight",
+                        "WheelOnRumbleStripRearLeft",
+                        "WheelOnRumbleStripRearRight",
+                        "WheelInPuddleDepthFrontLeft",
+                        "WheelInPuddleDepthFrontRight",
+                        "WheelInPuddleDepthRearLeft",
+                        "WheelInPuddleDepthRearRight",
+                        "SurfaceRumbleFrontLeft",
+                        "SurfaceRumbleFrontRight",
+                        "SurfaceRumbleRearLeft",
+                        "SurfaceRumbleRearRight",
+                        "TireSlipAngleFrontLeft",
+                        "TireSlipAngleFrontRight",
+                        "TireSlipAngleRearLeft",
+                        "TireSlipAngleRearRight",
+                        "TireCombinedSlipFrontLeft",
+                        "TireCombinedSlipFrontRight",
+                        "TireCombinedSlipRearLeft",
+                        "TireCombinedSlipRearRight",
+                        "SuspensionTravelMetersFrontLeft",
+                        "SuspensionTravelMetersFrontRight",
+                        "SuspensionTravelMetersRearLeft",
+                        "SuspensionTravelMetersRearRight"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "CarId",
+                    "doc": "The unique identifier of the car",
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  {
+                    "name": "SessionId",
+                    "doc": "The unique identifier of the session",
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  {
+                    "name": "LapId",
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  {
+                    "name": "SampleCount",
+                    "doc": "The number of samples in this batch",
+                    "type": "long"
+                  },
+                  {
+                    "name": "Frequency",
+                    "doc": "The frequency of the channel",
+                    "type": "long"
+                  },
+                  {
+                    "name": "Timespan",
+                    "type": {
+                      "name": "BatchTimespan",
+                      "type": "record",
+                      "fields": [
+                        {
+                          "name": "StartTS",
+                          "type": "long",
+                          "logicalType": "timestamp-millis"
+                        },
+                        {
+                          "name": "EndTS",
+                          "type": "long",
+                          "logicalType": "timestamp-millis"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "name": "Data",
+                    "type": {
+                      "type": "array",
+                      "items": "double"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

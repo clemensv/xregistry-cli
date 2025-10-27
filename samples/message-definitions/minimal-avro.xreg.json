@@ -1,93 +1,95 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
-    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "messagegroups": {
-        "Contoso.ERP.Events": {
-            "envelope": "CloudEvents/1.0",
-            "messages": {
-                "Contoso.ERP.Events.ReservationPlaced": {
-                    "description": "A reservation has been placed",
-                    "envelope": "CloudEvents/1.0",
-                    "envelopemetadata": {
-                        "id": {
-                            "type": "string",
-                            "required": true
-                        },
-                        "type": {
-                            "type": "string",
-                            "value": "Contoso.ERP.Events.ReservationPlaced",
-                            "required": true
-                        },
-                        "time": {
-                            "type": "datetime",
-                            "required": true
-                        },
-                        "source": {
-                            "type": "uritemplate",
-                            "value": "/erp/orders/{orderid}",
-                            "required": true
-                        }
-                    },
-                    "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
-                }
+  "$schema": "https://cloudevents.io/schemas/registry",
+  "specversion": "1.0-rc2",
+  "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
+  "messagegroups": {
+    "Contoso.ERP.Events": {
+      "envelope": "CloudEvents/1.0",
+      "messages": {
+        "Contoso.ERP.Events.ReservationPlaced": {
+          "description": "A reservation has been placed",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "attributes": {
+              "id": {
+                "type": "string",
+                "required": true
+              },
+              "type": {
+                "type": "string",
+                "value": "Contoso.ERP.Events.ReservationPlaced",
+                "required": true
+              },
+              "time": {
+                "type": "datetime",
+                "required": true
+              },
+              "source": {
+                "type": "uritemplate",
+                "value": "/erp/orders/{orderid}",
+                "required": true
+              }
             }
+          },
+          "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"
         }
-    },
-    "schemagroups": {
-        "Contoso.ERP.Events": {
-            "schemas": {
-                "orderData": {
-                    "format": "Avro/1.8.2",
-                    "versions": {
-                        "1": {
-                            "format": "Avro/1.8.2",
-                            "schema": {
-                                "type": "record",
-                                "name": "OrderData",
-                                "fields": [
-                                    {
-                                        "name": "orderId",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "customerId",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "total",
-                                        "type": "double"
-                                    },
-                                    {
-                                        "name": "items",
-                                        "type": {
-                                            "type": "array",
-                                            "items": {
-                                                "name": "Item",
-                                                "type": "record",
-                                                "fields": [
-                                                    {
-                                                        "name": "productId",
-                                                        "type": "string"
-                                                    },
-                                                    {
-                                                        "name": "quantity",
-                                                        "type": "double"
-                                                    },
-                                                    {
-                                                        "name": "price",
-                                                        "type": "double"
-                                                    }
-                                                ]
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-            }
-        }
+      }
     }
+  },
+  "schemagroups": {
+    "Contoso.ERP.Events": {
+      "schemas": {
+        "orderData": {
+          "format": "Avro/1.8.2",
+          "versions": {
+            "1": {
+              "format": "Avro/1.8.2",
+              "schema": {
+                "type": "record",
+                "name": "OrderData",
+                "fields": [
+                  {
+                    "name": "orderId",
+                    "type": "string"
+                  },
+                  {
+                    "name": "customerId",
+                    "type": "string"
+                  },
+                  {
+                    "name": "total",
+                    "type": "double"
+                  },
+                  {
+                    "name": "items",
+                    "type": {
+                      "type": "array",
+                      "items": {
+                        "name": "Item",
+                        "type": "record",
+                        "fields": [
+                          {
+                            "name": "productId",
+                            "type": "string"
+                          },
+                          {
+                            "name": "quantity",
+                            "type": "double"
+                          },
+                          {
+                            "name": "price",
+                            "type": "double"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
