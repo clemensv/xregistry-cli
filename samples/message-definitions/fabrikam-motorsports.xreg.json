@@ -1,5 +1,4 @@
 {
-  "$schema": "https://cloudevents.io/schemas/registry",
   "messagegroups": {
     "net.fabrikam.telemetry": {
       "envelope": "CloudEvents/1.0",

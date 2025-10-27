@@ -1,5 +1,4 @@
 {
-  "specversion": "1.0-rc2",
   "messagegroups": {
     "Fabrikam.InkJetPrinter": {
       "envelope": "CloudEvents/1.0",
