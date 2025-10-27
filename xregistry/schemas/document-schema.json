@@ -1156,8 +1156,17 @@
           "description": "Time of the object modification"
         },
         "usage": {
-          "type": "string",
-          "description": "Client's expected usage of this endpoint"
+          "type": "array",
+          "description": "Client's expected usage of this endpoint",
+          "items": {
+            "type": "string",
+            "enum": [
+              "subscriber",
+              "consumer",
+              "producer"
+            ]
+          },
+          "minItems": 1
         },
         "channel": {
           "type": "string",

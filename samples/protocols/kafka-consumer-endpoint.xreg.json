@@ -1,90 +1,92 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
-    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "endpoints": {
-        "Fabrikam.RedmondUsWa.Building42.Environment.Temperature": {
-            "usage": "consumer",
-            "protocol": "KAFKA",
-            "deployed": false,
-            "endpoints": [
-                {
-                    "uri": "SSL://myserver.example.com"
-                }
-            ],
-            "protocoloptions": {
-                "topic": "temperature",
-                "consumer-group": "specificgroup"
-            },
-            "messagegroups": [
-                "#/messagegroups/Contoso.MyGroup"
-            ],
-            "envelope": "CloudEvents/1.0"
-        }
-    },
-    "messagegroups": {
-        "Contoso.Sensors.Temperature": {
-            "envelope": "CloudEvents/1.0",
-            "messages": {
-                "Contoso.Sensors.Temperature.Metrics": {
-                    "description": "A set of metrics emitted by a temperature sensor",
-                    "envelope": "CloudEvents/1.0",
-                    "envelopemetadata": {
-                        "type": {
-                            "type": "string",
-                            "value": "Contoso.Sensors.Temperature.Metrics",
-                            "required": true
-                        },
-                        "source": {
-                            "type": "uritemplate",
-                            "value": "/contoso/{site}/sensors/{sensorid}",
-                            "required": true
-                        }
-                    },
-                    "dataschemaformat": "Avro/1.11.0",
-                    "dataschemauri": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
-                }
-            }
-        }
-    },
-    "schemagroups": {
-        "Contoso.Sensors.Temperature": {
-            "schemas": {
-                "temperatureData": {
-                    "format": "Avro/1.11.0",
-                    "versions": {
-                        "1": {
-                            "format": "Avro/1.11.0",
-                            "schema": {
-                                "type": "record",
-                                "name": "TemperatureData",
-                                "fields": [
-                                    {
-                                        "name": "metrics",
-                                        "type": {
-                                            "type": "array",
-                                            "items": {
-                                                "name": "Metric",
-                                                "type": "record",
-                                                "fields": [
-                                                    {
-                                                        "name": "timestamp",
-                                                        "type": "long"
-                                                    },
-                                                    {
-                                                        "name": "value",
-                                                        "type": "double"
-                                                    }
-                                                ]
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-            }
-        }
+  "$schema": "https://cloudevents.io/schemas/registry",
+  "specversion": "0.5-wip",
+  "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
+  "endpoints": {
+    "Fabrikam.RedmondUsWa.Building42.Environment.Temperature": {
+      "usage": [
+        "consumer"
+      ],
+      "protocol": "KAFKA",
+      "protocoloptions": {
+        "topic": "temperature",
+        "consumer-group": "specificgroup",
+        "deployed": false,
+        "endpoints": [
+          {
+            "uri": "SSL://myserver.example.com"
+          }
+        ]
+      },
+      "messagegroups": [
+        "#/messagegroups/Contoso.MyGroup"
+      ],
+      "envelope": "CloudEvents/1.0"
     }
+  },
+  "messagegroups": {
+    "Contoso.Sensors.Temperature": {
+      "envelope": "CloudEvents/1.0",
+      "messages": {
+        "Contoso.Sensors.Temperature.Metrics": {
+          "description": "A set of metrics emitted by a temperature sensor",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "type": {
+              "type": "string",
+              "value": "Contoso.Sensors.Temperature.Metrics",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/contoso/{site}/sensors/{sensorid}",
+              "required": true
+            }
+          },
+          "dataschemaformat": "Avro/1.11.0",
+          "dataschemauri": "#/schemagroupsContoso.Sensors.Temperature/schemas/temperatureData:TemperatureData"
+        }
+      }
+    }
+  },
+  "schemagroups": {
+    "Contoso.Sensors.Temperature": {
+      "schemas": {
+        "temperatureData": {
+          "format": "Avro/1.11.0",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.0",
+              "schema": {
+                "type": "record",
+                "name": "TemperatureData",
+                "fields": [
+                  {
+                    "name": "metrics",
+                    "type": {
+                      "type": "array",
+                      "items": {
+                        "name": "Metric",
+                        "type": "record",
+                        "fields": [
+                          {
+                            "name": "timestamp",
+                            "type": "long"
+                          },
+                          {
+                            "name": "value",
+                            "type": "double"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
