@@ -248,8 +248,14 @@ class RefactoredTemplateRenderer:
     def _resolve_schema_reference(self, schema_ref: str, root_document: JsonNode) -> Optional[JsonNode]:
         """Resolve a schema reference to its actual data."""
         try:
-            if schema_ref.startswith("#"):                # JSON pointer reference - already resolved in composed document
-                result = jsonpointer.resolve_pointer(root_document, schema_ref[1:])
+            if schema_ref.startswith("#"):
+                # xRegistry fragment reference - convert to JSON pointer format
+                # xRegistry uses: #schemagroups/group/schemas/name/versions/v1/schema
+                # JSON Pointer needs: /schemagroups/group/schemas/name/versions/v1/schema
+                pointer = schema_ref[1:]  # Remove #
+                if not pointer.startswith('/'):
+                    pointer = '/' + pointer  # Add leading / for JSON Pointer
+                result = jsonpointer.resolve_pointer(root_document, pointer)
                 return result  # type: ignore
             else:
                 # External reference - check if available from loader

@@ -65,8 +65,14 @@ class TemplateRendererRefactoring:
     def resolve_schema_reference_in_document(self, schema_ref: str) -> Optional[JsonNode]:
         """Resolve a schema reference in the composed document."""
         try:
-            if schema_ref.startswith("#"):                # JSON pointer - resolve in composed document
-                result = jsonpointer.resolve_pointer(self.composed_document, schema_ref[1:])
+            if schema_ref.startswith("#"):
+                # xRegistry fragment reference - convert to JSON pointer format
+                # xRegistry uses: #schemagroups/group/schemas/name/versions/v1/schema
+                # JSON Pointer needs: /schemagroups/group/schemas/name/versions/v1/schema
+                pointer = schema_ref[1:]  # Remove #
+                if not pointer.startswith('/'):
+                    pointer = '/' + pointer  # Add leading / for JSON Pointer
+                result = jsonpointer.resolve_pointer(self.composed_document, pointer)
                 return result  # type: ignore
             else:
                 # For external references, they should already be resolved in the composed document
@@ -108,6 +114,11 @@ class TemplateRendererRefactoring:
 
     def _extract_schema_info_from_dict(self, schema_ref: str, schema_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Extract schema info from a dictionary."""
+        # Handle raw JSON Schema documents (when ref points directly to /schema property)
+        # These have '$schema', 'type', 'properties' etc but not xRegistry metadata
+        if self._looks_like_raw_schema(schema_dict):
+            return self._extract_from_raw_schema(schema_ref, schema_dict)
+        
         # Handle schema definitions with versions
         if "versions" in schema_dict and isinstance(schema_dict["versions"], dict):
             latest_version_id = schema_dict.get("defaultversionid")
@@ -123,6 +134,71 @@ class TemplateRendererRefactoring:
             return self._extract_from_schema_version(schema_ref, schema_dict, schema_dict)
 
         return None
+    
+    def _looks_like_raw_schema(self, schema_dict: Dict[str, Any]) -> bool:
+        """Check if this looks like a raw schema document (JSON Schema, Avro, etc)."""
+        # JSON Schema indicators
+        if "type" in schema_dict and "properties" in schema_dict:
+            return True
+        if "$schema" in schema_dict:
+            return True
+        # Avro indicators
+        if schema_dict.get("type") == "record" and "fields" in schema_dict:
+            return True
+        return False
+    
+    def _extract_from_raw_schema(self, schema_ref: str, schema_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Extract info from a raw schema document."""
+        # Try to infer format from content
+        if "$schema" in schema_dict or ("type" in schema_dict and "properties" in schema_dict):
+            format_type = "jsonschema/draft-07"
+        elif schema_dict.get("type") == "record" and "fields" in schema_dict:
+            format_type = "avro/1.11.0"
+        else:
+            format_type = "jsonschema/draft-07"  # Default assumption
+        
+        # Extract class name from the schema reference path
+        # e.g., #schemagroups/Group/schemas/SchemaName/versions/1/schema -> SchemaName
+        class_name = self._extract_class_name_from_ref(schema_ref)
+        namespace = self._extract_namespace_from_ref(schema_ref)
+        
+        return {
+            "reference": schema_ref,
+            "content": schema_dict,
+            "format": format_type,
+            "format_short": format_type.split("/")[0],
+            "class_name": class_name,
+            "namespace": namespace
+        }
+    
+    def _extract_class_name_from_ref(self, schema_ref: str) -> str:
+        """Extract schema/class name from reference path."""
+        # Parse path like: #schemagroups/Group/schemas/SchemaName/versions/1/schema
+        # or: #/schemagroups/Group/schemas/SchemaName/versions/1/schema
+        parts = schema_ref.strip('#/').split('/')
+        try:
+            # Look for the schema name (after 'schemas' and before 'versions')
+            if 'schemas' in parts:
+                schemas_idx = parts.index('schemas')
+                if schemas_idx + 1 < len(parts):
+                    return parts[schemas_idx + 1]
+        except (ValueError, IndexError):
+            pass
+        return "Schema"  # Fallback
+    
+    def _extract_namespace_from_ref(self, schema_ref: str) -> str:
+        """Extract schema group name from reference path to use as namespace."""
+        # Parse path like: #schemagroups/Contoso.ERP.Events/schemas/SchemaName/versions/1/schema
+        # Extract: Contoso.ERP.Events
+        parts = schema_ref.strip('#/').split('/')
+        try:
+            if 'schemagroups' in parts:
+                sg_idx = parts.index('schemagroups')
+                if sg_idx + 1 < len(parts):
+                    return parts[sg_idx + 1]
+        except (ValueError, IndexError):
+            pass
+        return ""  # Fallback to empty namespace
 
     def _extract_from_schema_version(self, schema_ref: str, schema_version: Dict[str, Any], 
                                    parent_schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -200,20 +276,21 @@ class TemplateRendererRefactoring:
 
     def convert_json_to_avro_if_needed(self, schema_info: Dict[str, Any]) -> None:
         """Convert JSON schema to Avro if needed."""
-        if schema_info["format_short"] == "json":
+        if schema_info["format_short"] == "jsonschema":
+            namespace = schema_info.get("namespace", "")
             schema_info["content"] = self._convert_json_to_avro(
-                schema_info["content"], schema_info["class_name"]
+                schema_info["content"], schema_info["class_name"], namespace
             )
             schema_info["format_short"] = "avro"
 
-    def _convert_json_to_avro(self, json_schema: JsonNode, class_name: str) -> JsonNode:
+    def _convert_json_to_avro(self, json_schema: JsonNode, class_name: str, namespace: str = "") -> JsonNode:
         """Basic JSON to Avro conversion."""
         if isinstance(json_schema, dict):
             # Basic conversion
             avro_schema = {
                 "type": "record",
                 "name": class_name.split('.')[-1] if class_name else "Record",
-                "namespace": '.'.join(class_name.split('.')[:-1]) if '.' in class_name else "",
+                "namespace": namespace,
                 "fields": []
             }
             

@@ -180,8 +180,8 @@ class TemplateRenderer:
             
             # Check if this schema should be processed with avrotize
             if refactoring_helper.should_use_avrotize(schema_info, self.language):
-                # Convert JSON to Avro if needed
-                if schema_info["format_short"] == "json":
+                # Convert JSON Schema to Avro if needed
+                if schema_info["format_short"] == "jsonschema":
                     refactoring_helper.convert_json_to_avro_if_needed(schema_info)
                 
                 avrotize_queue.append(schema_info)
@@ -486,7 +486,8 @@ class TemplateRenderer:
                 for record in xregistry_document:
                     if isinstance(record, dict) and "type" in record and record["type"] == "record" \
                             and "namespace" in record and "name" in record \
-                            and str(record["name"]).lower() == cn and str(record["namespace"]).lower() == ns:                        class_name = self.concat_namespace(
+                            and str(record["name"]).lower() == cn and str(record["namespace"]).lower() == ns:
+                        class_name = self.concat_namespace(
                             str(record.get("namespace", "")), str(record["name"]))
                         break
                 raise RuntimeError(

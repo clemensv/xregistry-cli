@@ -142,8 +142,11 @@ class ResourceProcessor:
         """
         try:
             if reference.startswith("#"):
-                # JSON pointer reference
-                result = jsonpointer.resolve_pointer(root_document, reference[1:])
+                # xRegistry fragment reference - convert to JSON pointer format
+                pointer = reference[1:]  # Remove #
+                if not pointer.startswith('/'):
+                    pointer = '/' + pointer  # Add leading / for JSON Pointer
+                result = jsonpointer.resolve_pointer(root_document, pointer)
                 return result  # type: ignore
             else:
                 # External URL - use the loader
