@@ -3,7 +3,7 @@
     "specversion": "0.5-wip",
     "endpoints": {
         "Contoso.ERP.Eventing.HttpProducer": {
-            "usage": "producer",
+            "usage": ["producer"],
             "protocol": "HTTP",
             "deployed": false,
             "endpoints": [
@@ -17,7 +17,7 @@
             "envelope": "CloudEvents/1.0"
         },
         "Contoso.ERP.Eventing.HttpConsumer": {
-            "usage": "consumer",
+            "usage": ["consumer"],
             "protocol": "HTTP",
             "deployed": false,
             "endpoints": [

@@ -176,11 +176,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ReservationPlaced",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ReservationPlaced",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -204,11 +200,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ReservationCancelled",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ReservationCancelled",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -232,11 +224,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ReservationRefunded",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ReservationRefunded",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -265,11 +253,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.PaymentsReceived",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.PaymentsReceived",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -298,11 +282,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ShipmentAccepted",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ShipmentAccepted",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -326,11 +306,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ShipmentRejected",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ShipmentRejected",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -354,11 +330,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ReturnRequested",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ReturnRequested",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -388,12 +360,7 @@
                 "description": "The id of the inventory update event",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.InventoryUpdated",
-                "description": "The type of the inventory update event",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.InventoryUpdated",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -422,11 +389,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ProductAdded",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ProductAdded",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -450,11 +413,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ProductDeleted",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ProductDeleted",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -478,11 +437,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ProductUpdated",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.ProductUpdated",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -511,11 +466,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.EmployeeAdded",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.EmployeeAdded",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -539,11 +490,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.EmployeeDeleted",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.EmployeeDeleted",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -567,11 +514,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.EmployeeUpdated",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.EmployeeUpdated",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -600,11 +543,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.PurchaseOrderCreated",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.PurchaseOrderCreated",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -628,11 +567,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.PurchaseOrderUpdated",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.PurchaseOrderUpdated",
               "time": {
                 "type": "datetime",
                 "required": true
@@ -656,11 +591,7 @@
                 "type": "string",
                 "required": true
               },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.PurchaseOrderDeleted",
-                "required": true
-              },
+              "type": "Contoso.ERP.Events.PurchaseOrderDeleted",
               "time": {
                 "type": "datetime",
                 "required": true

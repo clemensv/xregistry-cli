@@ -3,7 +3,7 @@
     "specversion": "0.5-wip",
     "endpoints": {
         "Contoso.ERP.Eventing.HttpSubscriber": {
-            "usage": "subscriber",
+            "usage": ["subscriber"],
             "protocol": "HTTP",
             "deployed": false,
             "endpoints": [

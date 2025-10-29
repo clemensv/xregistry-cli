@@ -1,8 +1,9 @@
 {
+  "$schema": "https://xregistry.io/xregistryspecs/core-v1/schemas/model.schema.json",
   "groups": {
     "messagegroups": {
       "singular": "messagegroup",
-      "modelversion": "1.0-rc1",
+      "modelversion": "1.0-rc2",
       "compatiblewith": "https://xregistry.io/xreg/domains/message/specs/model.json",
       "attributes": {
         "envelope": {
@@ -27,7 +28,7 @@
           "maxversions": 1,
           "setdefaultversionsticky": false,
           "hasdocument": false,
-          "modelversion": "1.0-rc1",
+          "modelversion": "1.0-rc2",
           "compatiblewith": "https://xregistry.io/xreg/domains/message/specs/model.json",
           "attributes": {
             "basemessageurl": {

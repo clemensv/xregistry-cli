@@ -54,8 +54,8 @@ def test_codegen_cs():
                             '--output', output_dir,
                             '--projectname', f'Test.{pascal(dir_name)}']
                 assert xregistry.cli() == 0
-                # run dotnet build on the csproj here that references the generated files already
-                cmd = ['dotnet', 'build', output_dir] if platform.system() == "Windows" else f'dotnet build {output_dir}'
+                # run dotnet build on the solution file in the output directory
+                cmd = ['dotnet', 'build'] if platform.system() == "Windows" else 'dotnet build'
                 assert subprocess.check_call(cmd, cwd=output_dir, shell=True, stdout=sys.stdout, stderr=sys.stderr) == 0
         except Exception as e:
             print(f'Error processing {dir_name}: {e}')

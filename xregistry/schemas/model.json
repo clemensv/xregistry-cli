@@ -87,7 +87,7 @@
     "endpoints": {
       "plural": "endpoints",
       "singular": "endpoint",
-      "modelversion": "1.0-rc1",
+      "modelversion": "1.0-rc2",
       "compatiblewith": "https://xregistry.io/xreg/domains/endpoint/specs/model.json",
       "attributes": {
         "endpointid": {
@@ -969,7 +969,7 @@
           "setdefaultversionsticky": false,
           "hasdocument": false,
           "singleversionroot": false,
-          "modelversion": "1.0-rc1",
+          "modelversion": "1.0-rc2",
           "compatiblewith": "https://xregistry.io/xreg/domains/message/specs/model.json",
           "attributes": {
             "messageid": {
@@ -2507,7 +2507,7 @@
     "messagegroups": {
       "plural": "messagegroups",
       "singular": "messagegroup",
-      "modelversion": "1.0-rc1",
+      "modelversion": "1.0-rc2",
       "compatiblewith": "https://xregistry.io/xreg/domains/message/specs/model.json",
       "attributes": {
         "messagegroupid": {
@@ -2590,7 +2590,7 @@
           "setdefaultversionsticky": false,
           "hasdocument": false,
           "singleversionroot": false,
-          "modelversion": "1.0-rc1",
+          "modelversion": "1.0-rc2",
           "compatiblewith": "https://xregistry.io/xreg/domains/message/specs/model.json",
           "attributes": {
             "messageid": {
@@ -4129,7 +4129,7 @@
     "schemagroups": {
       "plural": "schemagroups",
       "singular": "schemagroup",
-      "modelversion": "1.0-rc1",
+      "modelversion": "1.0-rc2",
       "compatiblewith": "https://xregistry.io/xreg/domains/schema/specs/model.json",
       "attributes": {
         "schemagroupid": {
@@ -4206,7 +4206,7 @@
           "setdefaultversionsticky": true,
           "hasdocument": true,
           "singleversionroot": false,
-          "modelversion": "1.0-rc1",
+          "modelversion": "1.0-rc2",
           "compatiblewith": "https://xregistry.io/xreg/domains/schema/specs/model.json",
           "attributes": {
             "schemaid": {
