@@ -1,64 +1,63 @@
 {
-    "format": "Avro/1.11.1",
-    "id": "Fabrikam.Lumen.TurnedOnEventData",
-    "versions": {
-        "1": {
-            "format": "Avro/1.11.1",
-            "id": "1",
-            "schema": {
-                "type": "record",
-                "name": "TurnedOnEventData",
-                "namespace": "Fabrikam.Lumen",
-                "doc": "Data schema for bulb turned on event",
-                "fields": [
-                    {
-                        "name": "tenantid",
-                        "doc": "Tenant identifier",
-                        "type": "string"
-                    },
-                    {
-                        "name": "deviceid",
-                        "doc": "Device identifier",
-                        "type": "string"
-                    },
-                    {
-                        "name": "switchSource",
-                        "doc": "Source of the switch event",
-                        "type": {
-                            "type": "enum",
-                            "name": "SwitchSource",
-                            "symbols": [
-                                "PhysicalSwitch",
-                                "AppSwitch",
-                                "VoiceSwitch"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "brightness",
-                        "doc": "Brightness level (in Lumen)",
-                        "unit": "lm",
-                        "type": "int"
-                    },
-                    {
-                        "name": "color",
-                        "doc": "Color of the light (in RGB hex format)",
-                        "type": "string"
-                    },
-                    {
-                        "name": "colorTemperature",
-                        "doc": "Color temperature of the light (in Kelvin)",
-                        "unit": "K",
-                        "type": "int"
-                    },
-                    {
-                        "name": "powerConsumption",
-                        "doc": "Power consumption of the light (in Watts)",
-                        "unit": "W",
-                        "type": "float"
-                    }
-                ]
+  "format": "Avro/1.11.1",
+  "versions": {
+    "1": {
+      "format": "Avro/1.11.1",
+      "id": "1",
+      "schema": {
+        "type": "record",
+        "name": "TurnedOnEventData",
+        "namespace": "Fabrikam.Lumen",
+        "doc": "Data schema for bulb turned on event",
+        "fields": [
+          {
+            "name": "tenantid",
+            "doc": "Tenant identifier",
+            "type": "string"
+          },
+          {
+            "name": "deviceid",
+            "doc": "Device identifier",
+            "type": "string"
+          },
+          {
+            "name": "switchSource",
+            "doc": "Source of the switch event",
+            "type": {
+              "type": "enum",
+              "name": "SwitchSource",
+              "symbols": [
+                "PhysicalSwitch",
+                "AppSwitch",
+                "VoiceSwitch"
+              ]
             }
-        }
+          },
+          {
+            "name": "brightness",
+            "doc": "Brightness level (in Lumen)",
+            "unit": "lm",
+            "type": "int"
+          },
+          {
+            "name": "color",
+            "doc": "Color of the light (in RGB hex format)",
+            "type": "string"
+          },
+          {
+            "name": "colorTemperature",
+            "doc": "Color temperature of the light (in Kelvin)",
+            "unit": "K",
+            "type": "int"
+          },
+          {
+            "name": "powerConsumption",
+            "doc": "Power consumption of the light (in Watts)",
+            "unit": "W",
+            "type": "float"
+          }
+        ]
+      }
     }
+  }
 }

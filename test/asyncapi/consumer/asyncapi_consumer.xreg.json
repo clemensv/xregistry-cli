@@ -5,7 +5,7 @@
     "description": "Contoso ERP Events",
     "endpoints": {
         "Contoso.ERP.Eventing.HttpSubscriber": {
-            "usage": "subscriber",
+            "usage": ["subscriber"],
             "protocol": "HTTP",
             "deployed": false,
             "endpoints": [
@@ -19,7 +19,7 @@
             "envelope": "CloudEvents/1.0"
         },
         "Contoso.ERP.Eventing.AmqpSubscriber": {
-            "usage": "subscriber",
+            "usage": ["subscriber"],
             "protocol": "AMQP/1.0",
             "deployed": false,
             "endpoints": [
@@ -33,7 +33,7 @@
             "envelope": "CloudEvents/1.0"
         },
         "Contoso.ERP.Eventing.MqttSubscriber": {
-            "usage": "subscriber",
+            "usage": ["subscriber"],
             "protocol": "MQTT/5.0",
             "deployed": false,
             "endpoints": [

@@ -1,144 +1,146 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
-    "endpoints": {
-        "MyEventStream": {
-            "usage": "consumer",
-            "protocol": "AMQP/1.0",
-            "deployed": false,
-            "endpoints": [
-                {
-                    "uri": "amqps://cediscoveryinterop.example.com/stream"
-                }
-            ],
-            "protocoloptions": {
-                "link_properties": {
-                    "myprop": "prop"
-                },
-                "distribution_mode": "copy"
-            },
-            "messagegroups": [
-                "#/messagegroups/Contoso.MyGroup1",
-                "#/messagegroups/Contoso.MyGroup2"
-            ]
-        }
-    },
-    "messagegroups": {
-        "Contoso.MyGroup1": {
-            "protocol": "AMQP/1.0",
-            "messages": {
-                "Contoso.MyGroup1.MyEvent": {
-                    "protocol": "AMQP/1.0",
-                    "protocoloptions": {
-                        "header": {
-                            "ttl": {
-                                "type": "integer",
-                                "value": "1000"
-                            }
-                        },
-                        "properties": {
-                            "subject": {
-                                "type": "string",
-                                "value": "myvalue"
-                            }
-                        },
-                        "application_properties": {
-                            "myProperty1": {
-                                "type": "string"
-                            },
-                            "myProperty2": {
-                                "type": "string"
-                            },
-                            "myProperty3": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "dataschemaformat": "JsonSchema/draft-07",
-                    "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
-                }
-            }
+  "endpoints": {
+    "MyEventStream": {
+      "usage": [
+        "consumer"
+      ],
+      "protocol": "AMQP/1.0",
+      "protocoloptions": {
+        "linkproperties": {
+          "myprop": "prop"
         },
-        "Contoso.MyGroup2": {
-            "protocol": "AMQP/1.0",
-            "messages": {
-                "Contoso.MyGroup2.MyEvent": {
-                    "protocol": "AMQP/1.0",
-                    "protocoloptions": {
-                        "header": {
-                            "ttl": {
-                                "type": "integer",
-                                "value": "1000"
-                            }
-                        },
-                        "properties": {
-                            "subject": {
-                                "type": "string",
-                                "value": "myvalue"
-                            }
-                        },
-                        "application_properties": {
-                            "myProperty1": {
-                                "type": "string"
-                            },
-                            "myProperty2": {
-                                "type": "string"
-                            },
-                            "myProperty3": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "dataschemaformat": "JsonSchema/draft-07",
-                    "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
-                }
-            }
-        }
-    },
-    "schemagroups": {
-        "Contoso.MyEvents": {
-            "schemas": {
-                "MyEventData": {
-                    "format": "JsonSchema/draft-07",
-                    "versions": {
-                        "1.0": {
-                            "format": "JsonSchema/draft-07",
-                            "schema": {
-                                "$schema": "http://json-schema.org/draft-07/schema",
-                                "type": "object",
-                                "properties": {
-                                    "orderId": {
-                                        "type": "string"
-                                    },
-                                    "customerId": {
-                                        "type": "string"
-                                    },
-                                    "total": {
-                                        "type": "number"
-                                    },
-                                    "items": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "productId": {
-                                                    "type": "string"
-                                                },
-                                                "quantity": {
-                                                    "type": "number"
-                                                },
-                                                "price": {
-                                                    "type": "number"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        "distributionmode": "copy",
+        "deployed": false,
+        "endpoints": [
+          {
+            "uri": "amqps://cediscoveryinterop.example.com/stream"
+          }
+        ]
+      },
+      "messagegroups": [
+        "#/messagegroups/Contoso.MyGroup1",
+        "#/messagegroups/Contoso.MyGroup2"
+      ]
     }
+  },
+  "messagegroups": {
+    "Contoso.MyGroup1": {
+      "protocol": "AMQP/1.0",
+      "messages": {
+        "Contoso.MyGroup1.MyEvent": {
+          "protocol": "AMQP/1.0",
+          "protocoloptions": {
+            "header": {
+              "ttl": {
+                "type": "integer",
+                "value": "1000"
+              }
+            },
+            "properties": {
+              "subject": {
+                "type": "string",
+                "value": "myvalue"
+              }
+            },
+            "application_properties": {
+              "myProperty1": {
+                "type": "string"
+              },
+              "myProperty2": {
+                "type": "string"
+              },
+              "myProperty3": {
+                "type": "string"
+              }
+            }
+          },
+          "dataschemaformat": "JsonSchema/draft-07",
+          "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+        }
+      },
+      "protocoloptions": {}
+    },
+    "Contoso.MyGroup2": {
+      "protocol": "AMQP/1.0",
+      "messages": {
+        "Contoso.MyGroup2.MyEvent": {
+          "protocol": "AMQP/1.0",
+          "protocoloptions": {
+            "header": {
+              "ttl": {
+                "type": "integer",
+                "value": "1000"
+              }
+            },
+            "properties": {
+              "subject": {
+                "type": "string",
+                "value": "myvalue"
+              }
+            },
+            "application_properties": {
+              "myProperty1": {
+                "type": "string"
+              },
+              "myProperty2": {
+                "type": "string"
+              },
+              "myProperty3": {
+                "type": "string"
+              }
+            }
+          },
+          "dataschemaformat": "JsonSchema/draft-07",
+          "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+        }
+      },
+      "protocoloptions": {}
+    }
+  },
+  "schemagroups": {
+    "Contoso.MyEvents": {
+      "schemas": {
+        "MyEventData": {
+          "format": "JsonSchema/draft-07",
+          "versions": {
+            "1.0": {
+              "format": "JsonSchema/draft-07",
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema",
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string"
+                  },
+                  "customerId": {
+                    "type": "string"
+                  },
+                  "total": {
+                    "type": "number"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productId": {
+                          "type": "string"
+                        },
+                        "quantity": {
+                          "type": "number"
+                        },
+                        "price": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

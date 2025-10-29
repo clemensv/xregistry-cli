@@ -1,103 +1,106 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
-    "endpoints": {
-        "Contoso.MyAmqpProducer": {
-            "usage": "producer",
-            "protocol": "AMQP/1.0",
-            "deployed": false,
-            "endpoints": [
-                {
-                    "uri": "amqps://cediscoveryinterop.example.com/topic"
-                }
-            ],
-            "messagegroups": [
-                "#/messagegroups/Contoso.MyGroup"
-            ],
-            "envelope": "CloudEvents/1.0"
-        }
-    },
-    "messagegroups": {
-        "Contoso.MyGroup": {
-            "protocol": "AMQP/1.0",
-            "messages": {
-                "Contoso.MyGroup.MyEvent": {
-                    "protocol": "AMQP/1.0",
-                    "protocoloptions": {
-                        "header": {
-                            "ttl": {
-                                "type": "integer",
-                                "value": "1000"
-                            }
-                        },
-                        "properties": {
-                            "subject": {
-                                "type": "string",
-                                "value": "myvalue"
-                            }
-                        },
-                        "application_properties": {
-                            "myProperty1": {
-                                "type": "string"
-                            },
-                            "myProperty2": {
-                                "type": "string"
-                            },
-                            "myProperty3": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "dataschemaformat": "JsonSchema/draft-07",
-                    "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
-                }
-            }
-        }
-    },
-    "schemagroups": {
-        "Contoso.MyEvents": {
-            "schemas": {
-                "MyEventData": {
-                    "format": "JsonSchema/draft-07",
-                    "versions": {
-                        "1.0": {
-                            "format": "JsonSchema/draft-07",
-                            "schema": {
-                                "$schema": "http://json-schema.org/draft-07/schema",
-                                "type": "object",
-                                "properties": {
-                                    "orderId": {
-                                        "type": "string"
-                                    },
-                                    "customerId": {
-                                        "type": "string"
-                                    },
-                                    "total": {
-                                        "type": "number"
-                                    },
-                                    "items": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "productId": {
-                                                    "type": "string"
-                                                },
-                                                "quantity": {
-                                                    "type": "number"
-                                                },
-                                                "price": {
-                                                    "type": "number"
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+  "endpoints": {
+    "Contoso.MyAmqpProducer": {
+      "usage": [
+        "producer"
+      ],
+      "protocol": "AMQP/1.0",
+      "messagegroups": [
+        "#/messagegroups/Contoso.MyGroup"
+      ],
+      "envelope": "CloudEvents/1.0",
+      "protocoloptions": {
+        "deployed": false,
+        "endpoints": [
+          {
+            "uri": "amqps://cediscoveryinterop.example.com/topic"
+          }
+        ]
+      }
     }
+  },
+  "messagegroups": {
+    "Contoso.MyGroup": {
+      "protocol": "AMQP/1.0",
+      "messages": {
+        "Contoso.MyGroup.MyEvent": {
+          "protocol": "AMQP/1.0",
+          "protocoloptions": {
+            "header": {
+              "ttl": {
+                "type": "integer",
+                "value": "1000"
+              }
+            },
+            "properties": {
+              "subject": {
+                "type": "string",
+                "value": "myvalue"
+              }
+            },
+            "application_properties": {
+              "myProperty1": {
+                "type": "string"
+              },
+              "myProperty2": {
+                "type": "string"
+              },
+              "myProperty3": {
+                "type": "string"
+              }
+            }
+          },
+          "dataschemaformat": "JsonSchema/draft-07",
+          "dataschemauri": "#/schemagroups/Contoso.MyEvents/schemas/MyEventData"
+        }
+      },
+      "protocoloptions": {}
+    }
+  },
+  "schemagroups": {
+    "Contoso.MyEvents": {
+      "schemas": {
+        "MyEventData": {
+          "format": "JsonSchema/draft-07",
+          "versions": {
+            "1.0": {
+              "format": "JsonSchema/draft-07",
+              "schema": {
+                "$schema": "http://json-schema.org/draft-07/schema",
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string"
+                  },
+                  "customerId": {
+                    "type": "string"
+                  },
+                  "total": {
+                    "type": "number"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productId": {
+                          "type": "string"
+                        },
+                        "quantity": {
+                          "type": "number"
+                        },
+                        "price": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

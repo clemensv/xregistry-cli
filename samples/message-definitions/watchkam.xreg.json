@@ -1,173 +1,174 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
-    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "messagegroups": {
-        "Fabrikam.Watchkam": {
-            "envelope": "CloudEvents/1.0",
-            "description": "State change events for a Fabrikam security camera",
-            "messages": {
-                "Fabrikam.Watchkam.MotionDetected": {
-                    "description": "Event for when motion is detected",
-                    "envelope": "CloudEvents/1.0",
-                    "envelopemetadata": {
-                        "id": {
-                            "required": true
-                        },
-                        "type": {
-                            "value": "Fabrikam.Watchkam.MotionDetected",
-                            "description": "Event raised when motion is detected"
-                        },
-                        "source": {
-                            "type": "uritemplate",
-                            "description": "source of the event",
-                            "value": "{tenantid}/{deviceid}"
-                        },
-                        "subject": {
-                            "type": "string",
-                            "description": "motion identifier"
-                        },
-                        "time": {
-                            "required": true
-                        }
-                    },
-                    "dataschemaformat": "Avro/1.11.1",
-                    "dataschemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionDetectedEventData"
-                },
-                "Fabrikam.Watchkam.MotionEnded": {
-                    "description": "Event for when detected motion has ended",
-                    "envelope": "CloudEvents/1.0",
-                    "envelopemetadata": {
-                        "id": {
-                            "required": true
-                        },
-                        "type": {
-                            "value": "Fabrikam.Watchkam.MotionEnded",
-                            "description": "Event raised when detected motion has ended"
-                        },
-                        "source": {
-                            "type": "uritemplate",
-                            "description": "source of the event",
-                            "value": "{tenantid}/{deviceid}"
-                        },
-                        "subject": {
-                            "type": "string",
-                            "description": "motion identifier"
-                        },
-                        "time": {
-                            "required": true
-                        }
-                    },
-                    "dataschemaformat": "Avro/1.11.1",
-                    "dataschemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionEndedEventData"
-                }
+  "messagegroups": {
+    "Fabrikam.Watchkam": {
+      "envelope": "CloudEvents/1.0",
+      "description": "State change events for a Fabrikam security camera",
+      "messages": {
+        "Fabrikam.Watchkam.MotionDetected": {
+          "description": "Event for when motion is detected",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "attributes": {
+              "id": {
+                "required": true
+              },
+              "type": {
+                "value": "Fabrikam.Watchkam.MotionDetected",
+                "description": "Event raised when motion is detected"
+              },
+              "source": {
+                "type": "uritemplate",
+                "description": "source of the event",
+                "value": "{tenantid}/{deviceid}"
+              },
+              "subject": {
+                "type": "string",
+                "description": "motion identifier"
+              },
+              "time": {
+                "required": true
+              }
             }
-        }
-    },
-    "schemagroups": {
-        "Fabrikam.Watchkam": {
-            "schemas": {
-                "Fabrikam.Watchkam.MotionDetectedEventData": {
-                    "format": "Avro/1.11.1",
-                    "versions": {
-                        "1": {
-                            "format": "Avro/1.11.1",
-                            "schema": {
-                                "type": "record",
-                                "name": "MotionDetectedEventData",
-                                "namespace": "Fabrikam.Watchkam",
-                                "doc": "Data schema for motion detection event",
-                                "fields": [
-                                    {
-                                        "name": "tenantid",
-                                        "doc": "Tenant identifier",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "deviceid",
-                                        "doc": "Device identifier",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "motionid",
-                                        "doc": "Motion identifier",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "location",
-                                        "doc": "Location of detected motion",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "time",
-                                        "doc": "Time of detected motion",
-                                        "logicalType": "timestamp-millis",
-                                        "type": "long"
-                                    },
-                                    {
-                                        "name": "imageUrl",
-                                        "doc": "URL of the image captured during motion",
-                                        "type": "string"
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                },
-                "Fabrikam.Watchkam.MotionEndedEventData": {
-                    "format": "Avro/1.11.1",
-                    "versions": {
-                        "1": {
-                            "format": "Avro/1.11.1",
-                            "schema": {
-                                "type": "record",
-                                "name": "MotionEndedEventData",
-                                "namespace": "Fabrikam.Watchkam",
-                                "doc": "Data schema for motion end event",
-                                "fields": [
-                                    {
-                                        "name": "tenantid",
-                                        "doc": "Tenant identifier",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "deviceid",
-                                        "doc": "Device identifier",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "motionid",
-                                        "doc": "Motion identifier",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "location",
-                                        "doc": "Location of detected motion",
-                                        "type": "string"
-                                    },
-                                    {
-                                        "name": "startTime",
-                                        "doc": "Time when the motion started",
-                                        "logicalType": "timestamp-millis",
-                                        "type": "long"
-                                    },
-                                    {
-                                        "name": "endTime",
-                                        "doc": "Time when the motion ended",
-                                        "logicalType": "timestamp-millis",
-                                        "type": "long"
-                                    },
-                                    {
-                                        "name": "imageUrl",
-                                        "doc": "URL of the image captured during motion",
-                                        "type": "string"
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
+          },
+          "dataschemaformat": "Avro/1.11.1",
+          "dataschemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionDetectedEventData"
+        },
+        "Fabrikam.Watchkam.MotionEnded": {
+          "description": "Event for when detected motion has ended",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "attributes": {
+              "id": {
+                "required": true
+              },
+              "type": {
+                "value": "Fabrikam.Watchkam.MotionEnded",
+                "description": "Event raised when detected motion has ended"
+              },
+              "source": {
+                "type": "uritemplate",
+                "description": "source of the event",
+                "value": "{tenantid}/{deviceid}"
+              },
+              "subject": {
+                "type": "string",
+                "description": "motion identifier"
+              },
+              "time": {
+                "required": true
+              }
             }
+          },
+          "dataschemaformat": "Avro/1.11.1",
+          "dataschemauri": "#/schemagroups/Fabrikam.Watchkam/schemas/Fabrikam.Watchkam.MotionEndedEventData"
         }
+      }
     }
+  },
+  "schemagroups": {
+    "Fabrikam.Watchkam": {
+      "schemas": {
+        "Fabrikam.Watchkam.MotionDetectedEventData": {
+          "format": "Avro/1.11.1",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.1",
+              "schema": {
+                "type": "record",
+                "name": "MotionDetectedEventData",
+                "namespace": "Fabrikam.Watchkam",
+                "doc": "Data schema for motion detection event",
+                "fields": [
+                  {
+                    "name": "tenantid",
+                    "doc": "Tenant identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "deviceid",
+                    "doc": "Device identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "motionid",
+                    "doc": "Motion identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "location",
+                    "doc": "Location of detected motion",
+                    "type": "string"
+                  },
+                  {
+                    "name": "time",
+                    "doc": "Time of detected motion",
+                    "logicalType": "timestamp-millis",
+                    "type": "long"
+                  },
+                  {
+                    "name": "imageUrl",
+                    "doc": "URL of the image captured during motion",
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "Fabrikam.Watchkam.MotionEndedEventData": {
+          "format": "Avro/1.11.1",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.1",
+              "schema": {
+                "type": "record",
+                "name": "MotionEndedEventData",
+                "namespace": "Fabrikam.Watchkam",
+                "doc": "Data schema for motion end event",
+                "fields": [
+                  {
+                    "name": "tenantid",
+                    "doc": "Tenant identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "deviceid",
+                    "doc": "Device identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "motionid",
+                    "doc": "Motion identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "location",
+                    "doc": "Location of detected motion",
+                    "type": "string"
+                  },
+                  {
+                    "name": "startTime",
+                    "doc": "Time when the motion started",
+                    "logicalType": "timestamp-millis",
+                    "type": "long"
+                  },
+                  {
+                    "name": "endTime",
+                    "doc": "Time when the motion ended",
+                    "logicalType": "timestamp-millis",
+                    "type": "long"
+                  },
+                  {
+                    "name": "imageUrl",
+                    "doc": "URL of the image captured during motion",
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

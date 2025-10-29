@@ -1,22 +1,21 @@
 {
-    "$schema": "http://xregistry.io/schema/endpoints-messagegroups-schemagroups",
-    "specversion": "0.5-wip",
-    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "messagegroups": {
-        "com.example.group1": {
-            "envelope": "CloudEvents/1.0",
-            "messages": {
-                "com.example.group1.event1": {
-                    "envelope": "CloudEvents/1.0",
-                    "envelopemetadata": {
-                        "type": {
-                            "value": "com.example.group1.event1"
-                        }
-                    },
-                    "dataschemaformat": "Proto/3",
-                    "dataschema": "syntax = \"proto3\"; message Example { string example = 1; }"
-                }
+  "messagegroups": {
+    "com.example.group1": {
+      "envelope": "CloudEvents/1.0",
+      "messages": {
+        "com.example.group1.event1": {
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "attributes": {
+              "type": {
+                "value": "com.example.group1.event1"
+              }
             }
+          },
+          "dataschemaformat": "Proto/3",
+          "dataschema": "syntax = \"proto3\"; message Example { string example = 1; }"
         }
+      }
     }
+  }
 }

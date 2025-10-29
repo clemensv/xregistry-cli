@@ -3,7 +3,7 @@
     "specversion": "0.5-wip",
     "endpoints": {
         "Contoso.ERP.Eventing.Http": {
-            "usage": "producer",
+            "usage": ["producer"],
             "deployed": false,
             "endpoints": [
                 {
@@ -23,7 +23,7 @@
             "envelope": "CloudEvents/1.0"
         },
         "Contoso.ERP.Eventing.HttpSubscriber": {
-            "usage": "subscriber",
+            "usage": ["subscriber"],
             "protocol": "HTTP",
             "deployed": false,
             "endpoints": [
@@ -44,7 +44,7 @@
         },
         "Contoso.ERP.Eventing.QueueConsumer": {
             "channel": "myqueue",
-            "usage": "consumer",
+            "usage": ["consumer"],
             "protocol": "AMQP/1.0",
             "deployed": false,
             "endpoints": [
@@ -72,7 +72,7 @@
         },
         "Contoso.ERP.Eventing.QueueProducer": {
             "channel": "myqueue",
-            "usage": "producer",
+            "usage": ["producer"],
             "protocol": "AMQP/1.0",
             "protocoloptions": {
                 "node": "queue",

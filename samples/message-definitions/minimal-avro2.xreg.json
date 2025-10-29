@@ -1,119 +1,118 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
-    "id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66",
-    "messagegroups": {
-        "Microsoft.Samples.TollRecordEvents": {
-            "envelope": "CloudEvents/1.0",
-            "messages": {
-                "Microsoft.Samples.TollRecordEvents.TollRecordReceived": {
-                    "description": "A toll record event has been received",
-                    "envelope": "CloudEvents/1.0",
-                    "envelopemetadata": {
-                        "type": {
-                            "value": "Microsoft.Samples.TollRecordEvents.TollRecordReceived",
-                            "description": "Type of the event"
-                        },
-                        "time": {
-                            "value": "{entrytime}",
-                            "description": "Time the event was captured"
-                        },
-                        "source": {
-                            "value": "toolbooths://{site}",
-                            "description": "Toll station id"
-                        },
-                        "subject": {
-                            "value": "{sensorid}",
-                            "description": "Id of the sensor that scanned the vehicle"
-                        }
-                    },
-                    "dataschemauri": "#/schemagroups/Microsoft.Samples.TollRecordEvents/schemas/TollRecordEventData"
-                }
+  "messagegroups": {
+    "Microsoft.Samples.TollRecordEvents": {
+      "envelope": "CloudEvents/1.0",
+      "messages": {
+        "Microsoft.Samples.TollRecordEvents.TollRecordReceived": {
+          "description": "A toll record event has been received",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "attributes": {
+              "type": {
+                "value": "Microsoft.Samples.TollRecordEvents.TollRecordReceived",
+                "description": "Type of the event"
+              },
+              "time": {
+                "value": "{entrytime}",
+                "description": "Time the event was captured"
+              },
+              "source": {
+                "value": "toolbooths://{site}",
+                "description": "Toll station id"
+              },
+              "subject": {
+                "value": "{sensorid}",
+                "description": "Id of the sensor that scanned the vehicle"
+              }
             }
+          },
+          "dataschemauri": "#/schemagroups/Microsoft.Samples.TollRecordEvents/schemas/TollRecordEventData"
         }
-    },
-    "schemagroups": {
-        "Microsoft.Samples.TollRecordEvents": {
-            "schemas": {
-                "TollRecordEventData": {
-                    "format": "Avro/1.11.1",
-                    "versions": {
-                        "1": {
-                            "format": "Avro/1.11.1",
-                            "schema": {
-                                "type": "record",
-                                "name": "TollRecordEventData",
-                                "namespace": "Microsoft.Samples.TollRecordEvents",
-                                "fields": [
-                                    {
-                                        "name": "EntryTime",
-                                        "type": {
-                                            "type": "long",
-                                            "logicalType": "timestamp-millis"
-                                        },
-                                        "doc": "The timestamp of when the vehicle entered the toll area, in milliseconds since epoch."
-                                    },
-                                    {
-                                        "name": "CarModel",
-                                        "type": {
-                                            "type": "record",
-                                            "name": "CarModelRecord",
-                                            "fields": [
-                                                {
-                                                    "name": "Make",
-                                                    "type": "string",
-                                                    "doc": "The manufacturer or brand of the vehicle."
-                                                },
-                                                {
-                                                    "name": "Model",
-                                                    "type": "string",
-                                                    "doc": "The specific model of the vehicle."
-                                                },
-                                                {
-                                                    "name": "VehicleType",
-                                                    "type": "int",
-                                                    "doc": "An integer representing the type of vehicle, e.g., sedan, SUV."
-                                                },
-                                                {
-                                                    "name": "VehicleWeight",
-                                                    "type": "int",
-                                                    "doc": "The weight of the vehicle in kilograms."
-                                                }
-                                            ]
-                                        },
-                                        "doc": "Information about the car model."
-                                    },
-                                    {
-                                        "name": "State",
-                                        "type": "string",
-                                        "doc": "The state or region where the vehicle is registered."
-                                    },
-                                    {
-                                        "name": "TollAmount",
-                                        "type": "double",
-                                        "doc": "The amount of toll charged."
-                                    },
-                                    {
-                                        "name": "Tag",
-                                        "type": "long",
-                                        "doc": "A unique identifier for the toll transaction."
-                                    },
-                                    {
-                                        "name": "TollId",
-                                        "type": "int",
-                                        "doc": "A unique identifier for the toll booth or location."
-                                    },
-                                    {
-                                        "name": "LicensePlate",
-                                        "type": "string",
-                                        "doc": "The license plate number of the vehicle."
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-            }
-        }
+      }
     }
+  },
+  "schemagroups": {
+    "Microsoft.Samples.TollRecordEvents": {
+      "schemas": {
+        "TollRecordEventData": {
+          "format": "Avro/1.11.1",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.1",
+              "schema": {
+                "type": "record",
+                "name": "TollRecordEventData",
+                "namespace": "Microsoft.Samples.TollRecordEvents",
+                "fields": [
+                  {
+                    "name": "EntryTime",
+                    "type": {
+                      "type": "long",
+                      "logicalType": "timestamp-millis"
+                    },
+                    "doc": "The timestamp of when the vehicle entered the toll area, in milliseconds since epoch."
+                  },
+                  {
+                    "name": "CarModel",
+                    "type": {
+                      "type": "record",
+                      "name": "CarModelRecord",
+                      "fields": [
+                        {
+                          "name": "Make",
+                          "type": "string",
+                          "doc": "The manufacturer or brand of the vehicle."
+                        },
+                        {
+                          "name": "Model",
+                          "type": "string",
+                          "doc": "The specific model of the vehicle."
+                        },
+                        {
+                          "name": "VehicleType",
+                          "type": "int",
+                          "doc": "An integer representing the type of vehicle, e.g., sedan, SUV."
+                        },
+                        {
+                          "name": "VehicleWeight",
+                          "type": "int",
+                          "doc": "The weight of the vehicle in kilograms."
+                        }
+                      ]
+                    },
+                    "doc": "Information about the car model."
+                  },
+                  {
+                    "name": "State",
+                    "type": "string",
+                    "doc": "The state or region where the vehicle is registered."
+                  },
+                  {
+                    "name": "TollAmount",
+                    "type": "double",
+                    "doc": "The amount of toll charged."
+                  },
+                  {
+                    "name": "Tag",
+                    "type": "long",
+                    "doc": "A unique identifier for the toll transaction."
+                  },
+                  {
+                    "name": "TollId",
+                    "type": "int",
+                    "doc": "A unique identifier for the toll booth or location."
+                  },
+                  {
+                    "name": "LicensePlate",
+                    "type": "string",
+                    "doc": "The license plate number of the vehicle."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

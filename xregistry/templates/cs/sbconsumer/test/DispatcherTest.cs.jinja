@@ -214,7 +214,12 @@ namespace {{ project_name | pascal }}.Test
                     Assert.NotNull(message);
                     {%- if cloudEvents.isCloudEvent(message) %}
                     Assert.NotNull(cloudEvent);
-                    Assert.Equal("{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}", cloudEvent?.Type);
+                    {%- if message.envelopemetadata.attributes is defined %}
+                    {%- set type_value = message.envelopemetadata.attributes.type if message.envelopemetadata.attributes.type is string else (message.envelopemetadata.attributes.type.value if message.envelopemetadata.attributes.type.value else messageid) %}
+                    {%- else %}
+                    {%- set type_value = message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid %}
+                    {%- endif %}
+                    Assert.Equal("{{ type_value }}", cloudEvent?.Type);
                     {%- endif %}
                     {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                     {%- if message_body_type != "byte[]" %}
@@ -258,7 +263,12 @@ namespace {{ project_name | pascal }}.Test
             var cloudEvent = new CloudEvent
             {
                 Id = Guid.NewGuid().ToString(),
-                Type = "{{ message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid }}",
+                {%- if message.envelopemetadata.attributes is defined %}
+                {%- set type_value = message.envelopemetadata.attributes.type if message.envelopemetadata.attributes.type is string else (message.envelopemetadata.attributes.type.value if message.envelopemetadata.attributes.type.value else messageid) %}
+                {%- else %}
+                {%- set type_value = message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid %}
+                {%- endif %}
+                Type = "{{ type_value }}",
                 Source = new Uri("/test/source", UriKind.RelativeOrAbsolute),
                 Data = eventData,
                 DataContentType = {{ cloudEvents.GetDataContentType(message, '"application/json"' if message_body_type != "byte[]" else "null") }}

@@ -61,8 +61,8 @@ def catalog_container():
             if time.time() > timeout:
                 raise Exception("Catalog container did not start in time: HTTP service not available on port 8080")
             time.sleep(1)
-        # load /xregistry/schemas/_model.json, GET /modelsource from the server, merge the local model with the remote model, and PUT the merged model back to the server
-        local_model_path = os.path.join(project_root, "xregistry", "schemas", "_model.json")
+        # load /xregistry/schemas/model.json (full model with group definitions), GET /modelsource from the server, merge the local model with the remote model, and PUT the merged model back to the server
+        local_model_path = os.path.join(project_root, "xregistry", "schemas", "model.json")
         with open(local_model_path, "r") as local_model_file:
             local_model = json.load(local_model_file)
         remote_model = None
