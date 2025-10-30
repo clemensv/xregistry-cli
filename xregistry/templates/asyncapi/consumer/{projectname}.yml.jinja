@@ -13,30 +13,32 @@ info:
   
 defaultContentType: "application/cloudmessages+json"
 servers:
-{%- if root.endpoints %}
-{%- for endpointid, endpoint in root.endpoints.items() if endpoint -%}
+{%- if root.endpoints is defined and root.endpoints %}
+{%- for endpointid, endpoint in root.endpoints.items() if endpoint and (not endpoint.usage is defined or 'consumer' in endpoint.usage or 'subscriber' in endpoint.usage) %}
 {%- set options = endpoint.protocoloptions -%}
-{%- set endpoints = endpoint.endpoints -%}
+{%- set endpoints = endpoint.protocoloptions.endpoints if endpoint.protocoloptions and endpoint.protocoloptions.endpoints else [] -%}
 {%- for endpointObject in endpoints %}
   {{ endpointid | strip_dots }}:
-      host: {{ geturlhost( endpointObject.uri ) }}
-      {%- if geturlpath( endpointObject.uri ) %}
-      pathname: {{ geturlpath( endpointObject.uri ) }}    
-      {%- endif %}  
-      {%- if endpoint.protocol %}
-      {%- set pv = endpoint.protocol.split('/') %}
-      protocol: {{ pv[0] | lower }}
-      {%- if pv[1] %}
-      protocolVersion: '{{ pv[1] }}'
-      {%- endif %}
-      {%- endif %}
-{%- if endpoint.description is defined %}
-      description: {{ endpoint.description }}
-{%- endif -%}
+    host: {{ geturlhost( endpointObject.uri ) }}
+    {%- if geturlpath( endpointObject.uri ) %}
+    pathname: {{ geturlpath( endpointObject.uri ) }}    
+    {%- endif %}  
+    {%- if endpoint.protocol %}
+    {%- set pv = endpoint.protocol.split('/') %}
+    protocol: {{ pv[0] | lower }}
+    {%- if pv[1] %}
+    protocolVersion: '{{ pv[1] }}'
+    {%- endif %}
+    {%- endif %}
+    {%- if endpoint.description is defined %}
+    description: {{ endpoint.description }}
+    {%- endif -%}
 {%- endfor -%}  
 {%- endfor %}
 {%- else %}
-      host: "http://localhost"
+  default:
+    host: "http://localhost"
+    protocol: http
 {%- endif %}
 channels:
 {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
@@ -49,12 +51,12 @@ channels:
       {{ messageid | strip_dots | pascal }}:
         $ref: "#/components/messages/{{ messageid | strip_dots | pascal }}"
     {%- endfor %}
-    {%- if root.endpoints %}
-    {%- for endpointid, endpoint in root.endpoints.items() if endpoint.messagegroups -%}
+    {%- if root.endpoints is defined and root.endpoints %}
+    {%- for endpointid, endpoint in root.endpoints.items() if endpoint and endpoint.messagegroups is defined and (not endpoint.usage is defined or 'consumer' in endpoint.usage or 'subscriber' in endpoint.usage) -%}
     {%- if loop.first %}
     servers:
     {%- endif %}
-    {%- for group in endpoint.messagegroups if group.endswith('/'+messagegroupid) %}
+    {%- for group in endpoint.messagegroups if group.endswith('/'+messagegroupid) or group == ('#/messagegroups/'+messagegroupid) %}
       - $ref: "#/servers/{{ endpointid | strip_dots }}"
     {%- endfor -%}      
     {%- endfor -%}
@@ -82,102 +84,121 @@ components:
       {# messageId: "{{protocol | strip_dots | pascal}}{{ messageid | strip_dots | pascal }}" #}
       title: "{{ messageid }}"
       summary: "{{ message.description }}"
-      {%- if message.envelopemetadata.datacontenttype is defined and message.envelopemetadata.datacontenttype.value is defined %}
+      {%- if message.envelopemetadata is defined and message.envelopemetadata.datacontenttype is defined and message.envelopemetadata.datacontenttype.value is defined %}
       contentType: {{ message.envelopemetadata.datacontenttype.value }}
       {%- else %}
       contentType: "application/json"
       {%- endif %}
       correlationId:
         location: "$message.header#/{% if protocol == "http" -%}ce-{% elif protocol == "amqp"%}ce_{%- endif -%}id"
+      {%- if message.envelopemetadata is defined and message.envelopemetadata.attributes is defined %}
       headers:
         type: object
         properties:
-          {%- for attributeKey, attribute in message.envelopemetadata.items() %}
+          {%- for attributeKey, attribute in message.envelopemetadata.attributes.items() %}
           {% if protocol == "http" -%}ce-{% elif protocol == "amqp"%}ce_{%- endif -%}        
           {{ attributeKey }}:
-            {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
+            {%- if attribute is string %}
+            type: "string"
+            const: "{{ attribute }}"
+            {%- elif attribute is mapping %}
+              {%- if attribute.type == "datetime" or attribute.type == "timestamp" %}
             type: "string"
             format: "date-time"
-            {%- elif attribute.type == "uri" %}
+              {%- elif attribute.type == "uri" %}
             type: "string"
             format: "uri"
-            {%- elif attribute.type == "uri-reference" %}
+              {%- elif attribute.type == "uri-reference" %}
             type: "string"
             format: "uri-reference"
-            {%- elif attribute.type == "uri-template" %}
+              {%- elif attribute.type == "uritemplate" %}
             type: "string"
             format: "uri-reference"
-            {%- elif attribute.type == "binary" %}
+              {%- elif attribute.type == "binary" %}
             type: "string"
             format: "binary"
-            {%- elif attribute.type == "boolean" %}
+              {%- elif attribute.type == "boolean" %}
             type: "boolean"
-            {%- elif attribute.type == "integer" %}
+              {%- elif attribute.type == "integer" %}
             type: "integer"
-            {%- elif attribute.type == "number" %}
+              {%- elif attribute.type == "number" %}
             type: "number"
-            {%- else %}
+              {%- else %}
             type: "string"
-            {%- endif %}
-            {%- if attribute.value %}
-            default: "{{ attribute.value }}"
-            {%- endif %}
-          {%- endfor %}
-        {%- if protocol.startswith("http") %}
-        bindings:
-          http:
-            headers:
-              type: object
-              properties:
-                Content-Type:
-                  type: string
-                   {%- if message.envelopemetadata.datacontenttype is defined and message.envelopemetadata.datacontenttype.value is defined %}
-                  enum: ["{{ message.envelopemetadata.datacontenttype.value }}"]
-                   {%- else %}
-                  enum: ["application/json"]
-                   {%- endif %}
-            bindingVersion: '0.1.0'
-        {%- endif %}
-        {%- if message.dataschemauri %}
+              {%- endif %}
+              {%- if attribute.value %}
+            const: "{{ attribute.value }}"
+              {%- endif -%}
+            {%- else -%}
+            type: "string"
+            {%- endif -%}
+          {%- endfor -%}
+      {%- endif -%}
+      {%- if protocol is defined and protocol.startswith("http") %}
+      bindings:
+        http:
+          headers:
+            type: object
+            properties:
+              Content-Type:
+                type: string
+                 {%- if message.envelopemetadata is defined and message.envelopemetadata.datacontenttype is defined and message.envelopemetadata.datacontenttype.value is defined %}
+                enum: ["{{ message.envelopemetadata.datacontenttype.value }}"]
+                 {%- else %}
+                enum: ["application/json"]
+                 {%- endif %}
+          bindingVersion: '0.1.0'
+      {%- endif -%}
+      {%- if message.dataschemauri %}
             {%- if message.dataschemauri.startswith('#') or message.dataschemauri.startswith('/') %}
               {%- set schemaObj = schema_object(root, message.dataschemauri ) -%}
-                {%- if schemaObj.format is defined -%}
+                {%- if schemaObj and schemaObj.versions is defined -%}
                   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
-                  {%- if schemaVersion.schema is defined -%}
-                  {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
+                  {%- if schemaVersion and schemaVersion.schema is defined -%}
+                    {%- set schemaFormat = schemaVersion.format if schemaVersion.format is defined else (schemaObj.format if schemaObj.format is defined else "JSON") -%}
+                    {%- if schemaFormat and (schemaFormat | string).lower().startswith("json")%}
       payload:
           schemaFormat: "application/schema+json;version=draft-07"
           schema:
               $ref: "#/components/schemas/{{ message.dataschemauri[1:].split('/')[-3] | pascal }}.{{ message.dataschemauri[1:].split('/')[-1] | pascal }}"
-                  {%- elif schemaObj.format.lower().startswith("protobuf")%}
-                  {%- set fileName = (message.dataschemauri.split('/')[-1].split(':')[-1] | lower | snake) +".proto" -%}
-                  {%- set x = schemaVersion.schema | pushfile(fileName) %}
+                    {%- elif schemaFormat and ((schemaFormat | string).lower().startswith("protobuf") or (schemaFormat | string).lower().startswith("proto"))%}
+                      {%- set fileName = (message.dataschemauri.split('/')[-1].split(':')[-1] | lower | snake) +".proto" -%}
+                      {%- set x = schemaVersion.schema | pushfile(fileName) %}
       payload:
-        schemaFormat: "application/vnd.google.protobuf;version={{schemaObj.format.split('/')[-1]}};type=proto"
+        schemaFormat: "application/vnd.google.protobuf;version={{(schemaFormat | string).split('/')[-1]}};type=proto"
         schema:
             $ref: "{{ fileName }}"
-                  {%- elif schemaObj.format.lower().startswith("avro")%}
-                  {%- set fileName = (message.dataschemauri.split('/')[-1].split(':')[-1] | lower | snake) +".avsc" -%}
-                  {%- set x = schemaVersion.schema | tojson | pushfile(fileName) %}
+                    {%- elif schemaFormat and (schemaFormat | string).lower().startswith("avro")%}
+                      {%- set fileName = (message.dataschemauri.split('/')[-1].split(':')[-1] | lower | snake) +".avsc" -%}
+                      {%- set x = schemaVersion.schema | tojson | pushfile(fileName) %}
       payload:
-        schemaFormat: "application/vnd.apache.avro;version={{schemaObj.format.split('/')[-1]}}"
+        schemaFormat: "application/vnd.apache.avro;version={{(schemaFormat | string).split('/')[-1]}}"
         schema:
             $ref: "{{ fileName }}"
+                    {%- else %}
+      payload:
+          schemaFormat: "application/schema+json;version=draft-07"
+          schema:
+              $ref: "#/components/schemas/{{ message.dataschemauri[1:].split('/')[-3] | pascal }}.{{ message.dataschemauri[1:].split('/')[-1] | pascal }}"
+                    {%- endif -%}
+                  {%- endif -%}
                 {%- endif -%}
-                {%- endif -%}
-              {%- endif -%}
             {%- else %}
             $ref: "{{ message.dataschemauri }}"
             {%- endif %}
         {%- else %}
-            type: "object"
+      payload:
+        type: "object"
         {%- endif %}
     {%- endfor -%}
     {%- endfor %}
+{%- if (ce_content_mode == "structured" and root.messagegroups is defined) or (root.schemagroups is defined) %}
   schemas:
-  {%- if ce_content_mode == "structured" -%}
-  {%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
-    {%- for messageid, message in messagegroup.messages.items() %}
+{%- endif %}
+{%- if ce_content_mode == "structured" %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() -%}
+  {%- for messageid, message in messagegroup.messages.items() %}
+  {%- if message.envelopemetadata is defined %}
     {{ messageid }}:
       type: "object"
       properties:
@@ -243,23 +264,41 @@ components:
         - "{{ attributeKey }}"
         {%- endif %}
         {%- endfor %}
+    {%- endif %}
     {%- endfor -%}
   {%- endfor -%}
   {%- endif %}
-  {%- if root.schemagroups is defined -%}
+  {%- if root.schemagroups is defined %}
     {%- for schemagroupid, schemagroup in root.schemagroups.items() -%}
-       {%- for schemaid, schema in schemagroup.schemas.items() if schema.format.lower().startswith("json") -%}
-          {%- set newest_schemaversion = latest_dict_entry(schema.versions) %} 
+       {%- for schemaid, schema in schemagroup.schemas.items() -%}
+          {%- set newest_schemaversion = latest_dict_entry(schema.versions) %}
+          {%- set schemaFormat = newest_schemaversion.format if newest_schemaversion.format is defined else (schema.format if schema.format is defined else "JSON") -%}
+          {%- if schemaFormat and (schemaFormat | string).lower().startswith("json") %}
     {{ schemagroupid | pascal }}.{{ schemaid | pascal }}:
             {%- if newest_schemaversion.schemaurl is defined -%}
             {%- if ns.newest_schemaversion.schemaurl.startswith('#') %}
       $ref: "#/components/schemas/{{ ns.newest_schemaversion.schemaurl.split('#/schemagroups/')[1] }}"
             {%- else %}
-            $ref: "{{ newest_schemaversion.schemaurl }}"
+      $ref: "{{ newest_schemaversion.schemaurl }}"
             {%- endif -%}
             {%- else %} 
       {{ newest_schemaversion.schema | toyaml(3) | indent(6) }}
             {%- endif %} 
+          {%- elif schemaFormat and (schemaFormat | string).lower().startswith("avro") %}
+            {%- set fileName = (schemaid | lower | snake) + ".avsc" -%}
+            {%- set x = newest_schemaversion.schema | tojson | pushfile(fileName) %}
+    {{ schemagroupid | pascal }}.{{ schemaid | pascal }}:
+      schemaFormat: "application/vnd.apache.avro;version={{(schemaFormat | string).split('/')[-1]}}"
+      schema:
+        $ref: "{{ fileName }}"
+          {%- elif schemaFormat and (schemaFormat | string).lower().startswith("protobuf") or (schemaFormat | string).lower().startswith("proto") %}
+            {%- set fileName = (schemaid | lower | snake) + ".proto" -%}
+            {%- set x = newest_schemaversion.schema | pushfile(fileName) %}
+    {{ schemagroupid | pascal }}.{{ schemaid | pascal }}:
+      schemaFormat: "application/vnd.google.protobuf;version={{(schemaFormat | string).split('/')[-1]}};type=proto"
+      schema:
+        $ref: "{{ fileName }}"
+          {%- endif -%}
        {%- endfor -%} 
   {%- endfor -%}
   {%- endif -%}
