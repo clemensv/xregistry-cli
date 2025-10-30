@@ -1,9 +1,9 @@
 {%- set uses_protobuf = uses_protobuf | default(false) -%}
 {%- set uses_avro = uses_avro | default(false) -%}
-{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
-{%- set uses_amqp_message = (root | exists("protocol","AMQP/1.0")) %}
-{%- set uses_amqp_endpoint = (root | exists("protocol","AMQP/1.0")) %}
-{%- set uses_mqtt_message = (root | exists( "protocol", "mqtt" )) %}
+{%- set uses_cloudevents_message = (root | exists( "format", "cloudevents" )) %}
+{%- set uses_amqp_message = (root | exists( "binding", "amqp" )) %}
+{%- set uses_amqp_endpoint = (root | exists("protocol", "amqp" )) %}
+{%- set uses_mqtt_message = (root | exists( "binding", "mqtt" )) %}
 {%- set uses_mqtt_endpoint = (root | exists("protocol", "mqtt" )) %}
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -39,7 +39,7 @@
     </dependency>
      <dependency>
       <groupId>io.cloudevents</groupId>
-      <artifactId>cloudevents-http-basic</artifactId>
+      <artifactId>cloudevents-core</artifactId>
       <version>${io.cloudevents.version}</version>
     </dependency>
     <dependency>
@@ -48,10 +48,31 @@
       <version>${io.cloudevents.version}</version>
     </dependency>
     <dependency>
-        <groupId>io.cloudevents</groupId>
-        <artifactId>cloudevents-json-jackson</artifactId>
-        <version>${io.cloudevents.version}</version>
+      <groupId>io.cloudevents</groupId>
+      <artifactId>cloudevents-json-jackson</artifactId>
+      <version>${io.cloudevents.version}</version>
     </dependency>
+   {%- if uses_amqp_endpoint %}
+    <dependency>
+      <groupId>org.apache.qpid</groupId>
+      <artifactId>qpid-jms-client</artifactId>
+      <version>${qpid.jms.version}</version>
+    </dependency>
+    {%- endif %}
+    {%- if uses_mqtt_endpoint %}
+    <dependency>
+      <groupId>org.eclipse.paho</groupId>
+      <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+      <version>${paho.mqtt.version}</version>
+    </dependency>
+    {%- endif %}
+    {%- if (root | exists("protocol", "KAFKA")) %}
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <version>${kafka.clients.version}</version>
+    </dependency>
+    {%- endif %}
     {%- if uses_protobuf %}
     <dependency>
       <groupId>io.cloudevents</groupId>
@@ -102,7 +123,7 @@
          <plugin>
             <groupId>com.github.os72</groupId>
             <artifactId>protoc-jar-maven-plugin</artifactId>
-            <version>${protobuf.version}</version>
+            <version>3.11.4</version>
             <executions>
                 <execution>
                     <phase>generate-sources</phase>
@@ -110,7 +131,7 @@
                         <goal>run</goal>
                     </goals>
                     <configuration>
-                        <protocVersion>${protobuf.version}</protocVersion>
+                        <protocVersion>4.31.1</protocVersion>
                         <inputDirectories>
                             <include>main/protobuf</include>
                         </inputDirectories>
