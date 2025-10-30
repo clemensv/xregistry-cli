@@ -1,0 +1,179 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_amqp_message = amqp.uses_amqp_protocol(root) %}
+{%- set uses_amqp_endpoint = amqp.uses_amqp_endpoint(root) %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+import org.apache.qpid.proton.Proton;
+import org.apache.qpid.proton.message.Message;
+import org.apache.qpid.proton.amqp.messaging.Data;
+import org.apache.qpid.proton.amqp.Binary;
+{%- if uses_cloudevents_message %}
+{{ cloudEvents.CloudEventsImports() }}
+{%- endif %}
+{%- if uses_amqp_message %}
+{{ amqp.ProtonJImports() }}
+{%- endif %}
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.function.Consumer;
+
+{%- set class_name = (groupname | strip_namespace) + "EventProducer" %}
+
+/**
+ * Event producer for {{ groupname }} message group
+ */
+public class {{ class_name }} {
+    private static final Logger logger = LogManager.getLogger({{ class_name }}.class);
+    
+    {%- if uses_cloudevents_message %}
+    private final Consumer<io.cloudevents.CloudEvent> beforeSend;
+    {%- endif %}
+    private final AmqpProducer endpoint;
+    
+    private {{ class_name }}(AmqpProducer endpoint{%- if uses_cloudevents_message -%}, Consumer<io.cloudevents.CloudEvent> beforeSend{%- endif -%}) {
+        this.endpoint = endpoint;
+        {%- if uses_cloudevents_message %}
+        this.beforeSend = beforeSend;
+        {%- endif %}
+    }
+    
+    {%- if root.endpoints %}
+    {%- for endpointid, endpoint in root.endpoints.items() %}
+    {%- if endpoint.usage == "producer" %}
+    {%- set protocol = endpoint.protocol | lower %}
+    {%- set options = endpoint.protocoloptions %}
+    {%- set endpoints = endpoint.endpoints %}
+    
+    /**
+     * Create a producer for endpoint: {{ endpointid }}
+     */
+    public static {{ class_name }} createProducerFor{{ endpointid | pascal | strip_namespace }}(
+        EndpointCredential credential
+        {%- if uses_cloudevents_message -%}
+        , Consumer<io.cloudevents.CloudEvent> beforeSend
+        {%- endif -%}
+    ) {
+        {%- if options %}
+        Map<String, String> options = new HashMap<>();
+        {%- for key, value in options.items() %}
+        options.put("{{ key }}", "{{ value }}");
+        {%- endfor %}
+        {%- else %}
+        Map<String, String> options = new HashMap<>();
+        {%- endif %}
+        
+        List<URI> endpoints = List.of(
+        {%- for epo in endpoints %}
+            URI.create("{{ epo.uri }}")
+            {%- if not loop.last -%},{%- endif %}
+        {%- endfor %}
+        );
+        
+        return new {{ class_name }}(
+            new AmqpProducer(credential, options, endpoints)
+            {%- if uses_cloudevents_message -%}
+            , beforeSend
+            {%- endif -%}
+        );
+    }
+    {%- endif %}
+    {%- endfor %}
+    {%- endif %}
+    
+    /**
+     * Create a producer with custom configuration
+     */
+    public static {{ class_name }} createProducer(
+        EndpointCredential credential,
+        {%- if uses_cloudevents_message %}
+        Consumer<io.cloudevents.CloudEvent> beforeSend,
+        {%- endif %}
+        Map<String, String> options,
+        List<URI> endpoints
+    ) {
+        return new {{ class_name }}(
+            new AmqpProducer(credential, options, endpoints)
+            {%- if uses_cloudevents_message -%}
+            , beforeSend
+            {%- endif -%}
+        );
+    }
+    
+    {% for messageid, message in messagegroup.messages.items() -%}
+    {%- set messagename = messageid | pascal %}
+    {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+    {%- set is_amqp = amqp.is_amqp(message) %}
+    {%- set data_type = util.get_data_type(data_project_name, root, message) %}
+    {%- set content_type = util.get_content_type(message) %}
+    
+    /**
+     * Send {{ messagename }} message
+     */
+    public void send{{ messagename | strip_namespace }}(
+        {{ data_type }} data
+        {%- if isCloudEvent -%}
+        {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
+        {%- elif is_amqp -%}
+        {{- amqp.DeclareUriTemplateArguments(message) -}}
+        {%- endif -%}
+    ) throws Exception {
+        {%- if isCloudEvent %}
+        {{ cloudEvents.BuildCloudEvent("cloudEvent", message, "data") | indent(8) }}
+        
+        if (beforeSend != null) {
+            beforeSend.accept(cloudEvent);
+        }
+        
+        // Convert CloudEvent to Proton-J message
+        Message amqpMessage = Proton.message();
+        {{ cloudEvents.SerializeCloudEvent("cloudEvent", "amqpMessage") | indent(8) }}
+        
+        endpoint.send(amqpMessage);
+        
+        {%- elif is_amqp %}
+        // Serialize data to bytes
+        byte[] dataBytes;
+        {%- set schemaObj = schema_object(root, message.dataschemauri if message.dataschemauri else message.dataschema) %}
+        {%- if schemaObj and "format" in schemaObj %}
+        {%- if schemaObj.format.lower().startswith("avro") %}
+        dataBytes = data.toByteArray();  // Avro serialization
+        {%- elif schemaObj.format.lower().startswith("protobuf") %}
+        dataBytes = data.toByteArray();  // Protobuf serialization
+        {%- else %}
+        dataBytes = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
+        {%- endif %}
+        {%- else %}
+        dataBytes = data;  // Already byte[]
+        {%- endif %}
+        
+        {{ amqp.CreateProtonMessage(message, "dataBytes") | indent(8) }}
+        
+        endpoint.send(message);
+        {%- endif %}
+    }
+    
+    {% endfor %}
+    
+    /**
+     * Close the producer and release resources
+     */
+    public void close() {
+        endpoint.close();
+    }
+}
+{% endfor -%}

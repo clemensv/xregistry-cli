@@ -1,0 +1,7 @@
+{
+  "template": "amqpjmsproducer",
+  "language": "java",
+  "protocol": "AMQP/1.0",
+  "description": "AMQP 1.0 producer using Qpid JMS client (JMS over AMQP)",
+  "requires": ["messagegroups"]
+}

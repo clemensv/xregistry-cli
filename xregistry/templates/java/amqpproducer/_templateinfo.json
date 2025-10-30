@@ -1,0 +1,8 @@
+{
+  "template": "amqpproducer",
+  "description": "AMQP 1.0 Producer using Apache Qpid Proton-J",
+  "language": "java",
+  "protocol": "AMQP/1.0",
+  "usage": ["producer"],
+  "requires": ["messagegroups"]
+}

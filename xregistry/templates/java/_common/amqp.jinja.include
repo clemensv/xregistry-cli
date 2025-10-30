@@ -1,212 +1,220 @@
-{#- AMQP macros -#}
+{#- AMQP macros for Java - supports both Proton-J and Qpid JMS -#}
 
-{%- macro AmqpImports() -%}
-import com.azure.amqp;
+{%- macro is_amqp(message) -%}
+{%- if message.protocol and message.protocol.lower().startswith("amqp") -%}
+true
+{%- endif -%}
 {%- endmacro -%}
 
+{%- macro uses_amqp_protocol(root) -%}
+{%- if (root.messagegroups | exists("protocol","AMQP/1.0")) -%}
+true
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro uses_amqp_endpoint(root) -%}
+{%- if (root.endpoints | exists("protocol","AMQP/1.0")) -%}
+true
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Proton-J imports for pure AMQP client -#}
+{%- macro ProtonJImports() -%}
+import org.apache.qpid.proton.Proton;
+import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.proton.amqp.Symbol;
+import org.apache.qpid.proton.amqp.messaging.*;
+import org.apache.qpid.proton.message.Message;
+import org.apache.qpid.proton.reactor.Reactor;
+import org.apache.qpid.proton.reactor.impl.ReactorImpl;
+{%- endmacro -%}
+
+{#- Qpid JMS imports for JMS over AMQP -#}
+{%- macro QpidJmsImports() -%}
+import javax.jms.*;
+import org.apache.qpid.jms.JmsConnectionFactory;
+import org.apache.qpid.jms.message.JmsMessage;
+import org.apache.qpid.jms.provider.amqp.AmqpConnection;
+{%- endmacro -%}
+
+{#- URI template argument extraction -#}
 {%- macro EmitArguments(props) -%}
 {%- for propname, prop in props.items() %}
 {%- if prop.type == "uritemplate" -%}
-   {%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
-   String {{ placeholder }}
-   {%- endfor -%}
+{%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+, String {{ placeholder }}
+{%- endfor -%}
 {%- elif prop.value is not defined -%}
-   , String {{ propname }}{%- if not prop.required %} = default {%- endif %}{% endif -%}
+, String {{ propname }}
+{%- endif -%}
 {%- endfor -%}
 {%- endmacro -%}
 
-{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{#- Declare URI template arguments from protocol options -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
-{%- if message.protocoloptions["header"] -%}{{ EmitArguments(message.protocoloptions["header"]) }}{%- endif -%}
-{%- if message.protocoloptions["footer"] -%}{{ EmitArguments(message.protocoloptions["footer"]) }}{%- endif -%}
-{%- if message.protocoloptions["message_annotations"] -%}{{ EmitArguments(messages.message["message_annotations"]) }}{%- endif -%}
-{%- if message.protocoloptions["delivery_annotations"] -%}{{ EmitArguments(messages.message["delivery_annotations"]) }}{%- endif -%}
-{%- if message.protocoloptions["properties"] -%}{{ EmitArguments(message.protocoloptions["properties"]) }}{%- endif -%}
-{%- if message.protocoloptions["application_properties"] -%}{{ EmitArguments(message.protocoloptions["application_properties"]) }}{%- endif -%}
-{%- endmacro %}
-
-{#- Helper macro for assigning properties -#}
-{%- macro AssignProps(props, as_dict = False) -%}
-{%- for propname, prop in props.items() -%}
-{%- if as_dict %}
-["{{ propname }}"] = {% else %}
-{{ propname | pascal }} = {% endif -%}
-{%- if prop.value -%}
-   {%- if prop.type in ["integer", "number", "boolean"] -%}
-      {{ prop.value }}
-   {%- elif prop.type == "uri" or prop.type == "uritemplate" -%}
-       new Uri($"{{ prop.value }}", UriKind.RelativeOrAbsolute),
-   {%- else -%}
-      $"{{ prop.value }}"
-   {%- endif -%}
-{%- else -%}
-   {{ propname }}
-{%- endif -%},
-{%- endfor -%}
-{%- endmacro -%}
-
-{#- Generates AMQP message objects from amqpDefinition as message -#}
-{%- macro DeclareAmqpNetLiteMessage(variable, message) -%}
-{%- set header = message.protocoloptions["header"] %}
-{%- set footer = message.protocoloptions["footer"] %}
-{%- set messageAnnotations = message.protocoloptions["message_annotations"] %}
-{%- set deliveryAnnotations = message.protocoloptions["delivery_annotations"] %}
-{%- set properties = message.protocoloptions["properties"] %}
-{%- set applicationProperties = message.protocoloptions["application_properties"] %}
-Amqp.Message {{ variable }} = new Amqp.Message()
-{
-{%- if header %}
-   Header = new Header() 
-   {
-   {{- AssignProps(header) | indent(6) }}
-   },
-{%- if footer %}
-   Footer = new Footer() 
-   {
-   {{- AssignProps(footer) | indent(6) }}
-   },
-{%- endif %}
-{%- if messageAnnotations %}
-   MessageAnnotations = new MessageAnnotations()
-   {
-   {{- AssignProps(messageAnnotations) | indent(6) }}
-   },
-{%- endif %}
-{%- if deliveryAnnotations %}
-   DeliveryAnnotations = new DeliveryAnnotations()
-   {
-   {{- AssignProps(deliveryAnnotations) | indent(6) }}
-   },
-{%- endif %}
-{%- if properties %}
-   Properties = new Properties()
-   {
-   {{- AssignProps(properties) | indent(6) }}
-   },
-{%- endif %}
-{%- if applicationProperties %}
-   ApplicationProperties = new ApplicationProperties()
-   {
-   {{- AssignProps(applicationProperties, True) | indent(6) }}
-   },
-{%- endif %}
-{%- endif %}
-};
-{%- endmacro -%}
-
-{%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
-{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
-{%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal %}
-{%- if withType -%}{{ messagegroupname | namespace_dot(project_name) | lower }}I{{ messagegroupname | strip_namespace }}Dispatcher {% endif %}{{ messagegroupid | default(definitiongroup_key) | strip_namespace | camel }}AmqpDispatcher{%- if not loop.last %}, {%- endif -%}
-{%- endfor %}
-{%- endmacro-%}
-
-{%- macro DeclareDispatchObjectsFields(project_name,messagegroups) -%}
-{%- for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
-{%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
-{%- set handlerType=(messagegroupid  | namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
-{{ handlerType }} {{ handlerName }};
-{%- endfor %}
-{%- endmacro -%}
-
-{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
-{%- if messagegroups | exists("protocol","AMQP/1.0") %}
-{%- for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
-{%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal %}
-{%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
-{%- set handlerType=(messagegroupid  |  namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
-{{ handlerType }} {{ handlerName }};
-{%- endfor %}
-
-{{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
-    {%- for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
-    {%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal -%} 
-    {%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
-    {%- set handlerType=(messagegroupid  |  namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
-    {{ handlerType }} {{ handlerName }}
-    {%- if not loop.last -%}, {%- endif -%}
-    {%- endfor -%})
-{
-    {% for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
-    {%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal %}
-    {%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
-    {%- set handlerType=(messagegroupid  |  namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
-    this.{{ handlerName }} = {{ handlerName }};
-    {%- endfor %}
-    {{ body | indent(4) }}
-}
+{%- if message.protocoloptions %}
+{%- if message.protocoloptions.header %}{{ EmitArguments(message.protocoloptions.header) }}{% endif -%}
+{%- if message.protocoloptions.footer %}{{ EmitArguments(message.protocoloptions.footer) }}{% endif -%}
+{%- if message.protocoloptions["message-annotations"] %}{{ EmitArguments(message.protocoloptions["message-annotations"]) }}{% endif -%}
+{%- if message.protocoloptions["delivery-annotations"] %}{{ EmitArguments(message.protocoloptions["delivery-annotations"]) }}{% endif -%}
+{%- if message.protocoloptions.properties %}{{ EmitArguments(message.protocoloptions.properties) }}{% endif -%}
+{%- if message.protocoloptions["application-properties"] %}{{ EmitArguments(message.protocoloptions["application-properties"]) }}{% endif -%}
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
-{%- if messagegroups | exists("protocol","AMQP/1.0") %}
-try {
-   var messageSubject = {{ message }}.Properties.Subject;
-   switch (messageSubject)
-   {
-      {% for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
-      {%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
-      {% for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
-      {% set messagename = messageid | pascal %}
-      case "{{ messageid }}":
-         if ( this.{{ handlerName }} != null )
-         {
-               return this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
-               {%- if message.dataschemauri or message.dataschema -%}
-               {%- set type = ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
-               {%- set typePackage = type | namespace | lower %}
-               {%- set typeName = type | strip_namespace | pascal %}
-               {%- set dataType = typePackage + '.' + typeName -%}
-               {{ dataType }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
-               {%- else -%}
-               {{ message }}.Data
-               {%- endif %});
-         }
-         break;
-      {% endfor %}
-      {% endfor %}
-      default:
-         {{ logger }}.error(String.format("Unsupported message subject %s", messageSubject));
-         break;
-   }
-} catch ( Exception exception ) {
-    _logger.warn("Error while dispatching CloudEvent", exception);
-}
-return CompletableFuture.completedFuture(null);
-{%- endif -%}
+{#- Create Proton-J message from protocol options -#}
+{%- macro CreateProtonMessage(message, dataVar) -%}
+Message message = Proton.message();
+{%- if message.protocoloptions %}
+
+// Set message properties
+{%- if message.protocoloptions.properties %}
+Properties props = new Properties();
+{%- for propname, prop in message.protocoloptions.properties.items() %}
+{%- if propname == "message-id" %}
+props.setMessageId({% if prop.value %}"{{ prop.value }}"{% else %}java.util.UUID.randomUUID().toString(){% endif %});
+{%- elif propname == "user-id" %}
+props.setUserId(new Binary({% if prop.value %}"{{ prop.value }}".getBytes(){% else %}userId.getBytes(){% endif %}));
+{%- elif propname == "to" %}
+props.setTo({% if prop.value %}"{{ prop.value }}"{% else %}to{% endif %});
+{%- elif propname == "subject" %}
+props.setSubject({% if prop.value %}"{{ prop.value }}"{% else %}subject{% endif %});
+{%- elif propname == "reply-to" %}
+props.setReplyTo({% if prop.value %}"{{ prop.value }}"{% else %}replyTo{% endif %});
+{%- elif propname == "correlation-id" %}
+props.setCorrelationId({% if prop.value %}"{{ prop.value }}"{% else %}correlationId{% endif %});
+{%- elif propname == "content-type" %}
+props.setContentType(Symbol.valueOf({% if prop.value %}"{{ prop.value }}"{% else %}contentType{% endif %}));
+{%- elif propname == "content-encoding" %}
+props.setContentEncoding(Symbol.valueOf({% if prop.value %}"{{ prop.value }}"{% else %}contentEncoding{% endif %}));
+{%- elif propname == "absolute-expiry-time" %}
+props.setAbsoluteExpiryTime(new java.util.Date({% if prop.value %}{{ prop.value }}{% else %}absoluteExpiryTime{% endif %}));
+{%- elif propname == "creation-time" %}
+props.setCreationTime(new java.util.Date({% if prop.value %}{{ prop.value }}{% else %}System.currentTimeMillis(){% endif %}));
+{%- elif propname == "group-id" %}
+props.setGroupId({% if prop.value %}"{{ prop.value }}"{% else %}groupId{% endif %});
+{%- elif propname == "group-sequence" %}
+props.setGroupSequence({% if prop.value %}{{ prop.value }}{% else %}groupSequence{% endif %});
+{%- elif propname == "reply-to-group-id" %}
+props.setReplyToGroupId({% if prop.value %}"{{ prop.value }}"{% else %}replyToGroupId{% endif %});
+{%- endif %}
+{%- endfor %}
+message.setProperties(props);
+{%- endif %}
+
+// Set application properties
+{%- if message.protocoloptions["application-properties"] %}
+ApplicationProperties appProps = new ApplicationProperties(new java.util.HashMap<>());
+{%- for propname, prop in message.protocoloptions["application-properties"].items() %}
+appProps.getValue().put("{{ propname }}", {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
+{%- endfor %}
+message.setApplicationProperties(appProps);
+{%- endif %}
+
+// Set message annotations
+{%- if message.protocoloptions["message-annotations"] %}
+MessageAnnotations msgAnnotations = new MessageAnnotations(new java.util.HashMap<>());
+{%- for propname, prop in message.protocoloptions["message-annotations"].items() %}
+msgAnnotations.getValue().put(Symbol.valueOf("{{ propname }}"), {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
+{%- endfor %}
+message.setMessageAnnotations(msgAnnotations);
+{%- endif %}
+
+// Set delivery annotations
+{%- if message.protocoloptions["delivery-annotations"] %}
+DeliveryAnnotations deliveryAnnotations = new DeliveryAnnotations(new java.util.HashMap<>());
+{%- for propname, prop in message.protocoloptions["delivery-annotations"].items() %}
+deliveryAnnotations.getValue().put(Symbol.valueOf("{{ propname }}"), {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
+{%- endfor %}
+message.setDeliveryAnnotations(deliveryAnnotations);
+{%- endif %}
+
+// Set header
+{%- if message.protocoloptions.header %}
+Header header = new Header();
+{%- for propname, prop in message.protocoloptions.header.items() %}
+{%- if propname == "durable" %}
+header.setDurable({% if prop.value %}{{ prop.value }}{% else %}durable{% endif %});
+{%- elif propname == "priority" %}
+header.setPriority({% if prop.value %}(short){{ prop.value }}{% else %}priority{% endif %});
+{%- elif propname == "ttl" %}
+header.setTtl({% if prop.value %}{{ prop.value }}{% else %}ttl{% endif %});
+{%- elif propname == "first-acquirer" %}
+header.setFirstAcquirer({% if prop.value %}{{ prop.value }}{% else %}firstAcquirer{% endif %});
+{%- elif propname == "delivery-count" %}
+header.setDeliveryCount({% if prop.value %}{{ prop.value }}{% else %}deliveryCount{% endif %});
+{%- endif %}
+{%- endfor %}
+message.setHeader(header);
+{%- endif %}
+{%- endif %}
+
+// Set message body
+message.setBody(new Data(new Binary({{ dataVar }})));
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterface(project_name, messagegroup, messagegroupname, interfaceName) -%}
-package {{ project_name | lower }}.{{ messagegroupname | lower }};
+{#- Create JMS message with AMQP properties -#}
+{%- macro CreateJmsMessage(messageVar, message, dataVar) -%}
+// Note: JMS message must be created outside this macro
+{{ messageVar }}.writeBytes({{ dataVar }});
 
-import io.cloudevents.CloudEvent;
-import java.util.concurrent.CompletableFuture;
-{{ AmqpImports() }}
+{%- if message.protocoloptions %}
+// Set JMS properties
+{%- if message.protocoloptions.properties %}
+{%- for propname, prop in message.protocoloptions.properties.items() %}
+{%- if propname == "message-id" %}
+{{ messageVar }}.setJMSMessageID({% if prop.value %}"{{ prop.value }}"{% else %}java.util.UUID.randomUUID().toString(){% endif %});
+{%- elif propname == "correlation-id" %}
+{{ messageVar }}.setJMSCorrelationID({% if prop.value %}"{{ prop.value }}"{% else %}correlationId{% endif %});
+{%- elif propname == "content-type" %}
+{{ messageVar }}.setJMSType({% if prop.value %}"{{ prop.value }}"{% else %}contentType{% endif %});
+{%- elif propname == "subject" %}
+{{ messageVar }}.setStringProperty("JMSXGroupID", {% if prop.value %}"{{ prop.value }}"{% else %}subject{% endif %});
+{%- endif %}
+{%- endfor %}
+{%- endif %}
 
-public interface {{ interfaceName }}
-{
-    {%- for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
-    {%- set messagename = messageid | strip_namespace | pascal -%}
-    {%- if message.dataschemauri or message.dataschema -%}
-    {%- set type = ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
-    {%- set typePackage = type | namespace | lower %}
-    {%- set typeName = type | strip_namespace | pascal %}
-    {%- set dataType = typePackage + '.' + typeName -%}
-    {%- else -%}
-    {%- set dataType = "Object" -%}
-    {%- endif %}   
-    CompletableFuture<Void> on{{ messagename | strip_namespace }}Async(Message amqpMessage, {{ dataType }} data);
-    {%- endfor %}
+// Set application properties
+{%- if message.protocoloptions["application-properties"] %}
+{%- for propname, prop in message.protocoloptions["application-properties"].items() %}
+{{ messageVar }}.setObjectProperty("{{ propname }}", {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
+{%- endfor %}
+{%- endif %}
+{%- endif %}
+{%- endmacro -%}
+
+{#- Extract AMQP properties from Proton message -#}
+{%- macro ExtractProtonProperties(messageVar) -%}
+Properties props = {{ messageVar }}.getProperties();
+ApplicationProperties appProps = {{ messageVar }}.getApplicationProperties();
+MessageAnnotations msgAnnotations = {{ messageVar }}.getMessageAnnotations();
+DeliveryAnnotations deliveryAnnotations = {{ messageVar }}.getDeliveryAnnotations();
+Header header = {{ messageVar }}.getHeader();
+{%- endmacro -%}
+
+{#- Extract data from Proton message -#}
+{%- macro ExtractProtonData(messageVar) -%}
+byte[] data = null;
+if ({{ messageVar }}.getBody() instanceof Data) {
+    data = ((Data){{ messageVar }}.getBody()).getValue().getArray();
+} else if ({{ messageVar }}.getBody() instanceof AmqpValue) {
+    Object value = ((AmqpValue){{ messageVar }}.getBody()).getValue();
+    if (value instanceof Binary) {
+        data = ((Binary)value).getArray();
+    } else if (value instanceof String) {
+        data = ((String)value).getBytes();
+    }
 }
 {%- endmacro -%}
 
-{%- macro DeclareDispatchInterfaces(project_name, root) -%}
-{%- set messagegroups = root.messagegroups -%}
-{%- if messagegroups | exists("protocol","AMQP/1.0") %}
-{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
-{%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal -%}
-{%- set interfaceName = "I"+(messagegroupname | strip_namespace)+"AmqpDispatcher" -%}
-{{- DeclareDispatchInterface(root, project_name, messagegroup, messagegroupname, interfaceName) | pushfile(interfaceName+".java") -}}
-{%- endfor -%}
-{%- endif -%}
+{#- Extract data from JMS message -#}
+{%- macro ExtractJmsData(messageVar) -%}
+byte[] data = null;
+if ({{ messageVar }} instanceof BytesMessage) {
+    BytesMessage bytesMsg = (BytesMessage){{ messageVar }};
+    data = new byte[(int)bytesMsg.getBodyLength()];
+    bytesMsg.readBytes(data);
+} else if ({{ messageVar }} instanceof TextMessage) {
+    data = ((TextMessage){{ messageVar }}).getText().getBytes();
+}
 {%- endmacro -%}

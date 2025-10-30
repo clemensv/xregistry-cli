@@ -1,0 +1,169 @@
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{{ util.CommonFileHeader() }}
+
+package {{ project_name | lower | replace('-', '_') }};
+
+import jakarta.jms.*;
+import org.apache.qpid.jms.JmsConnectionFactory;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+{{ util.EndpointCredentialClasses() }}
+
+/**
+ * AMQP 1.0 producer using Qpid JMS client (JMS over AMQP)
+ */
+class AmqpJmsProducer {
+    private static final Logger logger = LogManager.getLogger(AmqpJmsProducer.class);
+    private final EndpointCredential credential;
+    private final List<URI> endpoints;
+    private final String node;
+    private final Map<URI, ConnectionInfo> connectionCache = new ConcurrentHashMap<>();
+    
+    private static class ConnectionInfo {
+        final Connection connection;
+        final Session session;
+        final MessageProducer producer;
+        
+        ConnectionInfo(Connection connection, Session session, MessageProducer producer) {
+            this.connection = connection;
+            this.session = session;
+            this.producer = producer;
+        }
+    }
+    
+    public AmqpJmsProducer(EndpointCredential credential, Map<String, String> options, List<URI> endpoints) {
+        this.credential = credential;
+        this.endpoints = endpoints;
+        this.node = options.getOrDefault("node", null);
+    }
+    
+    /**
+     * Send a JMS BytesMessage to all configured endpoints
+     */
+    public void send(BytesMessage message) throws Exception {
+        Exception lastException = null;
+        
+        for (URI endpoint : endpoints) {
+            try {
+                ConnectionInfo connInfo = getOrCreateConnection(endpoint);
+                connInfo.producer.send(message);
+            } catch (Exception ex) {
+                logger.error("Error sending message to endpoint " + endpoint + ": " + ex.getMessage(), ex);
+                endpoints.remove(endpoint);
+                connectionCache.remove(endpoint);
+                lastException = ex;
+            }
+        }
+        
+        if (lastException != null) {
+            throw lastException;
+        }
+    }
+    
+    /**
+     * Gets or creates a connection to the specified endpoint
+     */
+    private ConnectionInfo getOrCreateConnection(URI endpoint) throws Exception {
+        return connectionCache.computeIfAbsent(endpoint, ep -> {
+            try {
+                String host = ep.getHost();
+                int port = ep.getPort() == -1 ? 
+                    (ep.getScheme().equalsIgnoreCase("amqps") ? 5671 : 5672) : 
+                    ep.getPort();
+                String path = node != null ? node : ep.getPath();
+                
+                // Build connection URI
+                StringBuilder uriBuilder = new StringBuilder();
+                uriBuilder.append(ep.getScheme()).append("://")
+                         .append(host).append(":").append(port);
+                
+                // Add JMS options
+                uriBuilder.append("?jms.clientID=amqp-jms-producer-")
+                         .append(System.currentTimeMillis());
+                
+                // Configure TLS for amqps
+                if (ep.getScheme().equalsIgnoreCase("amqps")) {
+                    uriBuilder.append("&transport.trustAll=false")
+                             .append("&transport.verifyHost=true");
+                }
+                
+                JmsConnectionFactory factory = new JmsConnectionFactory(uriBuilder.toString());
+                
+                Connection connection;
+                if (credential instanceof PlainEndpointCredential) {
+                    PlainEndpointCredential plain = (PlainEndpointCredential) credential;
+                    connection = factory.createConnection(plain.getClientId(), plain.getClientSecret());
+                } else if (credential instanceof TokenEndpointCredential) {
+                    TokenEndpointCredential token = (TokenEndpointCredential) credential;
+                    // For token auth, use token as password with special username
+                    connection = factory.createConnection("$token", token.getToken());
+                } else {
+                    connection = factory.createConnection();
+                }
+                
+                connection.start();
+                
+                Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+                
+                Destination destination;
+                if (path != null && !path.isEmpty()) {
+                    // Determine if it's a queue or topic from the path or options
+                    if (path.startsWith("/topic/") || path.contains("topic")) {
+                        destination = session.createTopic(path.replaceFirst("^/topic/", ""));
+                    } else {
+                        destination = session.createQueue(path.replaceFirst("^/queue/", ""));
+                    }
+                } else {
+                    // Default to queue
+                    destination = session.createQueue("default");
+                }
+                
+                MessageProducer producer = session.createProducer(destination);
+                producer.setDeliveryMode(DeliveryMode.PERSISTENT);
+                
+                return new ConnectionInfo(connection, session, producer);
+            } catch (Exception ex) {
+                logger.error("Failed to establish connection to " + endpoint + ": " + ex.getMessage(), ex);
+                throw new RuntimeException("Failed to connect to endpoint", ex);
+            }
+        });
+    }
+    
+    /**
+     * Create a BytesMessage for sending
+     */
+    public BytesMessage createBytesMessage(URI endpoint) throws Exception {
+        ConnectionInfo connInfo = getOrCreateConnection(endpoint);
+        return connInfo.session.createBytesMessage();
+    }
+    
+    /**
+     * Close all connections and release resources
+     */
+    public void close() {
+        connectionCache.values().forEach(connInfo -> {
+            try {
+                if (connInfo.producer != null) {
+                    connInfo.producer.close();
+                }
+                if (connInfo.session != null) {
+                    connInfo.session.close();
+                }
+                if (connInfo.connection != null) {
+                    connInfo.connection.close();
+                }
+            } catch (Exception ex) {
+                logger.warn("Error closing connection: " + ex.getMessage(), ex);
+            }
+        });
+        connectionCache.clear();
+    }
+}
