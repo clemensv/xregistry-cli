@@ -1,0 +1,286 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = cloudEvents.usesCloudEvents(root) %}
+{%- set uses_amqp_message = amqp.uses_amqp_protocol(root) %}
+{%- set uses_amqp_endpoint = amqp.uses_amqp_endpoint(root) %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+import org.apache.qpid.proton.message.Message;
+{%- if uses_cloudevents_message %}
+{{ cloudEvents.CloudEventsImports() }}
+{%- endif %}
+{%- if uses_amqp_message %}
+{{ amqp.ProtonJImports() }}
+{%- endif %}
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.function.BiConsumer;
+
+{%- set class_name = (groupname | strip_namespace) + "EventConsumer" %}
+
+/**
+ * Event consumer for {{ groupname }} message group
+ */
+public class {{ class_name }} {
+    private static final Logger logger = LogManager.getLogger({{ class_name }}.class);
+    private final AmqpConsumer endpoint;
+    
+    {% for messageid, message in messagegroup.messages.items() -%}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    {%- if cloudEvents.isCloudEvent(message) %}
+    private BiConsumer<io.cloudevents.CloudEvent, {{ message_body_type }}> {{ messagename | lower }}Handler;
+    {%- else %}
+    private BiConsumer<Message, {{ message_body_type }}> {{ messagename | lower }}Handler;
+    {%- endif %}
+    {% endfor %}
+    
+    {%- if uses_amqp_message %}
+    private BiConsumer<Message, Void> unhandledMessageHandler;
+    {%- endif %}
+    {%- if uses_cloudevents_message %}
+    private BiConsumer<io.cloudevents.CloudEvent, Void> unhandledEventHandler;
+    {%- endif %}
+    
+    private {{ class_name }}(AmqpConsumer endpoint) {
+        this.endpoint = endpoint;
+    }
+    
+    {%- if root.endpoints %}
+    {%- for endpointid, endpoint in root.endpoints.items() %}
+    {%- if endpoint.usage == "consumer" %}
+    {%- set protocol = endpoint.protocol | lower %}
+    {%- set options = endpoint.protocoloptions %}
+    {%- set endpoints = endpoint.endpoints %}
+    
+    /**
+     * Create a consumer for endpoint: {{ endpointid }}
+     */
+    public static {{ class_name }} createConsumerFor{{ endpointid | pascal | strip_namespace }}(
+        EndpointCredential credential
+    ) {
+        {%- if options %}
+        Map<String, String> options = new HashMap<>();
+        {%- for key, value in options.items() %}
+        options.put("{{ key }}", "{{ value }}");
+        {%- endfor %}
+        {%- else %}
+        Map<String, String> options = new HashMap<>();
+        {%- endif %}
+        
+        List<URI> endpoints = List.of(
+        {%- for epo in endpoints %}
+            URI.create("{{ epo.uri }}")
+            {%- if not loop.last -%},{%- endif %}
+        {%- endfor %}
+        );
+        
+        {{ class_name }} consumer = new {{ class_name }}(null);
+        AmqpConsumer amqpConsumer = new AmqpConsumer(
+            credential,
+            options,
+            endpoints,
+            (message, log) -> consumer.dispatchMessage(message, log)
+        );
+        consumer.endpoint = amqpConsumer;
+        return consumer;
+    }
+    {%- endif %}
+    {%- endfor %}
+    {%- endif %}
+    
+    /**
+     * Create a consumer with custom configuration
+     */
+    public static {{ class_name }} createConsumer(
+        EndpointCredential credential,
+        Map<String, String> options,
+        List<URI> endpoints
+    ) {
+        {{ class_name }} consumer = new {{ class_name }}(null);
+        AmqpConsumer amqpConsumer = new AmqpConsumer(
+            credential,
+            options,
+            endpoints,
+            (message, log) -> consumer.dispatchMessage(message, log)
+        );
+        consumer.endpoint = amqpConsumer;
+        return consumer;
+    }
+    
+    // Handler setters
+    {% for messageid, message in messagegroup.messages.items() -%}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    {%- if cloudEvents.isCloudEvent(message) %}
+    public {{ class_name }} on{{ messagename }}(BiConsumer<io.cloudevents.CloudEvent, {{ message_body_type }}> handler) {
+        this.{{ messagename | lower }}Handler = handler;
+        return this;
+    }
+    {%- else %}
+    public {{ class_name }} on{{ messagename }}(BiConsumer<Message, {{ message_body_type }}> handler) {
+        this.{{ messagename | lower }}Handler = handler;
+        return this;
+    }
+    {%- endif %}
+    
+    {% endfor %}
+    
+    {%- if uses_amqp_message %}
+    public {{ class_name }} onUnhandledMessage(BiConsumer<Message, Void> handler) {
+        this.unhandledMessageHandler = handler;
+        return this;
+    }
+    {%- endif %}
+    
+    {%- if uses_cloudevents_message %}
+    public {{ class_name }} onUnhandledEvent(BiConsumer<io.cloudevents.CloudEvent, Void> handler) {
+        this.unhandledEventHandler = handler;
+        return this;
+    }
+    {%- endif %}
+    
+    /**
+     * Start consuming messages
+     */
+    public void start() throws Exception {
+        endpoint.start();
+    }
+    
+    /**
+     * Stop consuming messages
+     */
+    public void stop() {
+        endpoint.stop();
+    }
+    
+    /**
+     * Dispatch incoming messages to appropriate handlers
+     */
+    private void dispatchMessage(Message message, Logger log) {
+        try {
+            {%- if uses_cloudevents_message %}
+            // Check if this is a CloudEvent
+            if (isCloudEvent(message)) {
+                io.cloudevents.CloudEvent cloudEvent = extractCloudEvent(message);
+                dispatchCloudEvent(cloudEvent, log);
+                return;
+            }
+            {%- endif %}
+            
+            {%- if uses_amqp_message %}
+            // Dispatch as AMQP message
+            dispatchAmqpMessage(message, log);
+            {%- endif %}
+        } catch (Exception ex) {
+            log.error("Error dispatching message: " + ex.getMessage(), ex);
+        }
+    }
+    
+    {%- if uses_cloudevents_message %}
+    private void dispatchCloudEvent(io.cloudevents.CloudEvent cloudEvent, Logger log) {
+        String eventType = cloudEvent.getType();
+        log.info("Dispatching CloudEvent of type: " + eventType);
+        
+        switch (eventType) {
+            {% for messageid, message in messagegroup.messages.items() -%}
+            {%- set messagename = messageid | pascal | strip_namespace %}
+            {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+            {%- if cloudEvents.isCloudEvent(message) %}
+            case "{{ messageid }}":
+                if ({{ messagename | lower }}Handler != null) {
+                    {{ message_body_type }} data = {{ cloudEvents.DeserializeCloudEvent("cloudEvent", message_body_type) }};
+                    {{ messagename | lower }}Handler.accept(cloudEvent, data);
+                } else {
+                    log.warn("No handler registered for " + eventType);
+                }
+                break;
+            {%- endif %}
+            {% endfor %}
+            default:
+                log.warn("Unhandled CloudEvent type: " + eventType);
+                if (unhandledEventHandler != null) {
+                    unhandledEventHandler.accept(cloudEvent, null);
+                }
+                break;
+        }
+    }
+    
+    private boolean isCloudEvent(Message message) {
+        // Check for CloudEvents content type or application properties
+        if (message.getContentType() != null && 
+            message.getContentType().contains("cloudevents")) {
+            return true;
+        }
+        if (message.getApplicationProperties() != null) {
+            return message.getApplicationProperties().getValue().containsKey("cloudEvents:specversion");
+        }
+        return false;
+    }
+    
+    private io.cloudevents.CloudEvent extractCloudEvent(Message message) {
+        {{ cloudEvents.DeserializeCloudEvent("message") | indent(8) }}
+    }
+    {%- endif %}
+    
+    {%- if uses_amqp_message %}
+    private void dispatchAmqpMessage(Message message, Logger log) {
+        String subject = null;
+        if (message.getProperties() != null && message.getProperties().getSubject() != null) {
+            subject = message.getProperties().getSubject();
+        } else if (message.getApplicationProperties() != null) {
+            Object subjectObj = message.getApplicationProperties().getValue().get("subject");
+            if (subjectObj != null) {
+                subject = subjectObj.toString();
+            }
+        }
+        
+        log.info("Dispatching AMQP message with subject: " + subject);
+        
+        if (subject != null) {
+            switch (subject) {
+                {% for messageid, message in messagegroup.messages.items() -%}
+                {%- set messagename = messageid | pascal | strip_namespace %}
+                {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+                {%- if not cloudEvents.isCloudEvent(message) %}
+                case "{{ messageid }}":
+                    if ({{ messagename | lower }}Handler != null) {
+                        {{ amqp.ExtractProtonData("message") | indent(24) }}
+                        {{ message_body_type }} payload = deserialize(data, {{ message_body_type }}.class);
+                        {{ messagename | lower }}Handler.accept(message, payload);
+                    } else {
+                        log.warn("No handler registered for " + subject);
+                    }
+                    break;
+                {%- endif %}
+                {% endfor %}
+                default:
+                    log.warn("Unhandled message subject: " + subject);
+                    if (unhandledMessageHandler != null) {
+                        unhandledMessageHandler.accept(message, null);
+                    }
+                    break;
+            }
+        }
+    }
+    
+    private <T> T deserialize(byte[] data, Class<T> clazz) throws Exception {
+        // Basic deserialization - extend as needed
+        return new com.fasterxml.jackson.databind.ObjectMapper().readValue(data, clazz);
+    }
+    {%- endif %}
+}
+{% endfor -%}

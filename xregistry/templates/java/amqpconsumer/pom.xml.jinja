@@ -1,0 +1,170 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- set uses_cloudevents = cloudEvents.usesCloudEvents(root) -%}
+{%- set uses_amqp = amqp.uses_amqp_protocol(root) or amqp.uses_amqp_endpoint(root) -%}
+{%- set uses_avro = (root | exists("dataschemaformat", "Avro")) -%}
+{%- set uses_protobuf = (root | exists("dataschemaformat", "Protobuf")) -%}
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  
+  <groupId>{{ project_name | lower | replace('-', '_') }}</groupId>
+  <artifactId>amqp-consumer</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  
+  <name>{{ project_name }} AMQP Consumer</name>
+  <description>AMQP 1.0 Consumer generated from xRegistry</description>
+  
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+    
+    <proton.version>0.34.1</proton.version>
+    <log4j.version>3.0.0-beta2</log4j.version>
+    {%- if uses_cloudevents %}
+    <cloudevents.version>4.0.1</cloudevents.version>
+    <jackson.version>2.18.2</jackson.version>
+    {%- endif %}
+    {%- if uses_avro %}
+    <avro.version>1.12.1</avro.version>
+    {%- endif %}
+    {%- if uses_protobuf %}
+    <protobuf.version>4.31.1</protobuf.version>
+    {%- endif %}
+  </properties>
+  
+  <dependencies>
+    <!-- Apache Qpid Proton-J -->
+    <dependency>
+      <groupId>org.apache.qpid</groupId>
+      <artifactId>proton-j</artifactId>
+      <version>${proton.version}</version>
+    </dependency>
+    
+    <!-- Logging -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+    
+    {%- if uses_cloudevents %}
+    <!-- CloudEvents -->
+    <dependency>
+      <groupId>io.cloudevents</groupId>
+      <artifactId>cloudevents-core</artifactId>
+      <version>${cloudevents.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.cloudevents</groupId>
+      <artifactId>cloudevents-api</artifactId>
+      <version>${cloudevents.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.cloudevents</groupId>
+      <artifactId>cloudevents-json-jackson</artifactId>
+      <version>${cloudevents.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    {%- endif %}
+    
+    {%- if uses_avro %}
+    <!-- Avro -->
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>${avro.version}</version>
+    </dependency>
+    {%- endif %}
+    
+    {%- if uses_protobuf %}
+    <!-- Protocol Buffers -->
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+      <version>${protobuf.version}</version>
+    </dependency>
+    {%- endif %}
+    
+    <!-- Data project dependency -->
+    <dependency>
+      <groupId>{{ project_name | lower | replace('-', '_') }}</groupId>
+      <artifactId>{{ data_project_name | lower | replace('-', '_') }}</artifactId>
+      <version>1.0-SNAPSHOT</version>
+    </dependency>
+  </dependencies>
+  
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>21</release>
+          <encoding>UTF-8</encoding>
+        </configuration>
+      </plugin>
+      
+      {%- if uses_avro %}
+      <plugin>
+        <groupId>org.apache.avro</groupId>
+        <artifactId>avro-maven-plugin</artifactId>
+        <version>${avro.version}</version>
+        <executions>
+          <execution>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>schema</goal>
+            </goals>
+            <configuration>
+              <sourceDirectory>${project.basedir}/src/main/avro</sourceDirectory>
+              <outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      {%- endif %}
+      
+      {%- if uses_protobuf %}
+      <plugin>
+        <groupId>com.github.os72</groupId>
+        <artifactId>protoc-jar-maven-plugin</artifactId>
+        <version>3.11.4</version>
+        <executions>
+          <execution>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <protocVersion>4.31.1</protocVersion>
+              <inputDirectories>
+                <include>${project.basedir}/src/main/protobuf</include>
+              </inputDirectories>
+              <outputTargets>
+                <outputTarget>
+                  <type>java</type>
+                  <addSources>main</addSources>
+                </outputTarget>
+              </outputTargets>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      {%- endif %}
+    </plugins>
+  </build>
+</project>
