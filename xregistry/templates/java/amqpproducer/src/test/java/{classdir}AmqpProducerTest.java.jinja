@@ -1,0 +1,191 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+import org.junit.jupiter.api.*;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
+import org.apache.qpid.proton.Proton;
+import org.apache.qpid.proton.message.Message;
+import org.apache.qpid.proton.amqp.messaging.Data;
+import org.apache.qpid.proton.amqp.Binary;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
+import java.net.URI;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Integration tests for AMQP producer using Testcontainers with ActiveMQ Artemis
+ */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class AmqpProducerTest {
+    private static final Logger logger = LogManager.getLogger(AmqpProducerTest.class);
+    private static final String QUEUE_NAME = "exampleQueue";
+    
+    private GenericContainer<?> artemisContainer;
+    private URI brokerUrl;
+    
+    @BeforeAll
+    public void setUp() throws Exception {
+        logger.info("Starting Artemis container for tests");
+        
+        artemisContainer = new GenericContainer<>(DockerImageName.parse("apache/activemq-artemis:latest"))
+            .withExposedPorts(5672)
+            .withEnv("ARTEMIS_USER", "guest")
+            .withEnv("ARTEMIS_PASSWORD", "guest")
+            .withEnv("ANONYMOUS_LOGIN", "true")
+            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)));
+        
+        artemisContainer.start();
+        
+        String host = artemisContainer.getHost();
+        Integer port = artemisContainer.getMappedPort(5672);
+        brokerUrl = new URI("amqp://" + host + ":" + port + "/" + QUEUE_NAME);
+        
+        logger.info("Artemis broker URL: " + brokerUrl);
+    }
+    
+    @AfterAll
+    public void tearDown() {
+        if (artemisContainer != null) {
+            logger.info("Stopping Artemis container");
+            artemisContainer.stop();
+        }
+    }
+    
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroupid | pascal %}
+    {%- set class_name = (pascal_group_name | strip_namespace) + "EventProducer" %}
+    
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    
+    @Test
+    @DisplayName("Test {{ messagename }} message sending")
+    public void test{{ messagename }}MessageSend() throws Exception {
+        logger.info("Starting test{{ messagename }}MessageSend");
+        
+        PlainEndpointCredential credential = new PlainEndpointCredential("guest", "guest");
+        {{ class_name }} producer = {{ class_name }}.createProducer(
+            credential,
+            {%- if cloudEvents.isCloudEvent(message) %}
+            null, // No beforeSend callback for test
+            {%- endif %}
+            new HashMap<>(),
+            List.of(brokerUrl)
+        );
+        
+        CompletableFuture<Message> messageReceived = new CompletableFuture<>();
+        
+        // Start a receiver to verify the message was sent
+        Thread receiverThread = new Thread(() -> {
+            try {
+                org.apache.qpid.proton.reactor.Reactor reactor = Proton.reactor();
+                org.apache.qpid.proton.engine.BaseHandler handler = new org.apache.qpid.proton.engine.BaseHandler() {
+                    @Override
+                    public void onDelivery(org.apache.qpid.proton.engine.Event event) {
+                        org.apache.qpid.proton.engine.Receiver receiver = 
+                            (org.apache.qpid.proton.engine.Receiver) event.getLink();
+                        org.apache.qpid.proton.engine.Delivery delivery = receiver.current();
+                        
+                        if (delivery != null && delivery.isReadable() && !delivery.isPartial()) {
+                            byte[] data = new byte[delivery.pending()];
+                            receiver.recv(data, 0, data.length);
+                            
+                            try {
+                                Message message = Proton.message();
+                                message.decode(data, 0, data.length);
+                                messageReceived.complete(message);
+                                delivery.disposition(org.apache.qpid.proton.amqp.messaging.Accepted.getInstance());
+                                delivery.settle();
+                            } catch (Exception ex) {
+                                logger.error("Error decoding message", ex);
+                                messageReceived.completeExceptionally(ex);
+                            }
+                            
+                            receiver.advance();
+                        }
+                    }
+                };
+                
+                org.apache.qpid.proton.engine.Connection connection = reactor.connection(handler);
+                connection.setHostname(brokerUrl.getHost() + ":" + brokerUrl.getPort());
+                connection.setContainer("test-receiver");
+                connection.setUser("guest");
+                connection.setPassword("guest");
+                connection.open();
+                
+                org.apache.qpid.proton.engine.Session session = connection.session();
+                session.open();
+                
+                org.apache.qpid.proton.engine.Receiver receiver = session.receiver("test-receiver-link");
+                receiver.setSource(Proton.terminus());
+                receiver.getSource().setAddress(QUEUE_NAME);
+                receiver.open();
+                
+                reactor.run();
+            } catch (Exception ex) {
+                logger.error("Error in receiver thread", ex);
+                messageReceived.completeExceptionally(ex);
+            }
+        });
+        receiverThread.setDaemon(true);
+        receiverThread.start();
+        
+        // Give receiver time to connect
+        Thread.sleep(2000);
+        
+        try {
+            // Create and send test message
+            {%- if message_body_type != "byte[]" %}
+            {{ message_body_type }} testData = new {{ message_body_type }}();
+            // TODO: Initialize testData fields
+            {%- else %}
+            byte[] testData = "Test message content".getBytes();
+            {%- endif %}
+            
+            {%- if cloudEvents.isCloudEvent(message) %}
+            // Send as CloudEvent
+            producer.send{{ messagename }}(testData);
+            {%- else %}
+            // Send as native AMQP message
+            producer.send{{ messagename }}(testData);
+            {%- endif %}
+            
+            // Wait for message to be received
+            Message receivedMessage = messageReceived.get(10, TimeUnit.SECONDS);
+            assertNotNull(receivedMessage, "Message should be received");
+            
+            // Verify message content
+            assertNotNull(receivedMessage.getBody(), "Message body should not be null");
+            assertTrue(receivedMessage.getBody() instanceof Data, 
+                "Message body should be Data section");
+            
+            Data dataSection = (Data) receivedMessage.getBody();
+            byte[] receivedData = dataSection.getValue().getArray();
+            assertNotNull(receivedData, "Received data should not be null");
+            assertTrue(receivedData.length > 0, "Received data should not be empty");
+            
+            logger.info("Message send and receive validation completed successfully");
+        } finally {
+            producer.close();
+        }
+    }
+    
+    {%- endfor %}
+    {%- endfor %}
+}
