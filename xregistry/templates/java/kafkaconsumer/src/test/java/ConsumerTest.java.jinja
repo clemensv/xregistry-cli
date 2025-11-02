@@ -178,7 +178,11 @@ public class ConsumerTest {
                     
                     try {
                         // Try to deserialize as {{ messagename }}
+                        {%- if message_body_type == "byte[]" %}
+                        byte[] receivedData = record.value();
+                        {%- else %}
                         {{ message_body_type }} receivedData = {{ message_body_type }}.fromData(record.value(), "application/json");
+                        {%- endif %}
                         assertNotNull(receivedData, "Received data should not be null");
                         logger.info("Successfully deserialized {{ messagename }} message");
                         messageReceived = true;
