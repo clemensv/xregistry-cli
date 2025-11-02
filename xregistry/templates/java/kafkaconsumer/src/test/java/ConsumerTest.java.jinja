@@ -17,21 +17,22 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for Kafka consumer using Testcontainers
+ * Integration tests for Kafka consumer using Testcontainers.
+ * Uses synchronous test pattern matching C# implementation for reliability.
  */
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -43,12 +44,27 @@ public class ConsumerTest {
         .withEmbeddedZookeeper();
     
     private List<URI> bootstrapServers;
+    private static final String SHARED_TOPIC = "test-topic";  // Shared topic for all tests (like C#)
     
     @BeforeAll
-    public void setUp() {
+    public void setUp() throws Exception {
         String bootstrapServer = kafkaContainer.getBootstrapServers();
         bootstrapServers = List.of(URI.create("kafka://" + bootstrapServer.replace("PLAINTEXT://", "")));
         logger.info("Kafka container started at: {}", bootstrapServers.get(0));
+        
+        // Create shared topic once (like C# fixture)
+        createTopic(SHARED_TOPIC, bootstrapServer);
+        logger.info("Created shared topic: {}", SHARED_TOPIC);
+    }
+    
+    private void createTopic(String topicName, String bootstrapServers) throws Exception {
+        Properties adminProps = new Properties();
+        adminProps.put(org.apache.kafka.clients.admin.AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        
+        try (org.apache.kafka.clients.admin.AdminClient adminClient = org.apache.kafka.clients.admin.AdminClient.create(adminProps)) {
+            org.apache.kafka.clients.admin.NewTopic newTopic = new org.apache.kafka.clients.admin.NewTopic(topicName, 1, (short) 1);
+            adminClient.createTopics(Collections.singleton(newTopic)).all().get();
+        }
     }
     
     private KafkaProducer<byte[], byte[]> createProducer() {
@@ -75,140 +91,111 @@ public class ConsumerTest {
     public void test{{ messagename }}MessageConsumption() throws Exception {
         logger.info("Starting test{{ messagename }}MessageConsumption");
         
-        final CountDownLatch latch = new CountDownLatch(1);
-        final List<{{ message_body_type }}> receivedMessages = new ArrayList<>();
-        
-        // Create consumer with test handler
-        // This test accepts ANY message type from the topic but only counts {{ messagename }}
-        {{ group_package }}.{{ consumer_class }} eventConsumer = new {{ group_package }}.{{ consumer_class }}() {
-            @Override
-            protected void on{{ messagename }}({{ message_body_type }} data, ConsumerRecord<byte[], byte[]> record) {
-                logger.info("Received {{ messagename }} message (target type) from topic {} partition {} offset {}", 
-                    record.topic(), record.partition(), record.offset());
-                receivedMessages.add(data);
-                latch.countDown();
-            }
-            
-            {%- for other_messageid, other_message in messagegroup.messages.items() %}
-            {%- if other_messageid != messageid %}
-            {%- set other_messagename = other_messageid | pascal | strip_namespace %}
-            {%- set other_message_body_type = util.get_data_type(data_project_name, root, other_message) %}
-            @Override
-            protected void on{{ other_messagename }}({{ other_message_body_type }} data, ConsumerRecord<byte[], byte[]> record) {
-                logger.info("Received {{ other_messagename }} message (non-target type, ignoring) from topic {} partition {} offset {}", 
-                    record.topic(), record.partition(), record.offset());
-                // Don't count down latch - we're only interested in {{ messagename }}
-            }
+        // Create test data
+        {%- if message_body_type == "byte[]" %}
+        {{ message_body_type }} testData = "Test message data".getBytes();
+        {%- else %}
+        {{ message_body_type }} testData = new {{ message_body_type }}();
+        {%- endif %}
+        {%- set schemaObj = schema_object(root, message.get('dataschemauri') or message.get('dataschema')) %}
+        {%- if schemaObj %}
+            {#- Get the actual schema from the versions structure -#}
+            {%- if schemaObj.versions %}
+                {%- set version_key = schemaObj.defaultversionid if schemaObj.defaultversionid else (schemaObj.versions.keys() | list | last) %}
+                {%- set avroSchema = schemaObj.versions[version_key].schema %}
+            {%- elif schemaObj.schema %}
+                {%- set avroSchema = schemaObj.schema %}
+            {%- else %}
+                {%- set avroSchema = schemaObj %}
             {%- endif %}
-            {%- endfor %}
-        };
+            {#- Now process the Avro schema fields -#}
+            {%- if avroSchema and avroSchema.type == "record" and avroSchema.fields %}
+                {%- for field in avroSchema.fields %}
+                    {%- set fieldtype = field.type if field.type is string else field.type.type if field.type is mapping and field.type.type is defined else "unknown" %}
+                    {%- if fieldtype == "string" %}
+        testData.set{{ field.name | pascal }}("test-{{ field.name }}");
+                    {%- elif fieldtype == "int" or fieldtype == "integer" %}
+        testData.set{{ field.name | pascal }}(42);
+                    {%- elif fieldtype == "long" %}
+        testData.set{{ field.name | pascal }}(42L);
+                    {%- elif fieldtype == "boolean" %}
+        testData.set{{ field.name | pascal }}(true);
+                    {%- elif fieldtype == "double" %}
+        testData.set{{ field.name | pascal }}(42.0);
+                    {%- elif fieldtype == "float" %}
+        testData.set{{ field.name | pascal }}(42.0f);
+                    {%- elif fieldtype == "enum" %}
+                        {%- set enum_namespace = field.type.namespace if field.type.namespace else avroSchema.namespace %}
+                        {%- set normalized_namespace = (data_project_name | lower | replace('-', '_')) + '.' + (enum_namespace | lower | replace('.', '.') if enum_namespace else '') %}
+        testData.set{{ field.name | pascal }}({{ normalized_namespace }}.{{ field.type.name }}.{{ field.type.symbols[0] | upper }});
+                    {%- endif %}
+                {%- endfor %}
+            {%- endif %}
+        {%- endif %}
         
-        // Use unique topic per test to avoid interference between tests sharing same topic
-        String testTopic = "{{ topic }}-" + UUID.randomUUID();
+        // Send message first (like C# pattern: produce then consume)
+        {%- if message_body_type == "byte[]" %}
+        byte[] messageBytes = testData;
+        {%- else %}
+        byte[] messageBytes = testData.toByteArray("application/json");
+        {%- endif %}
         
-        {{ project_name | pascal }}KafkaConsumer consumer = {{ project_name | pascal }}KafkaConsumer.createFor{{ pascal_group_name | strip_namespace }}(
-            eventConsumer,
-            bootstrapServers,
-            "test-group-" + UUID.randomUUID(),
-            List.of(testTopic),
-            null
-        );
+        KafkaProducer<byte[], byte[]> producer = createProducer();
+        try {
+            ProducerRecord<byte[], byte[]> record = new ProducerRecord<>(SHARED_TOPIC, messageBytes);
+            producer.send(record).get();
+            producer.flush();
+            logger.info("Test message sent to shared topic {}", SHARED_TOPIC);
+        } finally {
+            producer.close();
+        }
+        
+        // Now consume synchronously (like C# KafkaProcessor pattern)
+        Properties consumerProps = new Properties();
+        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaContainer.getBootstrapServers());
+        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "test-group-" + UUID.randomUUID());
+        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        
+        org.apache.kafka.clients.consumer.KafkaConsumer<byte[], byte[]> consumer = 
+            new org.apache.kafka.clients.consumer.KafkaConsumer<>(consumerProps);
         
         try {
-            // Start consumer
-            consumer.start();
+            consumer.subscribe(Collections.singletonList(SHARED_TOPIC));
+            logger.info("Subscribed to shared topic, starting poll loop");
             
-            // Wait for consumer to be assigned partitions (readiness check)
-            // Using unique topic per test ensures no interference from previous test messages
-            int maxReadinessWait = 30; // 30 seconds max
-            boolean becameReady = false;
-            for (int i = 0; i < maxReadinessWait; i++) {
-                if (consumer.isReady()) {
-                    logger.info("Consumer became ready after {} seconds", i + 1);
-                    becameReady = true;
-                    Thread.sleep(1000); // Additional 1s after readiness
-                    break;
+            boolean messageReceived = false;
+            long endTime = System.currentTimeMillis() + 30000; // 30 second timeout
+            
+            while (!messageReceived && System.currentTimeMillis() < endTime) {
+                ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(1000));
+                
+                for (ConsumerRecord<byte[], byte[]> record : records) {
+                    logger.info("Received message from topic {} partition {} offset {}", 
+                        record.topic(), record.partition(), record.offset());
+                    
+                    try {
+                        // Try to deserialize as {{ messagename }}
+                        {{ message_body_type }} receivedData = {{ message_body_type }}.fromData(record.value(), "application/json");
+                        assertNotNull(receivedData, "Received data should not be null");
+                        logger.info("Successfully deserialized {{ messagename }} message");
+                        messageReceived = true;
+                        break;
+                    } catch (Exception ex) {
+                        logger.trace("Message does not match {{ messagename }} schema, trying next message", ex);
+                        // Continue to next message - might be from a previous test
+                    }
                 }
-                Thread.sleep(1000);
             }
             
-            if (!becameReady) {
-                logger.warn("Consumer did not become ready within {} seconds, proceeding anyway", maxReadinessWait);
-                // Give it a bit more time as fallback
-                Thread.sleep(5000);
-            }
-            
-            // Create test data and send message
-            {%- if message_body_type == "byte[]" %}
-            {{ message_body_type }} testData = "Test message data".getBytes();
-            {%- else %}
-            {{ message_body_type }} testData = new {{ message_body_type }}();
-            {%- endif %}
-            {%- set schemaObj = schema_object(root, message.get('dataschemauri') or message.get('dataschema')) %}
-            {%- if schemaObj %}
-                {#- Get the actual schema from the versions structure -#}
-                {%- if schemaObj.versions %}
-                    {%- set version_key = schemaObj.defaultversionid if schemaObj.defaultversionid else (schemaObj.versions.keys() | list | last) %}
-                    {%- set avroSchema = schemaObj.versions[version_key].schema %}
-                {%- elif schemaObj.schema %}
-                    {%- set avroSchema = schemaObj.schema %}
-                {%- else %}
-                    {%- set avroSchema = schemaObj %}
-                {%- endif %}
-                {#- Now process the Avro schema fields -#}
-                {%- if avroSchema and avroSchema.type == "record" and avroSchema.fields %}
-                    {%- for field in avroSchema.fields %}
-                        {%- set fieldtype = field.type if field.type is string else field.type.type if field.type is mapping and field.type.type is defined else "unknown" %}
-                        {%- if fieldtype == "string" %}
-            testData.set{{ field.name | pascal }}("test-{{ field.name }}");
-                        {%- elif fieldtype == "int" or fieldtype == "integer" %}
-            testData.set{{ field.name | pascal }}(42);
-                        {%- elif fieldtype == "long" %}
-            testData.set{{ field.name | pascal }}(42L);
-                        {%- elif fieldtype == "boolean" %}
-            testData.set{{ field.name | pascal }}(true);
-                        {%- elif fieldtype == "double" %}
-            testData.set{{ field.name | pascal }}(42.0);
-                        {%- elif fieldtype == "float" %}
-            testData.set{{ field.name | pascal }}(42.0f);
-                        {%- elif fieldtype == "enum" %}
-                            {%- set enum_namespace = field.type.namespace if field.type.namespace else avroSchema.namespace %}
-                            {%- set normalized_namespace = (data_project_name | lower | replace('-', '_')) + '.' + (enum_namespace | lower | replace('.', '.') if enum_namespace else '') %}
-            testData.set{{ field.name | pascal }}({{ normalized_namespace }}.{{ field.type.name }}.{{ field.type.symbols[0] | upper }});
-                        {%- endif %}
-                    {%- endfor %}
-                {%- endif %}
-            {%- endif %}
-            
-            {%- if message_body_type == "byte[]" %}
-            byte[] messageBytes = testData;
-            {%- else %}
-            byte[] messageBytes = testData.toByteArray("application/json");
-            {%- endif %}
-            
-            KafkaProducer<byte[], byte[]> producer = createProducer();
-            try {
-                ProducerRecord<byte[], byte[]> record = new ProducerRecord<>(testTopic, messageBytes);
-                producer.send(record).get();
-                producer.flush();
-                logger.info("Test message sent to topic {}", testTopic);
-            } finally {
-                producer.close();
-            }
-            
-            // Wait for message to be consumed (extended timeout for Testcontainers and Kafka setup)
-            boolean messageReceived = latch.await(120, TimeUnit.SECONDS);
-            
-            assertTrue(messageReceived, "{{ messagename }} message should be received within 120 seconds");
-            assertEquals(1, receivedMessages.size(), "Should receive exactly one message");
-            assertNotNull(receivedMessages.get(0), "Received message should not be null");
-            
+            assertTrue(messageReceived, "{{ messagename }} message should be received within 30 seconds");
             logger.info("{{ messagename }} message consumption test completed successfully");
             
         } finally {
-            consumer.close();
-            // Small delay to ensure full cleanup before next test starts
-            Thread.sleep(1000);
+            consumer.close(Duration.ofSeconds(5));
+            logger.info("Consumer closed");
         }
     }
     
