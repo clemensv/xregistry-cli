@@ -1,0 +1,220 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') | replace('.', '_') %}
+
+package {{ package_name }};
+
+import com.azure.messaging.eventhubs.EventProcessorClient;
+import com.azure.messaging.eventhubs.EventProcessorClientBuilder;
+import com.azure.messaging.eventhubs.models.ErrorContext;
+import com.azure.messaging.eventhubs.models.EventContext;
+import com.azure.storage.blob.BlobContainerAsyncClient;
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
+import org.junit.jupiter.api.*;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.MountableFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Integration tests for Event Hubs Consumer using Testcontainers.
+ * 
+ * This test uses the Azure Event Hubs Emulator and Azurite containers to run integration tests
+ * without requiring actual Azure resources.
+ */
+@Testcontainers
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class ConsumerTest {
+    
+    private static final Logger logger = LogManager.getLogger(ConsumerTest.class);
+    
+    private Network network;
+    private GenericContainer<?> azuriteContainer;
+    private GenericContainer<?> eventHubsEmulatorContainer;
+    private Path emulatorConfigPath;
+    
+    private String eventHubConnectionString;
+    private String blobStorageConnectionString;
+    
+    private static final String EMULATOR_CONFIG = """
+        {
+          "UserConfig": {
+            "NamespaceConfig": [
+              {
+                "Type": "EventHub",
+                "Name": "emulatorNs1",
+                "Entities": [
+                  {
+                    "Name": "eh1",
+                    "PartitionCount": "2",
+                    "ConsumerGroups": [
+                      {
+                        "Name": "cg1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "LoggingConfig": {
+              "Type": "File"
+            }
+          }
+        }
+        """;
+    
+    @BeforeAll
+    public void setUp() throws IOException {
+        logger.info("Setting up Event Hubs consumer emulator testcontainers");
+        
+        // Create network for containers to communicate
+        network = Network.newNetwork();
+        
+        // Create temporary config file for Event Hubs emulator
+        emulatorConfigPath = Files.createTempFile("emulator-config", ".json");
+        Files.writeString(emulatorConfigPath, EMULATOR_CONFIG);
+        
+        // Start Azurite container (blob+table storage for Event Hubs checkpoints and metadata)
+        azuriteContainer = new GenericContainer<>("mcr.microsoft.com/azure-storage/azurite:latest")
+            .withNetwork(network)
+            .withNetworkAliases("azurite")
+            .withExposedPorts(10000, 10001, 10002)
+            .waitingFor(Wait.forListeningPorts(10000, 10001, 10002)
+                .withStartupTimeout(Duration.ofMinutes(2)));
+        
+        azuriteContainer.start();
+        
+        // Build Azurite connection string
+        blobStorageConnectionString = String.format(
+            "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://%s:%d/devstoreaccount1;",
+            azuriteContainer.getHost(),
+            azuriteContainer.getMappedPort(10000)
+        );
+        
+        logger.info("Azurite started at: {}", blobStorageConnectionString);
+        
+        // Start Event Hubs emulator container
+        eventHubsEmulatorContainer = new GenericContainer<>("mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest")
+            .withCopyFileToContainer(MountableFile.forHostPath(emulatorConfigPath), "/Eventhubs_Emulator/ConfigFiles/Config.json")
+            .withNetwork(network)
+            .withNetworkAliases("eventhubs-emulator")
+            .withExposedPorts(5672)
+            .withEnv("BLOB_SERVER", "azurite")
+            .withEnv("METADATA_SERVER", "azurite")
+            .withEnv("ACCEPT_EULA", "Y")
+            .waitingFor(Wait.forLogMessage(".*Emulator is launching with config.*", 1)
+                .withStartupTimeout(Duration.ofMinutes(3)));
+        
+        eventHubsEmulatorContainer.start();
+        
+        // Build Event Hubs connection string
+        eventHubConnectionString = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;EntityPath=eh1;";
+        
+        logger.info("Event Hubs emulator started successfully");
+        
+        // Create blob container for checkpoints
+        try {
+            BlobServiceClient blobServiceClient = new BlobServiceClientBuilder()
+                .connectionString(blobStorageConnectionString)
+                .buildClient();
+            
+            BlobContainerClient containerClient = blobServiceClient.createBlobContainerIfNotExists("eventhub-checkpoints");
+            logger.info("Blob container created: {}", containerClient.getBlobContainerName());
+        } catch (Exception e) {
+            logger.error("Failed to create blob container", e);
+            throw e;
+        }
+    }
+    
+    @AfterAll
+    public void tearDown() {
+        logger.info("Tearing down Event Hubs consumer emulator testcontainers");
+        
+        if (eventHubsEmulatorContainer != null) {
+            eventHubsEmulatorContainer.stop();
+        }
+        
+        if (azuriteContainer != null) {
+            azuriteContainer.stop();
+        }
+        
+        if (network != null) {
+            network.close();
+        }
+        
+        if (emulatorConfigPath != null) {
+            try {
+                Files.deleteIfExists(emulatorConfigPath);
+            } catch (IOException e) {
+                logger.warn("Failed to delete emulator config file", e);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Test Consumer creation with Event Hubs Emulator")
+    public void testConsumerCreationWithEmulator() throws Exception {
+        logger.info("Testing Consumer creation with Event Hubs emulator");
+        
+        CountDownLatch latch = new CountDownLatch(1);
+        
+        EventProcessorClient processorClient = new EventProcessorClientBuilder()
+            .connectionString(eventHubConnectionString)
+            .consumerGroup("cg1")
+            .processEvent(eventContext -> {
+                logger.info("Received event from partition: {}", 
+                    eventContext.getPartitionContext().getPartitionId());
+                latch.countDown();
+            })
+            .processError(errorContext -> {
+                logger.error("Error in partition {}: {}", 
+                    errorContext.getPartitionContext().getPartitionId(),
+                    errorContext.getThrowable().getMessage());
+            })
+            .checkpointStore(new com.azure.messaging.eventhubs.checkpointstore.blob.BlobCheckpointStore(
+                new BlobServiceClientBuilder()
+                    .connectionString(blobStorageConnectionString)
+                    .buildAsyncClient()
+                    .getBlobContainerAsyncClient("eventhub-checkpoints")))
+            .buildEventProcessorClient();
+        
+        Consumer consumer = new Consumer(processorClient);
+        assertNotNull(consumer, "Consumer should be created successfully");
+        
+        logger.info("Consumer created successfully with emulator");
+        
+        // Start the consumer
+        consumer.start();
+        
+        // Wait a bit for the consumer to initialize
+        Thread.sleep(2000);
+        
+        // Stop the consumer
+        consumer.close();
+        
+        // Close the consumer
+        consumer.close();
+        
+        logger.info("Consumer test completed successfully");
+    }
+}
+
+

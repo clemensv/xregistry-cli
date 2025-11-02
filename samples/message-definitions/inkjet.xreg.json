@@ -8,26 +8,24 @@
           "description": "Event for when a print job starts",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.InkJetPrinter.PrintJobStarted",
-                "description": "Event raised when a print job is initiated"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "identifier of the print job"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.PrintJobStarted",
+              "description": "Event raised when a print job is initiated"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "identifier of the print job"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -37,26 +35,24 @@
           "description": "Event for when a print job is completed",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.InkJetPrinter.PrintJobCompleted",
-                "description": "Event raised when a print job is completed"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "identifier of the print job"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.PrintJobCompleted",
+              "description": "Event raised when a print job is completed"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "identifier of the print job"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -66,26 +62,24 @@
           "description": "Event for when ink levels are low",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.InkJetPrinter.InkLow",
-                "description": "Event raised when ink levels are detected to be low"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "identifier of the affected ink cartridge"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.InkLow",
+              "description": "Event raised when ink levels are detected to be low"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "identifier of the affected ink cartridge"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -95,26 +89,24 @@
           "description": "Event for when a paper jam occurs",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.InkJetPrinter.PaperJam",
-                "description": "Event raised when a paper jam is detected"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "location of the jam within the printer"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.PaperJam",
+              "description": "Event raised when a paper jam is detected"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "location of the jam within the printer"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -124,26 +116,24 @@
           "description": "Event for when the printer requires maintenance",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.InkJetPrinter.MaintenanceRequired",
-                "description": "Event raised when maintenance is required for the printer"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "type of maintenance required"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.MaintenanceRequired",
+              "description": "Event raised when maintenance is required for the printer"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "type of maintenance required"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",

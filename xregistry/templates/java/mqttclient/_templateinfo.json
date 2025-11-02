@@ -1,0 +1,8 @@
+{
+  "template": "mqttclient",
+  "description": "MQTT Client using Eclipse Paho",
+  "language": "java",
+  "protocol": "MQTT",
+  "usage": ["producer", "consumer"],
+  "requires": ["messagegroups"]
+}

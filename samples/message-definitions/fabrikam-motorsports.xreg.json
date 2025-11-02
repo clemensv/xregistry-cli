@@ -7,21 +7,19 @@
           "description": "Channel Timeseries Event",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "value": "net.fabrikam.telemetry.channel"
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "fza://{tenantid}/{carId}"
-              },
-              "subject": {
-                "type": "uritemplate",
-                "value": "{channelId}"
-              },
-              "time": {
-                "required": true
-              }
+            "type": {
+              "value": "net.fabrikam.telemetry.channel"
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "fza://{tenantid}/{carId}"
+            },
+            "subject": {
+              "type": "uritemplate",
+              "value": "{channelId}"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "AVRO/1.11.1",

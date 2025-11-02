@@ -1,0 +1,160 @@
+{%- import 'util.jinja.include' as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+import com.azure.core.credential.TokenCredential;
+import com.azure.identity.DefaultAzureCredential;
+import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.messaging.servicebus.ServiceBusClientBuilder;
+import com.azure.messaging.servicebus.ServiceBusProcessorClient;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+{%- for messagegroupid in root.messagegroups.keys() %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') -%}
+import {{ group_package }}.*;
+{%- endfor %}
+
+/**
+ * Azure Service Bus Consumer for {{ project_name }}.
+ * Manages ServiceBusProcessorClient lifecycle and provides factory methods for creating consumers.
+ */
+public class Consumer implements AutoCloseable {
+    private static final Logger logger = LogManager.getLogger(Consumer.class);
+    
+    private final ServiceBusProcessorClient processorClient;
+
+    /**
+     * Creates a new instance of Consumer.
+     * 
+     * @param processorClient The Service Bus processor client to use for consuming messages
+     */
+    public Consumer(ServiceBusProcessorClient processorClient) {
+        this.processorClient = processorClient;
+    }
+
+    {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+    {%- set messagegroupname = messagegroupid | pascal | strip_namespace %}
+    {%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+    {%- set consumer_class = messagegroupname ~ 'MessageConsumer' %}
+
+    /**
+     * Create a Service Bus consumer for {{ messagegroupid }} using DefaultAzureCredential.
+     * 
+     * @param messageConsumer The message consumer that handles incoming messages
+     * @param serviceBusNamespace The Service Bus namespace (e.g., "mynamespace.servicebus.windows.net")
+     * @param queueName The queue name
+     * @return A configured consumer instance
+     */
+    public static Consumer createFor{{ messagegroupname }}Queue(
+            {{ group_package }}.{{ consumer_class }} messageConsumer,
+            String serviceBusNamespace,
+            String queueName) {
+        
+        DefaultAzureCredential credential = new DefaultAzureCredentialBuilder().build();
+        return createFor{{ messagegroupname }}Queue(messageConsumer, credential, 
+            serviceBusNamespace, queueName);
+    }
+
+    /**
+     * Create a Service Bus consumer for {{ messagegroupid }} with a specific credential.
+     * 
+     * @param messageConsumer The message consumer that handles incoming messages
+     * @param credential The Azure credential to use for authentication
+     * @param serviceBusNamespace The Service Bus namespace
+     * @param queueName The queue name
+     * @return A configured consumer instance
+     */
+    public static Consumer createFor{{ messagegroupname }}Queue(
+            {{ group_package }}.{{ consumer_class }} messageConsumer,
+            TokenCredential credential,
+            String serviceBusNamespace,
+            String queueName) {
+        
+        // Create processor client for queue
+        ServiceBusProcessorClient processorClient = new ServiceBusClientBuilder()
+            .credential(serviceBusNamespace, credential)
+            .processor()
+            .queueName(queueName)
+            .processMessage(messageConsumer::processMessage)
+            .processError(context -> {
+                logger.error("Error in Service Bus processor", context.getException());
+            })
+            .buildProcessorClient();
+
+        return new Consumer(processorClient);
+    }
+
+    /**
+     * Create a Service Bus consumer for {{ messagegroupid }} topic subscription using DefaultAzureCredential.
+     * 
+     * @param messageConsumer The message consumer that handles incoming messages
+     * @param serviceBusNamespace The Service Bus namespace
+     * @param topicName The topic name
+     * @param subscriptionName The subscription name
+     * @return A configured consumer instance
+     */
+    public static Consumer createFor{{ messagegroupname }}TopicSubscription(
+            {{ group_package }}.{{ consumer_class }} messageConsumer,
+            String serviceBusNamespace,
+            String topicName,
+            String subscriptionName) {
+        
+        DefaultAzureCredential credential = new DefaultAzureCredentialBuilder().build();
+        return createFor{{ messagegroupname }}TopicSubscription(messageConsumer, credential,
+            serviceBusNamespace, topicName, subscriptionName);
+    }
+
+    /**
+     * Create a Service Bus consumer for {{ messagegroupid }} topic subscription with a specific credential.
+     * 
+     * @param messageConsumer The message consumer that handles incoming messages
+     * @param credential The Azure credential to use for authentication
+     * @param serviceBusNamespace The Service Bus namespace
+     * @param topicName The topic name
+     * @param subscriptionName The subscription name
+     * @return A configured consumer instance
+     */
+    public static Consumer createFor{{ messagegroupname }}TopicSubscription(
+            {{ group_package }}.{{ consumer_class }} messageConsumer,
+            TokenCredential credential,
+            String serviceBusNamespace,
+            String topicName,
+            String subscriptionName) {
+        
+        // Create processor client for topic subscription
+        ServiceBusProcessorClient processorClient = new ServiceBusClientBuilder()
+            .credential(serviceBusNamespace, credential)
+            .processor()
+            .topicName(topicName)
+            .subscriptionName(subscriptionName)
+            .processMessage(messageConsumer::processMessage)
+            .processError(context -> {
+                logger.error("Error in Service Bus processor", context.getException());
+            })
+            .buildProcessorClient();
+
+        return new Consumer(processorClient);
+    }
+    {%- endfor %}
+
+    /**
+     * Start processing messages from Service Bus.
+     * This method returns immediately; processing happens in background threads.
+     */
+    public void start() {
+        logger.info("Starting Service Bus consumer");
+        processorClient.start();
+    }
+
+    /**
+     * Stop processing messages and release resources.
+     */
+    @Override
+    public void close() {
+        logger.info("Stopping Service Bus consumer");
+        processorClient.close();
+    }
+}

@@ -5,68 +5,65 @@
 
 {%- set messagegroups = root.messagegroups %}
 {%- set package_name = project_name | lower | replace('-', '_') %}
+{%- set uses_cloudevents = namespace(value=false) %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- if cloudEvents.isCloudEvent(message) %}
+{%- set uses_cloudevents.value = true %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
 package {{ package_name }};
 
 import org.junit.jupiter.api.*;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.apache.qpid.proton.Proton;
-import org.apache.qpid.proton.message.Message;
-import org.apache.qpid.proton.amqp.messaging.Data;
-import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.protonj2.client.*;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
+{%- if uses_cloudevents.value %}
+{{ cloudEvents.CloudEventsImports() }}
+{%- endif %}
 
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests for AMQP producer using Testcontainers with ActiveMQ Artemis
  */
+@Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class AmqpProducerTest {
-    private static final Logger logger = LogManager.getLogger(AmqpProducerTest.class);
+public class {{ class_name | strip_namespace }} {
+    private static final Logger logger = LogManager.getLogger({{ class_name | strip_namespace }}.class);
     private static final String QUEUE_NAME = "exampleQueue";
     
-    private GenericContainer<?> artemisContainer;
+    @Container
+    private static final GenericContainer<?> artemisContainer = new GenericContainer<>(DockerImageName.parse("apache/activemq-artemis:latest"))
+        .withExposedPorts(5672)
+        .withEnv("ARTEMIS_USER", "guest")
+        .withEnv("ARTEMIS_PASSWORD", "guest")
+        .withEnv("ANONYMOUS_LOGIN", "true")
+        .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)));
+    
     private URI brokerUrl;
     
     @BeforeAll
     public void setUp() throws Exception {
-        logger.info("Starting Artemis container for tests");
-        
-        artemisContainer = new GenericContainer<>(DockerImageName.parse("apache/activemq-artemis:latest"))
-            .withExposedPorts(5672)
-            .withEnv("ARTEMIS_USER", "guest")
-            .withEnv("ARTEMIS_PASSWORD", "guest")
-            .withEnv("ANONYMOUS_LOGIN", "true")
-            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)));
-        
-        artemisContainer.start();
-        
+        Integer mappedPort = artemisContainer.getMappedPort(5672);
         String host = artemisContainer.getHost();
-        Integer port = artemisContainer.getMappedPort(5672);
-        brokerUrl = new URI("amqp://" + host + ":" + port + "/" + QUEUE_NAME);
-        
-        logger.info("Artemis broker URL: " + brokerUrl);
+        brokerUrl = new URI(String.format("amqp://%s:%d", host, mappedPort));
+        logger.info("Artemis container started at {}", brokerUrl);
     }
     
-    @AfterAll
-    public void tearDown() {
-        if (artemisContainer != null) {
-            logger.info("Stopping Artemis container");
-            artemisContainer.stop();
-        }
-    }
-    
-    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
     {%- set pascal_group_name = messagegroupid | pascal %}
     {%- set class_name = (pascal_group_name | strip_namespace) + "EventProducer" %}
     
@@ -80,112 +77,167 @@ public class AmqpProducerTest {
         logger.info("Starting test{{ messagename }}MessageSend");
         
         PlainEndpointCredential credential = new PlainEndpointCredential("guest", "guest");
+        Map<String, String> options = new HashMap<>();
+        options.put("node", QUEUE_NAME);
         {{ class_name }} producer = {{ class_name }}.createProducer(
             credential,
             {%- if cloudEvents.isCloudEvent(message) %}
             null, // No beforeSend callback for test
             {%- endif %}
-            new HashMap<>(),
-            List.of(brokerUrl)
+            options,
+            new ArrayList<>(List.of(brokerUrl))
         );
         
-        CompletableFuture<Message> messageReceived = new CompletableFuture<>();
+        CompletableFuture<Message<?>> messageReceived = new CompletableFuture<>();
         
         // Start a receiver to verify the message was sent
         Thread receiverThread = new Thread(() -> {
+            Client client = null;
+            Connection connection = null;
             try {
-                org.apache.qpid.proton.reactor.Reactor reactor = Proton.reactor();
-                org.apache.qpid.proton.engine.BaseHandler handler = new org.apache.qpid.proton.engine.BaseHandler() {
-                    @Override
-                    public void onDelivery(org.apache.qpid.proton.engine.Event event) {
-                        org.apache.qpid.proton.engine.Receiver receiver = 
-                            (org.apache.qpid.proton.engine.Receiver) event.getLink();
-                        org.apache.qpid.proton.engine.Delivery delivery = receiver.current();
-                        
-                        if (delivery != null && delivery.isReadable() && !delivery.isPartial()) {
-                            byte[] data = new byte[delivery.pending()];
-                            receiver.recv(data, 0, data.length);
-                            
-                            try {
-                                Message message = Proton.message();
-                                message.decode(data, 0, data.length);
-                                messageReceived.complete(message);
-                                delivery.disposition(org.apache.qpid.proton.amqp.messaging.Accepted.getInstance());
-                                delivery.settle();
-                            } catch (Exception ex) {
-                                logger.error("Error decoding message", ex);
-                                messageReceived.completeExceptionally(ex);
-                            }
-                            
-                            receiver.advance();
-                        }
-                    }
-                };
+                client = Client.create();
+                ConnectionOptions connOptions = new ConnectionOptions();
+                connOptions.user("guest");
+                connOptions.password("guest");
                 
-                org.apache.qpid.proton.engine.Connection connection = reactor.connection(handler);
-                connection.setHostname(brokerUrl.getHost() + ":" + brokerUrl.getPort());
-                connection.setContainer("test-receiver");
-                connection.setUser("guest");
-                connection.setPassword("guest");
-                connection.open();
+                connection = client.connect(brokerUrl.getHost(), brokerUrl.getPort(), connOptions);
+                Receiver receiver = connection.openReceiver(QUEUE_NAME);
                 
-                org.apache.qpid.proton.engine.Session session = connection.session();
-                session.open();
+                // Wait for message with timeout
+                Delivery delivery = receiver.receive(30, TimeUnit.SECONDS);
+                if (delivery != null) {
+                    Message<?> message = delivery.message();
+                    messageReceived.complete(message);
+                    delivery.accept();
+                } else {
+                    messageReceived.completeExceptionally(new Exception("No message received within timeout"));
+                }
                 
-                org.apache.qpid.proton.engine.Receiver receiver = session.receiver("test-receiver-link");
-                receiver.setSource(Proton.terminus());
-                receiver.getSource().setAddress(QUEUE_NAME);
-                receiver.open();
-                
-                reactor.run();
+                receiver.close();
+                connection.close();
+                client.close();
             } catch (Exception ex) {
                 logger.error("Error in receiver thread", ex);
                 messageReceived.completeExceptionally(ex);
+                try {
+                    if (connection != null) connection.close();
+                    if (client != null) client.close();
+                } catch (Exception closeEx) {
+                    logger.debug("Error closing connection: " + closeEx.getMessage());
+                }
             }
         });
         receiverThread.setDaemon(true);
         receiverThread.start();
         
         // Give receiver time to connect
-        Thread.sleep(2000);
+        Thread.sleep(1000);
         
-        try {
-            // Create and send test message
-            {%- if message_body_type != "byte[]" %}
-            {{ message_body_type }} testData = new {{ message_body_type }}();
-            // TODO: Initialize testData fields
+        // Create test data
+        {%- if message_body_type == "byte[]" %}
+        {{ message_body_type }} testData = new byte[0];
+        {%- else %}
+        {{ message_body_type }} testData = new {{ message_body_type }}();
+        {%- endif %}
+        {%- set schemaObj = schema_object(root, message.get('dataschemauri') or message.get('dataschema')) %}
+        {%- if schemaObj %}
+            {#- Get the actual schema from the versions structure -#}
+            {%- if schemaObj.versions %}
+                {%- set version_key = schemaObj.defaultversionid if schemaObj.defaultversionid else (schemaObj.versions.keys() | list | last) %}
+                {%- set avroSchema = schemaObj.versions[version_key].schema %}
+            {%- elif schemaObj.schema %}
+                {%- set avroSchema = schemaObj.schema %}
             {%- else %}
-            byte[] testData = "Test message content".getBytes();
+                {%- set avroSchema = schemaObj %}
             {%- endif %}
-            
-            {%- if cloudEvents.isCloudEvent(message) %}
-            // Send as CloudEvent
-            producer.send{{ messagename }}(testData);
-            {%- else %}
-            // Send as native AMQP message
-            producer.send{{ messagename }}(testData);
+            {#- Now process the Avro schema fields -#}
+            {%- if avroSchema and avroSchema.type == "record" and avroSchema.fields %}
+                {%- for field in avroSchema.fields %}
+                    {%- set fieldtype = field.type if field.type is string else field.type.type if field.type is mapping and field.type.type is defined else "unknown" %}
+                    {%- if fieldtype == "string" %}
+        testData.set{{ field.name | pascal }}("test-{{ field.name }}");
+                    {%- elif fieldtype == "int" or fieldtype == "integer" %}
+        testData.set{{ field.name | pascal }}(42);
+                    {%- elif fieldtype == "long" %}
+        testData.set{{ field.name | pascal }}(42L);
+                    {%- elif fieldtype == "boolean" %}
+        testData.set{{ field.name | pascal }}(true);
+                    {%- elif fieldtype == "double" %}
+        testData.set{{ field.name | pascal }}(42.0);
+                    {%- elif fieldtype == "float" %}
+        testData.set{{ field.name | pascal }}(42.0f);
+                    {%- elif fieldtype == "enum" %}
+                        {%- set enum_namespace = field.type.namespace if field.type.namespace else avroSchema.namespace %}
+                        {%- set normalized_namespace = (data_project_name | lower | replace('-', '_')) + '.' + (enum_namespace | lower | replace('.', '.') if enum_namespace else '') %}
+        testData.set{{ field.name | pascal }}({{ normalized_namespace }}.{{ field.type.name }}.{{ field.type.symbols[0] | upper }});
+                    {%- endif %}
+                {%- endfor %}
             {%- endif %}
-            
-            // Wait for message to be received
-            Message receivedMessage = messageReceived.get(10, TimeUnit.SECONDS);
-            assertNotNull(receivedMessage, "Message should be received");
-            
-            // Verify message content
-            assertNotNull(receivedMessage.getBody(), "Message body should not be null");
-            assertTrue(receivedMessage.getBody() instanceof Data, 
-                "Message body should be Data section");
-            
-            Data dataSection = (Data) receivedMessage.getBody();
-            byte[] receivedData = dataSection.getValue().getArray();
-            assertNotNull(receivedData, "Received data should not be null");
-            assertTrue(receivedData.length > 0, "Received data should not be empty");
-            
-            logger.info("Message send and receive validation completed successfully");
-        } finally {
-            producer.close();
-        }
+        {%- endif %}
+        
+        // Send message
+        producer.send{{ messagename }}(testData
+        {%- if cloudEvents.isCloudEvent(message) -%}
+        {%- if message.envelopemetadata -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() -%}
+        {%- if attribute.type == "uritemplate" -%}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+        , "test-{{ placeholder }}"
+        {%- endfor -%}
+        {%- elif attribute.value is not defined and attrname not in ["id", "time", "datacontenttype", "dataschema"] -%}
+        , "test-{{ attrname }}"
+        {%- endif -%}
+        {%- endfor -%}
+        {%- endif -%}
+        {%- elif amqp.is_amqp(message) -%}
+        {%- if message.metadata -%}
+        {%- for attrname, attribute in message.metadata.items() -%}
+        {%- if attribute.type == "uritemplate" -%}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+        , "test-{{ placeholder }}"
+        {%- endfor -%}
+        {%- elif attribute.value is not defined -%}
+        , "test-{{ attrname }}"
+        {%- endif -%}
+        {%- endfor -%}
+        {%- endif -%}
+        {%- endif -%}
+        );
+        
+        // Wait for message to be received
+        Message<?> received = messageReceived.get(30, TimeUnit.SECONDS);
+        assertNotNull(received, "Message should be received");
+        
+        // Verify message body
+        Object bodyObj = received.body();
+        assertNotNull(bodyObj, "Message body should not be null");
+        assertTrue(bodyObj instanceof byte[], "Message body should be byte array");
+        byte[] receivedBody = (byte[]) bodyObj;
+        assertTrue(receivedBody.length > 0, "Message body should not be empty");
+        
+        {%- if cloudEvents.isCloudEvent(message) %}
+        // For CloudEvents messages, verify the content-type header
+        String contentType = received.contentType();
+        assertTrue(contentType != null && contentType.contains("cloudevents"), 
+            "Message should have CloudEvents content type, got: " + contentType);
+        
+        // Basic validation - message should contain CloudEvents JSON structure
+        // Note: Full deserialization validation is complex due to AMQP body framing
+        String bodyAsString = new String(receivedBody, java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(bodyAsString.contains("\"specversion\""), "CloudEvent should contain specversion field");
+        assertTrue(bodyAsString.contains("\"type\""), "CloudEvent should contain type field");
+        assertTrue(bodyAsString.contains("\"source\""), "CloudEvent should contain source field");
+        {%- else %}
+        // Verify the received body matches the sent data by re-serializing test data
+        byte[] expectedBody = testData.toByteArray("avro/binary");
+        assertArrayEquals(expectedBody, receivedBody, "Message body should match the sent data");
+        {%- endif %}
+        
+        logger.info("Successfully sent and received {{ messagename }} message with verified content");
+        
+        producer.close();
     }
     
     {%- endfor %}
-    {%- endfor %}
+{%- endfor %}
 }

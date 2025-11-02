@@ -18,20 +18,14 @@ true
 {%- endif -%}
 {%- endmacro -%}
 
-{#- Proton-J imports for pure AMQP client -#}
+{#- ProtonJ2 imports for pure AMQP client -#}
 {%- macro ProtonJImports() -%}
-import org.apache.qpid.proton.Proton;
-import org.apache.qpid.proton.amqp.Binary;
-import org.apache.qpid.proton.amqp.Symbol;
-import org.apache.qpid.proton.amqp.messaging.*;
-import org.apache.qpid.proton.message.Message;
-import org.apache.qpid.proton.reactor.Reactor;
-import org.apache.qpid.proton.reactor.impl.ReactorImpl;
+import org.apache.qpid.protonj2.client.Message;
 {%- endmacro -%}
 
 {#- Qpid JMS imports for JMS over AMQP -#}
 {%- macro QpidJmsImports() -%}
-import javax.jms.*;
+import jakarta.jms.*;
 import org.apache.qpid.jms.JmsConnectionFactory;
 import org.apache.qpid.jms.message.JmsMessage;
 import org.apache.qpid.jms.provider.amqp.AmqpConnection;
@@ -62,95 +56,82 @@ import org.apache.qpid.jms.provider.amqp.AmqpConnection;
 {%- endif -%}
 {%- endmacro -%}
 
-{#- Create Proton-J message from protocol options -#}
+{#- Create ProtonJ2 message from protocol options -#}
 {%- macro CreateProtonMessage(message, dataVar) -%}
-Message message = Proton.message();
+Message<?> message = Message.create({{ dataVar }});
 {%- if message.protocoloptions %}
+{%- if message.protocoloptions.properties %}
 
 // Set message properties
-{%- if message.protocoloptions.properties %}
-Properties props = new Properties();
 {%- for propname, prop in message.protocoloptions.properties.items() %}
 {%- if propname == "message-id" %}
-props.setMessageId({% if prop.value %}"{{ prop.value }}"{% else %}java.util.UUID.randomUUID().toString(){% endif %});
+message.messageId({% if prop.value %}"{{ prop.value }}"{% else %}java.util.UUID.randomUUID().toString(){% endif %});
 {%- elif propname == "user-id" %}
-props.setUserId(new Binary({% if prop.value %}"{{ prop.value }}".getBytes(){% else %}userId.getBytes(){% endif %}));
+message.userId({% if prop.value %}"{{ prop.value }}".getBytes(){% else %}userId.getBytes(){% endif %});
 {%- elif propname == "to" %}
-props.setTo({% if prop.value %}"{{ prop.value }}"{% else %}to{% endif %});
+message.to({% if prop.value %}"{{ prop.value }}"{% else %}to{% endif %});
 {%- elif propname == "subject" %}
-props.setSubject({% if prop.value %}"{{ prop.value }}"{% else %}subject{% endif %});
+message.subject({% if prop.value %}"{{ prop.value }}"{% else %}subject{% endif %});
 {%- elif propname == "reply-to" %}
-props.setReplyTo({% if prop.value %}"{{ prop.value }}"{% else %}replyTo{% endif %});
+message.replyTo({% if prop.value %}"{{ prop.value }}"{% else %}replyTo{% endif %});
 {%- elif propname == "correlation-id" %}
-props.setCorrelationId({% if prop.value %}"{{ prop.value }}"{% else %}correlationId{% endif %});
+message.correlationId({% if prop.value %}"{{ prop.value }}"{% else %}correlationId{% endif %});
 {%- elif propname == "content-type" %}
-props.setContentType(Symbol.valueOf({% if prop.value %}"{{ prop.value }}"{% else %}contentType{% endif %}));
+message.contentType({% if prop.value %}"{{ prop.value }}"{% else %}contentType{% endif %});
 {%- elif propname == "content-encoding" %}
-props.setContentEncoding(Symbol.valueOf({% if prop.value %}"{{ prop.value }}"{% else %}contentEncoding{% endif %}));
+message.contentEncoding({% if prop.value %}"{{ prop.value }}"{% else %}contentEncoding{% endif %});
 {%- elif propname == "absolute-expiry-time" %}
-props.setAbsoluteExpiryTime(new java.util.Date({% if prop.value %}{{ prop.value }}{% else %}absoluteExpiryTime{% endif %}));
+message.expiryTime({% if prop.value %}{{ prop.value }}{% else %}absoluteExpiryTime{% endif %});
 {%- elif propname == "creation-time" %}
-props.setCreationTime(new java.util.Date({% if prop.value %}{{ prop.value }}{% else %}System.currentTimeMillis(){% endif %}));
+message.creationTime({% if prop.value %}{{ prop.value }}{% else %}System.currentTimeMillis(){% endif %});
 {%- elif propname == "group-id" %}
-props.setGroupId({% if prop.value %}"{{ prop.value }}"{% else %}groupId{% endif %});
+message.groupId({% if prop.value %}"{{ prop.value }}"{% else %}groupId{% endif %});
 {%- elif propname == "group-sequence" %}
-props.setGroupSequence({% if prop.value %}{{ prop.value }}{% else %}groupSequence{% endif %});
+message.groupSequence({% if prop.value %}{{ prop.value }}{% else %}groupSequence{% endif %});
 {%- elif propname == "reply-to-group-id" %}
-props.setReplyToGroupId({% if prop.value %}"{{ prop.value }}"{% else %}replyToGroupId{% endif %});
+message.replyToGroupId({% if prop.value %}"{{ prop.value }}"{% else %}replyToGroupId{% endif %});
 {%- endif %}
 {%- endfor %}
-message.setProperties(props);
 {%- endif %}
+{%- if message.protocoloptions["application-properties"] %}
 
 // Set application properties
-{%- if message.protocoloptions["application-properties"] %}
-ApplicationProperties appProps = new ApplicationProperties(new java.util.HashMap<>());
 {%- for propname, prop in message.protocoloptions["application-properties"].items() %}
-appProps.getValue().put("{{ propname }}", {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
+message.property("{{ propname }}", {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
 {%- endfor %}
-message.setApplicationProperties(appProps);
 {%- endif %}
+{%- if message.protocoloptions["message-annotations"] %}
 
 // Set message annotations
-{%- if message.protocoloptions["message-annotations"] %}
-MessageAnnotations msgAnnotations = new MessageAnnotations(new java.util.HashMap<>());
 {%- for propname, prop in message.protocoloptions["message-annotations"].items() %}
-msgAnnotations.getValue().put(Symbol.valueOf("{{ propname }}"), {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
+message.annotation("{{ propname }}", {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
 {%- endfor %}
-message.setMessageAnnotations(msgAnnotations);
 {%- endif %}
+{%- if message.protocoloptions["delivery-annotations"] %}
 
 // Set delivery annotations
-{%- if message.protocoloptions["delivery-annotations"] %}
-DeliveryAnnotations deliveryAnnotations = new DeliveryAnnotations(new java.util.HashMap<>());
 {%- for propname, prop in message.protocoloptions["delivery-annotations"].items() %}
-deliveryAnnotations.getValue().put(Symbol.valueOf("{{ propname }}"), {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
+message.annotation("{{ propname }}", {% if prop.value %}{% if prop.type == "integer" %}{{ prop.value }}{% elif prop.type == "boolean" %}{{ prop.value }}{% else %}"{{ prop.value }}"{% endif %}{% else %}{{ propname }}{% endif %});
 {%- endfor %}
-message.setDeliveryAnnotations(deliveryAnnotations);
 {%- endif %}
-
-// Set header
 {%- if message.protocoloptions.header %}
-Header header = new Header();
+
+// Set header properties
 {%- for propname, prop in message.protocoloptions.header.items() %}
 {%- if propname == "durable" %}
-header.setDurable({% if prop.value %}{{ prop.value }}{% else %}durable{% endif %});
+message.durable({% if prop.value %}{{ prop.value }}{% else %}durable{% endif %});
 {%- elif propname == "priority" %}
-header.setPriority({% if prop.value %}(short){{ prop.value }}{% else %}priority{% endif %});
+message.priority({% if prop.value %}(short){{ prop.value }}{% else %}priority{% endif %});
 {%- elif propname == "ttl" %}
-header.setTtl({% if prop.value %}{{ prop.value }}{% else %}ttl{% endif %});
+message.timeToLive({% if prop.value %}{{ prop.value }}{% else %}ttl{% endif %});
 {%- elif propname == "first-acquirer" %}
-header.setFirstAcquirer({% if prop.value %}{{ prop.value }}{% else %}firstAcquirer{% endif %});
+message.firstAcquirer({% if prop.value %}{{ prop.value }}{% else %}firstAcquirer{% endif %});
 {%- elif propname == "delivery-count" %}
-header.setDeliveryCount({% if prop.value %}{{ prop.value }}{% else %}deliveryCount{% endif %});
+message.deliveryCount({% if prop.value %}{{ prop.value }}{% else %}deliveryCount{% endif %});
 {%- endif %}
 {%- endfor %}
-message.setHeader(header);
 {%- endif %}
 {%- endif %}
-
-// Set message body
-message.setBody(new Data(new Binary({{ dataVar }})));
 {%- endmacro -%}
 
 {#- Create JMS message with AMQP properties -#}

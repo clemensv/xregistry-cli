@@ -1,0 +1,212 @@
+{#- AMQP macros -#}
+
+{%- macro AmqpImports() -%}
+import com.azure.amqp;
+{%- endmacro -%}
+
+{%- macro EmitArguments(props) -%}
+{%- for propname, prop in props.items() %}
+{%- if prop.type == "uritemplate" -%}
+   {%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+   String {{ placeholder }}
+   {%- endfor -%}
+{%- elif prop.value is not defined -%}
+   , String {{ propname }}{%- if not prop.required %} = default {%- endif %}{% endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{%- macro DeclareUriTemplateArguments(message) -%}
+{%- if message.protocoloptions["header"] -%}{{ EmitArguments(message.protocoloptions["header"]) }}{%- endif -%}
+{%- if message.protocoloptions["footer"] -%}{{ EmitArguments(message.protocoloptions["footer"]) }}{%- endif -%}
+{%- if message.protocoloptions["message_annotations"] -%}{{ EmitArguments(messages.message["message_annotations"]) }}{%- endif -%}
+{%- if message.protocoloptions["delivery_annotations"] -%}{{ EmitArguments(messages.message["delivery_annotations"]) }}{%- endif -%}
+{%- if message.protocoloptions["properties"] -%}{{ EmitArguments(message.protocoloptions["properties"]) }}{%- endif -%}
+{%- if message.protocoloptions["application_properties"] -%}{{ EmitArguments(message.protocoloptions["application_properties"]) }}{%- endif -%}
+{%- endmacro %}
+
+{#- Helper macro for assigning properties -#}
+{%- macro AssignProps(props, as_dict = False) -%}
+{%- for propname, prop in props.items() -%}
+{%- if as_dict %}
+["{{ propname }}"] = {% else %}
+{{ propname | pascal }} = {% endif -%}
+{%- if prop.value -%}
+   {%- if prop.type in ["integer", "number", "boolean"] -%}
+      {{ prop.value }}
+   {%- elif prop.type == "uri" or prop.type == "uritemplate" -%}
+       new Uri($"{{ prop.value }}", UriKind.RelativeOrAbsolute),
+   {%- else -%}
+      $"{{ prop.value }}"
+   {%- endif -%}
+{%- else -%}
+   {{ propname }}
+{%- endif -%},
+{%- endfor -%}
+{%- endmacro -%}
+
+{#- Generates AMQP message objects from amqpDefinition as message -#}
+{%- macro DeclareAmqpNetLiteMessage(variable, message) -%}
+{%- set header = message.protocoloptions["header"] %}
+{%- set footer = message.protocoloptions["footer"] %}
+{%- set messageAnnotations = message.protocoloptions["message_annotations"] %}
+{%- set deliveryAnnotations = message.protocoloptions["delivery_annotations"] %}
+{%- set properties = message.protocoloptions["properties"] %}
+{%- set applicationProperties = message.protocoloptions["application_properties"] %}
+Amqp.Message {{ variable }} = new Amqp.Message()
+{
+{%- if header %}
+   Header = new Header() 
+   {
+   {{- AssignProps(header) | indent(6) }}
+   },
+{%- if footer %}
+   Footer = new Footer() 
+   {
+   {{- AssignProps(footer) | indent(6) }}
+   },
+{%- endif %}
+{%- if messageAnnotations %}
+   MessageAnnotations = new MessageAnnotations()
+   {
+   {{- AssignProps(messageAnnotations) | indent(6) }}
+   },
+{%- endif %}
+{%- if deliveryAnnotations %}
+   DeliveryAnnotations = new DeliveryAnnotations()
+   {
+   {{- AssignProps(deliveryAnnotations) | indent(6) }}
+   },
+{%- endif %}
+{%- if properties %}
+   Properties = new Properties()
+   {
+   {{- AssignProps(properties) | indent(6) }}
+   },
+{%- endif %}
+{%- if applicationProperties %}
+   ApplicationProperties = new ApplicationProperties()
+   {
+   {{- AssignProps(applicationProperties, True) | indent(6) }}
+   },
+{%- endif %}
+{%- endif %}
+};
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsArgs( project_name, messagegroups, withType) -%}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
+{%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal %}
+{%- if withType -%}{{ messagegroupname | namespace_dot(project_name) | lower }}I{{ messagegroupname | strip_namespace }}Dispatcher {% endif %}{{ messagegroupid | default(definitiongroup_key) | strip_namespace | camel }}AmqpDispatcher{%- if not loop.last %}, {%- endif -%}
+{%- endfor %}
+{%- endmacro-%}
+
+{%- macro DeclareDispatchObjectsFields(project_name,messagegroups) -%}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
+{%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+{%- set handlerType=(messagegroupid  | namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
+{{ handlerType }} {{ handlerName }};
+{%- endfor %}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchObjectsConstructor(project_name, class_name, messagegroups, args, body) -%}
+{%- if messagegroups | exists("protocol","AMQP/1.0") %}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
+{%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal %}
+{%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+{%- set handlerType=(messagegroupid  |  namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
+{{ handlerType }} {{ handlerName }};
+{%- endfor %}
+
+{{ class_name }}({{ args }}{%- if args %}, {%- endif -%}
+    {%- for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
+    {%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal -%} 
+    {%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+    {%- set handlerType=(messagegroupid  |  namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    {{ handlerType }} {{ handlerName }}
+    {%- if not loop.last -%}, {%- endif -%}
+    {%- endfor -%})
+{
+    {% for definitiongroup_key, messagegroup in messagegroups.items() if messagegroup | exists("protocol","AMQP/1.0") -%}
+    {%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal %}
+    {%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+    {%- set handlerType=(messagegroupid  |  namespace_dot(project_name) | lower)+"I"+(messagegroupid | default(definitiongroup_key) | strip_namespace | pascal)+"AmqpDispatcher" -%}
+    this.{{ handlerName }} = {{ handlerName }};
+    {%- endfor %}
+    {{ body | indent(4) }}
+}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DispatchToDispatchObjects(project_name, root, message, messagegroups, logger) -%}
+{%- if messagegroups | exists("protocol","AMQP/1.0") %}
+try {
+   var messageSubject = {{ message }}.Properties.Subject;
+   switch (messageSubject)
+   {
+      {% for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
+      {%- set handlerName=(messagegroupid | default(definitiongroup_key) | strip_namespace | camel)+"AmqpDispatcher" -%}
+      {% for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
+      {% set messagename = messageid | pascal %}
+      case "{{ messageid }}":
+         if ( this.{{ handlerName }} != null )
+         {
+               return this.{{ handlerName }}.On{{ messagename | strip_namespace }}Async({{ message }},
+               {%- if message.dataschemauri or message.dataschema -%}
+               {%- set type = ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
+               {%- set typePackage = type | namespace | lower %}
+               {%- set typeName = type | strip_namespace | pascal %}
+               {%- set dataType = typePackage + '.' + typeName -%}
+               {{ dataType }}.FromData({{ message }}.Body, {{ message }}.Properties.ContentType)
+               {%- else -%}
+               {{ message }}.Data
+               {%- endif %});
+         }
+         break;
+      {% endfor %}
+      {% endfor %}
+      default:
+         {{ logger }}.error(String.format("Unsupported message subject %s", messageSubject));
+         break;
+   }
+} catch ( Exception exception ) {
+    _logger.warn("Error while dispatching CloudEvent", exception);
+}
+return CompletableFuture.completedFuture(null);
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchInterface(project_name, messagegroup, messagegroupname, interfaceName) -%}
+package {{ project_name | lower }}.{{ messagegroupname | lower }};
+
+import io.cloudevents.CloudEvent;
+import java.util.concurrent.CompletableFuture;
+{{ AmqpImports() }}
+
+public interface {{ interfaceName }}
+{
+    {%- for messageid, message in messagegroup.messages.items() if (message | exists("protocol","AMQP/1.0")) -%}
+    {%- set messagename = messageid | strip_namespace | pascal -%}
+    {%- if message.dataschemauri or message.dataschema -%}
+    {%- set type = ( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) %}
+    {%- set typePackage = type | namespace | lower %}
+    {%- set typeName = type | strip_namespace | pascal %}
+    {%- set dataType = typePackage + '.' + typeName -%}
+    {%- else -%}
+    {%- set dataType = "Object" -%}
+    {%- endif %}   
+    CompletableFuture<Void> on{{ messagename | strip_namespace }}Async(Message amqpMessage, {{ dataType }} data);
+    {%- endfor %}
+}
+{%- endmacro -%}
+
+{%- macro DeclareDispatchInterfaces(project_name, root) -%}
+{%- set messagegroups = root.messagegroups -%}
+{%- if messagegroups | exists("protocol","AMQP/1.0") %}
+{%- for definitiongroup_key, messagegroup in messagegroups.items() if (messagegroup | exists("protocol","AMQP/1.0")) -%}
+{%- set messagegroupname = messagegroupid | default(definitiongroup_key) | pascal -%}
+{%- set interfaceName = "I"+(messagegroupname | strip_namespace)+"AmqpDispatcher" -%}
+{{- DeclareDispatchInterface(root, project_name, messagegroup, messagegroupname, interfaceName) | pushfile(interfaceName+".java") -}}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}

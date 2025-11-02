@@ -1,0 +1,83 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') | replace('.', '_') %}
+
+package {{ package_name }};
+
+import com.azure.messaging.eventhubs.EventHubProducerClient;
+import com.azure.messaging.eventhubs.EventHubClientBuilder;
+import org.junit.jupiter.api.*;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal | strip_namespace %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+import {{ group_package }}.{{ groupname }}Producer;
+{%- endfor %}
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Basic integration tests for Event Hubs producer.
+ * 
+ * Note: These tests require actual Azure Event Hubs credentials or the Event Hubs Emulator.
+ * Set the following environment variables:
+ * - EVENTHUB_CONNECTION_STRING: Full connection string including EntityPath
+ * 
+ * For full Testcontainers-based emulator tests, see the C# implementation for reference patterns.
+ */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class ProducerTest {
+    
+    private static final Logger logger = LogManager.getLogger(ProducerTest.class);
+    
+    private String eventHubConnectionString;
+    
+    @BeforeAll
+    public void setUp() {
+        logger.info("Setting up Event Hubs producer tests");
+        
+        eventHubConnectionString = System.getenv("EVENTHUB_CONNECTION_STRING");
+        
+        if (eventHubConnectionString == null) {
+            logger.warn("Event Hubs credentials not configured. Tests will be skipped.");
+            logger.warn("Set EVENTHUB_CONNECTION_STRING environment variable to run tests.");
+        }
+    }
+    
+    @AfterAll
+    public void tearDown() {
+        logger.info("Tearing down Event Hubs producer tests");
+    }
+
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal | strip_namespace %}
+    
+    @Test
+    @DisplayName("Test {{ groupname }}Producer creation")
+    public void test{{ groupname }}ProducerCreation() {
+        Assumptions.assumeTrue(eventHubConnectionString != null,
+            "Event Hubs connection string not configured. Skipping test.");
+        
+        logger.info("Testing {{ groupname }}Producer creation");
+        
+        EventHubProducerClient client = new EventHubClientBuilder()
+            .connectionString(eventHubConnectionString)
+            .buildProducerClient();
+        
+        {{ groupname }}Producer producer = new {{ groupname }}Producer(client);
+        assertNotNull(producer, "Producer should be created successfully");
+        
+        try {
+            producer.close();
+        } catch (Exception e) {
+            logger.error("Error closing producer", e);
+        }
+    }
+    {%- endfor %}
+}

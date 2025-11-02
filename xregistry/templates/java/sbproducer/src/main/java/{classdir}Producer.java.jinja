@@ -1,0 +1,226 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set pascal_group_name = messagegroupid | pascal %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+
+package {{ group_package }};
+
+import com.azure.messaging.servicebus.ServiceBusMessage;
+import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.azure.messaging.servicebus.ServiceBusClientBuilder;
+import com.azure.core.credential.TokenCredential;
+import com.azure.identity.DefaultAzureCredential;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+{%- if cloudEvents.usesCloudEvents(root) %}
+import io.cloudevents.CloudEvent;
+{%- endif %}
+
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Producer class to send messages in the `{{ messagegroupid }}` message group to Azure Service Bus.
+ */
+public class {{ pascal_group_name | strip_namespace }}Producer {
+    private static final Logger logger = LogManager.getLogger({{ pascal_group_name | strip_namespace }}Producer.class);
+    private final ServiceBusSenderClient senderClient;
+
+    /**
+     * Creates a new instance of {{ pascal_group_name | strip_namespace }}Producer.
+     * 
+     * @param senderClient The Service Bus sender client to use for sending messages
+     */
+    public {{ pascal_group_name | strip_namespace }}Producer(ServiceBusSenderClient senderClient) {
+        this.senderClient = senderClient;
+    }
+
+    {%- if root.endpoints %}
+    {%- for endpointid, endpoint in root.endpoints.items() %}
+    {%- if endpoint.usage == "producer" %}
+    {%- set protocol = endpoint.protocol | lower %}
+    {%- if protocol == "amqp" %}
+    {%- set options = endpoint.protocoloptions %}
+    {%- set endpoints = endpoint.endpoints %}
+
+    /**
+     * Create a new instance of the Producer for the {{ endpointid }} endpoint.
+     * 
+     * @param credential The Azure credential to use for authentication
+     * @param fullyQualifiedNamespace The fully qualified namespace of the Service Bus (e.g., "namespace.servicebus.windows.net")
+     * @param queueOrTopicName The name of the queue or topic
+     * @return A new instance of the Producer
+     */
+    public static {{ pascal_group_name | strip_namespace }}Producer createFor{{ endpointid | pascal | strip_namespace }}(
+            TokenCredential credential,
+            String fullyQualifiedNamespace,
+            String queueOrTopicName) {
+        
+        if (fullyQualifiedNamespace == null) {
+            {%- if endpoints %}
+            fullyQualifiedNamespace = "{{ endpoints[0].uri }}";
+            {%- else %}
+            throw new IllegalArgumentException("fullyQualifiedNamespace cannot be null");
+            {%- endif %}
+        }
+        
+        if (queueOrTopicName == null) {
+            {%- if options and 'node' in options %}
+            queueOrTopicName = "{{ options['node'] }}";
+            {%- else %}
+            throw new IllegalArgumentException("queueOrTopicName cannot be null");
+            {%- endif %}
+        }
+
+        ServiceBusSenderClient client = new ServiceBusClientBuilder()
+            .credential(fullyQualifiedNamespace, credential)
+            .sender()
+            .queueName(queueOrTopicName)
+            .buildClient();
+
+        return new {{ pascal_group_name | strip_namespace }}Producer(client);
+    }
+
+    /**
+     * Create a new instance of the Producer for the {{ endpointid }} endpoint using DefaultAzureCredential.
+     * 
+     * @param fullyQualifiedNamespace The fully qualified namespace of the Service Bus
+     * @param queueOrTopicName The name of the queue or topic
+     * @return A new instance of the Producer
+     */
+    public static {{ pascal_group_name | strip_namespace }}Producer createFor{{ endpointid | pascal | strip_namespace }}(
+            String fullyQualifiedNamespace,
+            String queueOrTopicName) {
+        return createFor{{ endpointid | pascal | strip_namespace }}(
+            new DefaultAzureCredential(),
+            fullyQualifiedNamespace,
+            queueOrTopicName);
+    }
+
+    /**
+     * Create a new instance of the Producer for topics with the {{ endpointid }} endpoint.
+     * 
+     * @param credential The Azure credential to use for authentication
+     * @param fullyQualifiedNamespace The fully qualified namespace of the Service Bus
+     * @param topicName The name of the topic
+     * @return A new instance of the Producer
+     */
+    public static {{ pascal_group_name | strip_namespace }}Producer createTopicProducerFor{{ endpointid | pascal | strip_namespace }}(
+            TokenCredential credential,
+            String fullyQualifiedNamespace,
+            String topicName) {
+        
+        if (fullyQualifiedNamespace == null) {
+            {%- if endpoints %}
+            fullyQualifiedNamespace = "{{ endpoints[0].uri }}";
+            {%- else %}
+            throw new IllegalArgumentException("fullyQualifiedNamespace cannot be null");
+            {%- endif %}
+        }
+        
+        if (topicName == null) {
+            {%- if options and 'node' in options %}
+            topicName = "{{ options['node'] }}";
+            {%- else %}
+            throw new IllegalArgumentException("topicName cannot be null");
+            {%- endif %}
+        }
+
+        ServiceBusSenderClient client = new ServiceBusClientBuilder()
+            .credential(fullyQualifiedNamespace, credential)
+            .sender()
+            .topicName(topicName)
+            .buildClient();
+
+        return new {{ pascal_group_name | strip_namespace }}Producer(client);
+    }
+
+    /**
+     * Create a new instance of the Producer for topics using DefaultAzureCredential.
+     * 
+     * @param fullyQualifiedNamespace The fully qualified namespace of the Service Bus
+     * @param topicName The name of the topic
+     * @return A new instance of the Producer
+     */
+    public static {{ pascal_group_name | strip_namespace }}Producer createTopicProducerFor{{ endpointid | pascal | strip_namespace }}(
+            String fullyQualifiedNamespace,
+            String topicName) {
+        return createTopicProducerFor{{ endpointid | pascal | strip_namespace }}(
+            new DefaultAzureCredential(),
+            fullyQualifiedNamespace,
+            topicName);
+    }
+    {%- endif %}
+    {%- endif %}
+    {%- endfor %}
+    {%- endif %}
+
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+
+    /**
+     * Send a {{ messagename }} message.
+     * 
+     * @param data The message data
+     * @return A CompletableFuture that completes when the message is sent
+     */
+    public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                ServiceBusMessage message = {{ pascal_group_name | strip_namespace }}MessageFactory.create{{ messagename }}Message(data);
+                senderClient.sendMessage(message);
+                logger.info("Sent {{ messagename }} message");
+            } catch (Exception e) {
+                logger.error("Error sending {{ messagename }} message", e);
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    /**
+     * Send a {{ messagename }} message with a session ID.
+     * 
+     * @param data The message data
+     * @param sessionId The session ID for session-enabled queues/topics
+     * @return A CompletableFuture that completes when the message is sent
+     */
+    public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data, String sessionId) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                ServiceBusMessage message = {{ pascal_group_name | strip_namespace }}MessageFactory.create{{ messagename }}Message(data);
+                message.setSessionId(sessionId);
+                senderClient.sendMessage(message);
+                logger.info("Sent {{ messagename }} message with session ID: {}", sessionId);
+            } catch (Exception e) {
+                logger.error("Error sending {{ messagename }} message", e);
+                throw new RuntimeException(e);
+            }
+        });
+    }
+    {%- endfor %}
+
+    /**
+     * Flush any buffered messages (no-op for Service Bus as it sends immediately).
+     */
+    public void flush() {
+        // Service Bus client sends immediately, no buffering
+    }
+
+    /**
+     * Close the producer and release resources.
+     */
+    public void close() {
+        if (senderClient != null) {
+            senderClient.close();
+        }
+    }
+}
+{% endfor %}

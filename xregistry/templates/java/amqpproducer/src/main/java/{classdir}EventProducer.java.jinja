@@ -13,10 +13,7 @@
 {%- set package_name = project_name | lower | replace('-', '_') %}
 package {{ package_name }};
 
-import org.apache.qpid.proton.Proton;
-import org.apache.qpid.proton.message.Message;
-import org.apache.qpid.proton.amqp.messaging.Data;
-import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.protonj2.client.Message;
 {%- if uses_cloudevents_message %}
 {{ cloudEvents.CloudEventsImports() }}
 {%- endif %}
@@ -77,12 +74,12 @@ public class {{ class_name }} {
         Map<String, String> options = new HashMap<>();
         {%- endif %}
         
-        List<URI> endpoints = List.of(
+        List<URI> endpoints = new ArrayList<>(List.of(
         {%- for epo in endpoints %}
             URI.create("{{ epo.uri }}")
             {%- if not loop.last -%},{%- endif %}
         {%- endfor %}
-        );
+        ));
         
         return new {{ class_name }}(
             new AmqpProducer(credential, options, endpoints)
@@ -133,30 +130,67 @@ public class {{ class_name }} {
         {%- endif -%}
     ) throws Exception {
         {%- if isCloudEvent %}
-        {{ cloudEvents.BuildCloudEvent("cloudEvent", message, "data") | indent(8) }}
+        // Serialize data to bytes
+        byte[] dataBytes;
+        {%- set schemaObj = schema_object(root, message.get('dataschemauri') or message.get('dataschema')) %}
+        {%- if schemaObj %}
+            {%- if schemaObj.versions %}
+                {%- set version_key = schemaObj.defaultversionid if schemaObj.defaultversionid else (schemaObj.versions.keys() | list | last) %}
+                {%- set format = schemaObj.versions[version_key].format %}
+            {%- elif schemaObj.format %}
+                {%- set format = schemaObj.format %}
+            {%- else %}
+                {%- set format = message.dataschemaformat if message.dataschemaformat else "" %}
+            {%- endif %}
+            {%- if format and format.lower().startswith("avro") %}
+        dataBytes = data.toByteArray("avro/binary");
+            {%- elif format and format.lower().startswith("protobuf") %}
+        dataBytes = data.toByteArray();
+            {%- elif format %}
+        dataBytes = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
+            {%- else %}
+        dataBytes = data;  // Already byte[]
+            {%- endif %}
+        {%- else %}
+        dataBytes = data;  // Already byte[]
+        {%- endif %}
+        
+        {{ cloudEvents.BuildCloudEvent(message, "dataBytes") | indent(8) }}
         
         if (beforeSend != null) {
             beforeSend.accept(cloudEvent);
         }
         
-        // Convert CloudEvent to Proton-J message
-        Message amqpMessage = Proton.message();
-        {{ cloudEvents.SerializeCloudEvent("cloudEvent", "amqpMessage") | indent(8) }}
+        // Convert CloudEvent to ProtonJ2 message
+        byte[] cloudEventBytes = {{ cloudEvents.SerializeCloudEvent("cloudEvent") }};
+        Message<?> amqpMessage = Message.create(cloudEventBytes);
+        amqpMessage.contentType("application/cloudevents+json");
         
         endpoint.send(amqpMessage);
         
         {%- elif is_amqp %}
         // Serialize data to bytes
         byte[] dataBytes;
-        {%- set schemaObj = schema_object(root, message.dataschemauri if message.dataschemauri else message.dataschema) %}
-        {%- if schemaObj and "format" in schemaObj %}
-        {%- if schemaObj.format.lower().startswith("avro") %}
-        dataBytes = data.toByteArray();  // Avro serialization
-        {%- elif schemaObj.format.lower().startswith("protobuf") %}
+        {%- set schemaObj = schema_object(root, message.get('dataschemauri') or message.get('dataschema')) %}
+        {%- if schemaObj %}
+            {%- if schemaObj.versions %}
+                {%- set version_key = schemaObj.defaultversionid if schemaObj.defaultversionid else (schemaObj.versions.keys() | list | last) %}
+                {%- set format = schemaObj.versions[version_key].format %}
+            {%- elif schemaObj.format %}
+                {%- set format = schemaObj.format %}
+            {%- else %}
+                {%- set format = message.dataschemaformat if message.dataschemaformat else "" %}
+            {%- endif %}
+            {%- if format and format.lower().startswith("avro") %}
+        // Avro serialization
+        dataBytes = data.toByteArray("avro/binary");
+            {%- elif format and format.lower().startswith("protobuf") %}
         dataBytes = data.toByteArray();  // Protobuf serialization
-        {%- else %}
+            {%- elif format %}
         dataBytes = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
-        {%- endif %}
+            {%- else %}
+        dataBytes = data;  // Already byte[]
+            {%- endif %}
         {%- else %}
         dataBytes = data;  // Already byte[]
         {%- endif %}
@@ -172,7 +206,7 @@ public class {{ class_name }} {
     /**
      * Close the producer and release resources
      */
-    public void close() {
+    public void close() throws Exception {
         endpoint.close();
     }
 }

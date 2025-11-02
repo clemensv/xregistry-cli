@@ -45,3 +45,55 @@ def test_asyncapi_producer():
     cmd = 'asyncapi validate ' + os.path.join(output_dir, "ContosoErpProducerStructured/ContosoErpProducerStructured.yml".replace('/', os.path.sep))
     subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
 
+
+@pytest.mark.parametrize("xreg_file,project_name", [
+    ("contoso-erp.xreg.json", "ContosoErp"),
+    ("fabrikam-motorsports.xreg.json", "FabrikamMotorsports"),
+    ("inkjet.xreg.json", "Inkjet"),
+    ("lightbulb-amqp.xreg.json", "LightbulbAmqp"),
+    ("lightbulb.xreg.json", "Lightbulb"),
+])
+def test_asyncapi_producer_xreg_files(xreg_file, project_name):
+    """Test AsyncAPI producer generation for all xreg test files"""
+    # clean the output directory
+    output_dir = os.path.join(project_root, f'tmp/test/asyncapi/producer_{project_name}'.replace('/', os.path.sep))
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir, ignore_errors=True)
+    
+    xreg_path = os.path.join(project_root, 'test', 'xreg', xreg_file)
+    
+    # generate the producer with binary content mode
+    sys.argv = ['xregistry', 'generate',  
+                '--style', 'producer', 
+                '--language', 'asyncapi',
+                '--definitions', xreg_path,
+                '--output', output_dir,
+                '--projectname', f'{project_name}ProducerBinary',
+                '--template-args', 'ce_content_mode=binary']
+    assert xregistry.cli() == 0
+    
+    # Check if output file was generated
+    output_file = os.path.join(output_dir, f"{project_name}ProducerBinary/{project_name}ProducerBinary.yml".replace('/', os.path.sep))
+    assert os.path.exists(output_file), f"Expected output file {output_file} was not generated"
+    
+    # Validate with asyncapi CLI
+    cmd = 'asyncapi validate ' + output_file
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=project_root, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+
+    # generate the producer with structured content mode
+    sys.argv = ['xregistry', 'generate',  
+                '--style', 'producer', 
+                '--language', 'asyncapi',
+                '--definitions', xreg_path,
+                '--output', output_dir,
+                '--projectname', f'{project_name}ProducerStructured',
+                '--template-args', 'ce_content_mode=structured']
+    assert xregistry.cli() == 0
+    
+    # Check if output file was generated
+    output_file = os.path.join(output_dir, f"{project_name}ProducerStructured/{project_name}ProducerStructured.yml".replace('/', os.path.sep))
+    assert os.path.exists(output_file), f"Expected output file {output_file} was not generated"
+    
+    # Validate with asyncapi CLI
+    cmd = 'asyncapi validate ' + output_file
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=project_root, stdout=sys.stdout, stderr=sys.stderr, shell=True)

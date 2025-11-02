@@ -1,0 +1,6 @@
+{
+  "template": "sbproducer",
+  "language": "java",
+  "protocol": "AMQP",
+  "usage": ["producer"]
+}

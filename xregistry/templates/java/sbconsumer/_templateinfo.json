@@ -1,0 +1,6 @@
+{
+  "template": "sbconsumer",
+  "language": "java",
+  "protocol": "AMQP",
+  "usage": ["consumer"]
+}

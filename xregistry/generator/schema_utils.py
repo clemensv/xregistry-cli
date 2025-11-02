@@ -236,6 +236,8 @@ class SchemaUtils:
     def schema_object(root: Dict[str, Any], schema_url: str) -> Optional[Any]:
         """Return the object in the document that the schema URL points to."""
         logger.debug("Getting schema object from URL: %s", schema_url)
+        if schema_url is None:
+            return None
         try:
             obj = jsonpointer.resolve_pointer(root, schema_url[1:].split(":")[0])
         except jsonpointer.JsonPointerException:

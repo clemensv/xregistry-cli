@@ -1,0 +1,154 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "kafka.jinja.include" as kafka -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set pascal_group_name = messagegroupid | pascal %}
+{%- set class_name = (pascal_group_name | strip_namespace) + "Producer" %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+{%- set package_dir = group_package.replace('.', '/') %}
+package {{ group_package }};
+
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.net.URI;
+import java.util.Properties;
+import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
+{%- if cloudEvents.usesCloudEvents(root) %}
+import io.cloudevents.CloudEvent;
+{%- endif %}
+
+/**
+ * Kafka producer for the {{ messagegroupid }} message group.
+ */
+public class {{ class_name }} implements AutoCloseable {
+    private static final Logger log = LogManager.getLogger({{ class_name }}.class);
+    private final KafkaProducer<byte[], byte[]> producer;
+    
+    /**
+     * Create a Kafka producer for the specified bootstrap servers.
+     * 
+     * @param bootstrapServers List of Kafka broker URIs
+     * @return A new {{ class_name }} instance
+     */
+    public static {{ class_name }} create(List<URI> bootstrapServers) {
+        if (bootstrapServers == null || bootstrapServers.isEmpty()) {
+            throw new IllegalArgumentException("bootstrapServers cannot be null or empty");
+        }
+        
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, 
+            String.join(",", bootstrapServers.stream()
+                .map(uri -> uri.getHost() + ":" + (uri.getPort() > 0 ? uri.getPort() : 9092))
+                .toArray(String[]::new)));
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, 3);
+        
+        KafkaProducer<byte[], byte[]> kafkaProducer = new KafkaProducer<>(props);
+        return new {{ class_name }}(kafkaProducer);
+    }
+    
+    /**
+     * Constructor with existing KafkaProducer instance.
+     * 
+     * @param producer The Kafka producer instance
+     */
+    public {{ class_name }}(KafkaProducer<byte[], byte[]> producer) {
+        this.producer = producer;
+    }
+    
+    /**
+     * Get the underlying Kafka producer.
+     * 
+     * @return The KafkaProducer instance
+     */
+    public KafkaProducer<byte[], byte[]> getProducer() {
+        return producer;
+    }
+    
+    {% for messageid, message in messagegroup.messages.items() -%}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    {%- set topic = kafka.get_topic(message) or messageid %}
+    {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+    
+    /**
+     * Send a {{ messagename }} message to Kafka.
+     {%- if message.description %}
+     * {{ message.description }}
+     {%- endif %}
+     * 
+     * @param data The message data
+     * @return CompletableFuture that completes when the message is sent
+     * @throws Exception if there's an error creating or sending the message
+     */
+    public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data) throws Exception {
+        return send{{ messagename }}(data, null);
+    }
+    
+    /**
+     * Send a {{ messagename }} message to Kafka with a specific key.
+     {%- if message.description %}
+     * {{ message.description }}
+     {%- endif %}
+     * 
+     * @param data The message data
+     * @param key The message key (nullable)
+     * @return CompletableFuture that completes when the message is sent
+     * @throws Exception if there's an error creating or sending the message
+     */
+    public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data, String key) throws Exception {
+        ProducerRecord<byte[], byte[]> record = {{ pascal_group_name | strip_namespace }}EventFactory.create{{ messagename }}Message(
+            "{{ topic }}", 
+            data,
+            key
+        );
+        
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        producer.send(record, (metadata, exception) -> {
+            if (exception != null) {
+                log.error("Failed to send {{ messagename }} message", exception);
+                future.completeExceptionally(exception);
+            } else {
+                log.debug("Sent {{ messagename }} message to topic {} partition {} offset {}", 
+                    metadata.topic(), metadata.partition(), metadata.offset());
+                future.complete(null);
+            }
+        });
+        
+        return future;
+    }
+    
+    {% endfor %}
+    
+    /**
+     * Flush all pending messages.
+     */
+    public void flush() {
+        producer.flush();
+    }
+    
+    /**
+     * Close the producer and release resources.
+     */
+    @Override
+    public void close() {
+        if (producer != null) {
+            producer.close();
+        }
+    }
+}
+{% endfor -%}

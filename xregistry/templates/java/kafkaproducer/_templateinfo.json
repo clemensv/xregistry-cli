@@ -1,0 +1,8 @@
+{
+  "template": "kafkaproducer",
+  "description": "Kafka Producer using Apache Kafka Clients",
+  "language": "java",
+  "protocol": "Kafka",
+  "usage": ["producer"],
+  "requires": ["messagegroups"]
+}

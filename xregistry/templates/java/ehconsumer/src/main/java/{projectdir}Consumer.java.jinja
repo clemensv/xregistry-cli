@@ -1,0 +1,137 @@
+{%- import 'util.jinja.include' as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+import com.azure.core.credential.TokenCredential;
+import com.azure.identity.DefaultAzureCredential;
+import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.messaging.eventhubs.EventProcessorClient;
+import com.azure.messaging.eventhubs.EventProcessorClientBuilder;
+import com.azure.storage.blob.BlobContainerAsyncClient;
+import com.azure.storage.blob.BlobContainerClientBuilder;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+{%- for messagegroupid in root.messagegroups.keys() %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') -%}
+import {{ group_package }}.*;
+{%- endfor %}
+
+/**
+ * Azure Event Hubs Consumer for {{ project_name }}.
+ * Manages EventProcessorClient lifecycle and provides factory methods for creating consumers.
+ */
+public class Consumer implements AutoCloseable {
+    private static final Logger logger = LogManager.getLogger(Consumer.class);
+    
+    private final EventProcessorClient processorClient;
+
+    /**
+     * Creates a new instance of Consumer.
+     * 
+     * @param processorClient The Event Processor client to use for consuming events
+     */
+    public Consumer(EventProcessorClient processorClient) {
+        this.processorClient = processorClient;
+    }
+
+    {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+    {%- set messagegroupname = messagegroupid | pascal | strip_namespace %}
+    {%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+    {%- set consumer_class = messagegroupname ~ 'EventConsumer' %}
+
+    /**
+     * Create an Event Hubs consumer for {{ messagegroupid }} using DefaultAzureCredential.
+     * 
+     * @param eventConsumer The event consumer that handles incoming messages
+     * @param eventHubsNamespace The Event Hubs namespace (e.g., "mynamespace.servicebus.windows.net")
+     * @param eventHubName The Event Hub name
+     * @param consumerGroup The consumer group name (use "$Default" if unsure)
+     * @param storageAccountUrl The Azure Storage account URL for checkpointing (e.g., "https://mystorageaccount.blob.core.windows.net")
+     * @param blobContainerName The blob container name for checkpoints
+     * @return A configured consumer instance
+     */
+    public static Consumer createFor{{ messagegroupname }}(
+            {{ group_package }}.{{ consumer_class }} eventConsumer,
+            String eventHubsNamespace,
+            String eventHubName,
+            String consumerGroup,
+            String storageAccountUrl,
+            String blobContainerName) {
+        
+        DefaultAzureCredential credential = new DefaultAzureCredentialBuilder().build();
+        return createFor{{ messagegroupname }}(eventConsumer, credential, eventHubsNamespace, 
+            eventHubName, consumerGroup, storageAccountUrl, blobContainerName);
+    }
+
+    /**
+     * Create an Event Hubs consumer for {{ messagegroupid }} with a specific credential.
+     * 
+     * @param eventConsumer The event consumer that handles incoming messages
+     * @param credential The Azure credential to use for authentication
+     * @param eventHubsNamespace The Event Hubs namespace
+     * @param eventHubName The Event Hub name
+     * @param consumerGroup The consumer group name
+     * @param storageAccountUrl The Azure Storage account URL for checkpointing
+     * @param blobContainerName The blob container name for checkpoints
+     * @return A configured consumer instance
+     */
+    public static Consumer createFor{{ messagegroupname }}(
+            {{ group_package }}.{{ consumer_class }} eventConsumer,
+            TokenCredential credential,
+            String eventHubsNamespace,
+            String eventHubName,
+            String consumerGroup,
+            String storageAccountUrl,
+            String blobContainerName) {
+        
+        // Create checkpoint store
+        BlobContainerAsyncClient blobContainerAsyncClient = new BlobContainerClientBuilder()
+            .endpoint(storageAccountUrl)
+            .containerName(blobContainerName)
+            .credential(credential)
+            .buildAsyncClient();
+
+        // Create event processor client
+        EventProcessorClient processorClient = new EventProcessorClientBuilder()
+            .credential(eventHubsNamespace, eventHubName, credential)
+            .consumerGroup(consumerGroup)
+            .processEvent(eventConsumer::processEvent)
+            .processError(context -> {
+                logger.error("Error in partition " + context.getPartitionContext().getPartitionId(), 
+                    context.getThrowable());
+            })
+            .processPartitionInitialization(context -> {
+                eventConsumer.onInitialize(context.getPartitionContext());
+            })
+            .processPartitionClose(context -> {
+                eventConsumer.onClose(context.getPartitionContext());
+            })
+            .checkpointStore(new com.azure.messaging.eventhubs.checkpointstore.blob.BlobCheckpointStore(
+                blobContainerAsyncClient))
+            .buildEventProcessorClient();
+
+        return new Consumer(processorClient);
+    }
+    {%- endfor %}
+
+    /**
+     * Start processing events from Event Hubs.
+     * This method returns immediately; processing happens in background threads.
+     */
+    public void start() {
+        logger.info("Starting Event Hubs consumer");
+        processorClient.start();
+    }
+
+    /**
+     * Stop processing events and release resources.
+     */
+    @Override
+    public void close() {
+        logger.info("Stopping Event Hubs consumer");
+        processorClient.stop();
+    }
+}

@@ -1,0 +1,98 @@
+{%- import 'util.jinja.include' as util -%}
+{%- import 'cloudevents.jinja.include' as cloudEvents -%}
+{%- import 'mqtt.jinja.include' as mqtt -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+package {{ group_package }};
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+import {{ message_body_type.rsplit('.', 1)[0] }}.*;
+{%- endfor %}
+
+{%- set consumer_class = (groupname | strip_namespace) ~ 'Consumer' %}
+
+/**
+ * MQTT Consumer for {{ messagegroupid }} message group.
+ * Processes messages from MQTT topics and dispatches them to registered handlers.
+ */
+public abstract class {{ consumer_class }} {
+    private static final Logger logger = LogManager.getLogger({{ consumer_class }}.class);
+    protected final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Process a message from MQTT.
+     * 
+     * @param topic The topic the message was received on
+     * @param payload The message payload
+     */
+    public void processMessage(String topic, byte[] payload) {
+        try {
+            dispatchMessage(topic, payload);
+        } catch (Exception ex) {
+            logger.error("Error processing message from topic {}", topic, ex);
+            handleError(ex, topic, payload);
+        }
+    }
+
+    /**
+     * Dispatch the message to the appropriate handler based on topic.
+     */
+    private void dispatchMessage(String topic, byte[] payload) throws Exception {
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | pascal | strip_namespace %}
+        {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+        {%- set expected_topic = mqtt.get_topic(message) or messageid %}
+        
+        // Try {{ messagename }} (topic: {{ expected_topic }})
+        if (topic.equals("{{ expected_topic }}") || topic.endsWith("/{{ expected_topic }}")) {
+            try {
+                {{ message_body_type }} data = {{ message_body_type }}.fromData(payload, "application/json");
+                on{{ messagename }}(data, topic);
+                return;
+            } catch (Exception ex) {
+                logger.trace("Message does not match {{ messagename }} schema", ex);
+            }
+        }
+        {%- endfor %}
+        
+        logger.warn("Received message from topic {} does not match any known schema", topic);
+    }
+
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+
+    /**
+     * Handler for {{ messagename }} messages.
+     * Override this method to process {{ messagename }} events.
+     * 
+     * @param data The deserialized message data
+     * @param topic The MQTT topic
+     */
+    protected abstract void on{{ messagename }}({{ message_body_type }} data, String topic);
+    {%- endfor %}
+
+    /**
+     * Error handler for processing failures.
+     * Override this method to implement custom error handling.
+     * 
+     * @param ex The exception that occurred
+     * @param topic The MQTT topic
+     * @param payload The message payload
+     */
+    protected void handleError(Exception ex, String topic, byte[] payload) {
+        logger.error("Error processing message from topic {}", topic, ex);
+    }
+}
+{% endfor %}

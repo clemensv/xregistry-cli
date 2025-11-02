@@ -1,0 +1,157 @@
+{%- import 'util.jinja.include' as util -%}
+{%- import 'cloudevents.jinja.include' as cloudEvents -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+package {{ group_package }};
+
+import com.azure.messaging.eventhubs.models.EventContext;
+import com.azure.messaging.eventhubs.models.PartitionContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+{%- if cloudEvents.usesCloudEvents(root) %}
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
+{%- endif %}
+import java.net.URI;
+
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+import {{ message_body_type.rsplit('.', 1)[0] }}.*;
+{%- endfor %}
+
+{%- set consumer_class = (groupname | strip_namespace) ~ 'EventConsumer' %}
+
+/**
+ * Event consumer dispatcher for {{ messagegroupid }} message group.
+ * Processes events from Azure Event Hubs and dispatches them to registered handlers.
+ */
+public abstract class {{ consumer_class }} {
+    private static final Logger logger = LogManager.getLogger({{ consumer_class }}.class);
+    {%- if cloudEvents.usesCloudEvents(root) %}
+    private static final String CE_PREFIX = "cloudEvents_";
+    {%- endif %}
+    
+    protected final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Process a single event from Event Hubs.
+     * This method is called by the EventProcessorClient for each received event.
+     * 
+     * @param eventContext The event context containing the event data
+     */
+    public void processEvent(EventContext eventContext) {
+        try {
+            byte[] bodyData = eventContext.getEventData().getBody();
+            String contentType = eventContext.getEventData().getContentType();
+            
+            {%- if cloudEvents.usesCloudEvents(root) %}
+            // Check if this is a CloudEvents message (binary content mode)
+            if (eventContext.getEventData().getProperties().containsKey(CE_PREFIX + "type")) {
+                processCloudEvent(eventContext);
+                return;
+            }
+            {%- endif %}
+            
+            // Process as plain Event Hubs message
+            dispatchMessage(bodyData, contentType, eventContext);
+            
+        } catch (Exception ex) {
+            logger.error("Error processing event", ex);
+            handleError(ex, eventContext);
+        }
+    }
+
+    {%- if cloudEvents.usesCloudEvents(root) %}
+    /**
+     * Process a CloudEvents message in binary content mode.
+     */
+    private void processCloudEvent(EventContext eventContext) throws Exception {
+        // Extract CloudEvent attributes from properties
+        var properties = eventContext.getEventData().getProperties();
+        String ceType = (String) properties.get(CE_PREFIX + "type");
+        
+        byte[] bodyData = eventContext.getEventData().getBody();
+        String dataContentType = (String) properties.getOrDefault(CE_PREFIX + "datacontenttype", "application/json");
+        
+        dispatchMessage(bodyData, dataContentType, eventContext);
+    }
+    {%- endif %}
+
+    /**
+     * Dispatch the message to the appropriate handler based on content type.
+     */
+    private void dispatchMessage(byte[] bodyData, String contentType, EventContext eventContext) throws Exception {
+        String mediaType = contentType != null ? contentType.split(";")[0].trim().toLowerCase() : "application/json";
+        
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | pascal | strip_namespace %}
+        {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+        {%- set dataschema = message.dataschemaformat if message.dataschemaformat else message.metadataschemaformat if message.metadataschemaformat else messagegroup.dataschemaformat if messagegroup.dataschemaformat else "JSON" %}
+        
+        // Try {{ messagename }}
+        try {
+            {{ message_body_type }} data = {{ message_body_type }}.fromData(bodyData, mediaType);
+            on{{ messagename }}(data, eventContext);
+            eventContext.updateCheckpointAsync(); // Checkpoint after successful processing
+            return;
+        } catch (Exception ex) {
+            logger.trace("Message does not match {{ messagename }} schema", ex);
+        }
+        {%- endfor %}
+        
+        logger.warn("Received message does not match any known schema");
+    }
+
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+
+    /**
+     * Handler for {{ messagename }} messages.
+     * Override this method to process {{ messagename }} events.
+     * 
+     * @param data The deserialized message data
+     * @param context The Event Hubs event context
+     */
+    protected abstract void on{{ messagename }}({{ message_body_type }} data, EventContext context);
+    {%- endfor %}
+
+    /**
+     * Error handler for processing failures.
+     * Override this method to implement custom error handling.
+     * 
+     * @param ex The exception that occurred
+     * @param context The Event Hubs event context
+     */
+    protected void handleError(Exception ex, EventContext context) {
+        logger.error("Error processing event from partition " + context.getPartitionContext().getPartitionId(), ex);
+    }
+
+    /**
+     * Called when the processor starts processing events from a partition.
+     * Override this method to implement custom initialization logic.
+     * 
+     * @param partitionContext The partition context
+     */
+    public void onInitialize(PartitionContext partitionContext) {
+        logger.info("Initialized partition: " + partitionContext.getPartitionId());
+    }
+
+    /**
+     * Called when the processor stops processing events from a partition.
+     * Override this method to implement custom cleanup logic.
+     * 
+     * @param partitionContext The partition context
+     */
+    public void onClose(PartitionContext partitionContext) {
+        logger.info("Closed partition: " + partitionContext.getPartitionId());
+    }
+}
+{%- endfor %}

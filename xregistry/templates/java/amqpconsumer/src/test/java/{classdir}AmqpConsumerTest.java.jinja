@@ -10,13 +10,10 @@ package {{ package_name }};
 import org.junit.jupiter.api.*;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.apache.qpid.proton.Proton;
-import org.apache.qpid.proton.message.Message;
-import org.apache.qpid.proton.amqp.messaging.Data;
-import org.apache.qpid.proton.amqp.messaging.Properties;
-import org.apache.qpid.proton.amqp.messaging.ApplicationProperties;
-import org.apache.qpid.proton.amqp.Binary;
+import org.apache.qpid.protonj2.client.*;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 
@@ -31,40 +28,28 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for AMQP consumer using Testcontainers with ActiveMQ Artemis
  */
+@Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class AmqpConsumerTest {
-    private static final Logger logger = LogManager.getLogger(AmqpConsumerTest.class);
+public class {{ class_name | strip_namespace }} {
+    private static final Logger logger = LogManager.getLogger({{ class_name | strip_namespace }}.class);
     private static final String QUEUE_NAME = "exampleQueue";
     
-    private GenericContainer<?> artemisContainer;
+    @Container
+    private static final GenericContainer<?> artemisContainer = new GenericContainer<>(DockerImageName.parse("apache/activemq-artemis:latest"))
+        .withExposedPorts(5672)
+        .withEnv("ARTEMIS_USER", "guest")
+        .withEnv("ARTEMIS_PASSWORD", "guest")
+        .withEnv("ANONYMOUS_LOGIN", "true")
+        .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)));
+    
     private URI brokerUrl;
     
     @BeforeAll
     public void setUp() throws Exception {
-        logger.info("Starting Artemis container for tests");
-        
-        artemisContainer = new GenericContainer<>(DockerImageName.parse("apache/activemq-artemis:latest"))
-            .withExposedPorts(5672)
-            .withEnv("ARTEMIS_USER", "guest")
-            .withEnv("ARTEMIS_PASSWORD", "guest")
-            .withEnv("ANONYMOUS_LOGIN", "true")
-            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)));
-        
-        artemisContainer.start();
-        
         String host = artemisContainer.getHost();
         Integer port = artemisContainer.getMappedPort(5672);
         brokerUrl = new URI("amqp://" + host + ":" + port + "/" + QUEUE_NAME);
-        
         logger.info("Artemis broker URL: " + brokerUrl);
-    }
-    
-    @AfterAll
-    public void tearDown() {
-        if (artemisContainer != null) {
-            logger.info("Stopping Artemis container");
-            artemisContainer.stop();
-        }
     }
     
     {%- for messagegroupid, messagegroup in messagegroups.items() %}
@@ -103,25 +88,20 @@ public class AmqpConsumerTest {
         
         consumer.start();
         
+        Client client = null;
+        Connection connection = null;
         try {
-            // Send test message using Proton-J
-            org.apache.qpid.proton.reactor.Reactor reactor = Proton.reactor();
-            org.apache.qpid.proton.engine.Connection connection = reactor.connection();
-            connection.setHostname(brokerUrl.getHost() + ":" + brokerUrl.getPort());
-            connection.setContainer("test-sender");
-            connection.setUser("guest");
-            connection.setPassword("guest");
-            connection.open();
+            // Send test message using ProtonJ2 Client
+            client = Client.create();
+            ConnectionOptions connOptions = new ConnectionOptions();
+            connOptions.user("guest");
+            connOptions.password("guest");
             
-            org.apache.qpid.proton.engine.Session session = connection.session();
-            session.open();
+            connection = client.connect(brokerUrl.getHost(), brokerUrl.getPort(), connOptions);
+            Sender sender = connection.openSender(QUEUE_NAME);
             
-            org.apache.qpid.proton.engine.Sender sender = session.sender("test-sender-link");
-            sender.setTarget(Proton.terminus());
-            sender.getTarget().setAddress(QUEUE_NAME);
-            sender.open();
-            
-            // Create test message
+            {%- if cloudEvents.isCloudEvent(message) %}
+            // Create CloudEvent with test data
             {%- if message_body_type != "byte[]" %}
             // Create test data instance
             {{ message_body_type }} testData = new {{ message_body_type }}();
@@ -132,27 +112,49 @@ public class AmqpConsumerTest {
             byte[] eventData = "Test".getBytes();
             {%- endif %}
             
-            Message testMessage = Proton.message();
-            testMessage.setBody(new Data(new Binary(eventData)));
+            // Build CloudEvent
+            io.cloudevents.CloudEvent cloudEvent = io.cloudevents.core.builder.CloudEventBuilder.v1()
+                .withId(UUID.randomUUID().toString())
+                .withType("{{ messageid }}")
+                .withSource(URI.create("urn:example-com:test-source"))
+                .withDataContentType("application/json")
+                .withData(eventData)
+                .build();
             
-            Properties props = new Properties();
-            props.setMessageId(UUID.randomUUID().toString());
-            props.setContentType(org.apache.qpid.proton.amqp.Symbol.valueOf("application/json"));
-            testMessage.setProperties(props);
+            // Serialize CloudEvent to JSON
+            byte[] cloudEventBytes = new io.cloudevents.jackson.JsonFormat()
+                .serialize(cloudEvent);
             
-            // Add CloudEvents attributes as application properties
-            ApplicationProperties appProps = new ApplicationProperties(new HashMap<>());
-            appProps.getValue().put("cloudEvents:specversion", "1.0");
-            appProps.getValue().put("cloudEvents:type", "{{ messageid }}");
-            appProps.getValue().put("cloudEvents:id", UUID.randomUUID().toString());
-            appProps.getValue().put("cloudEvents:source", "urn:example-com:test-source");
-            appProps.getValue().put("cloudEvents:time", java.time.Instant.now().toString());
-            testMessage.setApplicationProperties(appProps);
+            // Create AMQP message with CloudEvent payload
+            Message<byte[]> testMessage = Message.create(cloudEventBytes);
+            testMessage.messageId(UUID.randomUUID().toString());
+            testMessage.contentType("application/cloudevents+json");
+            {%- else %}
+            // Create AMQP message with direct payload
+            {%- if message_body_type != "byte[]" %}
+            {{ message_body_type }} testData = new {{ message_body_type }}();
+            // TODO: Initialize testData fields
+            byte[] eventData = new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsBytes(testData);
+            {%- else %}
+            byte[] eventData = "Test".getBytes();
+            {%- endif %}
             
-            // Encode and send
-            byte[] encoded = new byte[1024];
-            int length = testMessage.encode(encoded, 0, encoded.length);
-            sender.send(encoded, 0, length);
+            Message<byte[]> testMessage = Message.create(eventData);
+            testMessage.messageId(UUID.randomUUID().toString());
+            testMessage.contentType("application/json");
+            {%- set protocolopts = message.get('protocoloptions', {}) %}
+            {%- if protocolopts.get('application_properties') %}
+            {%- for propname, propspec in protocolopts.application_properties.items() %}
+            {%- if propspec.get('value') %}
+            testMessage.property("{{ propname }}", "{{ propspec.value }}");
+            {%- endif %}
+            {%- endfor %}
+            {%- endif %}
+            {%- endif %}
+            
+            // Send message
+            sender.send(testMessage);
             
             // Wait for message to be received
             Boolean result = messageReceived.get(10, TimeUnit.SECONDS);
@@ -161,10 +163,19 @@ public class AmqpConsumerTest {
             logger.info("Message received validation completed");
             
             sender.close();
-            session.close();
             connection.close();
+            client.close();
+        } catch (Exception ex) {
+            logger.error("Test failed", ex);
+            throw ex;
         } finally {
             consumer.stop();
+            try {
+                if (connection != null) connection.close();
+                if (client != null) client.close();
+            } catch (Exception closeEx) {
+                logger.debug("Error closing connection: " + closeEx.getMessage());
+            }
         }
     }
     

@@ -1,0 +1,52 @@
+{#- Kafka utility macros for Java -#}
+
+{#- Check if the root document uses Kafka protocol -#}
+{%- macro uses_kafka_protocol(root) -%}
+{{ root | exists("protocol", "Kafka") or root | exists("protocol", "kafka") }}
+{%- endmacro -%}
+
+{#- Check if the root document has Kafka endpoints -#}
+{%- macro uses_kafka_endpoint(root) -%}
+{%- if root.endpoints -%}
+{%- for endpointid, endpoint in root.endpoints.items() -%}
+{%- if endpoint.protocol and (endpoint.protocol | lower) == "kafka" -%}
+true
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Get the topic name from a message -#}
+{%- macro get_topic(message) -%}
+{%- if message.protocoloptions and message.protocoloptions.topic -%}
+{{ message.protocoloptions.topic }}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Generate URI template arguments for Kafka message -#}
+{%- macro DeclareUriTemplateArguments(message) -%}
+{%- if message.protocoloptions -%}
+{%- if message.protocoloptions.headers -%}
+{%- for propname, prop in message.protocoloptions.headers.items() -%}
+{%- if prop.type == "uritemplate" -%}
+{%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+, String {{ placeholder }}
+{%- endfor -%}
+{%- elif prop.value is not defined -%}
+, String {{ propname }}
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- if message.protocoloptions.key -%}
+{%- for propname, prop in message.protocoloptions.key.items() -%}
+{%- if prop.type == "uritemplate" -%}
+{%- for placeholder in prop.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+, String {{ placeholder }}
+{%- endfor -%}
+{%- elif prop.value is not defined -%}
+, String {{ propname }}
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- endif -%}
+{%- endmacro -%}

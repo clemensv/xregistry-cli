@@ -1,0 +1,6 @@
+{
+    "template": "ehconsumer",
+    "language": "java",
+    "protocol": "AMQP",
+    "usage": ["consumer"]
+}

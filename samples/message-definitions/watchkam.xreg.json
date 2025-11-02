@@ -8,26 +8,24 @@
           "description": "Event for when motion is detected",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.Watchkam.MotionDetected",
-                "description": "Event raised when motion is detected"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "motion identifier"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.Watchkam.MotionDetected",
+              "description": "Event raised when motion is detected"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "motion identifier"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -37,26 +35,24 @@
           "description": "Event for when detected motion has ended",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.Watchkam.MotionEnded",
-                "description": "Event raised when detected motion has ended"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "motion identifier"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.Watchkam.MotionEnded",
+              "description": "Event raised when detected motion has ended"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "motion identifier"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",

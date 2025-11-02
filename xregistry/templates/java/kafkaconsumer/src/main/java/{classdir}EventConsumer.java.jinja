@@ -1,0 +1,170 @@
+{%- import 'util.jinja.include' as util -%}
+{%- import 'cloudevents.jinja.include' as cloudEvents -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+package {{ group_package }};
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+{%- if cloudEvents.usesCloudEvents(root) %}
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
+import io.cloudevents.kafka.CloudEventDeserializer;
+{%- endif %}
+import java.net.URI;
+
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+{%- if message_body_type != "byte[]" %}
+import {{ message_body_type.rsplit('.', 1)[0] }}.*;
+{%- endif %}
+{%- endfor %}
+
+{%- set consumer_class = (groupname | strip_namespace) ~ 'EventConsumer' %}
+
+/**
+ * Event consumer dispatcher for {{ messagegroupid }} message group.
+ * Processes messages from Kafka and dispatches them to registered handlers.
+ */
+public abstract class {{ consumer_class }} {
+    private static final Logger logger = LogManager.getLogger({{ consumer_class }}.class);
+    {%- if cloudEvents.usesCloudEvents(root) %}
+    private static final String CE_PREFIX = "ce_";
+    {%- endif %}
+    
+    protected final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Process multiple records from Kafka.
+     * This method is called by the consumer thread for each batch of received messages.
+     * 
+     * @param records The batch of consumer records
+     */
+    public void processRecords(ConsumerRecords<byte[], byte[]> records) {
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            try {
+                processRecord(record);
+            } catch (Exception ex) {
+                logger.error("Error processing record from topic {} partition {} offset {}", 
+                    record.topic(), record.partition(), record.offset(), ex);
+                handleError(ex, record);
+            }
+        }
+    }
+
+    /**
+     * Process a single record from Kafka.
+     * 
+     * @param record The consumer record containing the message data
+     */
+    public void processRecord(ConsumerRecord<byte[], byte[]> record) {
+        try {
+            byte[] bodyData = record.value();
+            
+            {%- if cloudEvents.usesCloudEvents(root) %}
+            // Check if this is a CloudEvents message (binary content mode)
+            if (hasCloudEventsHeaders(record)) {
+                processCloudEvent(record);
+                return;
+            }
+            {%- endif %}
+            
+            // Process as plain Kafka message
+            dispatchMessage(bodyData, "application/json", record);
+            
+        } catch (Exception ex) {
+            logger.error("Error processing record", ex);
+            handleError(ex, record);
+        }
+    }
+
+    {%- if cloudEvents.usesCloudEvents(root) %}
+    /**
+     * Check if the record has CloudEvents headers.
+     */
+    private boolean hasCloudEventsHeaders(ConsumerRecord<byte[], byte[]> record) {
+        var headers = record.headers();
+        return headers.lastHeader(CE_PREFIX + "type") != null;
+    }
+
+    /**
+     * Process a CloudEvents message in binary content mode.
+     */
+    private void processCloudEvent(ConsumerRecord<byte[], byte[]> record) throws Exception {
+        byte[] bodyData = record.value();
+        var headers = record.headers();
+        
+        var contentTypeHeader = headers.lastHeader(CE_PREFIX + "datacontenttype");
+        String dataContentType = contentTypeHeader != null ? 
+            new String(contentTypeHeader.value()) : "application/json";
+        
+        dispatchMessage(bodyData, dataContentType, record);
+    }
+    {%- endif %}
+
+    /**
+     * Dispatch the message to the appropriate handler based on content type.
+     */
+    private void dispatchMessage(byte[] bodyData, String contentType, ConsumerRecord<byte[], byte[]> record) throws Exception {
+        String mediaType = contentType != null ? contentType.split(";")[0].trim().toLowerCase() : "application/json";
+        
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | pascal | strip_namespace %}
+        {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+        {%- set dataschema = message.dataschemaformat if message.dataschemaformat else message.metadataschemaformat if message.metadataschemaformat else messagegroup.dataschemaformat if messagegroup.dataschemaformat else "JSON" %}
+        
+        // Try {{ messagename }}
+        try {
+            {%- if message_body_type == "byte[]" %}
+            byte[] data = bodyData;
+            {%- else %}
+            {{ message_body_type }} data = {{ message_body_type }}.fromData(bodyData, mediaType);
+            {%- endif %}
+            on{{ messagename }}(data, record);
+            logger.debug("Successfully processed {{ messagename }} message from topic {}", record.topic());
+            return;
+        } catch (Exception ex) {
+            logger.debug("Message from topic {} does not match {{ messagename }} schema: {}", record.topic(), ex.getMessage());
+        }
+        {%- endfor %}
+        
+        logger.error("Received message from topic {} does not match any known schema. Data length: {} bytes, Content-Type: {}", 
+                     record.topic(), bodyData.length, contentType);
+    }
+
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+
+    /**
+     * Handler for {{ messagename }} messages.
+     * Override this method to process {{ messagename }} events.
+     * 
+     * @param data The deserialized message data
+     * @param record The Kafka consumer record
+     */
+    protected abstract void on{{ messagename }}({{ message_body_type }} data, ConsumerRecord<byte[], byte[]> record);
+    {%- endfor %}
+
+    /**
+     * Error handler for processing failures.
+     * Override this method to implement custom error handling.
+     * 
+     * @param ex The exception that occurred
+     * @param record The Kafka consumer record
+     */
+    protected void handleError(Exception ex, ConsumerRecord<byte[], byte[]> record) {
+        logger.error("Error processing record from topic {} partition {} offset {}", 
+            record.topic(), record.partition(), record.offset(), ex);
+    }
+}
+{% endfor %}

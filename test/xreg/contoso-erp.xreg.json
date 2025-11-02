@@ -1,6 +1,4 @@
 {
-    "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
     "endpoints": {
         "Contoso.ERP.Eventing.Http": {
             "usage": ["producer"],

@@ -91,11 +91,12 @@ components:
       {%- endif %}
       correlationId:
         location: "$message.header#/{% if protocol == "http" -%}ce-{% elif protocol == "amqp"%}ce_{%- endif -%}id"
-      {%- if message.envelopemetadata is defined and message.envelopemetadata.attributes is defined %}
+      {%- if message.envelopemetadata is defined %}
       headers:
         type: object
         properties:
-          {%- for attributeKey, attribute in message.envelopemetadata.attributes.items() %}
+          {%- for attributeKey, attribute in message.envelopemetadata.items() %}
+          {%- if attributeKey not in ['description', 'required'] %}
           {% if protocol == "http" -%}ce-{% elif protocol == "amqp"%}ce_{%- endif -%}        
           {{ attributeKey }}:
             {%- if attribute is string %}
@@ -132,6 +133,7 @@ components:
             {%- else -%}
             type: "string"
             {%- endif -%}
+          {%- endif -%}
           {%- endfor -%}
       {%- endif %}
       {%- if protocol is defined and protocol.startswith("http") %}

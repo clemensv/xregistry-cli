@@ -7,6 +7,7 @@ import glob
 import json
 import os
 import re
+import sys
 import tempfile
 import uuid
 import xml.etree.ElementTree as ET
@@ -396,7 +397,7 @@ class TemplateRenderer:
                                     raise RuntimeError("Class name not found")
                                 if file_name_base.find("{classdir}") > -1:
                                     file_dir = os.path.join(file_dir_base, os.path.join(*package_name.split(".")).lower())
-                                    file_name = self.resolve_string(file_name_base, {"classdir": package_class_name })
+                                    file_name = self.resolve_string(file_name_base, {"classdir": JinjaFilters.pascal(package_class_name) })
                                     class_name = f'{package_name}.{file_name.split(".")[0]}'
                                 else:
                                     file_name = self.resolve_string(file_name_base, {
@@ -565,7 +566,21 @@ class TemplateRenderer:
                 args["class_name"] = class_name
                 args["self.ctx.uses_avro"] = self.ctx.uses_avro
                 args["self.ctx.uses_protobuf"] = self.ctx.uses_protobuf
-                rendered = template.render(args)
+                try:
+                    rendered = template.render(args)
+                except Exception as render_err:
+                    # Print detailed information about the rendering error
+                    import traceback
+                    print(f"\n=== Template Rendering Error in {template.name} ===", file=sys.stderr)
+                    print(f"Error: {render_err}", file=sys.stderr)
+                    print(f"Error type: {type(render_err)}", file=sys.stderr)
+                    print("\nTemplate arguments:", file=sys.stderr)
+                    for key in sorted(args.keys()):
+                        if key != "root":
+                            print(f"  {key}: {args[key]}", file=sys.stderr)
+                    print("\nFull traceback:", file=sys.stderr)
+                    traceback.print_exc()
+                    raise
                 if not suppress_output:
                     with open(output_path, "w", encoding='utf-8') as f:
                         f.write(rendered)
@@ -580,7 +595,9 @@ class TemplateRenderer:
             logger.error("%s: Include file not found: %s", template.name, err)
             exit(1)
         except TemplateRuntimeError as err:
-            logger.error("%s", err)
+            import traceback
+            logger.error("%s: %s", template.name, err)
+            logger.error("Full traceback:\n%s", traceback.format_exc())
             exit(1)
 
     @staticmethod

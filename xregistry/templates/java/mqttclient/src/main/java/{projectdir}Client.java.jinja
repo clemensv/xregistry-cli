@@ -1,0 +1,136 @@
+{%- import 'util.jinja.include' as util -%}
+{%- import 'cloudevents.jinja.include' as cloudEvents -%}
+{%- import 'mqtt.jinja.include' as mqtt -%}
+{{ util.CommonFileHeader() }}
+
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+import org.eclipse.paho.client.mqttv3.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.util.UUID;
+
+{%- for messagegroupid in root.messagegroups.keys() %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') -%}
+import {{ group_package }}.*;
+{%- endfor %}
+
+/**
+ * MQTT Client for {{ project_name }}.
+ * Manages MQTT client lifecycle and provides factory methods for publishing and subscribing.
+ */
+public class MqttEventClient implements AutoCloseable {
+    private static final Logger logger = LogManager.getLogger(MqttEventClient.class);
+    
+    private final MqttClient mqttClient;
+
+    /**
+     * Creates a new instance of MqttEventClient.
+     * 
+     * @param mqttClient The MQTT client to use
+     */
+    public MqttEventClient(MqttClient mqttClient) {
+        this.mqttClient = mqttClient;
+    }
+
+    {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+    {%- set messagegroupname = messagegroupid | pascal | strip_namespace %}
+    {%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+    {%- set producer_class = messagegroupname ~ 'Producer' %}
+    {%- set consumer_class = messagegroupname ~ 'Consumer' %}
+
+    /**
+     * Create an MQTT producer for {{ messagegroupid }}.
+     * 
+     * @param brokerUrl The MQTT broker URL (e.g., "tcp://localhost:1883")
+     * @param clientId Optional client ID (null for auto-generated)
+     * @return A configured MQTT client instance
+     */
+    public static {{ group_package }}.{{ producer_class }} createProducerFor{{ messagegroupname }}(
+            String brokerUrl,
+            String clientId) throws MqttException {
+        
+        if (clientId == null || clientId.isEmpty()) {
+            clientId = "producer-" + UUID.randomUUID();
+        }
+        
+        MqttClient client = new MqttClient(brokerUrl, clientId);
+        MqttConnectOptions options = new MqttConnectOptions();
+        options.setCleanSession(true);
+        options.setAutomaticReconnect(true);
+        
+        client.connect(options);
+        logger.info("Connected MQTT producer to {} with client ID {}", brokerUrl, clientId);
+        
+        return new {{ group_package }}.{{ producer_class }}(client);
+    }
+
+    /**
+     * Create an MQTT consumer for {{ messagegroupid }}.
+     * 
+     * @param messageConsumer The message consumer that handles incoming messages
+     * @param brokerUrl The MQTT broker URL
+     * @param clientId Optional client ID (null for auto-generated)
+     * @param topics List of topics to subscribe to
+     * @return A configured MQTT client instance
+     */
+    public static MqttEventClient createConsumerFor{{ messagegroupname }}(
+            {{ group_package }}.{{ consumer_class }} messageConsumer,
+            String brokerUrl,
+            String clientId,
+            String[] topics) throws MqttException {
+        
+        if (clientId == null || clientId.isEmpty()) {
+            clientId = "consumer-" + UUID.randomUUID();
+        }
+        
+        MqttClient client = new MqttClient(brokerUrl, clientId);
+        MqttConnectOptions options = new MqttConnectOptions();
+        options.setCleanSession(true);
+        options.setAutomaticReconnect(true);
+        
+        client.setCallback(new MqttCallback() {
+            @Override
+            public void connectionLost(Throwable cause) {
+                logger.error("Connection lost", cause);
+            }
+
+            @Override
+            public void messageArrived(String topic, MqttMessage message) throws Exception {
+                messageConsumer.processMessage(topic, message.getPayload());
+            }
+
+            @Override
+            public void deliveryComplete(IMqttDeliveryToken token) {
+                // Not used for consumer
+            }
+        });
+        
+        client.connect(options);
+        client.subscribe(topics);
+        
+        logger.info("Connected MQTT consumer to {} with client ID {} subscribed to {} topics", 
+            brokerUrl, clientId, topics.length);
+        
+        return new MqttEventClient(client);
+    }
+    {%- endfor %}
+
+    /**
+     * Disconnect and close the MQTT client.
+     */
+    @Override
+    public void close() {
+        try {
+            if (mqttClient != null && mqttClient.isConnected()) {
+                mqttClient.disconnect();
+                mqttClient.close();
+                logger.info("MQTT client disconnected and closed");
+            }
+        } catch (MqttException e) {
+            logger.error("Error closing MQTT client", e);
+        }
+    }
+}

@@ -8,6 +8,7 @@ import re
 from typing import Any, Dict, List, Optional, Set, Union
 import jsonpointer
 from xregistry.cli import logger
+from xregistry.generator.jinja_filters import JinjaFilters
 
 JsonNode = Union[Dict[str, 'JsonNode'], List['JsonNode'], str, bool, int, float, None]
 
@@ -287,9 +288,11 @@ class TemplateRendererRefactoring:
         """Basic JSON to Avro conversion."""
         if isinstance(json_schema, dict):
             # Basic conversion
+            # Ensure class name is PascalCase for Java compatibility
+            pascal_class_name = JinjaFilters.pascal(class_name.split('.')[-1]) if class_name else "Record"
             avro_schema = {
                 "type": "record",
-                "name": class_name.split('.')[-1] if class_name else "Record",
+                "name": pascal_class_name,
                 "namespace": namespace,
                 "fields": []
             }

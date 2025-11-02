@@ -15,8 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-{{ util.EndpointCredentialClasses() }}
-
 /**
  * AMQP 1.0 producer using Qpid JMS client (JMS over AMQP)
  */
@@ -100,7 +98,7 @@ class AmqpJmsProducer {
                 Connection connection;
                 if (credential instanceof PlainEndpointCredential) {
                     PlainEndpointCredential plain = (PlainEndpointCredential) credential;
-                    connection = factory.createConnection(plain.getClientId(), plain.getClientSecret());
+                    connection = factory.createConnection(plain.getUsername(), plain.getPassword());
                 } else if (credential instanceof TokenEndpointCredential) {
                     TokenEndpointCredential token = (TokenEndpointCredential) credential;
                     // For token auth, use token as password with special username

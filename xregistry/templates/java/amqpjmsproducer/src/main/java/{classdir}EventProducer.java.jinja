@@ -130,7 +130,32 @@ public class {{ class_name }} {
         {%- endif -%}
     ) throws Exception {
         {%- if isCloudEvent %}
-        {{ cloudEvents.BuildCloudEvent("cloudEvent", message, "data") | indent(8) }}
+        // Serialize data to bytes
+        byte[] dataBytes;
+        {%- set schemaObj = schema_object(root, message.get('dataschemauri') or message.get('dataschema')) %}
+        {%- if schemaObj %}
+            {%- if schemaObj.versions %}
+                {%- set version_key = schemaObj.defaultversionid if schemaObj.defaultversionid else (schemaObj.versions.keys() | list | last) %}
+                {%- set format = schemaObj.versions[version_key].format %}
+            {%- elif schemaObj.format %}
+                {%- set format = schemaObj.format %}
+            {%- else %}
+                {%- set format = message.dataschemaformat if message.dataschemaformat else "" %}
+            {%- endif %}
+            {%- if format and format.lower().startswith("avro") %}
+        dataBytes = data.toByteArray("avro/binary");
+            {%- elif format and format.lower().startswith("protobuf") %}
+        dataBytes = data.toByteArray();
+            {%- elif format %}
+        dataBytes = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
+            {%- else %}
+        dataBytes = data;  // Already byte[]
+            {%- endif %}
+        {%- else %}
+        dataBytes = data;  // Already byte[]
+        {%- endif %}
+        
+        {{ cloudEvents.BuildCloudEvent(message, "dataBytes") | indent(8) }}
         
         if (beforeSend != null) {
             beforeSend.accept(cloudEvent);
@@ -138,22 +163,34 @@ public class {{ class_name }} {
         
         // Convert CloudEvent to JMS BytesMessage
         BytesMessage jmsMessage = endpoint.createBytesMessage(null);
-        {{ cloudEvents.SerializeCloudEvent("cloudEvent", "jmsMessage") | indent(8) }}
+        byte[] cloudEventBytes = {{ cloudEvents.SerializeCloudEvent("cloudEvent") }};
+        jmsMessage.writeBytes(cloudEventBytes);
+        jmsMessage.setStringProperty("content-type", "application/cloudevents+json");
         
         endpoint.send(jmsMessage);
         
         {%- elif is_amqp %}
         // Serialize data to bytes
         byte[] dataBytes;
-        {%- set schemaObj = schema_object(root, message.dataschemauri if message.dataschemauri else message.dataschema) %}
-        {%- if schemaObj and "format" in schemaObj %}
-        {%- if schemaObj.format.lower().startswith("avro") %}
-        dataBytes = data.toByteArray();  // Avro serialization
-        {%- elif schemaObj.format.lower().startswith("protobuf") %}
+        {%- set schemaObj = schema_object(root, message.get('dataschemauri') or message.get('dataschema')) %}
+        {%- if schemaObj %}
+            {%- if schemaObj.versions %}
+                {%- set version_key = schemaObj.defaultversionid if schemaObj.defaultversionid else (schemaObj.versions.keys() | list | last) %}
+                {%- set format = schemaObj.versions[version_key].format %}
+            {%- elif schemaObj.format %}
+                {%- set format = schemaObj.format %}
+            {%- else %}
+                {%- set format = message.dataschemaformat if message.dataschemaformat else "" %}
+            {%- endif %}
+            {%- if format and format.lower().startswith("avro") %}
+        dataBytes = data.toByteArray("avro/binary");  // Avro serialization
+            {%- elif format and format.lower().startswith("protobuf") %}
         dataBytes = data.toByteArray();  // Protobuf serialization
-        {%- else %}
+            {%- elif format %}
         dataBytes = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
-        {%- endif %}
+            {%- else %}
+        dataBytes = data;  // Already byte[]
+            {%- endif %}
         {%- else %}
         dataBytes = data;  // Already byte[]
         {%- endif %}

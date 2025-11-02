@@ -1,0 +1,208 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') | replace('.', '_') %}
+
+package {{ package_name }};
+
+import com.azure.messaging.servicebus.ServiceBusClientBuilder;
+import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import org.junit.jupiter.api.*;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.MountableFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal | strip_namespace %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+import {{ group_package }}.{{ groupname }}Producer;
+{%- endfor %}
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Integration tests for Service Bus producer using Testcontainers.
+ * 
+ * This test uses the Azure Service Bus Emulator and SQL Edge containers to run integration tests
+ * without requiring actual Azure resources.
+ */
+@Testcontainers
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class ProducerTest {
+    
+    private static final Logger logger = LogManager.getLogger(ProducerTest.class);
+    
+    private Network network;
+    private GenericContainer<?> sqlEdgeContainer;
+    private GenericContainer<?> serviceBusEmulatorContainer;
+    private Path emulatorConfigPath;
+    
+    private String serviceBusConnectionString;
+    
+    private static final String EMULATOR_CONFIG = """
+        {
+          "UserConfig": {
+            "Namespaces": [
+              {
+                "Name": "sbemulatorns",
+                "Queues": [
+                  {
+                    "Name": "myqueue",
+                    "Properties": {
+                      "DeadLetteringOnMessageExpiration": false,
+                      "DefaultMessageTimeToLive": "PT1H",
+                      "LockDuration": "PT1M",
+                      "MaxDeliveryCount": 10,
+                      "RequiresDuplicateDetection": false,
+                      "RequiresSession": false
+                    }
+                  }
+                ],
+                "Topics": [
+                  {
+                    "Name": "mytopic",
+                    "Subscriptions": [
+                      {
+                        "Name": "mysub",
+                        "Properties": {
+                          "LockDuration": "PT1M",
+                          "RequiresSession": false,
+                          "DeadLetteringOnMessageExpiration": false,
+                          "DeadLetteringOnFilterEvaluationExceptions": false,
+                          "MaxDeliveryCount": 10
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Logging": {
+              "Type": "File"
+            }
+          }
+        }
+        """;
+    
+    @BeforeAll
+    public void setUp() throws IOException {
+        logger.info("Setting up Service Bus emulator testcontainers");
+        
+        // Create network for containers to communicate
+        network = Network.newNetwork();
+        
+        // Create temporary config file for Service Bus emulator
+        emulatorConfigPath = Files.createTempFile("emulator-config", ".json");
+        Files.writeString(emulatorConfigPath, EMULATOR_CONFIG);
+        
+        // Start SQL Edge container (required by Service Bus emulator)
+        sqlEdgeContainer = new GenericContainer<>("mcr.microsoft.com/azure-sql-edge:latest")
+            .withNetwork(network)
+            .withNetworkAliases("sqledge")
+            .withEnv("ACCEPT_EULA", "Y")
+            .withEnv("MSSQL_SA_PASSWORD", "StrongPassword!1")
+            .withExposedPorts(1433)
+            .waitingFor(Wait.forListeningPort()
+                .withStartupTimeout(Duration.ofMinutes(2)));
+        
+        sqlEdgeContainer.start();
+        logger.info("SQL Edge started");
+        
+        // Start Service Bus emulator container
+        serviceBusEmulatorContainer = new GenericContainer<>("mcr.microsoft.com/azure-messaging/servicebus-emulator:latest")
+            .withCopyFileToContainer(MountableFile.forHostPath(emulatorConfigPath), "/ServiceBus_Emulator/ConfigFiles/Config.json")
+            .withNetwork(network)
+            .withNetworkAliases("sb-emulator")
+            .withExposedPorts(5672)
+            .withEnv("SQL_SERVER", "sqledge")
+            .withEnv("MSSQL_SA_PASSWORD", "StrongPassword!1")
+            .withEnv("ACCEPT_EULA", "Y")
+            .waitingFor(Wait.forLogMessage(".*Emulator Service is Successfully Up!.*", 1)
+                .withStartupTimeout(Duration.ofMinutes(3)));
+        
+        serviceBusEmulatorContainer.start();
+        
+        // Build Service Bus connection string (Java SDK doesn't support UseDevelopmentEmulator parameter)
+        serviceBusConnectionString = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;";
+        
+        logger.info("Service Bus emulator started successfully");
+        
+        // Wait a bit for the emulator to settle
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    @AfterAll
+    public void tearDown() {
+        logger.info("Tearing down Service Bus emulator testcontainers");
+        
+        if (serviceBusEmulatorContainer != null) {
+            serviceBusEmulatorContainer.stop();
+        }
+        
+        if (sqlEdgeContainer != null) {
+            sqlEdgeContainer.stop();
+        }
+        
+        if (network != null) {
+            network.close();
+        }
+        
+        if (emulatorConfigPath != null) {
+            try {
+                Files.deleteIfExists(emulatorConfigPath);
+            } catch (IOException e) {
+                logger.warn("Failed to delete emulator config file", e);
+            }
+        }
+    }
+
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal | strip_namespace %}
+    
+    @Test
+    @DisplayName("Test {{ groupname }}Producer with Service Bus Emulator")
+    public void test{{ groupname }}ProducerWithEmulator() {
+        logger.info("Testing {{ groupname }}Producer with Service Bus emulator");
+        
+        // Create sender for the queue
+        ServiceBusSenderClient senderClient = new ServiceBusClientBuilder()
+            .connectionString(serviceBusConnectionString)
+            .sender()
+            .queueName("myqueue")
+            .buildClient();
+        
+        {{ groupname }}Producer producer = new {{ groupname }}Producer(senderClient);
+        assertNotNull(producer, "Producer should be created successfully");
+        
+        logger.info("{{ groupname }}Producer created successfully with emulator");
+        
+        // TODO: Add message sending tests here when message types are available
+        
+        try {
+            producer.close();
+        } catch (Exception e) {
+            logger.error("Error closing producer", e);
+            fail("Failed to close producer: " + e.getMessage());
+        }
+    }
+    {%- endfor %}
+}
+
+
+

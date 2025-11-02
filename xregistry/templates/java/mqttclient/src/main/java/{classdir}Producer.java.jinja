@@ -1,0 +1,82 @@
+{%- import 'util.jinja.include' as util -%}
+{%- import 'cloudevents.jinja.include' as cloudEvents -%}
+{%- import 'mqtt.jinja.include' as mqtt -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+package {{ group_package }};
+
+import org.eclipse.paho.client.mqttv3.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+{%- if message_body_type != "byte[]" %}
+import {{ message_body_type.rsplit('.', 1)[0] }}.*;
+{%- endif %}
+{%- endfor %}
+
+{%- set producer_class = (groupname | strip_namespace) ~ 'Producer' %}
+
+/**
+ * MQTT Producer for {{ messagegroupid }} message group.
+ */
+public class {{ producer_class }} implements AutoCloseable {
+    private static final Logger logger = LogManager.getLogger({{ producer_class }}.class);
+    private final MqttClient mqttClient;
+
+    public {{ producer_class }}(MqttClient mqttClient) {
+        this.mqttClient = mqttClient;
+    }
+
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    {%- set topic = mqtt.get_topic(message) or messageid %}
+
+    /**
+     * Send {{ messagename }} message to MQTT topic.
+     * 
+     * @param data The message data to send
+     * @param qos Quality of Service (0, 1, or 2)
+     * @throws MqttException if publishing fails
+     */
+    public void send{{ messagename }}({{ message_body_type }} data, int qos) throws MqttException {
+        {%- if message_body_type == "byte[]" %}
+        byte[] payload = data;
+        {%- else %}
+        byte[] payload = data.toByteArray("application/json");
+        {%- endif %}
+        MqttMessage message = new MqttMessage(payload);
+        message.setQos(qos);
+        mqttClient.publish("{{ topic }}", message);
+        logger.debug("Published {{ messagename }} to topic {{ topic }}");
+    }
+
+    /**
+     * Send {{ messagename }} message with QoS 1.
+     */
+    public void send{{ messagename }}({{ message_body_type }} data) throws MqttException {
+        send{{ messagename }}(data, 1);
+    }
+    {%- endfor %}
+
+    @Override
+    public void close() {
+        try {
+            if (mqttClient != null && mqttClient.isConnected()) {
+                mqttClient.disconnect();
+                mqttClient.close();
+            }
+        } catch (MqttException e) {
+            logger.error("Error closing producer", e);
+        }
+    }
+}
+{% endfor %}

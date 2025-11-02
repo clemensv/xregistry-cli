@@ -7,21 +7,19 @@
           "description": "",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "com.example.grp1.ev1",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "com.example.grp1.ev1",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/com.example.grp1/schemas/s1:x1"
@@ -34,20 +32,18 @@
         "com.example.grp2.ev1": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "com.example.grp2.ev1",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "com.example.grp2.ev1",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/com.example.grp2/schemas/s2:q1"
@@ -55,20 +51,18 @@
         "com.example.grp2.ev2": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "com.example.grp2.ev2",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "com.example.grp2.ev2",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/com.example.grp2/schemas/s1:q2"

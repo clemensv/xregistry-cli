@@ -6,36 +6,34 @@
         "Microsoft.Storage.BlobCreated": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.BlobCreated",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "dataschema": {
-                "type": "uritemplate",
-                "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreatedEventData#/definitions/StorageBlobCreatedEventData",
-                "required": true
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.BlobCreated",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "dataschema": {
+              "type": "uritemplate",
+              "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreatedEventData#/definitions/StorageBlobCreatedEventData",
+              "required": true
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobCreatedEventData#/definitions/StorageBlobCreatedEventData",
@@ -50,36 +48,34 @@
         "Microsoft.Storage.BlobDeleted": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.BlobDeleted",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "dataschema": {
-                "type": "uritemplate",
-                "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeletedEventData#/definitions/StorageBlobDeletedEventData",
-                "required": true
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.BlobDeleted",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "dataschema": {
+              "type": "uritemplate",
+              "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeletedEventData#/definitions/StorageBlobDeletedEventData",
+              "required": true
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobDeletedEventData#/definitions/StorageBlobDeletedEventData",
@@ -94,31 +90,29 @@
         "Microsoft.Storage.DirectoryCreated": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.DirectoryCreated",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.DirectoryCreated",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "groupId": "Microsoft.Storage",
@@ -132,31 +126,29 @@
         "Microsoft.Storage.DirectoryDeleted": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.DirectoryDeleted",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.DirectoryDeleted",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "groupId": "Microsoft.Storage",
@@ -170,31 +162,29 @@
         "Microsoft.Storage.BlobRenamed": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.BlobRenamed",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.BlobRenamed",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "groupId": "Microsoft.Storage",
@@ -208,31 +198,29 @@
         "Microsoft.Storage.DirectoryRenamed": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.DirectoryRenamed",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.DirectoryRenamed",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "groupId": "Microsoft.Storage",
@@ -246,31 +234,29 @@
         "Microsoft.Storage.BlobTierChanged": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.BlobTierChanged",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.BlobTierChanged",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "groupId": "Microsoft.Storage",
@@ -284,36 +270,34 @@
         "Microsoft.Storage.BlobInventoryPolicyCompleted": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.BlobInventoryPolicyCompleted",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "dataschema": {
-                "type": "uritemplate",
-                "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompletedEventData#/definitions/StorageBlobInventoryPolicyCompletedEventData",
-                "required": true
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.BlobInventoryPolicyCompleted",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "dataschema": {
+              "type": "uritemplate",
+              "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompletedEventData#/definitions/StorageBlobInventoryPolicyCompletedEventData",
+              "required": true
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.BlobInventoryPolicyCompletedEventData#/definitions/StorageBlobInventoryPolicyCompletedEventData",
@@ -328,36 +312,34 @@
         "Microsoft.Storage.AsyncOperationInitiated": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.AsyncOperationInitiated",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "dataschema": {
-                "type": "uritemplate",
-                "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiatedEventData#/definitions/StorageAsyncOperationInitiatedEventData",
-                "required": true
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.AsyncOperationInitiated",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "dataschema": {
+              "type": "uritemplate",
+              "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiatedEventData#/definitions/StorageAsyncOperationInitiatedEventData",
+              "required": true
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.AsyncOperationInitiatedEventData#/definitions/StorageAsyncOperationInitiatedEventData",
@@ -372,36 +354,34 @@
         "Microsoft.Storage.LifecyclePolicyCompleted": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Microsoft.Storage.LifecyclePolicyCompleted",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "value": "0001-01-01T00:00:00+00:00",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
-                "required": false
-              },
-              "dataschema": {
-                "type": "uritemplate",
-                "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompletedEventData#/definitions/StorageLifecyclePolicyCompletedEventData",
-                "required": true
-              },
-              "datacontenttype": {
-                "type": "symbol",
-                "value": "application/json",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Microsoft.Storage.LifecyclePolicyCompleted",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "value": "0001-01-01T00:00:00+00:00",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}",
+              "required": false
+            },
+            "dataschema": {
+              "type": "uritemplate",
+              "value": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompletedEventData#/definitions/StorageLifecyclePolicyCompletedEventData",
+              "required": true
+            },
+            "datacontenttype": {
+              "type": "symbol",
+              "value": "application/json",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/Microsoft.Storage/schemas/Microsoft.Storage.LifecyclePolicyCompletedEventData#/definitions/StorageLifecyclePolicyCompletedEventData",

@@ -7,25 +7,23 @@
           "description": "A reservation has been placed",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "Contoso.ERP.Events.ReservationPlaced",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/erp/orders/{orderid}",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "Contoso.ERP.Events.ReservationPlaced",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/erp/orders/{orderid}",
+              "required": true
             }
           },
           "dataschemauri": "#/schemagroups/Contoso.ERP.Events/schemas/orderData:OrderData"

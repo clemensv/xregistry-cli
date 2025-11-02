@@ -1,0 +1,189 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set pascal_group_name = messagegroupid | pascal %}
+{%- set class_name = (pascal_group_name | strip_namespace) + "Producer" %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+{%- set package_dir = group_package.replace('.', '/') %}
+
+package {{ group_package }};
+
+import com.azure.messaging.eventhubs.EventData;
+import com.azure.messaging.eventhubs.EventDataBatch;
+import com.azure.messaging.eventhubs.EventHubProducerClient;
+import com.azure.messaging.eventhubs.EventHubClientBuilder;
+import com.azure.core.credential.TokenCredential;
+import com.azure.identity.DefaultAzureCredential;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+{%- if cloudEvents.usesCloudEvents(root) %}
+import io.cloudevents.CloudEvent;
+{%- endif %}
+
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Producer class to send events in the `{{ messagegroupid }}` message group.
+ */
+public class {{ class_name }} {
+    private static final Logger logger = LogManager.getLogger({{ class_name }}.class);
+    private final EventHubProducerClient producerClient;
+
+    /**
+     * Creates a new instance of {{ class_name }}.
+     * 
+     * @param producerClient The Event Hub producer client to use for sending events
+     */
+    public {{ class_name }}(EventHubProducerClient producerClient) {
+        this.producerClient = producerClient;
+    }
+
+    {%- if root.endpoints %}
+    {%- for endpointid, endpoint in root.endpoints.items() %}
+    {%- if endpoint.usage == "producer" %}
+    {%- set protocol = endpoint.protocol | lower %}
+    {%- if protocol == "amqp" %}
+    {%- set options = endpoint.protocoloptions %}
+    {%- set endpoints = endpoint.endpoints %}
+
+    /**
+     * Create a new instance of the {{ class_name }} for the {{ endpointid }} endpoint.
+     * 
+     * @param credential The Azure credential to use for authentication
+     * @param fullyQualifiedNamespace The fully qualified namespace of the Event Hub
+     * @param eventHubName The name of the Event Hub
+     * @return A new instance of the {{ class_name }}
+     */
+    public static {{ class_name }} createFor{{ endpointid | pascal | strip_namespace }}(
+            TokenCredential credential,
+            String fullyQualifiedNamespace,
+            String eventHubName) {
+        
+        if (fullyQualifiedNamespace == null) {
+            {%- if endpoints %}
+            fullyQualifiedNamespace = "{{ endpoints[0].uri }}";
+            {%- else %}
+            throw new IllegalArgumentException("fullyQualifiedNamespace cannot be null");
+            {%- endif %}
+        }
+        
+        if (eventHubName == null) {
+            {%- if options and 'node' in options %}
+            eventHubName = "{{ options['node'] }}";
+            {%- else %}
+            throw new IllegalArgumentException("eventHubName cannot be null");
+            {%- endif %}
+        }
+
+        EventHubProducerClient client = new EventHubClientBuilder()
+            .credential(fullyQualifiedNamespace, eventHubName, credential)
+            .buildProducerClient();
+
+        return new {{ class_name }}(client);
+    }
+
+    /**
+     * Create a new instance of the {{ class_name }} for the {{ endpointid }} endpoint using DefaultAzureCredential.
+     * 
+     * @param fullyQualifiedNamespace The fully qualified namespace of the Event Hub
+     * @param eventHubName The name of the Event Hub
+     * @return A new instance of the {{ class_name }}
+     */
+    public static {{ class_name }} createFor{{ endpointid | pascal | strip_namespace }}(
+            String fullyQualifiedNamespace,
+            String eventHubName) {
+        return createFor{{ endpointid | pascal | strip_namespace }}(
+            new DefaultAzureCredential(),
+            fullyQualifiedNamespace,
+            eventHubName);
+    }
+    {%- endif %}
+    {%- endif %}
+    {%- endfor %}
+    {%- endif %}
+
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+
+    /**
+     * Send a {{ messagename }} message.
+     * 
+     * @param data The message data
+     * @return A CompletableFuture that completes when the message is sent
+     */
+    public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                EventData eventData = {{ pascal_group_name | strip_namespace }}EventFactory.create{{ messagename }}Message(data);
+                EventDataBatch batch = producerClient.createBatch();
+                
+                if (!batch.tryAdd(eventData)) {
+                    throw new IllegalStateException("Event is too large for an empty batch");
+                }
+                
+                producerClient.send(batch);
+                logger.info("Sent {{ messagename }} message");
+            } catch (Exception e) {
+                logger.error("Error sending {{ messagename }} message", e);
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    /**
+     * Send a {{ messagename }} message with a partition key.
+     * 
+     * @param data The message data
+     * @param partitionKey The partition key
+     * @return A CompletableFuture that completes when the message is sent
+     */
+    public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data, String partitionKey) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                EventData eventData = {{ pascal_group_name | strip_namespace }}EventFactory.create{{ messagename }}Message(data);
+                
+                com.azure.messaging.eventhubs.models.CreateBatchOptions batchOptions = 
+                    new com.azure.messaging.eventhubs.models.CreateBatchOptions()
+                        .setPartitionKey(partitionKey);
+                        
+                EventDataBatch batch = producerClient.createBatch(batchOptions);
+                
+                if (!batch.tryAdd(eventData)) {
+                    throw new IllegalStateException("Event is too large for an empty batch");
+                }
+                
+                producerClient.send(batch);
+                logger.info("Sent {{ messagename }} message with partition key: {}", partitionKey);
+            } catch (Exception e) {
+                logger.error("Error sending {{ messagename }} message", e);
+                throw new RuntimeException(e);
+            }
+        });
+    }
+    {%- endfor %}
+
+    /**
+     * Flush any buffered events.
+     */
+    public void flush() {
+        // Event Hubs client sends immediately, no buffering
+    }
+
+    /**
+     * Close the producer and release resources.
+     */
+    public void close() {
+        if (producerClient != null) {
+            producerClient.close();
+        }
+    }
+}
+{% endfor %}

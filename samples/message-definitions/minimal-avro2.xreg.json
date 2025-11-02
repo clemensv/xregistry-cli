@@ -7,23 +7,21 @@
           "description": "A toll record event has been received",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "value": "Microsoft.Samples.TollRecordEvents.TollRecordReceived",
-                "description": "Type of the event"
-              },
-              "time": {
-                "value": "{entrytime}",
-                "description": "Time the event was captured"
-              },
-              "source": {
-                "value": "toolbooths://{site}",
-                "description": "Toll station id"
-              },
-              "subject": {
-                "value": "{sensorid}",
-                "description": "Id of the sensor that scanned the vehicle"
-              }
+            "type": {
+              "value": "Microsoft.Samples.TollRecordEvents.TollRecordReceived",
+              "description": "Type of the event"
+            },
+            "time": {
+              "value": "{entrytime}",
+              "description": "Time the event was captured"
+            },
+            "source": {
+              "value": "toolbooths://{site}",
+              "description": "Toll station id"
+            },
+            "subject": {
+              "value": "{sensorid}",
+              "description": "Id of the sensor that scanned the vehicle"
             }
           },
           "dataschemauri": "#/schemagroups/Microsoft.Samples.TollRecordEvents/schemas/TollRecordEventData"

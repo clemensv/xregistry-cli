@@ -1,0 +1,221 @@
+{%- import 'util.jinja.include' as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.net.URI;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+{%- for messagegroupid in root.messagegroups.keys() %}
+{%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') -%}
+import {{ group_package }}.*;
+{%- endfor %}
+
+/**
+ * Kafka Consumer for {{ project_name }}.
+ * Manages Kafka consumer lifecycle and provides factory methods for creating consumers.
+ */
+public class {{ project_name | pascal }}KafkaConsumer implements AutoCloseable {
+    private static final Logger logger = LogManager.getLogger({{ project_name | pascal }}KafkaConsumer.class);
+    private static final java.util.concurrent.atomic.AtomicInteger instanceCounter = new java.util.concurrent.atomic.AtomicInteger(0);
+    
+    private final int instanceId;
+    private final Consumer<byte[], byte[]> consumer;
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicBoolean ready = new AtomicBoolean(false);
+    private Thread consumerThread;
+
+    /**
+     * Creates a new instance of {{ project_name | pascal }}KafkaConsumer.
+     * 
+     * @param consumer The Kafka consumer to use for consuming events
+     */
+    public {{ project_name | pascal }}KafkaConsumer(Consumer<byte[], byte[]> consumer) {
+        this.instanceId = instanceCounter.incrementAndGet();
+        this.consumer = consumer;
+        logger.info("Created {{ project_name | pascal }}KafkaConsumer instance #{}", instanceId);
+    }
+
+    {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+    {%- set messagegroupname = messagegroupid | pascal | strip_namespace %}
+    {%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+    {%- set consumer_class = messagegroupname ~ 'EventConsumer' %}
+
+    /**
+     * Create a Kafka consumer for {{ messagegroupid }} with custom properties.
+     * 
+     * @param eventConsumer The event consumer that handles incoming messages
+     * @param bootstrapServers List of Kafka bootstrap server URIs
+     * @param groupId Consumer group ID
+     * @param topics List of topics to subscribe to
+     * @param customProps Custom properties to override defaults (e.g., auto.offset.reset)
+     * @return A configured consumer instance
+     */
+    public static {{ project_name | pascal }}KafkaConsumer createFor{{ messagegroupname }}(
+            {{ group_package }}.{{ consumer_class }} eventConsumer,
+            List<URI> bootstrapServers,
+            String groupId,
+            List<String> topics,
+            Properties customProps) {
+        
+        Properties props = new Properties();
+        
+        // Build bootstrap servers string
+        StringBuilder bootstrapServersStr = new StringBuilder();
+        for (int i = 0; i < bootstrapServers.size(); i++) {
+            URI uri = bootstrapServers.get(i);
+            String host = uri.getHost() != null ? uri.getHost() : "localhost";
+            int port = uri.getPort() > 0 ? uri.getPort() : 9092;
+            
+            if (i > 0) {
+                bootstrapServersStr.append(",");
+            }
+            bootstrapServersStr.append(host).append(":").append(port);
+        }
+        
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServersStr.toString());
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
+        
+        // Apply custom properties (overrides defaults)
+        if (customProps != null) {
+            props.putAll(customProps);
+        }
+        
+        org.apache.kafka.clients.consumer.KafkaConsumer<byte[], byte[]> consumer = new org.apache.kafka.clients.consumer.KafkaConsumer<>(props);
+        consumer.subscribe(topics);
+        
+        {{ project_name | pascal }}KafkaConsumer kafkaConsumer = new {{ project_name | pascal }}KafkaConsumer(consumer);
+        kafkaConsumer.setEventConsumer(eventConsumer);
+        
+        logger.info("Created Kafka consumer for group {} subscribed to topics {}", groupId, topics);
+        return kafkaConsumer;
+    }
+    
+    /**
+     * Create a Kafka consumer for {{ messagegroupid }}.
+     * Uses default properties with auto.offset.reset=earliest.
+     * 
+     * @param eventConsumer The event consumer that handles incoming messages
+     * @param bootstrapServers List of Kafka bootstrap server URIs
+     * @param groupId Consumer group ID
+     * @param topics List of topics to subscribe to
+     * @return A configured consumer instance
+     */
+    public static {{ project_name | pascal }}KafkaConsumer createFor{{ messagegroupname }}(
+            {{ group_package }}.{{ consumer_class }} eventConsumer,
+            List<URI> bootstrapServers,
+            String groupId,
+            List<String> topics) {
+        return createFor{{ messagegroupname }}(eventConsumer, bootstrapServers, groupId, topics, null);
+    }
+    {%- endfor %}
+
+    private Object eventConsumer;
+    
+    private void setEventConsumer(Object eventConsumer) {
+        this.eventConsumer = eventConsumer;
+    }
+
+    /**
+     * Start consuming messages from Kafka.
+     * This method returns immediately; processing happens in a background thread.
+     */
+    public void start() {
+        if (running.compareAndSet(false, true)) {
+            logger.info("[Instance #{}] Starting Kafka consumer", instanceId);
+            consumerThread = new Thread(() -> {
+                try {
+                    while (running.get()) {
+                        ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(100));
+                        
+                        // Mark as ready once we have partition assignments
+                        if (!ready.get() && !consumer.assignment().isEmpty()) {
+                            ready.set(true);
+                            logger.info("[Instance #{}] Consumer ready with {} assigned partitions", instanceId, consumer.assignment().size());
+                        }
+                        
+                        if (!records.isEmpty()) {
+                            {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+                            {%- set messagegroupname = messagegroupid | pascal | strip_namespace %}
+                            {%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+                            {%- set consumer_class = messagegroupname ~ 'EventConsumer' %}
+                            if (eventConsumer instanceof {{ group_package }}.{{ consumer_class }}) {
+                                (({{ group_package }}.{{ consumer_class }}) eventConsumer).processRecords(records);
+                            }
+                            {%- endfor %}
+                        }
+                    }
+                } catch (Exception e) {
+                    if (running.get()) {
+                        logger.error("Error in consumer loop", e);
+                    }
+                } finally {
+                    logger.info("Consumer loop stopped");
+                }
+            });
+            consumerThread.setName("kafka-consumer-thread");
+            consumerThread.setDaemon(false);
+            consumerThread.start();
+        }
+    }
+
+    /**
+     * Check if consumer is ready (has partition assignments).
+     * Used by tests to verify consumer is initialized before sending messages.
+     * Thread-safe method that doesn't directly access the KafkaConsumer.
+     * 
+     * @return true if consumer has at least one assigned partition
+     */
+    public boolean isReady() {
+        return ready.get();
+    }
+
+    /**
+     * Stop consuming messages and release resources.
+     */
+    @Override
+    public void close() {
+        logger.info("[Instance #{}] Stopping Kafka consumer", instanceId);
+        running.set(false);
+        ready.set(false); // Reset ready flag
+        
+        if (consumerThread != null) {
+            try {
+                consumerThread.join(10000); // Increased timeout to 10 seconds
+                if (consumerThread.isAlive()) {
+                    logger.warn("Consumer thread did not terminate within 10 seconds");
+                } else {
+                    logger.info("Consumer thread terminated successfully");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warn("Interrupted while waiting for consumer thread to stop");
+            }
+        }
+        
+        if (consumer != null) {
+            try {
+                consumer.close(Duration.ofSeconds(5));
+                logger.info("Kafka consumer closed successfully");
+            } catch (Exception e) {
+                logger.error("Error closing Kafka consumer", e);
+            }
+        }
+    }
+}

@@ -1,0 +1,140 @@
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{{ util.CommonFileHeader() }}
+
+package {{ project_name | lower | replace('-', '_') }};
+
+import org.apache.qpid.protonj2.client.Client;
+import org.apache.qpid.protonj2.client.Connection;
+import org.apache.qpid.protonj2.client.ConnectionOptions;
+import org.apache.qpid.protonj2.client.Message;
+import org.apache.qpid.protonj2.client.Sender;
+import org.apache.qpid.protonj2.client.Tracker;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
+import java.net.URI;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+
+/**
+ * AMQP 1.0 producer using Apache Qpid ProtonJ2
+ */
+class AmqpProducer {
+    private static final Logger logger = LogManager.getLogger(AmqpProducer.class);
+    private final Client client;
+    private final EndpointCredential credential;
+    private final List<URI> endpoints;
+    private final String node;
+    private final Map<URI, ConnectionInfo> connectionCache = new HashMap<>();
+    
+    private static class ConnectionInfo {
+        final Connection connection;
+        final Sender sender;
+        
+        ConnectionInfo(Connection connection, Sender sender) {
+            this.connection = connection;
+            this.sender = sender;
+        }
+    }
+    
+    public AmqpProducer(EndpointCredential credential, Map<String, String> options, List<URI> endpoints) {
+        this.client = Client.create();
+        this.credential = credential;
+        this.endpoints = endpoints;
+        this.node = options.getOrDefault("node", null);
+    }
+    
+    /**
+     * Send a ProtonJ2 message to all configured endpoints
+     */
+    public void send(org.apache.qpid.protonj2.client.Message<?> message) throws Exception {
+        Exception lastException = null;
+        
+        Iterator<URI> iterator = endpoints.iterator();
+        while (iterator.hasNext()) {
+            URI endpoint = iterator.next();
+            try {
+                ConnectionInfo connInfo = getOrCreateConnection(endpoint);
+                Tracker tracker = connInfo.sender.send(message);
+                tracker.awaitSettlement();
+            } catch (Exception ex) {
+                logger.error("Error sending message to endpoint " + endpoint + ": " + ex.getMessage(), ex);
+                iterator.remove();
+                ConnectionInfo removed = connectionCache.remove(endpoint);
+                if (removed != null) {
+                    try {
+                        removed.sender.close();
+                        removed.connection.close();
+                    } catch (Exception closeEx) {
+                        logger.debug("Error closing connection: " + closeEx.getMessage());
+                    }
+                }
+                lastException = ex;
+            }
+        }
+        
+        if (lastException != null) {
+            throw lastException;
+        }
+    }
+    
+    /**
+     * Gets or creates a connection to the specified endpoint
+     */
+    private ConnectionInfo getOrCreateConnection(URI endpoint) throws Exception {
+        ConnectionInfo cached = connectionCache.get(endpoint);
+        if (cached != null) {
+            return cached;
+        }
+        
+        try {
+            String host = endpoint.getHost();
+            int port = endpoint.getPort() == -1 ? 
+                (endpoint.getScheme().equalsIgnoreCase("amqps") ? 5671 : 5672) : 
+                endpoint.getPort();
+            String path = node != null ? node : endpoint.getPath();
+            if (path != null && path.startsWith("/")) {
+                path = path.substring(1);
+            }
+            
+            ConnectionOptions options = new ConnectionOptions();
+            
+            // Configure authentication
+            if (credential instanceof PlainEndpointCredential) {
+                PlainEndpointCredential plain = (PlainEndpointCredential) credential;
+                options.user(plain.getUsername());
+                options.password(plain.getPassword());
+            }
+            
+            Connection connection = client.connect(host, port, options);
+            Sender sender = connection.openSender(path);
+            
+            ConnectionInfo connInfo = new ConnectionInfo(connection, sender);
+            connectionCache.put(endpoint, connInfo);
+            return connInfo;
+        } catch (Exception ex) {
+            logger.error("Failed to establish connection to " + endpoint + ": " + ex.getMessage(), ex);
+            throw ex;
+        }
+    }
+    
+    /**
+     * Close all connections
+     */
+    public void close() throws Exception {
+        for (ConnectionInfo connInfo : connectionCache.values()) {
+            try {
+                connInfo.sender.close();
+                connInfo.connection.close();
+            } catch (Exception ex) {
+                logger.debug("Error closing connection: " + ex.getMessage());
+            }
+        }
+        connectionCache.clear();
+        client.close();
+    }
+}

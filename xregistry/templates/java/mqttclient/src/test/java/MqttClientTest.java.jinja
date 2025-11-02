@@ -1,0 +1,138 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "mqtt.jinja.include" as mqtt -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+package {{ package_name }};
+
+import org.junit.jupiter.api.*;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+import org.eclipse.paho.client.mqttv3.*;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Integration tests for MQTT client using Testcontainers with Eclipse Mosquitto
+ */
+@Testcontainers
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class MqttClientTest {
+    private static final Logger logger = LogManager.getLogger(MqttClientTest.class);
+    
+    @Container
+    private static final GenericContainer<?> mosquittoContainer = new GenericContainer<>(DockerImageName.parse("eclipse-mosquitto:2.0"))
+        .withExposedPorts(1883)
+        .withCommand("mosquitto", "-c", "/mosquitto-no-auth.conf")
+        .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)));
+    
+    private String brokerUrl;
+    
+    @BeforeAll
+    public void setUp() {
+        String host = mosquittoContainer.getHost();
+        Integer port = mosquittoContainer.getMappedPort(1883);
+        brokerUrl = String.format("tcp://%s:%d", host, port);
+        logger.info("Mosquitto broker started at {}", brokerUrl);
+    }
+    
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroupid | pascal %}
+    {%- set producer_class = (pascal_group_name | strip_namespace) + "Producer" %}
+    {%- set consumer_class = (pascal_group_name | strip_namespace) + "Consumer" %}
+    {%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+    
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    {%- set topic = mqtt.get_topic(message) or messageid %}
+    
+    @Test
+    @DisplayName("Test {{ messagename }} message publish and consume")
+    public void test{{ messagename }}Message() throws Exception {
+        logger.info("Starting test{{ messagename }}Message");
+        
+        final CountDownLatch latch = new CountDownLatch(1);
+        final List<{{ message_body_type }}> receivedMessages = new ArrayList<>();
+        
+        // Create consumer with test handler
+        {{ group_package }}.{{ consumer_class }} messageConsumer = new {{ group_package }}.{{ consumer_class }}() {
+            @Override
+            protected void on{{ messagename }}({{ message_body_type }} data, String topic) {
+                logger.info("Received {{ messagename }} message from topic {}", topic);
+                receivedMessages.add(data);
+                latch.countDown();
+            }
+            
+            {%- for other_messageid, other_message in messagegroup.messages.items() %}
+            {%- if other_messageid != messageid %}
+            {%- set other_messagename = other_messageid | pascal | strip_namespace %}
+            {%- set other_message_body_type = util.get_data_type(data_project_name, root, other_message) %}
+            @Override
+            protected void on{{ other_messagename }}({{ other_message_body_type }} data, String topic) {
+                logger.info("Received {{ other_messagename }} message (not expected in this test)");
+            }
+            {%- endif %}
+            {%- endfor %}
+        };
+        
+        // Create and start consumer
+        MqttEventClient consumer = MqttEventClient.createConsumerFor{{ pascal_group_name | strip_namespace }}(
+            messageConsumer,
+            brokerUrl,
+            "test-consumer-" + UUID.randomUUID(),
+            new String[]{"{{ topic }}"}
+        );
+        
+        try {
+            // Give consumer time to subscribe
+            Thread.sleep(1000);
+            
+            // Create producer and send message
+            {{ group_package }}.{{ producer_class }} producer = MqttEventClient.createProducerFor{{ pascal_group_name | strip_namespace }}(
+                brokerUrl,
+                "test-producer-" + UUID.randomUUID()
+            );
+            
+            try {
+                // Create test data
+                {{ message_body_type }} testData = new {{ message_body_type }}();
+                // TODO: Initialize testData fields with test values
+                
+                // Send message
+                producer.send{{ messagename }}(testData);
+                logger.info("Test message sent to topic {{ topic }}");
+                
+                // Wait for message to be consumed
+                boolean messageReceived = latch.await(10, TimeUnit.SECONDS);
+                
+                assertTrue(messageReceived, "{{ messagename }} message should be received within 10 seconds");
+                assertEquals(1, receivedMessages.size(), "Should receive exactly one message");
+                assertNotNull(receivedMessages.get(0), "Received message should not be null");
+                
+                logger.info("{{ messagename }} message test completed successfully");
+                
+            } finally {
+                producer.close();
+            }
+        } finally {
+            consumer.close();
+        }
+    }
+    
+    {% endfor %}
+    {% endfor %}
+}

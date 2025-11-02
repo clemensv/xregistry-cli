@@ -8,26 +8,24 @@
           "description": "Event for when the vacuum starts a cleaning session",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.RoboVac.StartedCleaning",
-                "description": "Event raised when the vacuum begins cleaning"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "identifier of the cleaning session"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.RoboVac.StartedCleaning",
+              "description": "Event raised when the vacuum begins cleaning"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "identifier of the cleaning session"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -37,26 +35,24 @@
           "description": "Event for when the vacuum stops a cleaning session",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.RoboVac.StoppedCleaning",
-                "description": "Event raised when the vacuum stops cleaning"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "identifier of the cleaning session"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.RoboVac.StoppedCleaning",
+              "description": "Event raised when the vacuum stops cleaning"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "identifier of the cleaning session"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -66,26 +62,24 @@
           "description": "Event for when the vacuum returns to its docking station",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.RoboVac.Docked",
-                "description": "Event raised when the vacuum docks for charging or storage"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "identifier of the cleaning session"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.RoboVac.Docked",
+              "description": "Event raised when the vacuum docks for charging or storage"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "identifier of the cleaning session"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -95,26 +89,24 @@
           "description": "Event for when an error occurs during the vacuum's operation",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.RoboVac.ErrorOccurred",
-                "description": "Event raised when an error is detected in the vacuum's operation"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "identifier of the cleaning session"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.RoboVac.ErrorOccurred",
+              "description": "Event raised when an error is detected in the vacuum's operation"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "identifier of the cleaning session"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
@@ -124,26 +116,24 @@
           "description": "Event for when the vacuum reports its current condition",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "required": true
-              },
-              "type": {
-                "value": "Fabrikam.RoboVac.Condition",
-                "description": "Event raised when the vacuum reports its current condition"
-              },
-              "source": {
-                "type": "uritemplate",
-                "description": "source of the event",
-                "value": "{tenantid}/{deviceid}"
-              },
-              "subject": {
-                "type": "string",
-                "description": "identifier of the cleaning session"
-              },
-              "time": {
-                "required": true
-              }
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.RoboVac.Condition",
+              "description": "Event raised when the vacuum reports its current condition"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "identifier of the cleaning session"
+            },
+            "time": {
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.1",
