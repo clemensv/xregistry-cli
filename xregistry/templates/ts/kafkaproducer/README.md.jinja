@@ -1,0 +1,49 @@
+# {{ project_name }} Kafka Producer
+
+This project contains a TypeScript Kafka producer generated from an xRegistry definition.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+## Usage
+
+```typescript
+import { Kafka } from 'kafkajs';
+import { {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "Producer" %}{{ class_name }}{% if not loop.last %}, {% endif %}{% endfor %} } from './src';
+
+const kafka = new Kafka({
+    clientId: 'my-app',
+    brokers: ['localhost:9092']
+});
+
+{% set ns = namespace(done=false) %}
+{% for messagegroupid, messagegroup in root.messagegroups.items() if not ns.done -%}
+{%- set class_name = (messagegroupid | pascal | strip_namespace) + "Producer" %}
+const producer = await {{ class_name }}.createFor{{ messagegroupid | pascal | strip_namespace }}(kafka);
+
+// Send messages
+{% set message_list = messagegroup.messages.items() | list %}
+{% for messageid, message in message_list[:3] -%}
+{%- set messagename = messageid | strip_namespace | pascal -%}
+await producer.send{{ messagename }}({ test: 'data' });
+{% endfor %}
+
+await producer.disconnect();
+{% set ns.done = true %}
+{% endfor %}
+```

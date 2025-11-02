@@ -1,0 +1,9 @@
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['**/test/**/*.test.ts'],
+  collectCoverageFrom: ['src/**/*.ts'],
+  coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
+  testTimeout: 60000,
+  maxWorkers: 1  // Run tests sequentially to avoid overwhelming Kafka
+};

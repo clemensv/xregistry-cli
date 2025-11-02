@@ -1,0 +1,6 @@
+{
+    "description" : "TypeScript Azure Event Hubs consumer",
+    "priority" : 1,
+    "main_project_name" : "{project_name}EventHubsConsumer",
+    "data_project_name" : "{project_name}Data"
+}

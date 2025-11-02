@@ -1,0 +1,56 @@
+# {{ project_name }} Azure Event Hubs Consumer
+
+This project contains a TypeScript Azure Event Hubs consumer generated from an xRegistry definition.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+## Usage
+
+```typescript
+import { EventHubConsumerClient } from '@azure/event-hubs';
+import { EventHubsProcessor, {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "EventDispatcher" %}{{ class_name }}{% if not loop.last %}, {% endif %}{% endfor %} } from './src';
+
+const client = new EventHubConsumerClient(
+    '$Default', // consumer group
+    'connection-string',
+    'event-hub-name'
+);
+
+const dispatcher = new {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "EventDispatcher" %}{{ class_name }}{% if loop.first %}{% endif %}{% endfor %}();
+const processor = new EventHubsProcessor(client);
+
+// Register handlers
+{% set ns = namespace(done=false) %}
+{% for messagegroupid, messagegroup in root.messagegroups.items() if not ns.done -%}
+{% set message_list = messagegroup.messages.items() | list %}
+{% for messageid, message in message_list[:3] -%}
+{%- set messagename = messageid | strip_namespace | pascal -%}
+dispatcher.{{ messagename }}Handler = async (eventData, data) => {
+    console.log('Received {{ messagename }}:', data);
+};
+{% endfor %}
+{% set ns.done = true %}
+{% endfor %}
+
+processor.processEvent = async (eventData) => {
+    await dispatcher.processEvent(eventData);
+};
+
+await processor.start();
+```

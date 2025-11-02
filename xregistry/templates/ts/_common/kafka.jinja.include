@@ -1,0 +1,18 @@
+{# Kafka macros for TypeScript #}
+
+{%- macro KafkaHeaders() -%}
+import { Kafka, Producer, Consumer } from 'kafkajs';
+{%- endmacro -%}
+
+{%- macro CloudEventsUsings() -%}
+import { CloudEvent } from 'cloudevents';
+{%- endmacro -%}
+
+{%- macro CloudEventsMethods() -%}
+// CloudEvents support methods would go here if needed
+{%- endmacro -%}
+
+{#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
+{%- macro DeclareUriTemplateArguments(message) -%}
+{# For now, return empty - can be expanded later if needed #}
+{%- endmacro %}

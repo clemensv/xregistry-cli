@@ -1,0 +1,169 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "kafka.jinja.include" as kafka -%}
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set messagegroups = root.messagegroups %}
+{%- set package_name = project_name | lower | replace('-', '_') %}
+
+package {{ package_name }};
+
+import org.junit.jupiter.api.*;
+import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
+import java.net.URI;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Integration tests for Kafka consumer using Testcontainers
+ */
+@Testcontainers
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class ConsumerTest {
+    private static final Logger logger = LogManager.getLogger(ConsumerTest.class);
+    
+    @Container
+    private static final KafkaContainer kafkaContainer = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"))
+        .withEmbeddedZookeeper();
+    
+    private List<URI> bootstrapServers;
+    private static final String SHARED_TOPIC = "test-topic";  // Shared topic for all tests
+    
+    @BeforeAll
+    public void setUp() throws Exception {
+        String bootstrapServer = kafkaContainer.getBootstrapServers();
+        bootstrapServers = List.of(URI.create("kafka://" + bootstrapServer.replace("PLAINTEXT://", "")));
+        logger.info("Kafka container started at: {}", bootstrapServers.get(0));
+        
+        // Create shared topic once
+        createTopic(SHARED_TOPIC, bootstrapServer);
+        logger.info("Created shared topic: {}", SHARED_TOPIC);
+    }
+    
+    private void createTopic(String topicName, String bootstrapServers) throws Exception {
+        Properties adminProps = new Properties();
+        adminProps.put(org.apache.kafka.clients.admin.AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        
+        try (org.apache.kafka.clients.admin.AdminClient adminClient = org.apache.kafka.clients.admin.AdminClient.create(adminProps)) {
+            org.apache.kafka.clients.admin.NewTopic newTopic = new org.apache.kafka.clients.admin.NewTopic(topicName, 1, (short) 1);
+            adminClient.createTopics(Collections.singleton(newTopic)).all().get();
+        }
+    }
+    
+    private KafkaProducer<byte[], byte[]> createProducer() {
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaContainer.getBootstrapServers());
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        
+        return new KafkaProducer<>(props);
+    }
+    
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set pascal_group_name = messagegroupid | pascal %}
+    {%- set consumer_class = (pascal_group_name | strip_namespace) + "EventConsumer" %}
+    {%- set group_package = (package_name ~ "." ~ messagegroupid) | lower | replace('-', '_') %}
+    
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    {%- set topic = kafka.get_topic(message) or messageid %}
+    
+    @Test
+    @DisplayName("Test {{ messagename }} message consumption")
+    public void test{{ messagename }}MessageConsumption() throws Exception {
+        logger.info("Starting test{{ messagename }}MessageConsumption");
+        
+        // Create test data first
+            {%- if message_body_type == "byte[]" %}
+            {{ message_body_type }} testData = "Test message data".getBytes();
+            {%- else %}
+            {{ message_body_type }} testData = new {{ message_body_type }}();
+            {%- endif %}
+            {%- set schemaObj = schema_object(root, message.get('dataschemauri') or message.get('dataschema')) %}
+            {%- if schemaObj %}
+                {#- Get the actual schema from the versions structure -#}
+                {%- if schemaObj.versions %}
+                    {%- set version_key = schemaObj.defaultversionid if schemaObj.defaultversionid else (schemaObj.versions.keys() | list | last) %}
+                    {%- set avroSchema = schemaObj.versions[version_key].schema %}
+                {%- elif schemaObj.schema %}
+                    {%- set avroSchema = schemaObj.schema %}
+                {%- else %}
+                    {%- set avroSchema = schemaObj %}
+                {%- endif %}
+                {#- Now process the Avro schema fields -#}
+                {%- if avroSchema and avroSchema.type == "record" and avroSchema.fields %}
+                    {%- for field in avroSchema.fields %}
+                        {%- set fieldtype = field.type if field.type is string else field.type.type if field.type is mapping and field.type.type is defined else "unknown" %}
+                        {%- if fieldtype == "string" %}
+            testData.set{{ field.name | pascal }}("test-{{ field.name }}");
+                        {%- elif fieldtype == "int" or fieldtype == "integer" %}
+            testData.set{{ field.name | pascal }}(42);
+                        {%- elif fieldtype == "long" %}
+            testData.set{{ field.name | pascal }}(42L);
+                        {%- elif fieldtype == "boolean" %}
+            testData.set{{ field.name | pascal }}(true);
+                        {%- elif fieldtype == "double" %}
+            testData.set{{ field.name | pascal }}(42.0);
+                        {%- elif fieldtype == "float" %}
+            testData.set{{ field.name | pascal }}(42.0f);
+                        {%- elif fieldtype == "enum" %}
+                            {%- set enum_namespace = field.type.namespace if field.type.namespace else avroSchema.namespace %}
+                            {%- set normalized_namespace = (data_project_name | lower | replace('-', '_')) + '.' + (enum_namespace | lower | replace('.', '.') if enum_namespace else '') %}
+            testData.set{{ field.name | pascal }}({{ normalized_namespace }}.{{ field.type.name }}.{{ field.type.symbols[0] | upper }});
+                        {%- endif %}
+                    {%- endfor %}
+                {%- endif %}
+            {%- endif %}
+            
+            {%- if message_body_type == "byte[]" %}
+            byte[] messageBytes = testData;
+            {%- else %}
+            byte[] messageBytes = testData.toByteArray("application/json");
+            {%- endif %}
+            
+            KafkaProducer<byte[], byte[]> producer = createProducer();
+            try {
+                ProducerRecord<byte[], byte[]> record = new ProducerRecord<>(testTopic, messageBytes);
+                producer.send(record).get();
+                producer.flush();
+                logger.info("Test message sent to topic {}", testTopic);
+            } finally {
+                producer.close();
+            }
+            
+            // Wait for message to be consumed (extended timeout for Testcontainers and Kafka setup)
+            boolean messageReceived = latch.await(120, TimeUnit.SECONDS);
+            
+            assertTrue(messageReceived, "{{ messagename }} message should be received within 120 seconds");
+            assertEquals(1, receivedMessages.size(), "Should receive exactly one message");
+            assertNotNull(receivedMessages.get(0), "Received message should not be null");
+            
+            logger.info("{{ messagename }} message consumption test completed successfully");
+            
+        } finally {
+            consumer.close();
+            // Small delay to ensure full cleanup before next test starts
+            Thread.sleep(1000);
+        }
+    }
+    
+    {% endfor %}
+    {% endfor %}
+}

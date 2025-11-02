@@ -1,0 +1,5 @@
+{
+    "template_description": "MQTT Client",
+    "template_kind": "client",
+    "main_project_name": "{project_name}MqttClient"
+}

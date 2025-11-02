@@ -1,0 +1,5 @@
+{
+    "template_description": "Azure Service Bus Consumer",
+    "template_kind": "consumer",
+    "main_project_name": "{project_name}ServiceBusConsumer"
+}

@@ -1,4 +1,17 @@
 {#- CloudEvents macros -#}
+
+{%- macro isCloudEvent(message) %}
+{%- if message.envelope and message.envelope.lower().startswith("cloudevents") -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
+{%- macro usesCloudEvents(root) %}
+{%- if (root.messagegroups | exists("envelope","CloudEvents/1.0")) -%}
+true
+{%- endif -%}
+{%- endmacro %}
+
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
   {%- for attrname in message.envelopemetadata -%}

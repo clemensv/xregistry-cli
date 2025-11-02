@@ -1,0 +1,58 @@
+# {{ project_name }} MQTT Client
+
+This project contains a TypeScript MQTT client generated from an xRegistry definition.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+## Usage
+
+```typescript
+import { {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "MqttClient" %}{{ class_name }}{% if not loop.last %}, {% endif %}{% endfor %} } from './src';
+
+const client = new {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "MqttClient" %}{{ class_name }}{% if loop.first %}{% endif %}{% endfor %}('mqtt://localhost:1883');
+
+// Register handlers
+{% set ns = namespace(done=false) %}
+{% for messagegroupid, messagegroup in root.messagegroups.items() if not ns.done -%}
+{% set message_list = messagegroup.messages.items() | list %}
+{% for messageid, message in message_list[:3] -%}
+{%- set messagename = messageid | strip_namespace | pascal -%}
+client.{{ messagename }}Handler = async (data) => {
+    console.log('Received {{ messagename }}:', data);
+};
+{% endfor %}
+{% set ns.done = true %}
+{% endfor %}
+
+// Subscribe to topics
+await client.subscribe();
+
+// Publish a message
+{% set ns = namespace(done=false) %}
+{% for messagegroupid, messagegroup in root.messagegroups.items() if not ns.done -%}
+{% set message_list = messagegroup.messages.items() | list %}
+{% for messageid, message in message_list[:1] -%}
+{%- set messagename = messageid | strip_namespace | pascal -%}
+await client.publish{{ messagename }}({
+    // your data here
+});
+{% endfor %}
+{% set ns.done = true %}
+{% endfor %}
+```
