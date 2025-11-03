@@ -42,8 +42,6 @@ export class AmqpConsumer {
      */
     async start(): Promise<void> {
         return new Promise((resolve, reject) => {
-            const container = rhea.create_container();
-            
             const connectionOptions: rhea.ConnectionOptions = {
                 host: this.host,
                 port: this.port,
@@ -55,9 +53,9 @@ export class AmqpConsumer {
                 connectionOptions.password = this.password;
             }
             
-            this.connection = container.connect(connectionOptions);
+            this.connection = (rhea as any).connect(connectionOptions);
             
-            this.connection.on('connection_open', () => {
+            this.connection!.on('connection_open', () => {
                 this.receiver = this.connection!.open_receiver({
                     source: { address: this.address },
                     autoaccept: false,
@@ -67,7 +65,7 @@ export class AmqpConsumer {
                 resolve();
             });
             
-            this.connection.on('connection_error', (context) => {
+            this.connection!.on('connection_error', (context) => {
                 const error = context.error || new Error('Connection error');
                 console.error('AMQP connection error:', error);
                 if (this.processError) {
@@ -76,7 +74,7 @@ export class AmqpConsumer {
                 reject(error);
             });
             
-            this.connection.on('message', async (context: rhea.EventContext) => {
+            this.connection!.on('message', async (context: rhea.EventContext) => {
                 const message = context.message;
                 if (!message || !context.delivery) {
                     return;

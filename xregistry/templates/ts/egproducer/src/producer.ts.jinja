@@ -22,7 +22,7 @@ import * as {{ data_project_name }} from '../../{{ data_project_name }}/dist/ind
  * Azure Event Grid producer for the `{{ messagegroupid }}` message group.
  */
 export class {{ class_name }} {
-    private client: EventGridPublisherClient;
+    private client: EventGridPublisherClient<"CloudEvent">;
     
     /**
      * Constructor using access key authentication
@@ -41,7 +41,7 @@ export class {{ class_name }} {
         if (accessKey) {
             this.client = new EventGridPublisherClient(
                 endpoint,
-                "EventGrid",
+                "CloudEvent",
                 new AzureKeyCredential(accessKey)
             );
         } else {
@@ -83,15 +83,16 @@ export class {{ class_name }} {
      * @param data The message data object
      */
     async send{{ messagename }}(data: {{ type_name }}): Promise<void> {
-        const cloudEvent: CloudEvent = new CloudEvent({
+        const cloudEvent: any = {
             type: '{{ messageid }}',
             source: '/producer',
             id: uuidv4(),
             data: data,
-            datacontenttype: 'application/json'
-        });
+            dataContentType: 'application/json',
+            specVersion: '1.0'
+        };
         
-        await this.client.send([cloudEvent.toJSON()]);
+        await this.client.send([cloudEvent]);
     }
     
     /**
@@ -99,15 +100,14 @@ export class {{ class_name }} {
      * @param dataArray Array of message data objects
      */
     async send{{ messagename }}Batch(dataArray: {{ type_name }}[]): Promise<void> {
-        const cloudEvents = dataArray.map(data => {
-            return new CloudEvent({
-                type: '{{ messageid }}',
-                source: '/producer',
-                id: uuidv4(),
-                data: data,
-                datacontenttype: 'application/json'
-            }).toJSON();
-        });
+        const cloudEvents: any[] = dataArray.map(data => ({
+            type: '{{ messageid }}',
+            source: '/producer',
+            id: uuidv4(),
+            data: data,
+            dataContentType: 'application/json',
+            specVersion: '1.0'
+        }));
         
         await this.client.send(cloudEvents);
     }

@@ -41,8 +41,6 @@ export class {{ class_name }} {
         username?: string,
         password?: string
     ) {
-        const container = rhea.create_container();
-        
         const connectionOptions: rhea.ConnectionOptions = {
             host: host,
             port: port
@@ -53,7 +51,7 @@ export class {{ class_name }} {
             connectionOptions.password = password;
         }
         
-        this.connection = container.connect(connectionOptions);
+        this.connection = (rhea as any).connect(connectionOptions);
         this.sender = this.connection.open_sender({ target: { address: address } });
     }
     

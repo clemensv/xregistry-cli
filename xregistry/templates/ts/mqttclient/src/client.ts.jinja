@@ -88,9 +88,12 @@ export class {{ class_name }} {
         {%- if uses_cloudevents_message %}
         // Try to parse as CloudEvent
         try {
-            const cloudEvent = HTTP.toEvent({ body: payload.toString(), headers: {} });
-            await this.dispatchCloudEvent(cloudEvent);
-            return;
+            const result = HTTP.toEvent({ body: payload.toString(), headers: {} });
+            const cloudEvent = Array.isArray(result) ? result[0] : result;
+            if (cloudEvent) {
+                await this.dispatchCloudEvent(cloudEvent);
+                return;
+            }
         } catch {
             // Not a CloudEvent, treat as plain message
         }
@@ -104,7 +107,7 @@ export class {{ class_name }} {
     /**
      * Dispatch a CloudEvent message
      */
-    private async dispatchCloudEvent(cloudEvent: CloudEvent): Promise<void> {
+    private async dispatchCloudEvent(cloudEvent: CloudEvent | any): Promise<void> {
         const cloudEventType = cloudEvent.type;
         
         switch (cloudEventType) {
@@ -114,8 +117,8 @@ export class {{ class_name }} {
             {%- set message_body_type = util.body_type(data_project_name, root, message) %}
             {%- if isCloudEvent %}
             case '{{ messageid }}':
-                if (this.{{ messagename }}Handler) {
-                    const data = cloudEvent.data as {{ message_body_type }};
+                if (this.{{ messagename }}Handler && cloudEvent.data) {
+                    const data = cloudEvent.data as unknown as {{ message_body_type }};
                     await this.{{ messagename }}Handler(cloudEvent, data);
                 }
                 break;
