@@ -60,7 +60,7 @@ class TemplateRenderer:
         self.suppress_code_output = suppress_code_output
         self.suppress_schema_output = suppress_schema_output
         self.templateinfo: Dict[str, Any] = {}
-        self.data_project_name = f"{project_name}_data"
+        self.data_project_name = f"{project_name}Data"
         self.data_project_dir = self.data_project_name
         self.main_project_name = project_name
         self.src_layout = False

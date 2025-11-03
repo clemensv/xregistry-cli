@@ -42,7 +42,7 @@
                 "value": "myvalue"
               }
             },
-            "application_properties": {
+            "application-properties": {
               "myProperty1": {
                 "type": "string"
               },

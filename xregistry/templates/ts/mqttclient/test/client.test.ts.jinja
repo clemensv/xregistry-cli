@@ -36,7 +36,7 @@ describe('{{ test_class_name }}', () => {
     {%- set message_list = messagegroup.messages.items() | list %}
     {%- for messageid, message in message_list[:3] %}
     {%- set messagename = messageid | strip_namespace | pascal %}
-    {%- set body_type = util.body_type(message) %}
+    {%- set body_type = util.body_type(data_project_name, root, message) %}
     
     test('should publish and receive {{ messagename }} message', async () => {
         const receivedMessages: {{ body_type }}[] = [];

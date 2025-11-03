@@ -8,6 +8,10 @@ import { DefaultAzureCredential } from '@azure/identity';
 import { CloudEvent } from 'cloudevents';
 import { v4 as uuidv4 } from 'uuid';
 
+// Import data types (need to compile data project first: cd ../{{ data_project_name }} && npm install && npm run build)
+// NOTE: In real usage, the data project should be a proper npm package dependency
+import * as {{ data_project_name }} from '../../{{ data_project_name }}/dist/index.js';
+
 {%- set messagegroups = root.messagegroups %}
 
 {% for messagegroupid, messagegroup in messagegroups.items() -%}
