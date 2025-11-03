@@ -3,7 +3,7 @@
 // Changes to this file may cause incorrect behavior and will be lost if the code is regenerated.
 
 import { EventHubConsumerClient, ReceivedEventData, SubscriptionEventHandlers } from '@azure/event-hubs';
-import { ContainerClient } from '@azure/storage-blobs';
+import { ContainerClient } from '@azure/storage-blob';
 
 /**
  * A wrapper for the Azure Event Hubs consumer that processes events
@@ -58,9 +58,7 @@ export class EventHubsProcessor {
             }
         };
         
-        this.subscription = this.client.subscribe(handlers, {
-            startPosition: { earliest: true }
-        });
+        this.subscription = this.client.subscribe(handlers);
     }
     
     /**
