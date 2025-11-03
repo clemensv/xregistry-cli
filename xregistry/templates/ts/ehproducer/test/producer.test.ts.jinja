@@ -65,8 +65,8 @@ describe('{{ test_class_name }}', () => {
         
         // Start Azurite for blob storage (needed for Event Hubs checkpointing)
         azuriteContainer = await new GenericContainer('mcr.microsoft.com/azure-storage/azurite:latest')
-            .withCommand(['--skipApiVersionCheck'])
-            .withExposedPorts(10000, 10001, 10002)
+            .withCommand(['azurite-blob', '--blobHost', '0.0.0.0', '--skipApiVersionCheck'])
+            .withExposedPorts(10000)
             .start();
         
         const azuriteHost = azuriteContainer.getHost();
