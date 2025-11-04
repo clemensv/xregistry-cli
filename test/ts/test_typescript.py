@@ -63,16 +63,16 @@ def run_typescript_test(xreg_file: str, output_dir: str, projectname: str, style
     # First, install and build the data project if it exists
     if os.path.exists(data_project_dir):
         print(f"\n=== Installing data project in {data_project_dir} ===")
-        subprocess.check_call(['npm', 'install'], cwd=data_project_dir, stdout=sys.stdout, stderr=sys.stderr, shell=True, text=True)
+        subprocess.check_call(['npm', 'install'], cwd=data_project_dir, stdout=sys.stdout, stderr=sys.stderr)
         
         print(f"\n=== Building data project in {data_project_dir} ===")
-        subprocess.check_call(['npm', 'run', 'build'], cwd=data_project_dir, stdout=sys.stdout, stderr=sys.stderr, shell=True, text=True)
+        subprocess.check_call(['npm', 'run', 'build'], cwd=data_project_dir, stdout=sys.stdout, stderr=sys.stderr)
     
     # Run npm install in main project
-    subprocess.check_call(['npm', 'install'], cwd=project_dir, stdout=sys.stdout, stderr=sys.stderr, shell=True, text=True)
+    subprocess.check_call(['npm', 'install'], cwd=project_dir, stdout=sys.stdout, stderr=sys.stderr)
     
     # Run npm test
-    subprocess.check_call(['npm', 'test'], cwd=project_dir, stdout=sys.stdout, stderr=sys.stderr, shell=True, text=True)
+    subprocess.check_call(['npm', 'test'], cwd=project_dir, stdout=sys.stdout, stderr=sys.stderr)
 
 
 def test_kafkaproducer_contoso_erp_ts():
