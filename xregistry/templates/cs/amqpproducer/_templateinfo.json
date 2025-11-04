@@ -1,6 +1,6 @@
 {
-    "description" : "C# CloudEvents SDK AMQP endpoint producer class",
-    "priority" : 1,
-    "main_project_name" : "{project_name|pascal}AmqpProducer",
-    "data_project_name" : "{project_name|pascal}Data"
+  "description": "C# AMQP 1.0 Producer",
+  "priority": 1,
+  "main_project_name": "{project_name|pascal}AmqpProducer",
+  "data_project_name": "{project_name|pascal}Data"
 }

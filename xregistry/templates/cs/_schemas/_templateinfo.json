@@ -1,4 +1,4 @@
 {
-    "description" : "C# class generators for schema languages",
-    "priority" : 1
+  "description": "C# Data Schemas",
+  "priority": 1
 }

@@ -1,4 +1,4 @@
 {
-    "description" : "Java Experimental CloudEvents SDK endpoint producer class",
-    "priority" : 1
+  "description": "Java Generic Producer",
+  "priority": 1
 }

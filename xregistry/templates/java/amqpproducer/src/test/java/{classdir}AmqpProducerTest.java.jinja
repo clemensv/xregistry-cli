@@ -153,7 +153,30 @@ public class {{ class_name | strip_namespace }} {
             {#- Now process the Avro schema fields -#}
             {%- if avroSchema and avroSchema.type == "record" and avroSchema.fields %}
                 {%- for field in avroSchema.fields %}
-                    {%- set fieldtype = field.type if field.type is string else field.type.type if field.type is mapping and field.type.type is defined else "unknown" %}
+                    {#- Determine the actual field type and whether it's from a union -#}
+                    {%- if field.type is iterable and field.type is not string and field.type is not mapping %}
+                        {#- Union type like ['null', 'string'] or ['null', {...}] -#}
+                        {%- set non_null_types = field.type | reject('equalto', 'null') | list %}
+                        {%- if non_null_types | length > 0 %}
+                            {%- set actual_type = non_null_types[0] %}
+                            {%- set fieldtype = actual_type if actual_type is string else actual_type['type'] if (actual_type is mapping and 'type' in actual_type) else "unknown" %}
+                            {%- set is_union = true %}
+                        {%- else %}
+                            {%- set fieldtype = "unknown" %}
+                            {%- set actual_type = none %}
+                            {%- set is_union = false %}
+                        {%- endif %}
+                    {%- else %}
+                        {#- Direct type like 'string' or {'type': 'enum', ...} -#}
+                        {%- set actual_type = field.type %}
+                        {%- if field.type is string %}
+                            {%- set fieldtype = field.type %}
+                        {%- elif field.type is mapping and 'type' in field.type %}
+                            {%- set fieldtype = field.type['type'] %}
+                        {%- else %}
+                            {%- set fieldtype = "unknown" %}
+                        {%- endif %}
+                    {%- endif %}
                     {%- if fieldtype == "string" %}
         testData.set{{ field.name | pascal }}("test-{{ field.name }}");
                     {%- elif fieldtype == "int" or fieldtype == "integer" %}
@@ -166,10 +189,38 @@ public class {{ class_name | strip_namespace }} {
         testData.set{{ field.name | pascal }}(42.0);
                     {%- elif fieldtype == "float" %}
         testData.set{{ field.name | pascal }}(42.0f);
+                    {%- elif fieldtype == "array" %}
+        testData.set{{ field.name | pascal }}(new java.util.ArrayList<>());
+                    {%- elif fieldtype == "record" %}
+                        {#- Handle nested record types -#}
+                        {%- set record_namespace = actual_type.namespace if actual_type.namespace else avroSchema.namespace %}
+                        {%- set normalized_namespace = (data_project_name | lower | replace('-', '_')) + '.' + (record_namespace | lower | replace('.', '.') if record_namespace else '') %}
+        {{ normalized_namespace }}.{{ actual_type.name }} {{ field.name }}Obj = new {{ normalized_namespace }}.{{ actual_type.name }}();
+                        {%- if actual_type.fields %}
+                            {%- for nested_field in actual_type.fields %}
+                                {%- set nested_fieldtype = nested_field.type if nested_field.type is string else nested_field.type.type if nested_field.type is mapping else "unknown" %}
+                                {%- if nested_fieldtype == "string" %}
+        {{ field.name }}Obj.set{{ nested_field.name | pascal }}("test");
+                                {%- elif nested_fieldtype == "int" or nested_fieldtype == "integer" %}
+        {{ field.name }}Obj.set{{ nested_field.name | pascal }}(1);
+                                {%- elif nested_fieldtype == "long" %}
+        {{ field.name }}Obj.set{{ nested_field.name | pascal }}(1L);
+                                {%- elif nested_fieldtype == "boolean" %}
+        {{ field.name }}Obj.set{{ nested_field.name | pascal }}(true);
+                                {%- elif nested_fieldtype == "double" %}
+        {{ field.name }}Obj.set{{ nested_field.name | pascal }}(1.0);
+                                {%- elif nested_fieldtype == "float" %}
+        {{ field.name }}Obj.set{{ nested_field.name | pascal }}(1.0f);
+                                {%- endif %}
+                            {%- endfor %}
+                        {%- endif %}
+        testData.set{{ field.name | pascal }}({{ field.name }}Obj);
                     {%- elif fieldtype == "enum" %}
-                        {%- set enum_namespace = field.type.namespace if field.type.namespace else avroSchema.namespace %}
+                        {%- set enum_namespace = actual_type.namespace if actual_type.namespace else avroSchema.namespace %}
                         {%- set normalized_namespace = (data_project_name | lower | replace('-', '_')) + '.' + (enum_namespace | lower | replace('.', '.') if enum_namespace else '') %}
-        testData.set{{ field.name | pascal }}({{ normalized_namespace }}.{{ field.type.name }}.{{ field.type.symbols[0] | upper }});
+        testData.set{{ field.name | pascal }}({{ normalized_namespace }}.{{ actual_type.name }}.{{ actual_type.symbols[0] | upper }});
+                    {%- else %}
+        // TODO: Unhandled field type '{{ fieldtype }}' for field '{{ field.name }}'
                     {%- endif %}
                 {%- endfor %}
             {%- endif %}

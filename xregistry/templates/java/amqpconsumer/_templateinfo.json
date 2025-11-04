@@ -2,6 +2,8 @@
   "template": "amqpconsumer",
   "language": "java",
   "protocol": "AMQP/1.0",
-  "description": "AMQP 1.0 consumer using Apache Qpid Proton-J",
-  "requires": ["messagegroups"]
+  "description": "Java AMQP 1.0 Consumer",
+  "requires": [
+    "messagegroups"
+  ]
 }

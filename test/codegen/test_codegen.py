@@ -50,7 +50,7 @@ def test_codegen_cs():
                             '--style', dir_name,
                             '--language', 'cs',
                             '--definitions', os.path.join(
-                                project_root, 'samples/message-definitions/contoso-erp.xreg.json'.replace('/', os.path.sep)),
+                                project_root, 'test/xreg/contoso-erp.xreg.json'.replace('/', os.path.sep)),
                             '--output', output_dir,
                             '--projectname', f'Test.{pascal(dir_name)}']
                 assert xregistry.cli() == 0

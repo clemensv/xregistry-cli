@@ -58,7 +58,13 @@ public class MqttClientTest {
     {%- for messageid, message in messagegroup.messages.items() %}
     {%- set messagename = messageid | pascal | strip_namespace %}
     {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
-    {%- set topic = mqtt.get_topic(message) or messageid %}
+    {%- if message.binding and message.binding.mqtt and message.binding.mqtt.topic %}
+    {%- set topic = message.binding.mqtt.topic %}
+    {%- elif message.metadata and message.metadata.attributes and message.metadata.attributes["topic-name"] %}
+    {%- set topic = message.metadata.attributes["topic-name"].value %}
+    {%- else %}
+    {%- set topic = messageid %}
+    {%- endif %}
     
     @Test
     @DisplayName("Test {{ messagename }} message publish and consume")
@@ -109,8 +115,12 @@ public class MqttClientTest {
             
             try {
                 // Create test data
+                {%- if message_body_type == 'byte[]' %}
+                byte[] testData = "test data".getBytes();
+                {%- else %}
                 {{ message_body_type }} testData = new {{ message_body_type }}();
                 // TODO: Initialize testData fields with test values
+                {%- endif %}
                 
                 // Send message
                 producer.send{{ messagename }}(testData);

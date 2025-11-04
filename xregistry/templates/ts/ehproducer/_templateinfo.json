@@ -1,5 +1,5 @@
 {
-    "template_description": "Azure Event Hubs Producer",
-    "template_kind": "producer",
-    "main_project_name": "{project_name}EventHubsProducer"
+  "description": "TypeScript Azure Event Hubs Producer",
+  "template_kind": "producer",
+  "main_project_name": "{project_name}EventHubsProducer"
 }

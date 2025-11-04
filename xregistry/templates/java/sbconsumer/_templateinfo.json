@@ -1,6 +1,9 @@
 {
   "template": "sbconsumer",
+  "description": "Java Azure Service Bus Consumer",
   "language": "java",
   "protocol": "AMQP",
-  "usage": ["consumer"]
+  "usage": [
+    "consumer"
+  ]
 }

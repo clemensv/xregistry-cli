@@ -1,6 +1,6 @@
 {
-    "description" : "TypeScript Apache Kafka consumer",
-    "priority" : 1,
-    "main_project_name" : "{project_name}KafkaConsumer",
-    "data_project_name" : "{project_name}Data"
+  "description": "TypeScript Apache Kafka Consumer",
+  "priority": 1,
+  "main_project_name": "{project_name}KafkaConsumer",
+  "data_project_name": "{project_name}Data"
 }

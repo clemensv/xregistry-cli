@@ -17,7 +17,9 @@ import org.apache.logging.log4j.Logger;
 
 {%- for messageid, message in messagegroup.messages.items() %}
 {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+{%- if '.' in message_body_type %}
 import {{ message_body_type.rsplit('.', 1)[0] }}.*;
+{%- endif %}
 {%- endfor %}
 
 {%- set consumer_class = (groupname | strip_namespace) ~ 'Consumer' %}
@@ -52,12 +54,22 @@ public abstract class {{ consumer_class }} {
         {%- for messageid, message in messagegroup.messages.items() %}
         {%- set messagename = messageid | pascal | strip_namespace %}
         {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
-        {%- set expected_topic = mqtt.get_topic(message) or messageid %}
+        {%- if message.binding and message.binding.mqtt and message.binding.mqtt.topic -%}
+        {%- set expected_topic = message.binding.mqtt.topic %}
+        {%- elif message.metadata and message.metadata.attributes and message.metadata.attributes["topic-name"] -%}
+        {%- set expected_topic = message.metadata.attributes["topic-name"].value %}
+        {%- else -%}
+        {%- set expected_topic = messageid %}
+        {%- endif %}
         
         // Try {{ messagename }} (topic: {{ expected_topic }})
         if (topic.equals("{{ expected_topic }}") || topic.endsWith("/{{ expected_topic }}")) {
             try {
+                {%- if message_body_type == 'byte[]' %}
+                byte[] data = payload;
+                {%- else %}
                 {{ message_body_type }} data = {{ message_body_type }}.fromData(payload, "application/json");
+                {%- endif %}
                 on{{ messagename }}(data, topic);
                 return;
             } catch (Exception ex) {

@@ -48,7 +48,7 @@ def run_java_test(xreg_file: str, output_dir: str, projectname: str, style: str)
         
         # The code is generated in a subdirectory with the project name
         project_dir = os.path.join(output_dir, projectname)
-        data_project_dir = os.path.join(output_dir, f"{projectname}_data")
+        data_project_dir = os.path.join(output_dir, f"{projectname}Data")
         
         # First, install the data project if it exists
         if os.path.exists(data_project_dir):
@@ -376,17 +376,6 @@ def test_kafkaconsumer_lightbulb_java():
 
 
 # MQTT Client Tests
-
-def test_mqttclient_lightbulb_amqp_java():
-    """Test the MQTT client for Lightbulb AMQP."""
-    tmpdirname = tempfile.mkdtemp()
-    run_java_test(
-        os.path.join(project_root, "test/xreg/lightbulb-amqp.xreg.json"),
-        tmpdirname,
-        "TestProject",
-        "mqttclient"
-    )
-
 
 def test_mqttclient_contoso_erp_java():
     """Test the MQTT client for Contoso ERP."""

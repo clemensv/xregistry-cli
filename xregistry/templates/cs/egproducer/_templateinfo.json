@@ -1,4 +1,4 @@
 {
-    "description" : "C# Azure Service Bus producer class",
-    "priority" : 1
+  "description": "C# Azure Event Grid Producer",
+  "priority": 1
 }

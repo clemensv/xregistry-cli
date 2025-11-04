@@ -1,6 +1,9 @@
 {
-    "template": "ehconsumer",
-    "language": "java",
-    "protocol": "AMQP",
-    "usage": ["consumer"]
+  "template": "ehconsumer",
+  "description": "Java Azure Event Hubs Consumer",
+  "language": "java",
+  "protocol": "AMQP",
+  "usage": [
+    "consumer"
+  ]
 }

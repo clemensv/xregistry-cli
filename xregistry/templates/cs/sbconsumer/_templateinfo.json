@@ -1,6 +1,6 @@
 {
-    "description" : "C# Azure Service Bus consumer",
-    "priority" : 1,
-    "main_project_name" : "{project_name|pascal}ServiceBusConsumer",
-    "data_project_name" : "{project_name|pascal}Data"
+  "description": "C# Azure Service Bus Consumer",
+  "priority": 1,
+  "main_project_name": "{project_name|pascal}ServiceBusConsumer",
+  "data_project_name": "{project_name|pascal}Data"
 }

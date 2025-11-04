@@ -1,4 +1,4 @@
 {
-    "description" : "Open API 3.0 Subscriber",
-    "priority" : 1
+  "description": "OpenAPI Subscriber Definition",
+  "priority": 1
 }

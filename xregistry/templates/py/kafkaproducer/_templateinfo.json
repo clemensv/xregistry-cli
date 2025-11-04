@@ -1,7 +1,7 @@
 {
-    "description" : "Python Event Hubs producer class",
-    "priority" : 1,
-    "main_project_name" : "{project_name|dotunderscore|lower}_kafka_producer",
-    "data_project_name" : "{project_name|dotunderscore|lower}_data",
-    "src_layout" : false
+  "description": "Python Apache Kafka Producer",
+  "priority": 1,
+  "main_project_name": "{project_name|dotunderscore|lower}_kafka_producer",
+  "data_project_name": "{project_name|dotunderscore|lower}_data",
+  "src_layout": false
 }

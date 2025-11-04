@@ -17,7 +17,7 @@ import org.apache.logging.log4j.Logger;
 
 {%- for messageid, message in messagegroup.messages.items() %}
 {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
-{%- if message_body_type != "byte[]" %}
+{%- if '.' in message_body_type %}
 import {{ message_body_type.rsplit('.', 1)[0] }}.*;
 {%- endif %}
 {%- endfor %}
@@ -38,7 +38,13 @@ public class {{ producer_class }} implements AutoCloseable {
     {%- for messageid, message in messagegroup.messages.items() %}
     {%- set messagename = messageid | pascal | strip_namespace %}
     {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
-    {%- set topic = mqtt.get_topic(message) or messageid %}
+    {%- if message.binding and message.binding.mqtt and message.binding.mqtt.topic %}
+    {%- set topic = message.binding.mqtt.topic %}
+    {%- elif message.metadata and message.metadata.attributes and message.metadata.attributes["topic-name"] %}
+    {%- set topic = message.metadata.attributes["topic-name"].value %}
+    {%- else %}
+    {%- set topic = messageid %}
+    {%- endif %}
 
     /**
      * Send {{ messagename }} message to MQTT topic.
@@ -46,8 +52,11 @@ public class {{ producer_class }} implements AutoCloseable {
      * @param data The message data to send
      * @param qos Quality of Service (0, 1, or 2)
      * @throws MqttException if publishing fails
+     {%- if message_body_type != "byte[]" %}
+     * @throws Exception if serialization fails
+     {%- endif %}
      */
-    public void send{{ messagename }}({{ message_body_type }} data, int qos) throws MqttException {
+    public void send{{ messagename }}({{ message_body_type }} data, int qos) throws {% if message_body_type != "byte[]" %}Exception{% else %}MqttException{% endif %} {
         {%- if message_body_type == "byte[]" %}
         byte[] payload = data;
         {%- else %}
@@ -62,7 +71,7 @@ public class {{ producer_class }} implements AutoCloseable {
     /**
      * Send {{ messagename }} message with QoS 1.
      */
-    public void send{{ messagename }}({{ message_body_type }} data) throws MqttException {
+    public void send{{ messagename }}({{ message_body_type }} data) throws {% if message_body_type != "byte[]" %}Exception{% else %}MqttException{% endif %} {
         send{{ messagename }}(data, 1);
     }
     {%- endfor %}

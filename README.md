@@ -1,10 +1,7 @@
-# xRegistry CLI
+# xRegistry Code Generation CLI
 
 [![Python Test](https://github.com/clemensv/xregistry-cli/actions/workflows/test.yml/badge.svg)](https://github.com/clemensv/xregistry-cli/actions/workflows/test.yml)
 [![Python Release](https://github.com/clemensv/xregistry-cli/actions/workflows/build.yml/badge.svg)](https://github.com/clemensv/xregistry-cli/actions/workflows/build.yml)
-
-> **NOTE**: However finished this project might look, this is currently just a prototype.
-> **Do not use any of its output for any serious purpose at the moment.**
 
 This project is a command line client for the xRegistry document format and API, with
 a focus on generating code artifacts from xRegistry definitions, especially message catalogs.
@@ -34,6 +31,11 @@ it is the case for schemas.
 
 The xRegistry API and document model is defined in the
 [xRegistry API specification](https://github.com/xregistry/spec).
+
+## License and Governance rules
+
+This project is part of the CNCF xRegistry project and subject to the
+governance rules laid out in the [project governance document](https://github.com/xregistry/spec/blob/main/docs/GOVERNANCE.md)
 
 ## xRegistry Message Catalogs
 
@@ -123,47 +125,72 @@ The tool supports the following languages and styles (as emitted by the `list` c
 
 ```
 --languages options:
-styles:
+styles: 
 ├── asaql: Azure Stream Analytics
-│   ├── dispatch: Azure Stream Analytics: Dispatch to outputs by CloudEvent type
-│   └── dispatchpayload: Azure Stream Analytics: Dispatch to outputs by CloudEvent type
+│   ├── dispatch: Azure Stream Analytics Query Dispatch
+│   └── dispatchpayload: Azure Stream Analytics Query Dispatch with Payload
 ├── py: Python 3.9+
-│   ├── ehconsumer: Python Event Hubs consumer class
-│   ├── ehproducer: Python Event Hubs producer class
-│   ├── kafkaconsumer: Python Apache Kafka consumer class
-│   ├── kafkaproducer: Python Event Hubs producer class
-│   └── producer: Python generic HTTP producer class
+│   ├── mqttclient:
+│   ├── ehconsumer: Python Azure Event Hubs Consumer
+│   ├── ehproducer: Python Azure Event Hubs Producer
+│   ├── kafkaconsumer: Python Apache Kafka Consumer
+│   ├── kafkaproducer: Python Apache Kafka Producer
+│   └── producer: Python Generic Producer
 ├── ts: JavaScript/TypeScript
-│   └── producerhttp: JavaScript/TypeScript HTTP Producer
-├── asyncapi: Async API 2.0
-│   └── producer: Async API 2.0 Producer/Publisher
+│   ├── amqpconsumer: TypeScript AMQP 1.0 Consumer
+│   ├── amqpproducer: TypeScript AMQP 1.0 Producer
+│   ├── egproducer: TypeScript Azure Event Grid Producer
+│   ├── ehproducer: TypeScript Azure Event Hubs Producer
+│   ├── mqttclient: TypeScript MQTT 5.0 Client
+│   ├── producerhttp: TypeScript HTTP Producer
+│   ├── sbconsumer: TypeScript Azure Service Bus Consumer
+│   ├── sbproducer: TypeScript Azure Service Bus Producer
+│   ├── dashboard: TypeScript Dashboard
+│   ├── ehconsumer: TypeScript Azure Event Hubs Consumer
+│   ├── kafkaconsumer: TypeScript Apache Kafka Consumer
+│   └── kafkaproducer: TypeScript Apache Kafka Producer
+├── asyncapi: Async API 3.0
+│   ├── consumer: AsyncAPI Consumer Definition
+│   └── producer: AsyncAPI Producer Definition
 ├── openapi: Open API 3.0
-│   ├── producer: Open API 3.0 Producer
-│   └── subscriber: Open API 3.0 Subscriber
+│   ├── producer: OpenAPI Producer Definition
+│   └── subscriber: OpenAPI Subscriber Definition
 ├── java: Java 21+
-│   ├── consumer: Java Experimental CloudEvents SDK endpoint consumer class
-│   └── producer: Java Experimental CloudEvents SDK endpoint producer class
+│   ├── amqpconsumer: Java AMQP 1.0 Consumer
+│   ├── amqpjmsproducer: Java AMQP JMS Producer
+│   ├── amqpproducer: Java AMQP 1.0 Producer
+│   ├── ehconsumer: Java Azure Event Hubs Consumer
+│   ├── ehproducer: Java Azure Event Hubs Producer
+│   ├── kafkaconsumer: Java Apache Kafka Consumer
+│   ├── kafkaproducer: Java Apache Kafka Producer
+│   ├── mqttclient: Java MQTT 5.0 Client
+│   ├── sbconsumer: Java Azure Service Bus Consumer
+│   ├── sbproducer: Java Azure Service Bus Producer
+│   ├── consumer: Java Generic Consumer
+│   ├── producer: Java Generic Producer
+│   ├── xconsumer: Java Generic Consumer (Extended)
+│   └── xproducer: Java Generic Producer (Extended)
 └── cs: C# / .NET 6.0+
-    ├── egazfn: C# Azure Function with Azure Event Grid trigger
-    ├── ehazfn: C# Azure Function with Azure Event Hubs trigger
-    ├── sbazfn: C# Azure Function with Azure Service Bus trigger
-    ├── amqpconsumer: C# CloudEvents SDK AMQP endpoint consumer class
-    ├── amqpproducer: C# CloudEvents SDK AMQP endpoint producer class
-    ├── egproducer: C# Azure Service Bus producer class
-    ├── ehconsumer: C# Azure Event Hubs consumer
-    ├── ehproducer: Azure Event Hubs producer class
-    ├── kafkaconsumer: C# Apache Kafka consumer
-    ├── kafkaproducer: Apache Kafka producer class
-    ├── mqttclient: C# MQTT Client
-    ├── sbconsumer: C# Azure Service Bus consumer
-    └── sbproducer: Azure Service Bus producer class
+    ├── egazfn: C# Azure Event Grid Azure Function
+    ├── ehazfn: C# Azure Event Hubs Azure Function
+    ├── sbazfn: C# Azure Service Bus Azure Function
+    ├── amqpconsumer: C# AMQP 1.0 Consumer
+    ├── amqpproducer: C# AMQP 1.0 Producer
+    ├── egproducer: C# Azure Event Grid Producer
+    ├── ehconsumer: C# Azure Event Hubs Consumer
+    ├── ehproducer: C# Azure Event Hubs Producer
+    ├── kafkaconsumer: C# Apache Kafka Consumer
+    ├── kafkaproducer: C# Apache Kafka Producer
+    ├── mqttclient: C# MQTT 5.0 Client
+    ├── sbconsumer: C# Azure Service Bus Consumer
+    └── sbproducer: C# Azure Service Bus Producer
 ```
 
-Especially noteworthy might be the support for both AsyncAPI and OpenAPI.
+There is a test suite that validates all templates.
 
 ##### OpenAPI
 
-The tool can generate AsyncAPI definitions for producer endpoints with:
+The tool can generate OpenAPI definitions for producer endpoints with:
 
 ```shell
 xregistry generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer
@@ -221,32 +248,13 @@ The `validate` command takes the following options:
 
 The `list` subcommand lists the available language/style template sets.
 
-## Testing
-
-### Dependency Resolution Testing
-
-The project includes comprehensive testing for the xRegistry loader's dependency resolution functionality:
-
-```bash
-# Run the comprehensive dependency resolution test suite
-python test_xregistry_dependencies.py
-```
-
-This test suite validates:
-- ✅ **Fragment Reference Resolution**: All internal JSON pointer references (`#/messagegroups/...`, `#/schemagroups/...`)
-- ✅ **Document Composition**: Complete document assembly with all dependencies resolved
-- ✅ **Real-World Validation**: Testing with actual xRegistry files from the `/test/xreg` directory
-- ✅ **Endpoint Dependencies**: Specific validation of endpoint dependencies and schema references
-
-**Test Results**: 100% dependency resolution success rate across all test files (26 total references).
-
 ## Community and Docs
 
 Learn more about the people and organizations who are creating a dynamic cloud
 native ecosystem by making our systems interoperable with CloudEvents.
 
-- Our [Governance](https://github.com/cloudevents/spec/docs/GOVERNANCE.md) documentation.
-- [Contributing](https://github.com/cloudevents/spec/docs/CONTRIBUTING.md) guidance.
+- Our [Governance](https://github.com/xregistry/spec/docs/GOVERNANCE.md) documentation.
+- [Contributing](https://github.com/xregistry/spec/docs/CONTRIBUTING.md) guidance.
 - [Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md)
 
 ### Communications

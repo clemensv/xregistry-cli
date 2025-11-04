@@ -1,5 +1,5 @@
 {
-    "template_description": "AMQP 1.0 Consumer",
-    "template_kind": "consumer",
-    "main_project_name": "{project_name}AmqpConsumer"
+  "description": "TypeScript AMQP 1.0 Consumer",
+  "template_kind": "consumer",
+  "main_project_name": "{project_name}AmqpConsumer"
 }

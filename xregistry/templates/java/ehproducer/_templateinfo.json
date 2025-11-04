@@ -1,6 +1,9 @@
 {
   "template": "ehproducer",
+  "description": "Java Azure Event Hubs Producer",
   "language": "java",
   "protocol": "AMQP",
-  "usage": ["producer"]
+  "usage": [
+    "producer"
+  ]
 }

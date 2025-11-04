@@ -1,8 +1,12 @@
 {
   "template": "kafkaconsumer",
-  "description": "Kafka Consumer using Apache Kafka Clients",
+  "description": "Java Apache Kafka Consumer",
   "language": "java",
   "protocol": "Kafka",
-  "usage": ["consumer"],
-  "requires": ["messagegroups"]
+  "usage": [
+    "consumer"
+  ],
+  "requires": [
+    "messagegroups"
+  ]
 }

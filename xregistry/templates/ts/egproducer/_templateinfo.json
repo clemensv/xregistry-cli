@@ -1,5 +1,5 @@
 {
-    "template_description": "Azure Event Grid Producer",
-    "template_kind": "producer",
-    "main_project_name": "{project_name}EventGridProducer"
+  "description": "TypeScript Azure Event Grid Producer",
+  "template_kind": "producer",
+  "main_project_name": "{project_name}EventGridProducer"
 }

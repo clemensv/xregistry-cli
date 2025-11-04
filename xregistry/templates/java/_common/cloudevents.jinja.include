@@ -39,10 +39,9 @@ import io.cloudevents.jackson.JsonFormat;
 {%- macro BuildCloudEvent(message, dataBytes) -%}
 {%- if message.envelopemetadata %}
 CloudEvent cloudEvent = CloudEventBuilder.v1()
-{%- for attrname, attribute in message.envelopemetadata.items() %}
-{%- if attrname == "id" %}
     .withId(java.util.UUID.randomUUID().toString())
-{%- elif attrname == "type" %}
+{%- for attrname, attribute in message.envelopemetadata.items() %}
+{%- if attrname == "type" %}
     .withType({% if 'value' in attribute %}"{{ attribute.value }}"{% else %}type{% endif %})
 {%- elif attrname == "source" %}
     .withSource(java.net.URI.create({% if 'value' in attribute %}{% set placeholders = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}{% if placeholders %}String.format("{{ attribute.value | regex_replace('\\{[A-Za-z0-9_]+\\}', '%s') }}", {% for placeholder in placeholders %}{{ placeholder }}{% if not loop.last %}, {% endif %}{% endfor %}){% else %}"{{ attribute.value }}"{% endif %}{% else %}source{% endif %}))

@@ -1,4 +1,4 @@
 {
-    "description" : "Open API 3.0 Producer",
-    "priority" : 1
+  "description": "OpenAPI Producer Definition",
+  "priority": 1
 }

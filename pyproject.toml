@@ -38,6 +38,7 @@ dev = [
 
 [project.scripts]
 xregistry = "xregistry.cli:main"
+xcg = "xregistry.cli:main"
 
 [tool.setuptools_scm]
 write_to = "xregistry/_version.py"

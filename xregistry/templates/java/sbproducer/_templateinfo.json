@@ -1,6 +1,9 @@
 {
   "template": "sbproducer",
+  "description": "Java Azure Service Bus Producer",
   "language": "java",
   "protocol": "AMQP",
-  "usage": ["producer"]
+  "usage": [
+    "producer"
+  ]
 }

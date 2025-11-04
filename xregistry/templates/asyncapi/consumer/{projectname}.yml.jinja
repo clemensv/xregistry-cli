@@ -16,9 +16,9 @@ servers:
 {%- if root.endpoints is defined and root.endpoints %}
 {%- for endpointid, endpoint in root.endpoints.items() if endpoint and (not endpoint.usage is defined or 'consumer' in endpoint.usage or 'subscriber' in endpoint.usage) %}
 {%- set options = endpoint.protocoloptions -%}
-{%- set endpoints = endpoint.protocoloptions.endpoints if endpoint.protocoloptions and endpoint.protocoloptions.endpoints else [] -%}
+{%- set endpoints = endpoint.endpoints if endpoint.endpoints else [] -%}
 {%- for endpointObject in endpoints %}
-  {{ endpointid | strip_dots }}:
+  {{ endpointid | strip_dots }}{{ loop.index0 if endpoints|length > 1 else '' }}:
     host: {{ geturlhost( endpointObject.uri ) }}
     {%- if geturlpath( endpointObject.uri ) %}
     pathname: {{ geturlpath( endpointObject.uri ) }}    
@@ -238,26 +238,29 @@ components:
         {%- if message.dataschemauri %}
              {%- if message.dataschemauri.startswith('#') %}
               {%- set schemaObj = schema_object(root, message.dataschemauri ) -%}
-                {%- if schemaObj.format is defined -%}
-                  {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
-                  {%- if schemaVersion.schema is defined -%}
-                  {%- if not schemaObj.format is defined or schemaObj.format.lower().startswith("json")%}
+              {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
+              {%- if schemaVersion and schemaVersion.schema is defined -%}
+                {%- if not schemaVersion.format is defined or schemaVersion.format.lower().startswith("json")%}
+
                   $ref: "#/components/schemas/{{ message.dataschemauri[1:].split('/')[-3] | pascal }}.{{ message.dataschemauri[1:].split('/')[-1] | pascal }}"
-                  {%- elif schemaObj.format.lower().startswith("protobuf")%}
+                {%- elif schemaVersion.format.lower().startswith("protobuf")%}
                   {%- set x = schemaVersion.schema | pushfile(message.dataschemauri.split('/')[-1].split(':')[-1]+".proto") %}
+
                   type: string
                   format: binary
-                  {%- elif schemaObj.format.lower().startswith("avro")%}
+                {%- elif schemaVersion.format.lower().startswith("avro")%}
                   {%- set x = schemaVersion.schema | tojson | pushfile(message.dataschemauri.split('/')[-1].split(':')[-1]+".avsc") %}
+
                   type: string
                   format: binary
-                  {%- endif -%}
                 {%- endif -%}
               {%- endif -%}
             {%- else %}
+
             $ref: "{{ message.dataschemauri }}"
             {%- endif %}
         {%- else %}
+
             type: "object"
         {%- endif %}
       required:

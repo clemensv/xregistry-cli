@@ -1,5 +1,5 @@
 {
-    "template_description": "AMQP 1.0 Producer",
-    "template_kind": "producer",
-    "main_project_name": "{project_name}AmqpProducer"
+  "description": "TypeScript AMQP 1.0 Producer",
+  "template_kind": "producer",
+  "main_project_name": "{project_name}AmqpProducer"
 }

@@ -1,7 +1,7 @@
 {
-    "description" : "Python Event Hubs consumer class",
-    "priority" : 1,
-    "main_project_name" : "{project_name|dotunderscore|lower}_eventhubs_consumer",
-    "data_project_name" : "{project_name|dotunderscore|lower}_data",
-    "src_layout" : false
+  "description": "Python Azure Event Hubs Consumer",
+  "priority": 1,
+  "main_project_name": "{project_name|dotunderscore|lower}_eventhubs_consumer",
+  "data_project_name": "{project_name|dotunderscore|lower}_data",
+  "src_layout": false
 }
