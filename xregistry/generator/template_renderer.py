@@ -60,6 +60,8 @@ class TemplateRenderer:
         self.suppress_code_output = suppress_code_output
         self.suppress_schema_output = suppress_schema_output
         self.templateinfo: Dict[str, Any] = {}
+        # Keep data_project_name same for all languages for template compatibility
+        # Templates use {{ data_project_name }} in paths and imports
         self.data_project_name = f"{project_name}Data"
         self.data_project_dir = self.data_project_name
         self.main_project_name = project_name
@@ -221,8 +223,10 @@ class TemplateRenderer:
                     pascal_properties=True, system_text_json_annotation=json_enabled, avro_annotation=avro_enabled
                 )
             elif self.language == "java":
+                # Java: use lowercase package name to match Maven artifact conventions
+                java_package_name = self.data_project_name.lower().replace('-', '_')
                 avrotize.convert_avro_schema_to_java(
-                    merged_schema, project_data_dir, package_name=self.data_project_name,
+                    merged_schema, project_data_dir, package_name=java_package_name,
                     jackson_annotation=json_enabled, avro_annotation=avro_enabled
                 )
             elif self.language == "js":
