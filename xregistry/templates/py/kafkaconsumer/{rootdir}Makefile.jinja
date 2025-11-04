@@ -5,8 +5,8 @@ build:
 {{'\t'}}pip wheel -w whl ./{{ data_project_name }} ./{{ main_project_name }}
 
 install: build
-{{'\t'}}poetry export --only dev -f requirements.txt -o requirements_{{data_project_name}}_dev.txt -C {{ data_project_name }}
-{{'\t'}}poetry export --only dev -f requirements.txt -o requirements_{{main_project_name}}_dev.txt -C {{ main_project_name }}
+{{'\t'}}poetry export --only dev -o requirements_{{data_project_name}}_dev.txt -C {{ data_project_name }}
+{{'\t'}}poetry export --only dev -o requirements_{{main_project_name}}_dev.txt -C {{ main_project_name }}
 {{'\t'}}pip install -r requirements_{{data_project_name}}_dev.txt
 {{'\t'}}pip install -r requirements_{{main_project_name}}_dev.txt
 {{'\t'}}pip install ./{{ data_project_name }} ./{{ main_project_name }}
