@@ -9,6 +9,7 @@ import os
 import sys
 import tempfile
 import subprocess
+import platform
 import pytest
 
 # Get the project root directory (two levels up from this file)
@@ -50,26 +51,32 @@ def run_java_test(xreg_file: str, output_dir: str, projectname: str, style: str)
         project_dir = os.path.join(output_dir, projectname)
         data_project_dir = os.path.join(output_dir, f"{projectname}Data")
         
+        # Use shell=True on Windows to find .cmd files in PATH
+        use_shell = platform.system() == 'Windows'
+        
         # First, install the data project if it exists
         if os.path.exists(data_project_dir):
             print(f"\n=== Installing data project in {data_project_dir} ===")
             subprocess.check_call(
                 ['mvn', 'clean', 'install', '-DskipTests'],
-                cwd=data_project_dir
+                cwd=data_project_dir,
+                shell=use_shell
             )
         
         # Compile the generated code with Maven
         print(f"\n=== Compiling generated Java code in {project_dir} ===")
         subprocess.check_call(
             ['mvn', 'clean', 'compile'],
-            cwd=project_dir
+            cwd=project_dir,
+            shell=use_shell
         )
         
         # Run JUnit tests with Maven
         print(f"\n=== Running JUnit tests in {project_dir} ===")
         subprocess.check_call(
             ['mvn', 'test'],
-            cwd=project_dir
+            cwd=project_dir,
+            shell=use_shell
         )
         
         print(f"[PASS] Test passed: {style} with {os.path.basename(xreg_file)}")
