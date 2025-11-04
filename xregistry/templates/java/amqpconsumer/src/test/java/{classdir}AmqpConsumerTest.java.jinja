@@ -109,7 +109,8 @@ public class {{ class_name | strip_namespace }} {
             byte[] eventData = new com.fasterxml.jackson.databind.ObjectMapper()
                 .writeValueAsBytes(testData);
             {%- else %}
-            byte[] eventData = "Test".getBytes();
+            // For byte[] data type, create valid JSON test data
+            byte[] eventData = "\"Test data\"".getBytes();
             {%- endif %}
             
             // Build CloudEvent
