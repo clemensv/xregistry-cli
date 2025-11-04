@@ -23,7 +23,6 @@ import re
 import unicodedata as _ud
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
-from pyrsistent import b
 import requests
 
 from ..common.model import Model
