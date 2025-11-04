@@ -23,13 +23,16 @@ import * as {{ data_project_name }} from '../../{{ data_project_name }}/dist/ind
  */
 export class {{ class_name }} {
     private producer: Producer;
+    private topic: string;
     
     /**
      * Create a new {{ class_name }}
      * @param producer The KafkaJS producer instance
+     * @param topic The Kafka topic to send messages to (optional, defaults to message-specific topics)
      */
-    constructor(producer: Producer) {
+    constructor(producer: Producer, topic?: string) {
         this.producer = producer;
+        this.topic = topic || '{{ messagegroupid }}';
     }
     
     {%- if root.endpoints -%}
@@ -90,7 +93,7 @@ export class {{ class_name }} {
         );
         
         await this.producer.send({
-            topic: '{{ messagename }}',
+            topic: this.topic,
             messages: [message]
         });
     }
@@ -122,7 +125,7 @@ export class {{ class_name }} {
         );
         
         await this.producer.send({
-            topic: '{{ messagename }}',
+            topic: this.topic,
             messages
         });
     }
