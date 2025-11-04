@@ -55,24 +55,21 @@ def run_java_test(xreg_file: str, output_dir: str, projectname: str, style: str)
             print(f"\n=== Installing data project in {data_project_dir} ===")
             subprocess.check_call(
                 ['mvn', 'clean', 'install', '-DskipTests'],
-                cwd=data_project_dir,
-                shell=True
+                cwd=data_project_dir
             )
         
         # Compile the generated code with Maven
         print(f"\n=== Compiling generated Java code in {project_dir} ===")
         subprocess.check_call(
             ['mvn', 'clean', 'compile'],
-            cwd=project_dir,
-            shell=True
+            cwd=project_dir
         )
         
         # Run JUnit tests with Maven
         print(f"\n=== Running JUnit tests in {project_dir} ===")
         subprocess.check_call(
             ['mvn', 'test'],
-            cwd=project_dir,
-            shell=True            
+            cwd=project_dir
         )
         
         print(f"[PASS] Test passed: {style} with {os.path.basename(xreg_file)}")
