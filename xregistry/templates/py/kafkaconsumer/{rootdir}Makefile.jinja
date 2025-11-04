@@ -1,7 +1,7 @@
 .PHONY: build install
 
 build:
-{{'\t'}}pip install wheel poetry
+{{'\t'}}pip install wheel poetry poetry-plugin-export
 {{'\t'}}pip wheel -w whl ./{{ data_project_name }} ./{{ main_project_name }}
 
 install: build
