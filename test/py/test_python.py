@@ -37,12 +37,8 @@ def run_python_test(xreg_file: str, output_dir: str, projectname: str, style: st
                 '--language', "py"]
     print(f"sys.argv: {sys.argv}")
     assert xregistry.cli() == 0
-    cmd = ['make', 'test', '-C', output_dir] if platform.system() == "Windows" else f'make test -C {output_dir}'
-
-    # Run the python test with stdout and stderr redirected
-    subprocess.check_call(
-            cmd, cwd=os.path.dirname(__file__), 
-            stdout=sys.stdout, stderr=sys.stderr,  shell=True, text=True)
+    use_shell = platform.system() == 'Windows'
+    subprocess.check_call(['make', 'test', '-C', output_dir], cwd=os.path.dirname(__file__), shell=use_shell)
 
 
 def test_ehproducer_contoso_erp_py():

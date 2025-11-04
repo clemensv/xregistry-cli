@@ -21,9 +21,9 @@ def run_test():
     local_repo_arg = '-Dmaven.repo.local='+os.path.join(project_root, 'tmp/test/java/repo'.replace('/', os.path.sep))
     local_ce_libs = os.path.join(project_root, 'tmp/test/java/ce_libs'.replace('/', os.path.sep))
     if not os.path.exists(local_ce_libs):
-        subprocess.check_call(['git', 'clone', 'https://github.com/clemensv/io.cloudevents.experimental.endpoints.git', local_ce_libs], stdout=sys.stdout, stderr=sys.stderr)
+        subprocess.check_call(['git', 'clone', 'https://github.com/clemensv/io.cloudevents.experimental.endpoints.git', local_ce_libs])
         # build the ce libs
-        subprocess.check_call(['mvn', '--quiet', 'clean', 'install', local_repo_arg], cwd=local_ce_libs, stdout=sys.stdout, stderr=sys.stderr)
+        subprocess.check_call(['mvn', '--quiet', 'clean', 'install', local_repo_arg], cwd=local_ce_libs)
 
     # generate the producer
     sys.argv = ['xregistry', 'generate',  
@@ -33,7 +33,7 @@ def run_test():
                 '--output', os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/producer/'.replace('/', os.path.sep)),
                 '--projectname', 'Contoso.ERP.Producer']
     assert xregistry.cli() == 0
-    subprocess.check_call(['mvn', '--quiet', 'install', local_repo_arg], cwd=os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/producer/'.replace('/', os.path.sep)), stdout=sys.stdout, stderr=sys.stderr)
+    subprocess.check_call(['mvn', '--quiet', 'install', local_repo_arg], cwd=os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/producer/'.replace('/', os.path.sep)))
     # generate the consumer
     sys.argv = [ 'xregistry', 'generate', 
                 '--style', 'consumer', 
@@ -42,11 +42,11 @@ def run_test():
                 '--output', os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/consumer/'),
                 '--projectname', 'Contoso.ERP.Consumer']
     assert xregistry.cli() == 0
-    subprocess.check_call(['mvn', '--quiet', 'clean', 'install',local_repo_arg], cwd=os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/consumer/'.replace('/', os.path.sep)), stdout=sys.stdout, stderr=sys.stderr)
+    subprocess.check_call(['mvn', '--quiet', 'clean', 'install',local_repo_arg], cwd=os.path.join(project_root, 'tmp/test/java/mqtt_end_to_end/consumer/'.replace('/', os.path.sep)))
     # run mvn verify on the s here that references the generated files already
     
-    subprocess.check_call(['mvn', '--quiet', 'clean', 'install', local_repo_arg], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
-    subprocess.check_call(['java', '-jar', 'target/mqtt_end_to_end-1.0-SNAPSHOT.jar'], cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr)
+    subprocess.check_call(['mvn', '--quiet', 'clean', 'install', local_repo_arg], cwd=os.path.dirname(__file__))
+    subprocess.check_call(['java', '-jar', 'target/mqtt_end_to_end-1.0-SNAPSHOT.jar'], cwd=os.path.dirname(__file__))
     
 def xtest_mqtt_end_to_end():
     container_name = ''.join(random.choices(string.ascii_lowercase, k=10))

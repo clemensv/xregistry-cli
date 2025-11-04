@@ -38,6 +38,6 @@ def test_openapi_producer():
     # Optional: Try external validation if openapi-generator-cli is available
     try:
         cmd = 'openapi-generator-cli validate -i ' + output_file
-        subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True, timeout=10)
+        subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), shell=True, timeout=10)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
         print(f"Warning: External validation skipped or failed: {e}")

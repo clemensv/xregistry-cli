@@ -29,7 +29,7 @@ def test_asyncapi_consumer():
     assert xregistry.cli() == 0
     # validate with asyncapi CLI
     cmd = 'asyncapi validate ' + os.path.join(output_dir, "ContosoErpConsumerBinary/ContosoErpConsumerBinary.yml".replace('/', os.path.sep))
-    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), shell=True)
 
     # generate the consumer with structured content mode
     sys.argv = ['xregistry', 'generate',  
@@ -42,7 +42,7 @@ def test_asyncapi_consumer():
     assert xregistry.cli() == 0
     # validate with asyncapi CLI
     cmd = 'asyncapi validate ' + os.path.join(output_dir, "ContosoErpConsumerStructured/ContosoErpConsumerStructured.yml".replace('/', os.path.sep))
-    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=os.path.dirname(__file__), shell=True)
 
 
 @pytest.mark.parametrize("xreg_file,project_name", [
@@ -77,7 +77,7 @@ def test_asyncapi_consumer_xreg_files(xreg_file, project_name):
     
     # Validate with asyncapi CLI
     cmd = 'asyncapi validate ' + output_file
-    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=project_root, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=project_root, shell=True)
 
     # generate the consumer with structured content mode
     sys.argv = ['xregistry', 'generate',  
@@ -95,4 +95,4 @@ def test_asyncapi_consumer_xreg_files(xreg_file, project_name):
     
     # Validate with asyncapi CLI
     cmd = 'asyncapi validate ' + output_file
-    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=project_root, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+    subprocess.check_call(cmd.split(" ") if platform.system() == "Windows" else cmd, cwd=project_root, shell=True)

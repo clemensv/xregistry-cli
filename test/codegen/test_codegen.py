@@ -56,7 +56,7 @@ def test_codegen_cs():
                 assert xregistry.cli() == 0
                 # run dotnet build on the solution file in the output directory
                 cmd = ['dotnet', 'build'] if platform.system() == "Windows" else 'dotnet build'
-                assert subprocess.check_call(cmd, cwd=output_dir, shell=True, stdout=sys.stdout, stderr=sys.stderr) == 0
+                assert subprocess.check_call(cmd, cwd=output_dir, shell=True) == 0
         except Exception as e:
             print(f'Error processing {dir_name}: {e}')
             raise e
@@ -113,4 +113,4 @@ def test_codegen_java():
             assert xregistry.cli() == 0
             # run dotnet build on the csproj here that references the generated files already
             assert subprocess.check_call(
-                "mvn package -B", cwd=output_dir, stdout=sys.stdout, stderr=sys.stderr, shell=True) == 0
+                "mvn package -B", cwd=output_dir, shell=True) == 0
