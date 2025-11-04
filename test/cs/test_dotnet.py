@@ -41,10 +41,10 @@ def run_dotnet_test(xreg_file: str, output_dir: str, projectname: str, style: st
                 '--language', "cs"]
     print(f"sys.argv: {sys.argv}")
     assert xregistry.cli() == 0
-    cmd = ['dotnet', 'test', output_dir] if platform.system() == "Windows" else f'dotnet test {output_dir}'
     
-    # Run the dotnet test with stdout and stderr redirected
-    subprocess.check_call(cmd, cwd=os.path.dirname(__file__), stdout=sys.stdout, stderr=sys.stderr, shell=True, text=True)
+    # Use shell=True on Windows for .cmd files, direct execution on Linux
+    use_shell = platform.system() == 'Windows'
+    subprocess.check_call(['dotnet', 'test', output_dir], cwd=os.path.dirname(__file__), shell=use_shell)
 
 def test_ehproducer_contoso_erp_cs():
     """ Test the EventHub producer for Contoso ERP. """
