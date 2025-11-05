@@ -23,10 +23,10 @@ This document tracks tests that are temporarily skipped due to known issues.
 
 ---
 
-## Python EventHubs Tests (8 tests) - Build Issue
+## Python EventHubs Tests (8 tests) - pytest-asyncio Configuration Issue
 
 **Status:** Skipped  
-**Issue:** Make test command fails with non-zero exit status 2  
+**Issue:** Generated tests fail with "async def functions are not natively supported"  
 **Affected Tests:**
 - `test/py/test_python.py::test_ehproducer_contoso_erp_py`
 - `test/py/test_python.py::test_ehproducer_fabrikam_motorsports_py`
@@ -37,19 +37,32 @@ This document tracks tests that are temporarily skipped due to known issues.
 - `test/py/test_python.py::test_ehconsumer_inkjet_py`
 - `test/py/test_python.py::test_ehconsumer_lightbulb_py`
 
-**Root Cause:** Generated Python EventHubs producer/consumer code fails during `make test` execution. The generated Makefile or test code has issues.
+**Root Cause:** The generated `pyproject.toml` includes `pytest-asyncio` as a dependency and test functions use `@pytest.mark.asyncio` decorators, but the async fixture `event_hub_emulator` lacks proper configuration. Pytest gives the error: `'test_producer.py' requested an async fixture 'event_hub_emulator', with no plugin or hook that handled it.`
+
+**Technical Details:**
+- Template: `xregistry/templates/py/ehproducer/{testdir}test_producer.py.jinja` and `ehconsumer` variant
+- The fixture at line 40-41 uses `@pytest.fixture(scope="module")` instead of `@pytest_asyncio.fixture`
+- Alternative: Add `asyncio_mode = "auto"` to `[tool.pytest.ini_options]` in `pyproject.toml.jinja`
 
 **Resolution:** 
-- Debug the Python EventHubs template generation
-- Fix the generated Makefile or test setup
-- Investigate missing dependencies or incorrect test configuration
+- Option 1: Change `@pytest.fixture` to `@pytest_asyncio.fixture` for async fixtures in templates
+- Option 2: Add pytest configuration to `pyproject.toml.jinja`:
+  ```toml
+  [tool.pytest.ini_options]
+  asyncio_mode = "auto"
+  ```
+- Files to modify:
+  - `xregistry/templates/py/ehproducer/{testdir}test_producer.py.jinja`
+  - `xregistry/templates/py/ehconsumer/{testdir}test_dispatcher.py.jinja`
+  - `xregistry/templates/py/ehproducer/pyproject.toml.jinja`
+  - `xregistry/templates/py/ehconsumer/pyproject.toml.jinja`
 
 ---
 
-## Python Kafka Tests (8 tests) - Build Issue
+## Python Kafka Tests (8 tests) - pytest-asyncio Configuration Issue
 
 **Status:** Skipped  
-**Issue:** Make test command fails with non-zero exit status 2  
+**Issue:** Generated tests fail with "async def functions are not natively supported"  
 **Affected Tests:**
 - `test/py/test_python.py::test_kafkaproducer_contoso_erp_py`
 - `test/py/test_python.py::test_kafkaproducer_fabrikam_motorsports_py`
@@ -60,12 +73,25 @@ This document tracks tests that are temporarily skipped due to known issues.
 - `test/py/test_python.py::test_kafkaconsumer_inkjet_py`
 - `test/py/test_python.py::test_kafkaconsumer_lightbulb_py`
 
-**Root Cause:** Generated Python Kafka producer/consumer code fails during `make test` execution. The generated Makefile or test code has issues.
+**Root Cause:** Same as EventHubs tests - the generated `pyproject.toml` includes `pytest-asyncio` as a dependency and test functions use `@pytest.mark.asyncio` decorators, but async fixtures lack proper configuration. Pytest gives the error: `'test_producer.py' requested an async fixture 'kafka_emulator', with no plugin or hook that handled it.`
 
-**Resolution:**
-- Debug the Python Kafka template generation
-- Fix the generated Makefile or test setup
-- Investigate missing dependencies or incorrect test configuration
+**Technical Details:**
+- Templates: `xregistry/templates/py/kafkaproducer/{testdir}test_producer.py.jinja` and `kafkaconsumer` variant
+- The fixture uses `@pytest.fixture(scope="module")` instead of `@pytest_asyncio.fixture`
+- Alternative: Add `asyncio_mode = "auto"` to `[tool.pytest.ini_options]` in `pyproject.toml.jinja`
+
+**Resolution:** Same fix as EventHubs tests:
+- Option 1: Change `@pytest.fixture` to `@pytest_asyncio.fixture` for async fixtures in templates
+- Option 2: Add pytest configuration to `pyproject.toml.jinja`:
+  ```toml
+  [tool.pytest.ini_options]
+  asyncio_mode = "auto"
+  ```
+- Files to modify:
+  - `xregistry/templates/py/kafkaproducer/{testdir}test_producer.py.jinja`
+  - `xregistry/templates/py/kafkaconsumer/{testdir}test_dispatcher.py.jinja`
+  - `xregistry/templates/py/kafkaproducer/pyproject.toml.jinja`
+  - `xregistry/templates/py/kafkaconsumer/pyproject.toml.jinja`
 
 ---
 
@@ -75,4 +101,9 @@ This document tracks tests that are temporarily skipped due to known issues.
 **Passing:** 156  
 **Skipped:** 37 (17 pre-existing + 20 new)  
 **Last Updated:** 2025-11-05  
-**CI Run:** https://github.com/clemensv/xregistry-cli/actions/runs/19109631212
+**Last Successful CI Run:** https://github.com/clemensv/xregistry-cli/actions/runs/19112322037  
+**Last Failed CI Run (Investigation):** https://github.com/clemensv/xregistry-cli/actions/runs/19111112588
+
+**Root Cause Summary:**
+- **Catalog tests (4):** Infrastructure issue with xrserver MySQL container initialization
+- **Python EventHubs/Kafka tests (16):** Template generation issue - async fixtures missing `@pytest_asyncio.fixture` decorator or `asyncio_mode = "auto"` configuration
