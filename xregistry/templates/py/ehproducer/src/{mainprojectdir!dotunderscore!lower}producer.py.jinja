@@ -97,7 +97,7 @@ class {{ class_name }}:
         {%- endfor %}
         }
         attributes["datacontenttype"] = content_type
-        byte_data = data.to_byte_array(content_type)
+        byte_data = data.to_byte_array(content_type) if data is not None else b''
         event = CloudEvent(attributes, byte_data)
         if self.content_mode == "structured":
             headers, body = to_structured(event)

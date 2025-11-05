@@ -147,120 +147,119 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
         azure_logger.setLevel(logging.DEBUG)
         logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
-    async for emulator in event_hub_emulator:
-        event_hub_conn_str = emulator["event_hub_connection_str"]
-        blob_storage_conn_str = emulator["blob_storage_connection_str"]
+    event_hub_conn_str = event_hub_emulator["event_hub_connection_str"]
+    blob_storage_conn_str = event_hub_emulator["blob_storage_connection_str"]
 
-        dispatcher = {{ class_name }}()
+    dispatcher = {{ class_name }}()
 
-        future = asyncio.Future()
-        async def set_future(_cx, _e, {%if isCloudEvent %}_ce,{% endif %} data):
-            future.set_result(data)
-            return future
+    future = asyncio.Future()
+    async def set_future(_cx, _e, {%if isCloudEvent %}_ce,{% endif %} data):
+        future.set_result(data)
+        return future
 
-        dispatcher.{{ messageid | dotunderscore | snake }}_async = set_future
+    dispatcher.{{ messageid | dotunderscore | snake }}_async = set_future
 
-        async with BlobServiceClientAsync.from_connection_string(blob_storage_conn_str) as blob_service_client:
-            container_client = blob_service_client.get_container_client("eventhub-checkpoints")
-            await container_client.create_container()
-            await blob_service_client.close()
+    async with BlobServiceClientAsync.from_connection_string(blob_storage_conn_str) as blob_service_client:
+        container_client = blob_service_client.get_container_client("eventhub-checkpoints")
+        await container_client.create_container()
+        await blob_service_client.close()
 
-        async with dispatcher.create_processor_from_connection_strings(
-            "$Default", event_hub_conn_str, "eh1", 
-            blob_storage_conn_str, "eventhub-checkpoints") as processor:
+    async with dispatcher.create_processor_from_connection_strings(
+        "$Default", event_hub_conn_str, "eh1", 
+        blob_storage_conn_str, "eventhub-checkpoints") as processor:
 
-            producer = EventHubProducerClient.from_connection_string(event_hub_conn_str, eventhub_name="eh1")
-            event_data_batch = await producer.create_batch()
-            {%- if type_name != "object" %}
-            # Import the data class to create a valid test instance
-            # Use default/minimal values to satisfy required fields
-            test_instance = {{  type_name | pascal | strip_namespace }}
-            # Create instance with minimal/default data
-            try:
-                # Try creating with empty/default values
-                import inspect
-                import typing
-                import enum
-                sig = inspect.signature({{ type_name | pascal | strip_namespace }}.__init__)
-                kwargs = {}
-                for param_name, param in sig.parameters.items():
-                    if param_name == 'self':
-                        continue
-                    if param.default == inspect.Parameter.empty or param.kind == inspect.Parameter.KEYWORD_ONLY:
-                        # Get the actual type, unwrapping Optional/Union if needed
-                        ann = param.annotation
+        producer = EventHubProducerClient.from_connection_string(event_hub_conn_str, eventhub_name="eh1")
+        event_data_batch = await producer.create_batch()
+        {%- if type_name != "object" %}
+        # Import the data class to create a valid test instance
+        # Use default/minimal values to satisfy required fields
+        test_instance = {{  type_name | pascal | strip_namespace }}
+        # Create instance with minimal/default data
+        try:
+            # Try creating with empty/default values
+            import inspect
+            import typing
+            import enum
+            sig = inspect.signature({{ type_name | pascal | strip_namespace }}.__init__)
+            kwargs = {}
+            for param_name, param in sig.parameters.items():
+                if param_name == 'self':
+                    continue
+                if param.default == inspect.Parameter.empty or param.kind == inspect.Parameter.KEYWORD_ONLY:
+                    # Get the actual type, unwrapping Optional/Union if needed
+                    ann = param.annotation
+                    origin = typing.get_origin(ann)
+                    
+                    # Handle Optional[X] which is Union[X, None]
+                    if origin is typing.Union:
+                        args = typing.get_args(ann)
+                        # Use the first non-None type
+                        ann = next((a for a in args if a is not type(None)), args[0])
                         origin = typing.get_origin(ann)
-                        
-                        # Handle Optional[X] which is Union[X, None]
-                        if origin is typing.Union:
-                            args = typing.get_args(ann)
-                            # Use the first non-None type
-                            ann = next((a for a in args if a is not type(None)), args[0])
-                            origin = typing.get_origin(ann)
-                        
-                        # Now match based on the actual type
-                        ann_str = str(ann).lower()
-                        if ann is str or ann == 'str' or 'str' in ann_str:
-                            kwargs[param_name] = ""
-                        elif ann is int or ann == 'int' or 'int' in ann_str:
-                            kwargs[param_name] = 0
-                        elif ann is float or ann == 'float' or 'float' in ann_str:
-                            kwargs[param_name] = 0.0
-                        elif ann is bool or ann == 'bool' or 'bool' in ann_str:
-                            kwargs[param_name] = False
-                        elif origin is list or ann is list or 'list' in ann_str:
-                            kwargs[param_name] = []
-                        elif origin is dict or ann is dict or 'dict' in ann_str:
-                            kwargs[param_name] = {}
-                        elif isinstance(ann, type) and issubclass(ann, enum.Enum):
-                            # For enums, use the first value
-                            kwargs[param_name] = list(ann)[0] if list(ann) else None
-                        elif 'enum' in ann_str:
-                            # Fallback for enum detection via string
-                            try:
-                                kwargs[param_name] = list(ann)[0] if hasattr(ann, '__iter__') else None
-                            except:
-                                kwargs[param_name] = None
-                        else:
+                    
+                    # Now match based on the actual type
+                    ann_str = str(ann).lower()
+                    if ann is str or ann == 'str' or 'str' in ann_str:
+                        kwargs[param_name] = ""
+                    elif ann is int or ann == 'int' or 'int' in ann_str:
+                        kwargs[param_name] = 0
+                    elif ann is float or ann == 'float' or 'float' in ann_str:
+                        kwargs[param_name] = 0.0
+                    elif ann is bool or ann == 'bool' or 'bool' in ann_str:
+                        kwargs[param_name] = False
+                    elif origin is list or ann is list or 'list' in ann_str:
+                        kwargs[param_name] = []
+                    elif origin is dict or ann is dict or 'dict' in ann_str:
+                        kwargs[param_name] = {}
+                    elif isinstance(ann, type) and issubclass(ann, enum.Enum):
+                        # For enums, use the first value
+                        kwargs[param_name] = list(ann)[0] if list(ann) else None
+                    elif 'enum' in ann_str:
+                        # Fallback for enum detection via string
+                        try:
+                            kwargs[param_name] = list(ann)[0] if hasattr(ann, '__iter__') else None
+                        except:
                             kwargs[param_name] = None
-                test_instance = {{ type_name | pascal | strip_namespace }}(**kwargs)
-                test_json = test_instance.to_json()
-                event_data = EventData(test_json.encode('utf-8'))
-            except Exception:
-                # Fallback to minimal JSON
-                event_data = EventData(b'{}')
-            {%- else %}
+                    else:
+                        kwargs[param_name] = None
+            test_instance = {{ type_name | pascal | strip_namespace }}(**kwargs)
+            test_json = test_instance.to_json()
+            event_data = EventData(test_json.encode('utf-8'))
+        except Exception:
+            # Fallback to minimal JSON
             event_data = EventData(b'{}')
-            {%- endif %}
-            event_data.content_type = "application/json"
-            {%- if isCloudEvent %}
-            event_data.properties = {
-                "cloudEvents_type": "{{ messageid }}",
-                "cloudEvents_specversion": "1.0",
-                "cloudEvents_source": "/test",
-                "cloudEvents_id": "test-id"
-            }
-            {% else %}
-            {%- set message_application_properties = message.protocoloptions['application_properties'] if 'application_properties' in message.protocoloptions else None %}
-            {%- set message_properties = message.protocoloptions.properties %}
-            {%- if message_application_properties %}
-            {%- for key, prop in message_application_properties.items() if "value" in prop %}
-            event_data.raw_amqp_message.application_properties['{{ key }}'] = '{{ prop.value }}'
-            {%- if not loop.last %} and {% endif -%}
-            {%- endfor -%}
-            {%- endif -%}
-            {%- if message_properties -%}
-            {%- if message_application_properties.values() | selectattr("value") | count > 0 -%} and {% endif -%}
-            {%- for key, prop in message_properties.items() if "value" in prop %}
-            event_data.raw_amqp_message.properties['{{ key }}'] = '{{ prop.value }}'
-            {%- if not loop.last %} and {%- endif -%}
-            {%- endfor %}
-            {%- endif %}
-            {%- endif %}
-            event_data_batch.add(event_data)
-            await producer.send_batch(event_data_batch)
-            await asyncio.wait_for(future, timeout=5)
-            await producer.close()
+        {%- else %}
+        event_data = EventData(b'{}')
+        {%- endif %}
+        event_data.content_type = "application/json"
+        {%- if isCloudEvent %}
+        event_data.properties = {
+            "cloudEvents_type": "{{ messageid }}",
+            "cloudEvents_specversion": "1.0",
+            "cloudEvents_source": "/test",
+            "cloudEvents_id": "test-id"
+        }
+        {% else %}
+        {%- set message_application_properties = message.protocoloptions['application_properties'] if 'application_properties' in message.protocoloptions else None %}
+        {%- set message_properties = message.protocoloptions.properties %}
+        {%- if message_application_properties %}
+        {%- for key, prop in message_application_properties.items() if "value" in prop %}
+        event_data.raw_amqp_message.application_properties['{{ key }}'] = '{{ prop.value }}'
+        {%- if not loop.last %} and {% endif -%}
+        {%- endfor -%}
+        {%- endif -%}
+        {%- if message_properties -%}
+        {%- if message_application_properties.values() | selectattr("value") | count > 0 -%} and {% endif -%}
+        {%- for key, prop in message_properties.items() if "value" in prop %}
+        event_data.raw_amqp_message.properties['{{ key }}'] = '{{ prop.value }}'
+        {%- if not loop.last %} and {%- endif -%}
+        {%- endfor %}
+        {%- endif %}
+        {%- endif %}
+        event_data_batch.add(event_data)
+        await producer.send_batch(event_data_batch)
+        await asyncio.wait_for(future, timeout=5)
+        await producer.close()
 
 {% endfor %}
 {% endfor %}
