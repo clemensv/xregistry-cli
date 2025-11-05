@@ -128,99 +128,100 @@ async def event_hub_emulator():
 async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
     """Test the {{ messagename }} event from the {{ groupname }} message group"""
 
-    event_hub_conn_str = event_hub_emulator["event_hub_connection_str"]
+    async for emulator in event_hub_emulator:
+        event_hub_conn_str = emulator["event_hub_connection_str"]
 
-    producer = EventHubProducerClient.from_connection_string(event_hub_conn_str, eventhub_name="eh1")
-    consumer = EventHubConsumerClient.from_connection_string(event_hub_conn_str, consumer_group="cg1", eventhub_name="eh1")
+        producer = EventHubProducerClient.from_connection_string(event_hub_conn_str, eventhub_name="eh1")
+        consumer = EventHubConsumerClient.from_connection_string(event_hub_conn_str, consumer_group="cg1", eventhub_name="eh1")
 
-    on_event_future = asyncio.Future()
-    async def on_event(partition_context, event):
+        on_event_future = asyncio.Future()
+        async def on_event(partition_context, event):
+            try:
+                assert event.properties["cloudEvents_type".encode('utf-8')] == "{{ messageid }}".encode('utf-8')
+                await partition_context.update_checkpoint(event)
+                on_event_future.set_result(True)
+            except Exception as e:
+                on_event_future.set_exception(e)
+
+        receive_task = asyncio.create_task(consumer.receive(on_event, starting_position="-1"))
+        producer_instance = {{ class_name }}(producer, 'binary')
+        {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+        {%- if type_name != "object" %}
+        # Create minimal test data instance to satisfy schema requirements
         try:
-            assert event.properties["cloudEvents_type".encode('utf-8')] == "{{ messageid }}".encode('utf-8')
-            await partition_context.update_checkpoint(event)
-            on_event_future.set_result(True)
-        except Exception as e:
-            on_event_future.set_exception(e)
-
-    receive_task = asyncio.create_task(consumer.receive(on_event, starting_position="-1"))
-    producer_instance = {{ class_name }}(producer, 'binary')
-    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
-    {%- if type_name != "object" %}
-    # Create minimal test data instance to satisfy schema requirements
-    try:
-        import inspect
-        import typing
-        import enum
-        data_class = {{ type_name | pascal | strip_namespace }}
-        sig = inspect.signature(data_class.__init__)
-        kwargs = {}
-        for param_name, param in sig.parameters.items():
-            if param_name == 'self':
-                continue
-            if param.default == inspect.Parameter.empty or param.kind == inspect.Parameter.KEYWORD_ONLY:
-                # Get the actual type, unwrapping Optional/Union if needed
-                ann = param.annotation
-                origin = typing.get_origin(ann)
-                
-                # Handle Optional[X] which is Union[X, None]
-                if origin is typing.Union:
-                    args = typing.get_args(ann)
-                    # Use the first non-None type
-                    ann = next((a for a in args if a is not type(None)), args[0])
+            import inspect
+            import typing
+            import enum
+            data_class = {{ type_name | pascal | strip_namespace }}
+            sig = inspect.signature(data_class.__init__)
+            kwargs = {}
+            for param_name, param in sig.parameters.items():
+                if param_name == 'self':
+                    continue
+                if param.default == inspect.Parameter.empty or param.kind == inspect.Parameter.KEYWORD_ONLY:
+                    # Get the actual type, unwrapping Optional/Union if needed
+                    ann = param.annotation
                     origin = typing.get_origin(ann)
-                
-                # Now match based on the actual type
-                ann_str = str(ann).lower()
-                if ann is str or ann == 'str' or 'str' in ann_str:
-                    kwargs[param_name] = ""
-                elif ann is int or ann == 'int' or 'int' in ann_str:
-                    kwargs[param_name] = 0
-                elif ann is float or ann == 'float' or 'float' in ann_str:
-                    kwargs[param_name] = 0.0
-                elif ann is bool or ann == 'bool' or 'bool' in ann_str:
-                    kwargs[param_name] = False
-                elif origin is list or ann is list or 'list' in ann_str:
-                    kwargs[param_name] = []
-                elif origin is dict or ann is dict or 'dict' in ann_str:
-                    kwargs[param_name] = {}
-                elif isinstance(ann, type) and issubclass(ann, enum.Enum):
-                    # For enums, use the first value
-                    kwargs[param_name] = list(ann)[0] if list(ann) else None
-                elif 'enum' in ann_str:
-                    # Fallback for enum detection via string
-                    try:
-                        kwargs[param_name] = list(ann)[0] if hasattr(ann, '__iter__') else None
-                    except:
+                    
+                    # Handle Optional[X] which is Union[X, None]
+                    if origin is typing.Union:
+                        args = typing.get_args(ann)
+                        # Use the first non-None type
+                        ann = next((a for a in args if a is not type(None)), args[0])
+                        origin = typing.get_origin(ann)
+                    
+                    # Now match based on the actual type
+                    ann_str = str(ann).lower()
+                    if ann is str or ann == 'str' or 'str' in ann_str:
+                        kwargs[param_name] = ""
+                    elif ann is int or ann == 'int' or 'int' in ann_str:
+                        kwargs[param_name] = 0
+                    elif ann is float or ann == 'float' or 'float' in ann_str:
+                        kwargs[param_name] = 0.0
+                    elif ann is bool or ann == 'bool' or 'bool' in ann_str:
+                        kwargs[param_name] = False
+                    elif origin is list or ann is list or 'list' in ann_str:
+                        kwargs[param_name] = []
+                    elif origin is dict or ann is dict or 'dict' in ann_str:
+                        kwargs[param_name] = {}
+                    elif isinstance(ann, type) and issubclass(ann, enum.Enum):
+                        # For enums, use the first value
+                        kwargs[param_name] = list(ann)[0] if list(ann) else None
+                    elif 'enum' in ann_str:
+                        # Fallback for enum detection via string
+                        try:
+                            kwargs[param_name] = list(ann)[0] if hasattr(ann, '__iter__') else None
+                        except:
+                            kwargs[param_name] = None
+                    else:
                         kwargs[param_name] = None
-                else:
-                    kwargs[param_name] = None
-        event_data = data_class(**kwargs)
-    except Exception:
+            event_data = data_class(**kwargs)
+        except Exception:
+            event_data = {}
+        {%- else %}
         event_data = {}
-    {%- else %}
-    event_data = {}
-    {%- endif %}
-    await producer_instance.send_{{ messageid | dotunderscore | snake }}(
-        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
-            _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
-        {%- endfor -%}
-        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
-            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
-        {%- endfor -%}
-        data = event_data
-        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
-            , _{{ attrname }} = ''
-        {%- endfor -%}
-    )
+        {%- endif %}
+        await producer_instance.send_{{ messageid | dotunderscore | snake }}(
+            {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
+                _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
+            {%- endfor -%}
+            {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
+                {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
+            {%- endfor -%}
+            data = event_data
+            {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
+                , _{{ attrname }} = ''
+            {%- endfor -%}
+        )
 
-    await asyncio.wait_for(on_event_future, timeout=10)
-    if receive_task:
-        receive_task.cancel()
-        try:
-            await receive_task
-        except asyncio.CancelledError:
-            pass
-    await producer.close()
+        await asyncio.wait_for(on_event_future, timeout=10)
+        if receive_task:
+            receive_task.cancel()
+            try:
+                await receive_task
+            except asyncio.CancelledError:
+                pass
+        await producer.close()
 
 {%- endfor %}
 {%- endfor %}
