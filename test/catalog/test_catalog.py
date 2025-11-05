@@ -31,7 +31,8 @@ from xregistry.cli import main as cli
 CATALOG_PORT = 3900
 CATALOG_URL = "http://localhost:3900"
 IMAGE_NAME = "ghcr.io/xregistry/xrserver-all:latest"
-STARTUP_TIMEOUT = 180
+STARTUP_TIMEOUT = 90  # Container starts in 20-30s normally, but MySQL can occasionally hang
+# Note: If tests timeout, MySQL initialization in container may have hung (known issue)
 
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("http.client").setLevel(logging.DEBUG)
@@ -45,22 +46,35 @@ sys.path.append(os.path.join(project_root))
 
 @pytest.fixture(scope="module")
 def catalog_container():
-    with DockerContainer(IMAGE_NAME) \
-        .with_command("--recreatedb") \
-        .with_bind_ports(CATALOG_PORT, 8080) as container:
-        wait_for_logs(container, "/xrserver")
-        # wait for the server to be available
+    container = DockerContainer(IMAGE_NAME).with_command("--recreatedb").with_bind_ports(CATALOG_PORT, 8080)
+    container.start()
+    try:
+        # Wait for HTTP service to be available (removed deprecated wait_for_logs)
+        # Container takes 20-30 seconds to start MySQL and HTTP service
         timeout = time.time() + STARTUP_TIMEOUT
+        print(f"Waiting for xrserver HTTP service on port {CATALOG_PORT}...")
+        print(f"Container ID: {container.get_wrapped_container().id if hasattr(container, 'get_wrapped_container') else 'unknown'}")
+        last_error = None
         while True:
             try:
-                response = requests.get(CATALOG_URL)
+                response = requests.get(CATALOG_URL, timeout=5)
                 if response.status_code == 200:
+                    elapsed = time.time() - (timeout - STARTUP_TIMEOUT)
+                    print(f"xrserver HTTP service ready after {elapsed:.1f}s")
                     break
-            except Exception:
+            except Exception as e:
+                last_error = str(e)
                 pass
             if time.time() > timeout:
-                raise Exception(f"Catalog container did not start in time: HTTP service not available on port {CATALOG_PORT}")
-            time.sleep(1)
+                # Get container logs before failing
+                try:
+                    logs = container.get_logs()
+                    print(f"Container logs (stdout): {logs[0][:500] if logs[0] else 'empty'}")
+                    print(f"Container logs (stderr): {logs[1][:500] if logs[1] else 'empty'}")
+                except:
+                    print("Could not retrieve container logs")
+                raise Exception(f"Catalog container did not start in time: HTTP service not available on port {CATALOG_PORT}. Last error: {last_error}")
+            time.sleep(2)
         # load /xregistry/schemas/model.json (full model with group definitions), GET /modelsource from the server, merge the local model with the remote model, and PUT the merged model back to the server
         local_model_path = os.path.join(project_root, "xregistry", "schemas", "model.json")
         with open(local_model_path, "r") as local_model_file:
@@ -98,6 +112,8 @@ def catalog_container():
             pytest.fail(f"Failed to start catalog container: {e}")
         
         yield container
+    finally:
+        container.stop()
 
 
 # --------------------------------------------------------------------------- #
