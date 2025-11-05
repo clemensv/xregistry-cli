@@ -51,15 +51,24 @@ channels:
       {{ messageid | strip_dots | pascal }}:
         $ref: "#/components/messages/{{ messageid | strip_dots | pascal }}"
     {%- endfor %}
+    {%- set has_explicit_servers = namespace(value=false) %}
     {%- if root.endpoints is defined and root.endpoints %}
     {%- for endpointid, endpoint in root.endpoints.items() if endpoint and endpoint.messagegroups is defined and (not endpoint.usage is defined or 'producer' in endpoint.usage) -%}
-    {%- if loop.first %}
-    servers:
+    {%- for group in endpoint.messagegroups if group.endswith('/'+messagegroupid) or group == ('#/messagegroups/'+messagegroupid) %}
+    {%- set has_explicit_servers.value = true %}
+    {%- endfor -%}
+    {%- endfor -%}
     {%- endif %}
+    {%- if has_explicit_servers.value %}
+    servers:
+    {%- for endpointid, endpoint in root.endpoints.items() if endpoint and endpoint.messagegroups is defined and (not endpoint.usage is defined or 'producer' in endpoint.usage) -%}
     {%- for group in endpoint.messagegroups if group.endswith('/'+messagegroupid) or group == ('#/messagegroups/'+messagegroupid) %}
       - $ref: "#/servers/{{ endpointid | strip_dots }}"
-    {%- endfor -%}      
     {%- endfor -%}
+    {%- endfor -%}
+    {%- else %}
+    servers:
+      - $ref: "#/servers/default"
     {%- endif %}
 {%- endfor %}
 operations:
@@ -174,7 +183,7 @@ components:
                       {%- set fileName = (message.dataschemauri.split('/')[-1].split(':')[-1] | lower | snake) +".avsc" -%}
                       {%- set x = schemaVersion.schema | tojson | pushfile(fileName) %}
       payload:
-        schemaFormat: "application/vnd.apache.avro;version={{(schemaFormat | string).split('/')[-1]}}"
+        schemaFormat: "application/vnd.apache.avro;version=1.9.0"
         schema:
             $ref: "{{ fileName }}"
                     {%- else %}
@@ -293,7 +302,7 @@ components:
             {%- set fileName = (schemaid | lower | snake) + ".avsc" -%}
             {%- set x = newest_schemaversion.schema | tojson | pushfile(fileName) %}
     {{ schemagroupid | pascal }}.{{ schemaid | pascal }}:
-      schemaFormat: "application/vnd.apache.avro;version={{(schemaFormat | string).split('/')[-1]}}"
+      schemaFormat: "application/vnd.apache.avro;version=1.9.0"
       schema:
         $ref: "{{ fileName }}"
           {%- elif schemaFormat and (schemaFormat | string).lower().startswith("protobuf") or (schemaFormat | string).lower().startswith("proto") %}
