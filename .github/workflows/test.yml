@@ -57,7 +57,7 @@ jobs:
     - name: Install Test Prerequesites
       run: |
         npm install -g azure-functions-core-tools@4 --unsafe-perm true 
-        npm install -g @asyncapi/cli
+        npm install -g @asyncapi/cli@latest
         npm install -g @openapitools/openapi-generator-cli      
     - name: Run tests
       run: |
