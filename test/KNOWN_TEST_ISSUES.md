@@ -25,7 +25,7 @@ This document tracks tests that are temporarily skipped due to known issues.
 
 ## Python EventHubs Tests (8 tests) - pytest-asyncio Configuration Issue
 
-**Status:** Skipped  
+**Status:** ✅ FIXED  
 **Issue:** Generated tests fail with "async def functions are not natively supported"  
 **Affected Tests:**
 - `test/py/test_python.py::test_ehproducer_contoso_erp_py`
@@ -44,24 +44,15 @@ This document tracks tests that are temporarily skipped due to known issues.
 - The fixture at line 40-41 uses `@pytest.fixture(scope="module")` instead of `@pytest_asyncio.fixture`
 - Alternative: Add `asyncio_mode = "auto"` to `[tool.pytest.ini_options]` in `pyproject.toml.jinja`
 
-**Resolution:** 
-- Option 1: Change `@pytest.fixture` to `@pytest_asyncio.fixture` for async fixtures in templates
-- Option 2: Add pytest configuration to `pyproject.toml.jinja`:
-  ```toml
-  [tool.pytest.ini_options]
-  asyncio_mode = "auto"
-  ```
-- Files to modify:
-  - `xregistry/templates/py/ehproducer/{testdir}test_producer.py.jinja`
-  - `xregistry/templates/py/ehconsumer/{testdir}test_dispatcher.py.jinja`
-  - `xregistry/templates/py/ehproducer/pyproject.toml.jinja`
-  - `xregistry/templates/py/ehconsumer/pyproject.toml.jinja`
+**Fix Applied:** Added `[tool.pytest.ini_options]` with `asyncio_mode = "auto"` to pyproject.toml templates:
+- ✅ `xregistry/templates/py/ehproducer/pyproject.toml.jinja`
+- ✅ `xregistry/templates/py/ehconsumer/pyproject.toml.jinja`
 
 ---
 
 ## Python Kafka Tests (8 tests) - pytest-asyncio Configuration Issue
 
-**Status:** Skipped  
+**Status:** ✅ FIXED  
 **Issue:** Generated tests fail with "async def functions are not natively supported"  
 **Affected Tests:**
 - `test/py/test_python.py::test_kafkaproducer_contoso_erp_py`
@@ -80,30 +71,21 @@ This document tracks tests that are temporarily skipped due to known issues.
 - The fixture uses `@pytest.fixture(scope="module")` instead of `@pytest_asyncio.fixture`
 - Alternative: Add `asyncio_mode = "auto"` to `[tool.pytest.ini_options]` in `pyproject.toml.jinja`
 
-**Resolution:** Same fix as EventHubs tests:
-- Option 1: Change `@pytest.fixture` to `@pytest_asyncio.fixture` for async fixtures in templates
-- Option 2: Add pytest configuration to `pyproject.toml.jinja`:
-  ```toml
-  [tool.pytest.ini_options]
-  asyncio_mode = "auto"
-  ```
-- Files to modify:
-  - `xregistry/templates/py/kafkaproducer/{testdir}test_producer.py.jinja`
-  - `xregistry/templates/py/kafkaconsumer/{testdir}test_dispatcher.py.jinja`
-  - `xregistry/templates/py/kafkaproducer/pyproject.toml.jinja`
-  - `xregistry/templates/py/kafkaconsumer/pyproject.toml.jinja`
+**Fix Applied:** Added `[tool.pytest.ini_options]` with `asyncio_mode = "auto"` to pyproject.toml templates:
+- ✅ `xregistry/templates/py/kafkaproducer/pyproject.toml.jinja`
+- ✅ `xregistry/templates/py/kafkaconsumer/pyproject.toml.jinja`
 
 ---
 
 ## Summary
 
 **Total Tests:** 193  
-**Passing:** 156  
-**Skipped:** 37 (17 pre-existing + 20 new)  
+**Expected Passing:** 172 (156 + 16 fixed)  
+**Expected Skipped:** 21 (17 pre-existing + 4 catalog)  
 **Last Updated:** 2025-11-05  
-**Last Successful CI Run:** https://github.com/clemensv/xregistry-cli/actions/runs/19112322037  
+**Last Successful CI Run (before fix):** https://github.com/clemensv/xregistry-cli/actions/runs/19112322037  
 **Last Failed CI Run (Investigation):** https://github.com/clemensv/xregistry-cli/actions/runs/19111112588
 
-**Root Cause Summary:**
-- **Catalog tests (4):** Infrastructure issue with xrserver MySQL container initialization
-- **Python EventHubs/Kafka tests (16):** Template generation issue - async fixtures missing `@pytest_asyncio.fixture` decorator or `asyncio_mode = "auto"` configuration
+**Status Summary:**
+- **Catalog tests (4):** ⏳ Still skipped - Infrastructure issue with xrserver MySQL container initialization
+- **Python EventHubs/Kafka tests (16):** ✅ FIXED - Added `asyncio_mode = "auto"` to pyproject.toml templates
