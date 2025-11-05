@@ -28,8 +28,8 @@ from xregistry.cli import main as cli
 # constants / tracing                                                         #
 # --------------------------------------------------------------------------- #
 
-CATALOG_PORT = 8080
-CATALOG_URL = "http://localhost:8080"
+CATALOG_PORT = 3900
+CATALOG_URL = "http://localhost:3900"
 IMAGE_NAME = "ghcr.io/xregistry/xrserver-all:latest"
 STARTUP_TIMEOUT = 180
 
@@ -47,7 +47,7 @@ sys.path.append(os.path.join(project_root))
 def catalog_container():
     with DockerContainer(IMAGE_NAME) \
         .with_command("--recreatedb") \
-        .with_bind_ports(CATALOG_PORT, CATALOG_PORT) as container:
+        .with_bind_ports(CATALOG_PORT, 8080) as container:
         wait_for_logs(container, "/xrserver")
         # wait for the server to be available
         timeout = time.time() + STARTUP_TIMEOUT
@@ -59,7 +59,7 @@ def catalog_container():
             except Exception:
                 pass
             if time.time() > timeout:
-                raise Exception("Catalog container did not start in time: HTTP service not available on port 8080")
+                raise Exception(f"Catalog container did not start in time: HTTP service not available on port {CATALOG_PORT}")
             time.sleep(1)
         # load /xregistry/schemas/model.json (full model with group definitions), GET /modelsource from the server, merge the local model with the remote model, and PUT the merged model back to the server
         local_model_path = os.path.join(project_root, "xregistry", "schemas", "model.json")
