@@ -7,6 +7,7 @@ build:
 install: build
 {{'\t'}}cd {{ data_project_name }} && poetry install
 {{'\t'}}cd {{ main_project_name }} && poetry install
+{{'\t'}}pip install ./{{ data_project_name }} ./{{ main_project_name }}
 
 test: install
 {{'\t'}}pytest ./{{ main_project_name }}/tests ./{{ data_project_name }}/tests
