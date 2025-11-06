@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 import tempfile
 import pytest
+import pytest_asyncio
 from azure.eventhub import EventData
 from azure.eventhub.aio import EventHubConsumerClient, EventHubProducerClient
 from azure.storage.blob.aio import BlobServiceClient as BlobServiceClientAsync
@@ -44,7 +45,7 @@ from {{main_project_name}}.dispatcher import {{class_name}}
 {%- endfor %}
 {%- endfor %}
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="function")
 async def event_hub_emulator():
     with Network() as network:
         with AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:3.31.0") \
