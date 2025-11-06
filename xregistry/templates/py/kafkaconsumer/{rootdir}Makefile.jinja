@@ -5,9 +5,8 @@ build:
 {{'\t'}}pip wheel -w whl ./{{ data_project_name }} ./{{ main_project_name }}
 
 install: build
-{{'\t'}}cd {{ data_project_name }} && poetry install --only dev
-{{'\t'}}cd {{ main_project_name }} && poetry install --only dev
-{{'\t'}}pip install ./{{ data_project_name }} ./{{ main_project_name }}
+{{'\t'}}cd {{ data_project_name }} && poetry install
+{{'\t'}}cd {{ main_project_name }} && poetry install
 
 test: install
 {{'\t'}}pytest ./{{ main_project_name }}/tests ./{{ data_project_name }}/tests
