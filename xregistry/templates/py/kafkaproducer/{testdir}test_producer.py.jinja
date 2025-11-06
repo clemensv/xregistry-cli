@@ -75,8 +75,7 @@ def parse_cloudevent(msg: Message) -> CloudEvent:
 {%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
 {%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
 
-@pytest.mark.asyncio
-async def {{ test_function_name | dotunderscore }}(kafka_emulator):
+def {{ test_function_name | dotunderscore }}(kafka_emulator):
     """Test the {{ messagename }} event from the {{ groupname }} message group"""
 
     bootstrap_servers = kafka_emulator["bootstrap_servers"]
@@ -90,8 +89,12 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
     })
     consumer.subscribe([topic])
 
-    async def on_event():
+    def on_event():
+        import time
+        timeout = time.time() + 10  # 10 second timeout
         while True:
+            if time.time() > timeout:
+                return False
             msg = consumer.poll(1.0)
             if msg is None:
                 continue
@@ -157,7 +160,7 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
     {%- else %}
     event_data = {}
     {%- endif %}
-    await producer_instance.send_{{ messageid | dotunderscore | snake }}(
+    producer_instance.send_{{ messageid | dotunderscore | snake }}(
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
             _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
         {%- endfor -%}
@@ -170,7 +173,7 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
         {%- endfor -%}
     )
 
-    assert await asyncio.wait_for(on_event(), timeout=10)
+    assert on_event()
     consumer.close()
 
 {%- endfor %}

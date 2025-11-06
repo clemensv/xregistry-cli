@@ -41,7 +41,7 @@ from {{main_project_name}}.dispatcher import {{class_name}}
 {%- endfor %}
 
 @pytest.fixture(scope="module")
-async def kafka_emulator():
+def kafka_emulator():
     with KafkaContainer() as kafka:
         connection = kafka.get_bootstrap_server()
         admin_client = AdminClient({'bootstrap.servers': connection})

@@ -63,7 +63,7 @@ class {{ class_name }}:
     {%- set message_snake = messageid | dotunderscore | snake %}
     {%- set data_type = util.DeclareDataType( data_project_name, root, message ) %}
 
-    async def send_{{message_snake}}(self,
+    def send_{{message_snake}}(self,
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
         _{{ attrname }}: str, {{ '' }}
         {%- endfor -%}
