@@ -86,31 +86,50 @@ def test_codegen_py():
             assert xregistry.cli() == 0
 
 
-@pytest.mark.skip(reason="temporarily disabled")
-def test_codegen_java():
+@pytest.mark.parametrize('template_name', ['amqpconsumer', 'amqpproducer', 'kafkaproducer'])
+def test_codegen_java(template_name):
+    """Test Java code generation for production-ready templates."""
     # check whether maven is installed
-    if subprocess.check_call("mvn -v", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True) != 0:
+    try:
+        result = subprocess.run("mvn -v", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+        if result.returncode != 0:
+            pytest.skip('Maven is not installed')
+    except Exception:
         pytest.skip('Maven is not installed')
 
-    input_dir = os.path.join(
-        project_root, 'xregistry/templates/java'.replace('/', os.path.sep))
-    # loop through all dirs in the input directory that have no leading underscore in their name
-    for dir_name in os.listdir(input_dir):
-        if os.path.exists(os.path.join(project_root, f'tmp/test/java/{dir_name}/'.replace('/', os.path.sep))):
-            shutil.rmtree(os.path.join(
-                project_root, f'tmp/test/java/{dir_name}/'.replace('/', os.path.sep)), ignore_errors=True)
-        output_dir = os.path.join(
-            project_root, f'tmp/test/java/{dir_name}'.replace('/', os.path.sep))
-        if not dir_name.startswith('_') and os.path.isdir(os.path.join(input_dir, dir_name)):
-            # generate the code for each directory
-            sys.argv = ['xregistry', 'generate',
-                        '--style', dir_name,
-                        '--language', 'java',
-                        '--definitions', os.path.join(
-                            project_root, 'samples/message-definitions/contoso-erp.xreg.json'.replace('/', os.path.sep)),
-                        '--output', output_dir,
-                        '--projectname', f'test.{dir_name}']
-            assert xregistry.cli() == 0
-            # run dotnet build on the csproj here that references the generated files already
-            assert subprocess.check_call(
-                "mvn package -B", cwd=output_dir, shell=True) == 0
+    output_dir = os.path.join(project_root, f'tmp/test/java/{template_name}')
+    
+    # Clean output directory
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir, ignore_errors=True)
+    
+    # Generate code
+    sys.argv = ['xregistry', 'generate',
+                '--style', template_name,
+                '--language', 'java',
+                '--definitions', os.path.join(project_root, 'test/java/contoso-erp-java.xreg.json'),
+                '--output', output_dir,
+                '--projectname', f'test.{template_name}']
+    assert xregistry.cli() == 0
+    
+    # Find generated directories
+    subdirs = [d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
+    
+    # Find data and main project directories
+    data_dir = None
+    main_dir = None
+    for subdir in subdirs:
+        if 'data' in subdir.lower():
+            data_dir = os.path.join(output_dir, subdir)
+        else:
+            main_dir = os.path.join(output_dir, subdir)
+    
+    assert main_dir is not None, f"Could not find main project directory in {output_dir}"
+    
+    # Build data project first if it exists
+    if data_dir and os.path.exists(os.path.join(data_dir, 'pom.xml')):
+        assert subprocess.check_call("mvn install -B", cwd=data_dir, shell=True) == 0, "Data project build failed"
+    
+    # Build main project
+    assert os.path.exists(os.path.join(main_dir, 'pom.xml')), f"No pom.xml found in {main_dir}"
+    assert subprocess.check_call("mvn package -B", cwd=main_dir, shell=True) == 0, "Main project build failed"

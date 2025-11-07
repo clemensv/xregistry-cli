@@ -114,9 +114,17 @@
     {%- endif %}
     
     <!-- Data project dependency -->
+    {%- set package_parts = (data_project_name | lower).split('.') %}
+    {%- if package_parts | length > 1 %}
+    {%- set data_groupid = package_parts[:-1] | join('.') %}
+    {%- set data_artifactid = package_parts[-1] %}
+    {%- else %}
+    {%- set data_groupid = package_parts[0] %}
+    {%- set data_artifactid = package_parts[0] %}
+    {%- endif %}
     <dependency>
-      <groupId>{{ data_project_name | lower | replace('-', '_') }}</groupId>
-      <artifactId>{{ data_project_name | lower | replace('-', '_') }}</artifactId>
+      <groupId>{{ data_groupid }}</groupId>
+      <artifactId>{{ data_artifactid }}</artifactId>
       <version>1.0-SNAPSHOT</version>
     </dependency>
     
