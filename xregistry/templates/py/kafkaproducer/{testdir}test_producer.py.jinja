@@ -84,7 +84,7 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
     producer = Producer({'bootstrap.servers': bootstrap_servers})
     consumer = Consumer({
         'bootstrap.servers': bootstrap_servers,
-        'group.id': 'test_group',
+        'group.id': '{{ test_function_name | dotunderscore }}',  # Unique group per test
         'auto.offset.reset': 'earliest'
     })
     consumer.subscribe([topic])
@@ -94,6 +94,13 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
     assignment_timeout = time.time() + 10
     while not consumer.assignment() and time.time() < assignment_timeout:
         consumer.poll(0.1)
+    
+    # Verify partition assignment succeeded
+    if not consumer.assignment():
+        pytest.fail(f"Consumer failed to get partition assignment within 10 seconds. Topic: {topic}")
+    
+    # Give consumer time to stabilize and seek to beginning
+    time.sleep(1)
 
     def on_event():
         import time
@@ -103,6 +110,8 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
                 return False
             msg = consumer.poll(1.0)
             if msg is None:
+                continue
+            if msg.error():
                 continue
             cloudevent = parse_cloudevent(msg)
             if cloudevent['type'] == "{{ messageid }}":
