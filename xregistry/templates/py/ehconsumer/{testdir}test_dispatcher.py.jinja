@@ -199,28 +199,23 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
                         origin = typing.get_origin(ann)
                     
                     # Now match based on the actual type
-                    ann_str = str(ann).lower()
-                    if ann is str or ann == 'str' or 'str' in ann_str:
-                        kwargs[param_name] = ""
-                    elif ann is int or ann == 'int' or 'int' in ann_str:
-                        kwargs[param_name] = 0
-                    elif ann is float or ann == 'float' or 'float' in ann_str:
-                        kwargs[param_name] = 0.0
-                    elif ann is bool or ann == 'bool' or 'bool' in ann_str:
-                        kwargs[param_name] = False
-                    elif origin is list or ann is list or 'list' in ann_str:
-                        kwargs[param_name] = []
-                    elif origin is dict or ann is dict or 'dict' in ann_str:
-                        kwargs[param_name] = {}
-                    elif isinstance(ann, type) and issubclass(ann, enum.Enum):
+                    # Check for enum FIRST before string-based type checks
+                    # to avoid false positives (e.g., "int" in "PrintJobOutcome")
+                    if isinstance(ann, type) and issubclass(ann, enum.Enum):
                         # For enums, use the first value
                         kwargs[param_name] = list(ann)[0] if list(ann) else None
-                    elif 'enum' in ann_str:
-                        # Fallback for enum detection via string
-                        try:
-                            kwargs[param_name] = list(ann)[0] if hasattr(ann, '__iter__') else None
-                        except:
-                            kwargs[param_name] = None
+                    elif ann is str:
+                        kwargs[param_name] = ""
+                    elif ann is int:
+                        kwargs[param_name] = 0
+                    elif ann is float:
+                        kwargs[param_name] = 0.0
+                    elif ann is bool:
+                        kwargs[param_name] = False
+                    elif origin is list or ann is list:
+                        kwargs[param_name] = []
+                    elif origin is dict or ann is dict:
+                        kwargs[param_name] = {}
                     else:
                         kwargs[param_name] = None
             test_instance = {{ type_name | pascal | strip_namespace }}(**kwargs)
