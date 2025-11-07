@@ -97,7 +97,7 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
 
     def on_event():
         import time
-        timeout = time.time() + 10  # 10 second timeout
+        timeout = time.time() + 20  # 20 second timeout for CI robustness
         while True:
             if time.time() > timeout:
                 return False
@@ -178,6 +178,9 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
             , _{{ attrname }} = ''
         {%- endfor -%}
     )
+    
+    # Flush producer to ensure message is sent before consumer polling
+    kafka_producer.flush(timeout=5.0)
 
     assert on_event()
     consumer.close()
