@@ -19,13 +19,24 @@ using Microsoft.Extensions.Logging;
 namespace {{ project_name | pascal }}
 {
     {%- set class_name = ( groupname | strip_namespace )+"EventProducer" %}
-     public partial class {{ class_name }}
+    /// <summary>
+    /// Producer for {{ groupname }} message group events.
+    /// Provides strongly-typed methods to send events over AMQP.
+    /// </summary>
+    /// <remarks>
+    /// Use <see cref="CreateProducer"/> to instantiate or <see cref="{{ class_name }}Builder"/> for fluent configuration.
+    /// </remarks>
+     public partial class {{ class_name }} : IDisposable
      {
         
          {%- if uses_cloudevents_message %}
          private readonly ContentMode contentMode;
          private readonly CloudEventFormatter formatter;
-         public event EventHandler<CloudEvent>? BeforeSend;
+         /// <summary>
+         /// Event raised before sending a CloudEvent. 
+         /// Return null to cancel send, or return a modified CloudEvent to send instead.
+         /// </summary>
+         public event Func<CloudEvent, CancellationToken, Task<CloudEvent?>>? BeforeSendAsync;
          {%- endif %}
          private readonly AmqpProducer endpoint;
 
@@ -45,6 +56,16 @@ namespace {{ project_name | pascal }}
            {%- set protocol = endpoint.protocol | lower -%}
            {%- set options = endpoint.protocoloptions -%}
            {%- set endpoints = endpoint.endpoints %}
+        /// <summary>
+        /// Creates a producer configured for the {{ endpointid }} endpoint.
+        /// </summary>
+        /// <param name="logger">Logger instance for diagnostics.</param>
+        /// <param name="credential">Credentials for AMQP authentication.</param>
+        {%- if uses_cloudevents_message %}
+        /// <param name="contentMode">CloudEvents content mode (Structured or Binary).</param>
+        /// <param name="formatter">CloudEvent formatter (JSON, Protobuf, or Avro).</param>
+        {%- endif %}
+        /// <returns>Configured producer instance.</returns>
         public static {{ class_name }} CreateProducerFor{{ endpointid | pascal | strip_namespace }}(ILogger logger, EndpointCredential credential {% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter {% endif %}) 
         {       
             {%- if options %}
@@ -67,15 +88,68 @@ namespace {{ project_name | pascal }}
         {%- endfor -%}
         {% endif %}
 
+        /// <summary>
+        /// Creates a producer with custom endpoint configuration.
+        /// </summary>
+        /// <param name="logger">Logger instance for diagnostics.</param>
+        /// <param name="credential">Credentials for AMQP authentication.</param>
+        {%- if uses_cloudevents_message %}
+        /// <param name="contentMode">CloudEvents content mode (Structured or Binary).</param>
+        /// <param name="formatter">CloudEvent formatter (JSON, Protobuf, or Avro).</param>
+        {%- endif %}
+        /// <param name="options">AMQP protocol options (e.g., node, filter).</param>
+        /// <param name="endpoints">List of AMQP broker URIs.</param>
+        /// <returns>Configured producer instance.</returns>
+        /// <example>
+        /// <code>
+        /// var producer = {{ class_name }}.CreateProducer(
+        ///     logger,
+        ///     new PlainEndpointCredential("user", "pass"),
+        ///     ContentMode.Structured,
+        ///     new JsonEventFormatter(),
+        ///     new Dictionary&lt;string, string&gt; { ["node"] = "/queue" },
+        ///     new List&lt;Uri&gt; { new Uri("amqp://localhost:5672") });
+        /// </code>
+        /// </example>
         public static {{ class_name }} CreateProducer(ILogger logger, EndpointCredential credential{% if uses_cloudevents_message %}, ContentMode contentMode, CloudEventFormatter formatter{% endif %}, Dictionary<string, string> options, List<Uri> endpoints)
         {
             return new {{ class_name }}(new AmqpProducer(logger, credential, options, endpoints){%- if uses_cloudevents_message %}, contentMode, formatter{%- endif %});
+        }
+        
+        /// <summary>
+        /// Creates a builder for fluent producer configuration.
+        /// </summary>
+        /// <returns>Builder instance for configuring the producer.</returns>
+        /// <example>
+        /// <code>
+        /// var producer = {{ class_name }}.CreateBuilder()
+        ///     .WithEndpoint("amqp://localhost:5672")
+        ///     .WithCredential(new PlainEndpointCredential("user", "pass"))
+        ///     .WithNode("/queue")
+        ///     .WithLogger(logger)
+        ///     .Build();
+        /// </code>
+        /// </example>
+        public static {{ class_name }}Builder CreateBuilder()
+        {
+            return new {{ class_name }}Builder();
         }
         
         {% for messageid, message in messagegroup.messages.items() -%}
         {%- set messagename = messageid | pascal %}
         {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
         {%- set is_amqp = amqp.is_amqp(message) %}
+        /// <summary>
+        /// Sends a {{ messagename | strip_namespace }} event.
+        /// </summary>
+        /// <param name="data">Event data payload.</param>
+        {%- if isCloudEvent or is_amqp %}
+        /// <param name="contentType">Content type for the event data.</param>
+        {%- endif %}
+        {%- if isCloudEvent %}
+        /// <param name="formatter">Optional formatter override.</param>
+        {%- endif %}
+        /// <returns>Task that completes when the event is sent.</returns>
         public async Task Send{{ messagename | strip_namespace }}Async(
         {{- util.body_type(data_project_name, root, message) }} data    
         {%- if isCloudEvent -%}
@@ -101,18 +175,141 @@ namespace {{ project_name | pascal }}
             {%- endif -%}
             {%- else -%}data{%- endif %};
             cloudEvent.DataContentType = contentType;
-            if (BeforeSend != null)
+            if (BeforeSendAsync != null)
             {
-                BeforeSend(this, cloudEvent);
+                var modifiedEvent = await BeforeSendAsync(cloudEvent, CancellationToken.None).ConfigureAwait(false);
+                if (modifiedEvent == null)
+                {
+                    return; // Send cancelled
+                }
+                cloudEvent = modifiedEvent;
             }
-            await endpoint.SendAsync(cloudEvent, contentMode, formatter);
+            await endpoint.SendAsync(cloudEvent, contentMode, formatter).ConfigureAwait(false);
             {% elif is_amqp %}
             {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", message) | indent(12)}}
             amqpMessage.BodySection = new Data() { Binary = data.ToByteArray(contentType) };
-            await ((AmqpProducer)endpoint).SendAsync(amqpMessage);
+            await ((AmqpProducer)endpoint).SendAsync(amqpMessage).ConfigureAwait(false);
             {%- endif %}
         }
         {% endfor %}
+
+        /// <summary>
+        /// Disposes the producer and releases AMQP resources.
+        /// </summary>
+        public void Dispose()
+        {
+            endpoint?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Builder for creating {{ class_name }} instances with fluent configuration.
+    /// </summary>
+    public class {{ class_name }}Builder
+    {
+        private ILogger? _logger;
+        private EndpointCredential? _credential;
+        {%- if uses_cloudevents_message %}
+        private ContentMode _contentMode = ContentMode.Structured;
+        private CloudEventFormatter _formatter = new JsonEventFormatter();
+        {%- endif %}
+        private Dictionary<string, string> _options = new Dictionary<string, string>();
+        private List<Uri> _endpoints = new List<Uri>();
+
+        /// <summary>
+        /// Sets the logger for diagnostics.
+        /// </summary>
+        public {{ class_name }}Builder WithLogger(ILogger logger)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the AMQP authentication credential.
+        /// </summary>
+        public {{ class_name }}Builder WithCredential(EndpointCredential credential)
+        {
+            _credential = credential ?? throw new ArgumentNullException(nameof(credential));
+            return this;
+        }
+
+        {%- if uses_cloudevents_message %}
+        /// <summary>
+        /// Sets the CloudEvents content mode (default: Structured).
+        /// </summary>
+        public {{ class_name }}Builder WithContentMode(ContentMode contentMode)
+        {
+            _contentMode = contentMode;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the CloudEvent formatter (default: JsonEventFormatter).
+        /// </summary>
+        public {{ class_name }}Builder WithFormatter(CloudEventFormatter formatter)
+        {
+            _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
+            return this;
+        }
+        {%- endif %}
+
+        /// <summary>
+        /// Adds an AMQP broker endpoint URI.
+        /// </summary>
+        public {{ class_name }}Builder WithEndpoint(string uri)
+        {
+            if (string.IsNullOrWhiteSpace(uri))
+                throw new ArgumentException("URI cannot be null or empty", nameof(uri));
+            _endpoints.Add(new Uri(uri));
+            return this;
+        }
+
+        /// <summary>
+        /// Adds an AMQP broker endpoint URI.
+        /// </summary>
+        public {{ class_name }}Builder WithEndpoint(Uri uri)
+        {
+            _endpoints.Add(uri ?? throw new ArgumentNullException(nameof(uri)));
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the AMQP node (queue/topic) name.
+        /// </summary>
+        public {{ class_name }}Builder WithNode(string node)
+        {
+            if (string.IsNullOrWhiteSpace(node))
+                throw new ArgumentException("Node cannot be null or empty", nameof(node));
+            _options["node"] = node;
+            return this;
+        }
+
+        /// <summary>
+        /// Adds a custom protocol option.
+        /// </summary>
+        public {{ class_name }}Builder WithOption(string key, string value)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            _options[key] = value;
+            return this;
+        }
+
+        /// <summary>
+        /// Builds the producer instance.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if required configuration is missing.</exception>
+        public {{ class_name }} Build()
+        {
+            if (_credential == null)
+                throw new InvalidOperationException("Credential is required. Call WithCredential().");
+            if (_endpoints.Count == 0)
+                throw new InvalidOperationException("At least one endpoint is required. Call WithEndpoint().");
+            
+            var logger = _logger ?? new LoggerFactory().CreateLogger<{{ class_name }}>();
+            return {{ class_name }}.CreateProducer(logger, _credential{% if uses_cloudevents_message %}, _contentMode, _formatter{% endif %}, _options, _endpoints);
+        }
     }
 }
 {% endfor -%}

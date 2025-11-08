@@ -47,6 +47,8 @@ namespace {{ project_name | pascal }}
         /// <param name="deserializeCloudEventData">The function to use to deserialize the CloudEvent data.</param>
         public AmqpConsumer(EndpointCredential credential, Uri endpoint, Dictionary<string, string>? options = null, ILoggerFactory? loggerFactory = null)
         {
+            ArgumentNullException.ThrowIfNull(credential);
+            ArgumentNullException.ThrowIfNull(endpoint);
             Logger = loggerFactory != null ? loggerFactory.CreateLogger(GetType()) : new LoggerFactory().CreateLogger(GetType());
             _credential = credential;
             _endpoint = endpoint;
@@ -77,12 +79,12 @@ namespace {{ project_name | pascal }}
 
             try
             {
-                _connection = await factory.CreateAsync(address);
-                Logger.LogInformation(VERBOSE_LOG_TEMPLATE, "Connection to endpoint " + _endpoint + " created");
+                _connection = await factory.CreateAsync(address).ConfigureAwait(false);
+                Logger.LogInformation(VERBOSE_LOG_TEMPLATE, "Connection to endpoint created");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ERROR_LOG_TEMPLATE, "Error creating connection to endpoint " + _endpoint + ": " + ex.Message);
+                Logger.LogError(ex, "Error connecting to endpoint");
                 throw;
             }
 
@@ -91,19 +93,19 @@ namespace {{ project_name | pascal }}
             {
                 try
                 {
-                    var token = ((TokenEndpointCredential)_credential).GetTokenAsync().Result;
+                    var token = await ((TokenEndpointCredential)_credential).GetTokenAsync().ConfigureAwait(false);
                     var cbsSender = new SenderLink(_session, "$cbs", "$cbs");
                     var request = new global::Amqp.Message(token);
                     request.Properties.MessageId = Guid.NewGuid().ToString();
                     request.ApplicationProperties["operation"] = "put-token";
                     request.ApplicationProperties["type"] = "amqp:jwt";
                     request.ApplicationProperties["name"] = string.Format("amqp://{0}/{1}", address.Host, address.Path);
-                    await cbsSender.SendAsync(request);
-                    await cbsSender.CloseAsync();
+                    await cbsSender.SendAsync(request).ConfigureAwait(false);
+                    await cbsSender.CloseAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ERROR_LOG_TEMPLATE, "Error sending token to endpoint " + _endpoint + ": " + ex.Message);
+                    Logger.LogError(ex, "Error sending token to endpoint");
                     throw;
                 }
             }
@@ -116,17 +118,38 @@ namespace {{ project_name | pascal }}
         {
             if (_receiverLink != null)
             {
-                _receiverLink.Close();
+                try
+                {
+                    _receiverLink.Close(TimeSpan.FromSeconds(5));
+                }
+                catch (TimeoutException)
+                {
+                    // Expected if close times out
+                }
                 _receiverLink = null;
             }
             if (_session != null)
             {
-                _session.Close();
+                try
+                {
+                    _session.Close(TimeSpan.FromSeconds(5));
+                }
+                catch (TimeoutException)
+                {
+                    // Expected if close times out
+                }
                 _session = null;
             }
             if (_connection != null)
             {
-                _connection.Close();
+                try
+                {
+                    _connection.Close(TimeSpan.FromSeconds(5));
+                }
+                catch (TimeoutException)
+                {
+                    // Expected if close times out
+                }
                 _connection = null;
             }
         }
@@ -180,7 +203,7 @@ namespace {{ project_name | pascal }}
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError(ERROR_LOG_TEMPLATE, "Error processing message: " + ex.Message);
+                        Logger.LogError(ex, "Error processing message");
                         receiver.Release(message);
                     }
                 }
@@ -195,7 +218,7 @@ namespace {{ project_name | pascal }}
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ERROR_LOG_TEMPLATE, "Error processing message: " + ex.Message);
+                    Logger.LogError(ex, "Error processing message");
                     receiver.Release(message);
                 }
                 {%- endfilter %}
@@ -205,7 +228,7 @@ namespace {{ project_name | pascal }}
             }
             catch (Exception ex)
             {
-                Logger.LogError(ERROR_LOG_TEMPLATE, "Error processing message: " + ex.Message);
+                Logger.LogError(ex, "Error processing message");
             }
         }
 
@@ -216,11 +239,11 @@ namespace {{ project_name | pascal }}
         {
             Logger.LogInformation(VERBOSE_LOG_TEMPLATE, "Stopping AMQP consumer endpoint");
             if (_receiverLink != null)
-                await _receiverLink.CloseAsync();
+                await _receiverLink.CloseAsync().ConfigureAwait(false);
             if (_session != null)
-                await _session.CloseAsync();
+                await _session.CloseAsync().ConfigureAwait(false);
             if (_connection != null)
-                await _connection.CloseAsync();
+                await _connection.CloseAsync().ConfigureAwait(false);
         }
 
         ~AmqpConsumer()

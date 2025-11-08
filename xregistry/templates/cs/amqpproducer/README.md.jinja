@@ -1,0 +1,212 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
+{%- set class_name = ( groupname | strip_namespace )+"EventProducer" %}
+# {{ project_name | pascal }} - AMQP Producer
+
+Auto-generated AMQP producer for {{ groupname }} message group.
+
+## Overview
+
+This producer provides strongly-typed methods to send events over AMQP using the CloudEvents specification.
+
+## Quick Start
+
+### Using Builder Pattern (Recommended)
+
+```csharp
+using {{ project_name | pascal }};
+using CloudNative.CloudEvents;
+using CloudNative.CloudEvents.SystemTextJson;
+using Microsoft.Extensions.Logging;
+
+// Create producer using fluent builder
+var producer = {{ class_name }}.CreateBuilder()
+    .WithEndpoint("amqp://localhost:5672")
+    .WithCredential(new PlainEndpointCredential("username", "password"))
+    .WithNode("/queue/events")
+    .WithLogger(loggerFactory.CreateLogger<{{ class_name }}>())
+    .Build();
+
+// Send events
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+var eventData = new {{ message_body_type }}
+{
+    // Set properties
+};
+
+await producer.Send{{ messagename }}Async(eventData, "tenant-id", "device-id");
+{%- endif %}
+
+// Cleanup
+producer.Dispose();
+```
+
+### Using Factory Method
+
+```csharp
+var logger = loggerFactory.CreateLogger<{{ class_name }}>();
+var endpoints = new List<Uri> { new Uri("amqp://localhost:5672") };
+var options = new Dictionary<string, string> { ["node"] = "/queue/events" };
+
+var producer = {{ class_name }}.CreateProducer(
+    logger,
+    new PlainEndpointCredential("username", "password"),
+    ContentMode.Structured,
+    new JsonEventFormatter(),
+    options,
+    endpoints);
+```
+
+## Available Events
+
+This producer can send the following events:
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Event Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`
+
+```csharp
+await producer.Send{{ messagename }}Async(data, ...);
+```
+
+{% endfor %}
+
+## Authentication
+
+### Plain Credentials
+
+```csharp
+var credential = new PlainEndpointCredential("username", "password");
+```
+
+### Token-Based Authentication
+
+```csharp
+var credential = new TokenEndpointCredential(async () => 
+{
+    // Fetch and return access token
+    return await GetAccessTokenAsync();
+});
+```
+
+## Advanced Features
+
+### Before Send Hook
+
+Modify or cancel events before sending:
+
+```csharp
+producer.BeforeSendAsync += async (cloudEvent, cancellationToken) =>
+{
+    // Modify event
+    cloudEvent.SetAttributeFromString("custom-header", "value");
+    
+    // Return null to cancel send
+    // return null;
+    
+    // Return event to send
+    return cloudEvent;
+};
+```
+
+### Content Formats
+
+The producer supports multiple CloudEvents formats:
+
+```csharp
+// JSON (default)
+.WithFormatter(new JsonEventFormatter())
+
+// Protobuf
+.WithFormatter(new ProtobufEventFormatter())
+
+// Avro
+.WithFormatter(new AvroEventFormatter())
+```
+
+### Content Modes
+
+```csharp
+// Structured mode (event + data in body)
+.WithContentMode(ContentMode.Structured)
+
+// Binary mode (data in body, event in headers)
+.WithContentMode(ContentMode.Binary)
+```
+
+## Configuration Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `node` | AMQP queue or topic name | `/queue/events` |
+| `filter` | Message filter expression | `priority = 'high'` |
+
+```csharp
+producer = {{ class_name }}.CreateBuilder()
+    .WithNode("/queue/events")
+    .WithOption("filter", "priority = 'high'")
+    .Build();
+```
+
+## Error Handling
+
+All send methods throw exceptions on failure:
+
+```csharp
+try
+{
+    await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data, ...);
+}
+catch (AmqpException ex)
+{
+    // Handle AMQP-specific errors
+    logger.LogError(ex, "Failed to send event");
+}
+catch (Exception ex)
+{
+    // Handle general errors
+    logger.LogError(ex, "Unexpected error");
+}
+```
+
+## Disposal
+
+Always dispose the producer to release AMQP connections:
+
+```csharp
+using var producer = {{ class_name }}.CreateBuilder()
+    .WithEndpoint("amqp://localhost:5672")
+    .WithCredential(credential)
+    .Build();
+
+// Use producer
+await producer.Send...Async(...);
+
+// Disposed automatically
+```
+
+## Dependencies
+
+- `CloudNative.CloudEvents` >= 2.8.0
+- `AMQPNetLite` >= 2.4.11
+- `Microsoft.Extensions.Logging` >= 9.0.0
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** AMQP 1.0  
+**Envelope:** CloudEvents 1.0
+{% endfor %}

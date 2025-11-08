@@ -31,7 +31,7 @@ using CloudNative.CloudEvents.Avro;
         {%- endfor -%}    
     {%- elif attribute.value is not defined -%}
         {%- if not attrname == "time" and not attrname == "id" -%}
-        , string {{ attrname }}{%- if not attribute.required %} = default {%- endif %}{% endif -%}
+        , string {{ attrname }}{%- if not attribute.required %} = default! {%- endif %}{% endif -%}
     {%- endif -%}
 {%- endfor -%} 
 {%- endmacro -%}

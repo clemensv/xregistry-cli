@@ -24,7 +24,15 @@ namespace {{ project_name | pascal }}
     {% for messagegroupid, messagegroup in messagegroups.items() -%}
     {%- set groupname = messagegroupid | pascal -%}
     {%- set class_name = (groupname | strip_namespace) + "EventConsumer" %}
-    public class {{ class_name }} : {{project_name | pascal }}.Tools.DispatcherBase
+    /// <summary>
+    /// Consumer for {{ groupname }} message group events.
+    /// Provides event handlers for incoming AMQP messages.
+    /// </summary>
+    /// <remarks>
+    /// Use <see cref="CreateConsumer"/> to instantiate or <see cref="{{ class_name }}Builder"/> for fluent configuration.
+    /// Implements IAsyncDisposable for proper resource cleanup.
+    /// </remarks>
+    public class {{ class_name }} : {{project_name | pascal }}.Tools.DispatcherBase, IAsyncDisposable
     {
         private readonly AmqpConsumer _endpoint;
 
@@ -32,19 +40,39 @@ namespace {{ project_name | pascal }}
         {%- set messagename = messageid | strip_dots | pascal -%}
         {%- set message_body_type = util.body_type(data_project_name, root, message) %}
         {%- if cloudEvents.isCloudEvent(message) %}
+        /// <summary>
+        /// Event handler for {{ messagename }} messages.
+        /// </summary>
         public event Func<CloudEvent, {{ message_body_type }}?, Task>? {{ messagename }}Async;
         {%- else %}
+        /// <summary>
+        /// Event handler for {{ messagename }} messages.
+        /// </summary>
         public event Func<Message, {{ message_body_type }}?, Task>? {{ messagename }}Async;
         {%- endif %}
         {%- endfor %}
         {%- if uses_amqp_message%}
+        /// <summary>
+        /// Event handler for unhandled AMQP messages.
+        /// </summary>
         public event Func<Message, Task>? UnhandledMessageAsync;   
         {%- endif %}
         {%- if uses_cloudevents_message%}
+        /// <summary>
+        /// Event handler for unhandled CloudEvents.
+        /// </summary>
         public event Func<CloudEvent, Task>? UnhandledEventAsync;
         {%- endif %}
+        /// <summary>
+        /// Event handler for message processing errors.
+        /// </summary>
+        public event Func<CloudEvent, Exception, Task>? MessageProcessingErrorAsync;
+        /// <summary>
+        /// Event handler for deserialization errors.
+        /// </summary>
+        public event Func<CloudEvent, Exception, Task>? DeserializationErrorAsync;
         
-        public {{ class_name }}(AmqpConsumer endpoint, ILoggerFactory? logger)
+        private {{ class_name }}(AmqpConsumer endpoint, ILoggerFactory? logger)
             : base(logger)
         {
             _endpoint = endpoint;
@@ -56,7 +84,60 @@ namespace {{ project_name | pascal }}
             {%- endif %}
         }
 
+        /// <summary>
+        /// Creates a consumer with custom endpoint configuration.
+        /// </summary>
+        /// <param name="credential">Credentials for AMQP authentication.</param>
+        /// <param name="endpoint">AMQP broker URI.</param>
+        /// <param name="loggerFactory">Optional logger factory for diagnostics.</param>
+        /// <param name="options">AMQP protocol options (e.g., node, filter).</param>
+        /// <returns>Configured consumer instance.</returns>
+        /// <example>
+        /// <code>
+        /// var consumer = {{ class_name }}.CreateConsumer(
+        ///     new PlainEndpointCredential("user", "pass"),
+        ///     new Uri("amqp://localhost:5672"),
+        ///     loggerFactory,
+        ///     new Dictionary&lt;string, string&gt; { ["node"] = "/queue" });
+        /// consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (ce, data) => {
+        ///     // Handle message
+        /// };
+        /// await consumer.StartAsync();
+        /// </code>
+        /// </example>
+        public static {{ class_name }} CreateConsumer(EndpointCredential credential, Uri endpoint, ILoggerFactory? loggerFactory = null, Dictionary<string, string>? options = null)
+        {
+            var amqpConsumer = new AmqpConsumer(credential, endpoint, options, loggerFactory);
+            return new {{ class_name }}(amqpConsumer, loggerFactory);
+        }
+
+        /// <summary>
+        /// Creates a builder for fluent consumer configuration.
+        /// </summary>
+        /// <returns>Builder instance for configuring the consumer.</returns>
+        /// <example>
+        /// <code>
+        /// var consumer = {{ class_name }}.CreateBuilder()
+        ///     .WithEndpoint("amqp://localhost:5672")
+        ///     .WithCredential(new PlainEndpointCredential("user", "pass"))
+        ///     .WithNode("/queue")
+        ///     .WithLogger(loggerFactory)
+        ///     .Build();
+        /// </code>
+        /// </example>
+        public static {{ class_name }}Builder CreateBuilder()
+        {
+            return new {{ class_name }}Builder();
+        }
+
+        /// <summary>
+        /// Starts consuming messages from the AMQP endpoint.
+        /// </summary>
         public Task StartAsync() => _endpoint.StartAsync();
+        
+        /// <summary>
+        /// Stops consuming messages from the AMQP endpoint.
+        /// </summary>
         public Task StopAsync() => _endpoint.StopAsync();
 
         {%- if uses_cloudevents_message %}
@@ -77,12 +158,23 @@ namespace {{ project_name | pascal }}
                         {
                             if ( handler == null ) continue;
                             {%- if message_body_type != "byte[]" -%}
-                            var t = (Task?)(handler.DynamicInvoke(
-                                cloudEvent,
-                                {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)));
-                            if (t != null)
+                            try
                             {
-                                tasks.Add(t);
+                                var t = (Task?)(handler.DynamicInvoke(
+                                    cloudEvent,
+                                    {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)));
+                                if (t != null)
+                                {
+                                    tasks.Add(t);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error deserializing {{ messagename }} message");
+                                if (DeserializationErrorAsync != null)
+                                {
+                                    await DeserializationErrorAsync(cloudEvent, ex);
+                                }
                             }
                             {%- else -%}
                             var t = (Task?)(handler.DynamicInvoke(cloudEvent, cloudEvent.Data));
@@ -92,7 +184,18 @@ namespace {{ project_name | pascal }}
                             }
                             {%- endif -%}
                         }
-                        await Task.WhenAll(tasks);
+                        try
+                        {
+                            await Task.WhenAll(tasks);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error processing {{ messagename }} message");
+                            if (MessageProcessingErrorAsync != null)
+                            {
+                                await MessageProcessingErrorAsync(cloudEvent, ex);
+                            }
+                        }
                     }
                     return true;
                 {% endfor %}
@@ -178,9 +281,21 @@ namespace {{ project_name | pascal }}
             }
         }
 
+        /// <summary>
+        /// Disposes the consumer synchronously.
+        /// </summary>
         public void Dispose()
         {
             _endpoint.Dispose();
+        }
+
+        /// <summary>
+        /// Disposes the consumer asynchronously, ensuring proper cleanup.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            await StopAsync();
+            _endpoint?.Dispose();
         }
 
         {%- if root.endpoints -%}
@@ -214,6 +329,91 @@ namespace {{ project_name | pascal }}
         {%- endif %}
         {%- endfor %}
         {%- endif %}
+    }
+
+    /// <summary>
+    /// Builder for creating {{ class_name }} instances with fluent configuration.
+    /// </summary>
+    public class {{ class_name }}Builder
+    {
+        private EndpointCredential? _credential;
+        private Uri? _endpoint;
+        private ILoggerFactory? _loggerFactory;
+        private Dictionary<string, string> _options = new Dictionary<string, string>();
+
+        /// <summary>
+        /// Sets the AMQP authentication credential.
+        /// </summary>
+        public {{ class_name }}Builder WithCredential(EndpointCredential credential)
+        {
+            _credential = credential ?? throw new ArgumentNullException(nameof(credential));
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the AMQP broker endpoint URI.
+        /// </summary>
+        public {{ class_name }}Builder WithEndpoint(string uri)
+        {
+            if (string.IsNullOrWhiteSpace(uri))
+                throw new ArgumentException("URI cannot be null or empty", nameof(uri));
+            _endpoint = new Uri(uri);
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the AMQP broker endpoint URI.
+        /// </summary>
+        public {{ class_name }}Builder WithEndpoint(Uri uri)
+        {
+            _endpoint = uri ?? throw new ArgumentNullException(nameof(uri));
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the logger factory for diagnostics.
+        /// </summary>
+        public {{ class_name }}Builder WithLogger(ILoggerFactory loggerFactory)
+        {
+            _loggerFactory = loggerFactory;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the AMQP node (queue/topic) name.
+        /// </summary>
+        public {{ class_name }}Builder WithNode(string node)
+        {
+            if (string.IsNullOrWhiteSpace(node))
+                throw new ArgumentException("Node cannot be null or empty", nameof(node));
+            _options["node"] = node;
+            return this;
+        }
+
+        /// <summary>
+        /// Adds a custom protocol option.
+        /// </summary>
+        public {{ class_name }}Builder WithOption(string key, string value)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            _options[key] = value;
+            return this;
+        }
+
+        /// <summary>
+        /// Builds the consumer instance.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if required configuration is missing.</exception>
+        public {{ class_name }} Build()
+        {
+            if (_credential == null)
+                throw new InvalidOperationException("Credential is required. Call WithCredential().");
+            if (_endpoint == null)
+                throw new InvalidOperationException("Endpoint is required. Call WithEndpoint().");
+            
+            return {{ class_name }}.CreateConsumer(_credential, _endpoint, _loggerFactory, _options);
+        }
     }
     {% endfor %}
 }

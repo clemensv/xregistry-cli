@@ -7,6 +7,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Xunit;
@@ -15,6 +16,7 @@ using Amqp;
 using Amqp.Framing;
 using Amqp.Types;
 using Testcontainers.ActiveMq;
+using CloudNative.CloudEvents;
 
 using {{ project_name | pascal }};
 
@@ -181,11 +183,8 @@ namespace {{ project_name | pascal }}.Test
     public class {{ project_name |  pascal | strip_dots }}CollectionFixture : ICollectionFixture<{{ project_name |  pascal | strip_dots }}Fixture>
     {
     }
-
-    {%- for messagegroupid, messagegroup in messagegroups.items() %}
-    {%- set pascal_group_name = messagegroupid | pascal %}
-    {%- set class_name = (pascal_group_name | strip_namespace) + "EventConsumer" %}
-    {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"Tests" %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set test_class_name = (project_name + messagegroupid) |  pascal | strip_dots + "Tests" %}
     [Collection("Artemis container")]
     public class {{ test_class_name }} 
     {
@@ -201,8 +200,9 @@ namespace {{ project_name | pascal }}.Test
 #pragma warning disable CS8604 // init takes care of nullables 
 
         {%- for messageid, message in messagegroup.messages.items() %}
-        {%- set messagename = messageid | strip_dots | pascal %}
+        {%- set messagename = messageid | strip_namespace | strip_dots | pascal %}
         {%- set message_body_type = util.body_type(data_project_name, root, message) %}
+        {%- set producer_class_name = (messagegroupid | pascal | strip_namespace) + "EventProducer" %}
         [Fact]
         public async Task Test{{ messagename }}Message()
         {
@@ -210,32 +210,17 @@ namespace {{ project_name | pascal }}.Test
             try
             {
                 var plainEndpointCredential = new PlainEndpointCredential("guest", "guest");
-                var dispatcher = {{ class_name }}.CreateBuilder()
+                var producer = {{ producer_class_name }}.CreateBuilder()
                     .WithEndpoint(new Uri(_fixture.ArtemisBrokerUrl, _fixture.QueueName))
                     .WithCredential(plainEndpointCredential)
-                    .WithLogger(_fixture.GetLoggerFactory())
+                    .WithNode("/" + _fixture.QueueName)
+                    .WithLogger(_fixture.GetLoggerFactory().CreateLogger<{{ producer_class_name }}>())
                     .Build();
-                await dispatcher.StartAsync();
                 try
                 {
                     var messageReceived = new TaskCompletionSource<bool>();
-                    dispatcher.{{ messagename }}Async += (amqpMessage, messageObj) =>
-                    {
-                        try
-                        {
-                            _logger.LogInformation("{{ messagename }} message received");
-                            Assert.NotNull(amqpMessage);
-                            Assert.NotNull(messageObj);
-                            messageReceived.SetResult(true);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "An error occurred during {{ messagename }} message processing");
-                            messageReceived.SetResult(false);
-                        }
-                        return Task.CompletedTask;
-                    };
-
+                    
+                    // Set up receiver to verify message was sent
                     var factory = new ConnectionFactory();
                     var address = new Address(_fixture.ArtemisBrokerUrl?.AbsoluteUri);
                     var connection = await factory.CreateAsync(address);
@@ -244,36 +229,62 @@ namespace {{ project_name | pascal }}.Test
                         var session = new Session(connection);
                         try
                         {
-                            var sender = new SenderLink(session, "sender-link", "/" + _fixture.QueueName);
+                            var receiver = new ReceiverLink(session, "receiver-link", "/" + _fixture.QueueName);
                             try
                             {
+                                // Start listening for message
+                                var receiveTask = Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        var receivedMessage = await receiver.ReceiveAsync(TimeSpan.FromSeconds(10));
+                                        if (receivedMessage != null)
+                                        {
+                                            receiver.Accept(receivedMessage);
+                                            _logger.LogInformation("{{ messagename }} message received");
+                                            
+                                            // Verify CloudEvents properties
+                                            Assert.NotNull(receivedMessage.ApplicationProperties);
+                                            Assert.Equal("1.0", receivedMessage.ApplicationProperties["cloudEvents:specversion"]);
+                                            Assert.Equal("{{ messageid }}", receivedMessage.ApplicationProperties["cloudEvents:type"]);
+                                            Assert.NotNull(receivedMessage.ApplicationProperties["cloudEvents:id"]);
+                                            Assert.NotNull(receivedMessage.ApplicationProperties["cloudEvents:source"]);
+                                            
+                                            messageReceived.SetResult(true);
+                                        }
+                                        else
+                                        {
+                                            _logger.LogWarning("No message received within timeout");
+                                            messageReceived.SetResult(false);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _logger.LogError(ex, "Error receiving message");
+                                        messageReceived.SetException(ex);
+                                    }
+                                });
+
+                                // Send message using producer
                                 {%- if message_body_type != "byte[]" %}
                                 var eventDataTest = new {{ message_body_type }}Tests();
-                                var eventDataInstance = eventDataTest.CreateInstance();
-                                var eventData = eventDataInstance.ToByteArray("application/json");
+                                var eventData = eventDataTest.CreateInstance();
                                 {%- else %}
-                                var eventData = System.Text.Encoding.UTF8.GetBytes("Test");
+                                var eventData = System.Text.Encoding.UTF8.GetBytes("test data");
                                 {%- endif %}
-                                var amqpMessage = new Message();
-                                amqpMessage.BodySection = new Data { Binary = eventData };
-                                amqpMessage.Properties = new Properties() { 
-                                    MessageId = Guid.NewGuid().ToString(),
-                                    ContentType = "application/json"
-                                };
-                                amqpMessage.ApplicationProperties = new ApplicationProperties();
-                                amqpMessage.ApplicationProperties["cloudEvents:specversion"] = "1.0";
-                                amqpMessage.ApplicationProperties["cloudEvents:type"] = "{{ messageid }}";
-                                amqpMessage.ApplicationProperties["cloudEvents:id"] = Guid.NewGuid().ToString();
-                                amqpMessage.ApplicationProperties["cloudEvents:source"] = "urn:example-com:example-source";
-                                amqpMessage.ApplicationProperties["cloudEvents:time"] = DateTime.UtcNow.ToString("O");
-                                await sender.SendAsync(amqpMessage);
-                                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(10000));
+                                
+                                await producer.Send{{ messagename }}Async(eventData, "test-tenant", "test-device", "test-subject", "application/json");
+                                _logger.LogInformation("{{ messagename }} message sent");
+
+                                // Wait for message to be received
+                                await receiveTask;
                                 Assert.True(messageReceived.Task.IsCompleted, "The message was not received within the timeout period.");
-                                _logger.LogInformation("Message received validation completed");
+                                Assert.True(await messageReceived.Task, "Message receive validation failed.");
+                                _logger.LogInformation("Message send and receive validation completed");
                             }
                             finally
                             {
-                                await sender.CloseAsync();
+                                await receiver.CloseAsync();
                             }
                         }
                         finally
@@ -288,7 +299,7 @@ namespace {{ project_name | pascal }}.Test
                 }
                 finally
                 {
-                    await dispatcher.StopAsync();
+                    producer.Dispose();
                 }
             }
             catch (Exception ex)
@@ -297,8 +308,7 @@ namespace {{ project_name | pascal }}.Test
                 throw;
             }
         }
-
         {%- endfor %}
     }
-    {%- endfor %}
+{%- endfor %}
 }
