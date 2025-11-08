@@ -59,7 +59,16 @@ jobs:
         npm install -g azure-functions-core-tools@4 --unsafe-perm true 
         npm install -g @asyncapi/cli@latest
         npm install -g @openapitools/openapi-generator-cli      
+    - name: Check disk space before tests
+      run: df -h
     - name: Run tests
       run: |
         pytest -rE -vv --capture=tee-sys
+    - name: Clean up Docker resources
+      if: always()
+      run: |
+        docker ps -aq | xargs -r docker rm -f || true
+        docker images -q | xargs -r docker rmi -f || true
+        docker system prune -af --volumes || true
+        df -h
 
