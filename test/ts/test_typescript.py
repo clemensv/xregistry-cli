@@ -197,7 +197,6 @@ def test_ehconsumer_lightbulb_ts():
                         tmpdirname, "TestProject", "ehconsumer")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbproducer_contoso_erp_ts():
     """ Test the Service Bus producer for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
@@ -205,7 +204,6 @@ def test_sbproducer_contoso_erp_ts():
             '/', os.sep)), tmpdirname, "TestProject", "sbproducer")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbproducer_fabrikam_motorsports_ts():
     """ Test the Service Bus producer for Fabrikam Motorsports."""
     tmpdirname = tempfile.mkdtemp()
@@ -213,7 +211,6 @@ def test_sbproducer_fabrikam_motorsports_ts():
             '/', os.sep)), tmpdirname, "TestProject", "sbproducer")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbproducer_inkjet_ts():
     """ Test the Service Bus producer for Inkjet."""
     tmpdirname = tempfile.mkdtemp()
@@ -221,7 +218,6 @@ def test_sbproducer_inkjet_ts():
             '/', os.sep)), tmpdirname, "TestProject", "sbproducer")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbproducer_lightbulb_ts():
     """ Test the Service Bus producer for Lightbulb."""
     tmpdirname = tempfile.mkdtemp()
@@ -229,7 +225,6 @@ def test_sbproducer_lightbulb_ts():
                         tmpdirname, "TestProject", "sbproducer")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbconsumer_contoso_erp_ts():
     """ Test the Service Bus consumer for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
@@ -237,7 +232,6 @@ def test_sbconsumer_contoso_erp_ts():
             '/', os.sep)), tmpdirname, "TestProject", "sbconsumer")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbconsumer_fabrikam_motorsports_ts():
     """ Test the Service Bus consumer for Fabrikam Motorsports."""
     tmpdirname = tempfile.mkdtemp()
@@ -245,7 +239,6 @@ def test_sbconsumer_fabrikam_motorsports_ts():
             '/', os.sep)), tmpdirname, "TestProject", "sbconsumer")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbconsumer_inkjet_ts():
     """ Test the Service Bus consumer for Inkjet."""
     tmpdirname = tempfile.mkdtemp()
@@ -253,7 +246,6 @@ def test_sbconsumer_inkjet_ts():
             '/', os.sep)), tmpdirname, "TestProject", "sbconsumer")
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_sbconsumer_lightbulb_ts():
     """ Test the Service Bus consumer for Lightbulb."""
     tmpdirname = tempfile.mkdtemp()
