@@ -9,11 +9,37 @@ on:
       - 'v*'
     
 jobs:
-  test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
+  # Core tests - validation, xreg, codegen (no Docker, fast)
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.11
+    - name: Install dependencies and build package
+      run: |
+        python -m pip install --upgrade pip build wheel
+        python -m pip install -e .[dev]
+        python -m build --sdist --wheel --outdir dist
+    - name: Install Test Prerequisites
+      run: |
+        npm install -g @asyncapi/cli@latest
+        npm install -g @openapitools/openapi-generator-cli
+    - name: Check disk space
+      run: df -h
+    - name: Run core tests
+      run: |
+        pytest -v test/core/ test/validate/ test/xreg/ test/codegen/
+    - name: Report disk space
+      if: always()
+      run: df -h
+
+  # C# tests - Event Hubs, Service Bus, Kafka, MQTT (requires Docker)
+  test-csharp:
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -23,6 +49,35 @@ jobs:
         dotnet-version: 8.0.x
     - name: Check dotnet version
       run: dotnet --version
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.11
+    - name: Install dependencies and build package
+      run: |
+        python -m pip install --upgrade pip build wheel
+        python -m pip install -e .[dev]
+    - name: Check disk space before tests
+      run: df -h
+    - name: Run C# tests
+      run: |
+        pytest -v test/cs/
+    - name: Clean up Docker resources
+      if: always()
+      run: |
+        docker ps -aq | xargs -r docker rm -f || true
+        docker images -q | xargs -r docker rmi -f || true
+        docker system prune -af --volumes || true
+    - name: Report disk space after cleanup
+      if: always()
+      run: df -h
+
+  # Java tests - AMQP, Event Hubs, Service Bus (requires Docker + Java)
+  test-java:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
@@ -33,10 +88,6 @@ jobs:
       with:
         java-version: 21
         maven-version: '3.9.6'
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
@@ -47,28 +98,91 @@ jobs:
         repository: clemensv/io.cloudevents.experimental.endpoints
         ref: main
         path: javaendpoints
-    - name: build CloudNative.CloudEvents.Endpoint package code
+    - name: Build CloudNative.CloudEvents.Endpoint package
       run: mvn install -DskipTests -f javaendpoints/pom.xml
     - name: Install dependencies and build package
       run: |
         python -m pip install --upgrade pip build wheel
         python -m pip install -e .[dev]
-        python -m build --sdist --wheel --outdir dist
-    - name: Install Test Prerequesites
-      run: |
-        npm install -g azure-functions-core-tools@4 --unsafe-perm true 
-        npm install -g @asyncapi/cli@latest
-        npm install -g @openapitools/openapi-generator-cli      
     - name: Check disk space before tests
       run: df -h
-    - name: Run tests
+    - name: Run Java tests
       run: |
-        pytest -rE -vv --capture=tee-sys
+        pytest -v test/java/
     - name: Clean up Docker resources
       if: always()
       run: |
         docker ps -aq | xargs -r docker rm -f || true
         docker images -q | xargs -r docker rmi -f || true
         docker system prune -af --volumes || true
-        df -h
+    - name: Report disk space after cleanup
+      if: always()
+      run: df -h
+
+  # TypeScript tests - Kafka, Event Hubs, Service Bus (requires Docker + Node)
+  test-typescript:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.11
+    - name: Install dependencies and build package
+      run: |
+        python -m pip install --upgrade pip build wheel
+        python -m pip install -e .[dev]
+    - name: Check disk space before tests
+      run: df -h
+    - name: Run TypeScript tests
+      run: |
+        pytest -v test/ts/
+    - name: Clean up Docker resources
+      if: always()
+      run: |
+        docker ps -aq | xargs -r docker rm -f || true
+        docker images -q | xargs -r docker rmi -f || true
+        docker system prune -af --volumes || true
+    - name: Report disk space after cleanup
+      if: always()
+      run: df -h
+
+  # Python, OpenAPI, AsyncAPI, Catalog tests (minimal Docker usage)
+  test-other:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.11
+    - name: Install dependencies and build package
+      run: |
+        python -m pip install --upgrade pip build wheel
+        python -m pip install -e .[dev]
+    - name: Install Test Prerequisites
+      run: |
+        npm install -g azure-functions-core-tools@4 --unsafe-perm true 
+        npm install -g @asyncapi/cli@latest
+        npm install -g @openapitools/openapi-generator-cli
+    - name: Check disk space before tests
+      run: df -h
+    - name: Run other tests
+      run: |
+        pytest -v test/py/ test/openapi/ test/asyncapi/ test/catalog/
+    - name: Clean up Docker resources
+      if: always()
+      run: |
+        docker ps -aq | xargs -r docker rm -f || true
+        docker images -q | xargs -r docker rmi -f || true
+        docker system prune -af --volumes || true
+    - name: Report disk space after cleanup
+      if: always()
+      run: df -h
 
