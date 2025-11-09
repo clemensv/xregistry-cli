@@ -30,12 +30,28 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+{%- if cloudEvents.usesCloudEvents(root) %}
+
+/**
+ * Content mode for CloudEvents serialization.
+ */
+enum ContentMode {
+    /** Binary content mode - CloudEvent attributes as headers, data as body */
+    BINARY,
+    /** Structured content mode - Entire CloudEvent as JSON body */
+    STRUCTURED
+}
+{%- endif %}
+
 /**
  * Factory class to create Kafka ProducerRecords for the {{ messagegroupid }} message group.
  */
 public class {{ class_name }} {
     private static final Logger log = LogManager.getLogger({{ class_name }}.class);
+    {%- if cloudEvents.usesCloudEvents(root) %}
     private static final String CE_PREFIX = "ce_";
+    private static final JsonFormat JSON_FORMAT = new JsonFormat();
+    {%- endif %}
     
     {% for messageid, message in messagegroup.messages.items() -%}
     {%- set messagename = messageid | pascal | strip_namespace %}
@@ -49,13 +65,19 @@ public class {{ class_name }} {
      * @param topic The Kafka topic name
      * @param data The message data
      * @param key The message key (nullable)
+     {%- if isCloudEvent %}
+     * @param contentMode CloudEvents content mode (BINARY or STRUCTURED)
+     * @param format Content type format for structured mode (default: "application/json")
+     {%- endif %}
      * @return ProducerRecord ready to be sent
      * @throws Exception if there's an error creating the message
      */
     public static ProducerRecord<byte[], byte[]> create{{ messagename }}Message(
             String topic,
             {{ message_body_type }} data,
-            String key) throws Exception {
+            String key{% if isCloudEvent %},
+            ContentMode contentMode,
+            String format{% endif %}) throws Exception {
         
         byte[] keyBytes = key != null ? key.getBytes(StandardCharsets.UTF_8) : null;
         Headers headers = new RecordHeaders();
@@ -74,19 +96,27 @@ public class {{ class_name }} {
             .withData(serializeData(data))
             .build();
         
-        // Add CloudEvent attributes as Kafka headers (binary content mode)
-        cloudEvent.getAttributeNames().forEach(attrName -> {
-            Object attrValue = cloudEvent.getAttribute(attrName);
-            if (attrValue != null) {
-                String headerValue = attrValue instanceof URI ? 
-                    ((URI) attrValue).toString() : attrValue.toString();
-                headers.add(CE_PREFIX + attrName, headerValue.getBytes(StandardCharsets.UTF_8));
-            }
-        });
+        byte[] bodyBytes;
         
-        // Serialize the data as the body
-        byte[] bodyBytes = serializeData(data);
-        headers.add("content-type", "application/json".getBytes(StandardCharsets.UTF_8));
+        if (contentMode == ContentMode.STRUCTURED) {
+            // Structured content mode - entire CloudEvent as JSON payload
+            bodyBytes = JSON_FORMAT.serialize(cloudEvent);
+            headers.add("content-type", format.getBytes(StandardCharsets.UTF_8));
+        } else {
+            // Binary content mode - CloudEvent attributes as headers, data as body
+            cloudEvent.getAttributeNames().forEach(attrName -> {
+                Object attrValue = cloudEvent.getAttribute(attrName);
+                if (attrValue != null) {
+                    String headerValue = attrValue instanceof URI ? 
+                        ((URI) attrValue).toString() : attrValue.toString();
+                    headers.add(CE_PREFIX + attrName, headerValue.getBytes(StandardCharsets.UTF_8));
+                }
+            });
+            
+            // Serialize the data as the body
+            bodyBytes = serializeData(data);
+            headers.add("content-type", "application/json".getBytes(StandardCharsets.UTF_8));
+        }
         
         return new ProducerRecord<>(topic, null, keyBytes, bodyBytes, headers);
         

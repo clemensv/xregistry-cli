@@ -22,6 +22,7 @@ import org.apache.logging.log4j.Logger;
 
 {%- if cloudEvents.usesCloudEvents(root) %}
 import io.cloudevents.CloudEvent;
+import {{ group_package }}.{{ pascal_group_name | strip_namespace }}MessageFactory.ContentMode;
 {%- endif %}
 
 import java.util.concurrent.CompletableFuture;
@@ -32,6 +33,10 @@ import java.util.concurrent.CompletableFuture;
 public class {{ pascal_group_name | strip_namespace }}Producer {
     private static final Logger logger = LogManager.getLogger({{ pascal_group_name | strip_namespace }}Producer.class);
     private final ServiceBusSenderClient senderClient;
+    {%- if cloudEvents.usesCloudEvents(root) %}
+    private final ContentMode contentMode;
+    private final String format;
+    {%- endif %}
 
     /**
      * Creates a new instance of {{ pascal_group_name | strip_namespace }}Producer.
@@ -39,8 +44,28 @@ public class {{ pascal_group_name | strip_namespace }}Producer {
      * @param senderClient The Service Bus sender client to use for sending messages
      */
     public {{ pascal_group_name | strip_namespace }}Producer(ServiceBusSenderClient senderClient) {
+        {%- if cloudEvents.usesCloudEvents(root) %}
+        this(senderClient, ContentMode.STRUCTURED, "application/json");
+        {%- else %}
         this.senderClient = senderClient;
+        {%- endif %}
     }
+
+    {%- if cloudEvents.usesCloudEvents(root) %}
+
+    /**
+     * Creates a new instance of {{ pascal_group_name | strip_namespace }}Producer with specified content mode and format.
+     * 
+     * @param senderClient The Service Bus sender client to use for sending messages
+     * @param contentMode The content mode (BINARY or STRUCTURED)
+     * @param format The content format (e.g., "application/json")
+     */
+    public {{ pascal_group_name | strip_namespace }}Producer(ServiceBusSenderClient senderClient, ContentMode contentMode, String format) {
+        this.senderClient = senderClient;
+        this.contentMode = contentMode;
+        this.format = format;
+    }
+    {%- endif %}
 
     {%- if root.endpoints %}
     {%- for endpointid, endpoint in root.endpoints.items() %}
@@ -165,6 +190,7 @@ public class {{ pascal_group_name | strip_namespace }}Producer {
     {%- for messageid, message in messagegroup.messages.items() %}
     {%- set messagename = messageid | pascal | strip_namespace %}
     {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
 
     /**
      * Send a {{ messagename }} message.
@@ -175,7 +201,11 @@ public class {{ pascal_group_name | strip_namespace }}Producer {
     public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data) {
         return CompletableFuture.runAsync(() -> {
             try {
+                {%- if isCloudEvent %}
+                ServiceBusMessage message = {{ pascal_group_name | strip_namespace }}MessageFactory.create{{ messagename }}Message(data, this.contentMode, this.format);
+                {%- else %}
                 ServiceBusMessage message = {{ pascal_group_name | strip_namespace }}MessageFactory.create{{ messagename }}Message(data);
+                {%- endif %}
                 senderClient.sendMessage(message);
                 logger.info("Sent {{ messagename }} message");
             } catch (Exception e) {
@@ -195,7 +225,11 @@ public class {{ pascal_group_name | strip_namespace }}Producer {
     public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data, String sessionId) {
         return CompletableFuture.runAsync(() -> {
             try {
+                {%- if isCloudEvent %}
+                ServiceBusMessage message = {{ pascal_group_name | strip_namespace }}MessageFactory.create{{ messagename }}Message(data, this.contentMode, this.format);
+                {%- else %}
                 ServiceBusMessage message = {{ pascal_group_name | strip_namespace }}MessageFactory.create{{ messagename }}Message(data);
+                {%- endif %}
                 message.setSessionId(sessionId);
                 senderClient.sendMessage(message);
                 logger.info("Sent {{ messagename }} message with session ID: {}", sessionId);

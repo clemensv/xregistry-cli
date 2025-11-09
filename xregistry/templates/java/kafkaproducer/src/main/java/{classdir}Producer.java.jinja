@@ -35,6 +35,10 @@ import io.cloudevents.CloudEvent;
 public class {{ class_name }} implements AutoCloseable {
     private static final Logger log = LogManager.getLogger({{ class_name }}.class);
     private final KafkaProducer<byte[], byte[]> producer;
+    {%- if cloudEvents.usesCloudEvents(root) %}
+    private final ContentMode contentMode;
+    private final String format;
+    {%- endif %}
     
     /**
      * Create a Kafka producer for the specified bootstrap servers.
@@ -43,6 +47,9 @@ public class {{ class_name }} implements AutoCloseable {
      * @return A new {{ class_name }} instance
      */
     public static {{ class_name }} create(List<URI> bootstrapServers) {
+        {%- if cloudEvents.usesCloudEvents(root) %}
+        return create(bootstrapServers, ContentMode.STRUCTURED, "application/json");
+        {%- else %}
         if (bootstrapServers == null || bootstrapServers.isEmpty()) {
             throw new IllegalArgumentException("bootstrapServers cannot be null or empty");
         }
@@ -59,7 +66,38 @@ public class {{ class_name }} implements AutoCloseable {
         
         KafkaProducer<byte[], byte[]> kafkaProducer = new KafkaProducer<>(props);
         return new {{ class_name }}(kafkaProducer);
+        {%- endif %}
     }
+    
+    {%- if cloudEvents.usesCloudEvents(root) %}
+    
+    /**
+     * Create a Kafka producer for the specified bootstrap servers with content mode and format.
+     * 
+     * @param bootstrapServers List of Kafka broker URIs
+     * @param contentMode CloudEvents content mode (BINARY or STRUCTURED)
+     * @param format Content type format for structured mode
+     * @return A new {{ class_name }} instance
+     */
+    public static {{ class_name }} create(List<URI> bootstrapServers, ContentMode contentMode, String format) {
+        if (bootstrapServers == null || bootstrapServers.isEmpty()) {
+            throw new IllegalArgumentException("bootstrapServers cannot be null or empty");
+        }
+        
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, 
+            String.join(",", bootstrapServers.stream()
+                .map(uri -> uri.getHost() + ":" + (uri.getPort() > 0 ? uri.getPort() : 9092))
+                .toArray(String[]::new)));
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, 3);
+        
+        KafkaProducer<byte[], byte[]> kafkaProducer = new KafkaProducer<>(props);
+        return new {{ class_name }}(kafkaProducer, contentMode, format);
+    }
+    {%- endif %}
     
     /**
      * Constructor with existing KafkaProducer instance.
@@ -67,8 +105,28 @@ public class {{ class_name }} implements AutoCloseable {
      * @param producer The Kafka producer instance
      */
     public {{ class_name }}(KafkaProducer<byte[], byte[]> producer) {
+        {%- if cloudEvents.usesCloudEvents(root) %}
+        this(producer, ContentMode.STRUCTURED, "application/json");
+        {%- else %}
         this.producer = producer;
+        {%- endif %}
     }
+    
+    {%- if cloudEvents.usesCloudEvents(root) %}
+    
+    /**
+     * Constructor with existing KafkaProducer instance and content mode.
+     * 
+     * @param producer The Kafka producer instance
+     * @param contentMode CloudEvents content mode (BINARY or STRUCTURED)
+     * @param format Content type format for structured mode
+     */
+    public {{ class_name }}(KafkaProducer<byte[], byte[]> producer, ContentMode contentMode, String format) {
+        this.producer = producer;
+        this.contentMode = contentMode;
+        this.format = format;
+    }
+    {%- endif %}
     
     /**
      * Get the underlying Kafka producer.
@@ -114,7 +172,9 @@ public class {{ class_name }} implements AutoCloseable {
         ProducerRecord<byte[], byte[]> record = {{ pascal_group_name | strip_namespace }}EventFactory.create{{ messagename }}Message(
             "{{ topic }}", 
             data,
-            key
+            key{% if isCloudEvent %},
+            this.contentMode,
+            this.format{% endif %}
         );
         
         CompletableFuture<Void> future = new CompletableFuture<>();

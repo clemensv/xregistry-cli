@@ -28,6 +28,19 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+{%- if cloudEvents.usesCloudEvents(root) %}
+
+/**
+ * Content mode for CloudEvents serialization.
+ */
+enum ContentMode {
+    /** Binary content mode - CloudEvent attributes as properties, data as body */
+    BINARY,
+    /** Structured content mode - Entire CloudEvent as JSON body */
+    STRUCTURED
+}
+{%- endif %}
+
 /**
  * Factory class to create Azure Event Hubs EventData for the messages declared in the `{{ messagegroupid }}` message group.
  */
@@ -35,6 +48,7 @@ public class {{ class_name }} {
     private static final Logger logger = LogManager.getLogger({{ class_name }}.class);
     {%- if cloudEvents.usesCloudEvents(root) %}
     private static final String CE_PREFIX = "cloudEvents_";
+    private static final JsonFormat JSON_FORMAT = new JsonFormat();
     {%- endif %}
 
     {%- for messageid, message in messagegroup.messages.items() %}
@@ -47,9 +61,13 @@ public class {{ class_name }} {
      * Create an EventData for the {{ messagename }} message.
      * 
      * @param data The message data
+     {%- if isCloudEvent %}
+     * @param contentMode CloudEvents content mode (BINARY or STRUCTURED)
+     * @param format Content type format for structured mode
+     {%- endif %}
      * @return An EventData instance
      */
-    public static EventData create{{ messagename }}Message({{ message_body_type }} data) {
+    public static EventData create{{ messagename }}Message({{ message_body_type }} data{% if isCloudEvent %}, ContentMode contentMode, String format{% endif %}) {
         try {
             {%- if isCloudEvent %}
             // Create CloudEvent
@@ -86,46 +104,55 @@ public class {{ class_name }} {
 
             CloudEvent cloudEvent = builder.build();
 
-            // Use binary content mode - CloudEvent attributes in properties, data in body
-            byte[] bodyData;
-            {%- if dataschema and ("Avro" in dataschema or "avro" in dataschema) %}
-            bodyData = data.toByteArray("avro/binary");
-            {%- elif dataschema and ("Protobuf" in dataschema or "protobuf" in dataschema or "proto" in dataschema) %}
-            bodyData = data.toByteArray();
-            {%- else %}
-            bodyData = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
-            {%- endif %}
-
-            EventData eventData = new EventData(bodyData);
+            EventData eventData;
             
-            // Set CloudEvent attributes as properties
-            eventData.getProperties().put(CE_PREFIX + "specversion", cloudEvent.getSpecVersion().toString());
-            eventData.getProperties().put(CE_PREFIX + "type", cloudEvent.getType());
-            eventData.getProperties().put(CE_PREFIX + "source", cloudEvent.getSource().toString());
-            eventData.getProperties().put(CE_PREFIX + "id", cloudEvent.getId());
-            
-            if (cloudEvent.getDataContentType() != null) {
-                eventData.getProperties().put(CE_PREFIX + "datacontenttype", cloudEvent.getDataContentType());
-            }
-            if (cloudEvent.getDataSchema() != null) {
-                eventData.getProperties().put(CE_PREFIX + "dataschema", cloudEvent.getDataSchema().toString());
-            }
-            if (cloudEvent.getSubject() != null) {
-                eventData.getProperties().put(CE_PREFIX + "subject", cloudEvent.getSubject());
-            }
-            if (cloudEvent.getTime() != null) {
-                eventData.getProperties().put(CE_PREFIX + "time", cloudEvent.getTime().toString());
-            }
+            if (contentMode == ContentMode.STRUCTURED) {
+                // Structured content mode - entire CloudEvent as JSON body
+                byte[] bodyData = JSON_FORMAT.serialize(cloudEvent);
+                eventData = new EventData(bodyData);
+                eventData.setContentType(format);
+            } else {
+                // Binary content mode - CloudEvent attributes in properties, data in body
+                byte[] bodyData;
+                {%- if dataschema and ("Avro" in dataschema or "avro" in dataschema) %}
+                bodyData = data.toByteArray("avro/binary");
+                {%- elif dataschema and ("Protobuf" in dataschema or "protobuf" in dataschema or "proto" in dataschema) %}
+                bodyData = data.toByteArray();
+                {%- else %}
+                bodyData = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
+                {%- endif %}
 
-            {%- if message.envelopemetadata %}
-            {%- for key, value in message.envelopemetadata.items() %}
-            {%- if key not in ['id', 'type', 'source', 'time', 'datacontenttype', 'dataschema', 'subject'] %}
-            {%- if value.value %}
-            eventData.getProperties().put(CE_PREFIX + "{{ key }}", "{{ value.value }}");
-            {%- endif %}
-            {%- endif %}
-            {%- endfor %}
-            {%- endif %}
+                eventData = new EventData(bodyData);
+            
+                // Set CloudEvent attributes as properties
+                eventData.getProperties().put(CE_PREFIX + "specversion", cloudEvent.getSpecVersion().toString());
+                eventData.getProperties().put(CE_PREFIX + "type", cloudEvent.getType());
+                eventData.getProperties().put(CE_PREFIX + "source", cloudEvent.getSource().toString());
+                eventData.getProperties().put(CE_PREFIX + "id", cloudEvent.getId());
+                
+                if (cloudEvent.getDataContentType() != null) {
+                    eventData.getProperties().put(CE_PREFIX + "datacontenttype", cloudEvent.getDataContentType());
+                }
+                if (cloudEvent.getDataSchema() != null) {
+                    eventData.getProperties().put(CE_PREFIX + "dataschema", cloudEvent.getDataSchema().toString());
+                }
+                if (cloudEvent.getSubject() != null) {
+                    eventData.getProperties().put(CE_PREFIX + "subject", cloudEvent.getSubject());
+                }
+                if (cloudEvent.getTime() != null) {
+                    eventData.getProperties().put(CE_PREFIX + "time", cloudEvent.getTime().toString());
+                }
+
+                {%- if message.envelopemetadata %}
+                {%- for key, value in message.envelopemetadata.items() %}
+                {%- if key not in ['id', 'type', 'source', 'time', 'datacontenttype', 'dataschema', 'subject'] %}
+                {%- if value.value %}
+                eventData.getProperties().put(CE_PREFIX + "{{ key }}", "{{ value.value }}");
+                {%- endif %}
+                {%- endif %}
+                {%- endfor %}
+                {%- endif %}
+            }
 
             {%- else %}
             // Create plain Event Hubs message
@@ -162,4 +189,5 @@ public class {{ class_name }} {
     }
     {%- endfor %}
 }
+{% endfor -%}
 {% endfor %}

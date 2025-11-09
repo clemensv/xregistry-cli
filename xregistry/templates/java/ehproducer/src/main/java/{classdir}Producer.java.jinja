@@ -35,6 +35,8 @@ import java.util.concurrent.CompletableFuture;
 public class {{ class_name }} {
     private static final Logger logger = LogManager.getLogger({{ class_name }}.class);
     private final EventHubProducerClient producerClient;
+    private final ContentMode contentMode;
+    private final String format;
 
     /**
      * Creates a new instance of {{ class_name }}.
@@ -42,7 +44,20 @@ public class {{ class_name }} {
      * @param producerClient The Event Hub producer client to use for sending events
      */
     public {{ class_name }}(EventHubProducerClient producerClient) {
+        this(producerClient, ContentMode.STRUCTURED, "application/json");
+    }
+
+    /**
+     * Creates a new instance of {{ class_name }} with content mode and format.
+     * 
+     * @param producerClient The Event Hub producer client to use for sending events
+     * @param contentMode CloudEvents content mode (BINARY or STRUCTURED)
+     * @param format Content type format for structured mode
+     */
+    public {{ class_name }}(EventHubProducerClient producerClient, ContentMode contentMode, String format) {
         this.producerClient = producerClient;
+        this.contentMode = contentMode;
+        this.format = format;
     }
 
     {%- if root.endpoints %}
@@ -112,6 +127,7 @@ public class {{ class_name }} {
     {%- for messageid, message in messagegroup.messages.items() %}
     {%- set messagename = messageid | pascal | strip_namespace %}
     {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+    {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
 
     /**
      * Send a {{ messagename }} message.
@@ -122,7 +138,11 @@ public class {{ class_name }} {
     public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data) {
         return CompletableFuture.runAsync(() -> {
             try {
+                {%- if isCloudEvent %}
+                EventData eventData = {{ pascal_group_name | strip_namespace }}EventFactory.create{{ messagename }}Message(data, this.contentMode, this.format);
+                {%- else %}
                 EventData eventData = {{ pascal_group_name | strip_namespace }}EventFactory.create{{ messagename }}Message(data);
+                {%- endif %}
                 EventDataBatch batch = producerClient.createBatch();
                 
                 if (!batch.tryAdd(eventData)) {
@@ -148,7 +168,11 @@ public class {{ class_name }} {
     public CompletableFuture<Void> send{{ messagename }}({{ message_body_type }} data, String partitionKey) {
         return CompletableFuture.runAsync(() -> {
             try {
+                {%- if isCloudEvent %}
+                EventData eventData = {{ pascal_group_name | strip_namespace }}EventFactory.create{{ messagename }}Message(data, this.contentMode, this.format);
+                {%- else %}
                 EventData eventData = {{ pascal_group_name | strip_namespace }}EventFactory.create{{ messagename }}Message(data);
+                {%- endif %}
                 
                 com.azure.messaging.eventhubs.models.CreateBatchOptions batchOptions = 
                     new com.azure.messaging.eventhubs.models.CreateBatchOptions()

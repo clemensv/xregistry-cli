@@ -33,6 +33,17 @@ public class {{ pascal_group_name | strip_namespace }}MessageFactory {
     private static final Logger logger = LogManager.getLogger({{ pascal_group_name | strip_namespace }}MessageFactory.class);
     {%- if cloudEvents.usesCloudEvents(root) %}
     private static final String CE_PREFIX = "cloudEvents_";
+    private static final JsonFormat JSON_FORMAT = new JsonFormat();
+    
+    /**
+     * Content mode for CloudEvents serialization.
+     */
+    enum ContentMode {
+        /** Binary content mode - CloudEvent attributes as properties, data as body */
+        BINARY,
+        /** Structured content mode - entire CloudEvent as JSON body */
+        STRUCTURED
+    }
     {%- endif %}
 
     {%- for messageid, message in messagegroup.messages.items() %}
@@ -45,9 +56,13 @@ public class {{ pascal_group_name | strip_namespace }}MessageFactory {
      * Create a ServiceBusMessage for the {{ messagename }} message.
      * 
      * @param data The message data
+     {%- if isCloudEvent %}
+     * @param contentMode The content mode (BINARY or STRUCTURED)
+     * @param format The content format (e.g., "application/json")
+     {%- endif %}
      * @return A ServiceBusMessage instance
      */
-    public static ServiceBusMessage create{{ messagename }}Message({{ message_body_type }} data) {
+    public static ServiceBusMessage create{{ messagename }}Message({{ message_body_type }} data{% if isCloudEvent %}, ContentMode contentMode, String format{% endif %}) {
         try {
             {%- if isCloudEvent %}
             // Create CloudEvent
@@ -83,49 +98,59 @@ public class {{ pascal_group_name | strip_namespace }}MessageFactory {
                 {%- endif %};
 
             CloudEvent cloudEvent = builder.build();
-
-            // Use binary content mode - CloudEvent attributes in properties, data in body
-            byte[] bodyData;
-            {%- if dataschema and ("Avro" in dataschema or "avro" in dataschema) %}
-            bodyData = data.toByteArray("avro/binary");
-            {%- elif dataschema and ("Protobuf" in dataschema or "protobuf" in dataschema or "proto" in dataschema) %}
-            bodyData = data.toByteArray();
-            {%- else %}
-            bodyData = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
-            {%- endif %}
-
-            ServiceBusMessage serviceBusMessage = new ServiceBusMessage(bodyData);
             
-            // Set CloudEvent attributes as application properties
-            serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "specversion", cloudEvent.getSpecVersion().toString());
-            serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "type", cloudEvent.getType());
-            serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "source", cloudEvent.getSource().toString());
-            serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "id", cloudEvent.getId());
+            ServiceBusMessage serviceBusMessage;
             
-            if (cloudEvent.getDataContentType() != null) {
-                serviceBusMessage.setContentType(cloudEvent.getDataContentType());
-                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "datacontenttype", cloudEvent.getDataContentType());
-            }
-            if (cloudEvent.getDataSchema() != null) {
-                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "dataschema", cloudEvent.getDataSchema().toString());
-            }
-            if (cloudEvent.getSubject() != null) {
-                serviceBusMessage.setSubject(cloudEvent.getSubject());
-                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "subject", cloudEvent.getSubject());
-            }
-            if (cloudEvent.getTime() != null) {
-                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "time", cloudEvent.getTime().toString());
-            }
+            if (contentMode == ContentMode.STRUCTURED) {
+                // Structured content mode - entire CloudEvent as JSON body
+                byte[] bodyData = JSON_FORMAT.serialize(cloudEvent);
+                serviceBusMessage = new ServiceBusMessage(bodyData);
+                serviceBusMessage.setContentType(format);
+            } else {
+                // Binary content mode - CloudEvent attributes in properties, data in body
+                byte[] bodyData;
+                {%- if dataschema and ("Avro" in dataschema or "avro" in dataschema) %}
+                bodyData = data.toByteArray("avro/binary");
+                {%- elif dataschema and ("Protobuf" in dataschema or "protobuf" in dataschema or "proto" in dataschema) %}
+                bodyData = data.toByteArray();
+                {%- else %}
+                bodyData = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(data);
+                {%- endif %}
 
-            {%- if message.envelopemetadata %}
-            {%- for key, value in message.envelopemetadata.items() %}
-            {%- if key not in ['id', 'type', 'source', 'time', 'datacontenttype', 'dataschema', 'subject'] %}
-            {%- if value.value %}
-            serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "{{ key }}", "{{ value.value }}");
-            {%- endif %}
-            {%- endif %}
-            {%- endfor %}
-            {%- endif %}
+                serviceBusMessage = new ServiceBusMessage(bodyData);
+                serviceBusMessage = new ServiceBusMessage(bodyData);
+            
+                // Set CloudEvent attributes as application properties
+                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "specversion", cloudEvent.getSpecVersion().toString());
+                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "type", cloudEvent.getType());
+                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "source", cloudEvent.getSource().toString());
+                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "id", cloudEvent.getId());
+                
+                if (cloudEvent.getDataContentType() != null) {
+                    serviceBusMessage.setContentType(cloudEvent.getDataContentType());
+                    serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "datacontenttype", cloudEvent.getDataContentType());
+                }
+                if (cloudEvent.getDataSchema() != null) {
+                    serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "dataschema", cloudEvent.getDataSchema().toString());
+                }
+                if (cloudEvent.getSubject() != null) {
+                    serviceBusMessage.setSubject(cloudEvent.getSubject());
+                    serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "subject", cloudEvent.getSubject());
+                }
+                if (cloudEvent.getTime() != null) {
+                    serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "time", cloudEvent.getTime().toString());
+                }
+
+                {%- if message.envelopemetadata %}
+                {%- for key, value in message.envelopemetadata.items() %}
+                {%- if key not in ['id', 'type', 'source', 'time', 'datacontenttype', 'dataschema', 'subject'] %}
+                {%- if value.value %}
+                serviceBusMessage.getApplicationProperties().put(CE_PREFIX + "{{ key }}", "{{ value.value }}");
+                {%- endif %}
+                {%- endif %}
+                {%- endfor %}
+                {%- endif %}
+            }
 
             // Set message ID from CloudEvent ID
             serviceBusMessage.setMessageId(cloudEvent.getId());
