@@ -1,18 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",          // Using ES Modules
-    "outDir": "./dist",           // Output directory
-    "rootDir": "./src",           // Root source directory
-    "strict": true,               // Enforce strict type checking
-    "esModuleInterop": true,      // Ensure compatibility with CommonJS modules
-    "moduleResolution": "node",   // Node.js module resolution
+    "module": "ES2022",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "useDefineForClassFields": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "isolatedModules": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

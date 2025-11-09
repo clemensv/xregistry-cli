@@ -4,7 +4,20 @@ import dotenv from 'dotenv';
 
 dotenv.config(); // Load environment variables from .env file
 
-export const config = {
+interface DashboardConfig {
+  PORT: string | number;
+  KAFKA_SSL: string;
+  KAFKA_BROKERS: string;
+  KAFKA_TOPIC: string;
+  KAFKA_USERNAME: string;
+  KAFKA_PASSWORD: string;
+  CONSUMER_GROUP: string;
+  CONNECTION_STRING: string;
+  KQL_CONNECTION_STRING: string;
+  KQL_DATABASE_NAME: string;
+}
+
+export const config: DashboardConfig = {
   PORT: process.env.PORT || 3000,
   KAFKA_SSL: process.env.KAFKA_SSL || 'true',
   KAFKA_BROKERS: process.env.KAFKA_BROKERS || '',
@@ -18,8 +31,8 @@ export const config = {
 };
 
 
-export function parseConnectionString(connectionString: string): { [key: string]: string } {
-  const configDict: { [key: string]: string } = {
+export function parseConnectionString(connectionString: string): Record<string, string> {
+  const configDict: Record<string, string> = {
     'KAFKA_USERNAME': '$ConnectionString',
     'KAFKA_PASSWORD': connectionString.trim(),
   };
@@ -40,23 +53,25 @@ export function parseConnectionString(connectionString: string): { [key: string]
 }
 
 // Validate configuration
-export function validateConfig(config: any) : any {
-  const requiredConfigs = [
+export function validateConfig(config: DashboardConfig): DashboardConfig {
+  const requiredConfigs: (keyof DashboardConfig)[] = [
     'PORT',
     'KAFKA_BROKERS',
     'KAFKA_TOPIC',
     'CONSUMER_GROUP'
   ];
 
+  let validatedConfig = { ...config };
+  
   if (config.CONNECTION_STRING) {
     const connectionStringConfig = parseConnectionString(config.CONNECTION_STRING);
-    config = { ...config, ...connectionStringConfig };
+    validatedConfig = { ...validatedConfig, ...connectionStringConfig };
   }
 
   for (const key of requiredConfigs) {
-    if (!config[key]) {
+    if (!validatedConfig[key]) {
       throw new Error(`${key} is not defined`);
     }
   }
-  return config;
+  return validatedConfig;
 };

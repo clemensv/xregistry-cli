@@ -2,18 +2,31 @@
 {
   "compilerOptions": {
     "allowJs": true,                          /* Allow javascript files to be compiled. */
-    "checkJs": false,                          /* Report errors in .js files. */
+    "checkJs": false,                         /* Report errors in .js files. */
     "strict": true,                           /* Enable all strict type-checking options. */
+    "noImplicitAny": true,                    /* Raise error on implied 'any' types. */
+    "strictNullChecks": true,                 /* Enable strict null checks. */
+    "noImplicitOverride": true,               /* Ensure overrides are marked. */
+    "exactOptionalPropertyTypes": true,       /* Strict optional property handling. */
+    "useDefineForClassFields": true,          /* ECMAScript-standard class fields. */
     "baseUrl": ".",
     "outDir": "./browser",
-    "target": "es2016",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
-    "lib": ["es2016", "dom", "es5"]
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "sourceMap": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": [
     "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
   ]
 }
 {%- endmacro -%}

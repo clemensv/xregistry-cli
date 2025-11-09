@@ -1,0 +1,68 @@
+{%- macro DeclareLogger() -%}
+/**
+ * Structured logger interface for consistent logging across the application
+ */
+export interface LogContext {
+    correlationId?: string;
+    [key: string]: unknown;
+}
+
+export enum LogLevel {
+    DEBUG = 'debug',
+    INFO = 'info',
+    WARN = 'warn',
+    ERROR = 'error'
+}
+
+export class Logger {
+    private context: LogContext;
+
+    constructor(context: LogContext = {}) {
+        this.context = context;
+    }
+
+    private formatMessage(level: LogLevel, message: string, data?: Record<string, unknown>): string {
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            level,
+            message,
+            ...this.context,
+            ...data
+        };
+        return JSON.stringify(logEntry);
+    }
+
+    debug(message: string, data?: Record<string, unknown>): void {
+        // Only log debug in development
+        if (process.env.NODE_ENV === 'development') {
+            process.stdout.write(this.formatMessage(LogLevel.DEBUG, message, data) + '\n');
+        }
+    }
+
+    info(message: string, data?: Record<string, unknown>): void {
+        process.stdout.write(this.formatMessage(LogLevel.INFO, message, data) + '\n');
+    }
+
+    warn(message: string, data?: Record<string, unknown>): void {
+        process.stderr.write(this.formatMessage(LogLevel.WARN, message, data) + '\n');
+    }
+
+    error(message: string, error?: Error, data?: Record<string, unknown>): void {
+        const errorData = error ? {
+            error: {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            },
+            ...data
+        } : data;
+        process.stderr.write(this.formatMessage(LogLevel.ERROR, message, errorData) + '\n');
+    }
+
+    withContext(additionalContext: LogContext): Logger {
+        return new Logger({ ...this.context, ...additionalContext });
+    }
+}
+
+export const createLogger = (context?: LogContext): Logger => new Logger(context);
+{%- endmacro -%}

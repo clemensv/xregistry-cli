@@ -5,15 +5,22 @@ import { ClientFilters } from './types.js';
 import { KqlClient } from './kqlClient.js';
 import { Logger } from 'winston';
 import { CloudEvent } from 'cloudevents';
-import e from 'express';
+
+interface HistoryRequest {
+  eventType: string;
+  subjectPrefix?: string;
+  sourcePrefix?: string;
+  fromTime?: string;
+  toTime?: string;
+}
 
 export class ClientManager {
   private clients: Map<string, { socket: Socket; filters: ClientFilters[] }> = new Map();
   private kqlClient: KqlClient | null;
   private logger: Logger;
-  private eventTypeTableMap: { [key: string]: string };
+  private eventTypeTableMap: Record<string, string>;
 
-  constructor(kqlClient: KqlClient | null, logger: Logger, eventTypeTableMap: { [key: string]: string }) {
+  constructor(kqlClient: KqlClient | null, logger: Logger, eventTypeTableMap: Record<string, string>) {
     this.kqlClient = kqlClient;
     this.logger = logger;
     this.eventTypeTableMap = eventTypeTableMap;
@@ -23,7 +30,7 @@ export class ClientManager {
     this.clients.set(clientId, { socket, filters: [] });
 
     // Handle requests for data stream segments
-    const handleHistoryRequest = async (request: any, isLatest: boolean = false) => {
+    const handleHistoryRequest = async (request: HistoryRequest, isLatest: boolean = false) => {
       if (!this.kqlClient) {
         return;
       }
@@ -42,7 +49,7 @@ export class ClientManager {
       }
 
       // Build filters
-      const filters: { [key: string]: any } = {};
+      const filters: Record<string, string | Date | [Date, Date]> = {};
       if (subjectPrefix) filters['___subject'] = subjectPrefix;
       if (sourcePrefix) filters['___source'] = sourcePrefix;
       if (!isLatest) {
@@ -81,9 +88,9 @@ export class ClientManager {
     });
   }
 
-  private createCloudEventFromRow(row: { [key: string]: any }): CloudEvent {
-    const cloudEvent: { [key: string]: any } = {};
-    const data: { [key: string]: any } = {};
+  private createCloudEventFromRow(row: Record<string, unknown>): CloudEvent {
+    const cloudEvent: Record<string, unknown> = {};
+    const data: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(row)) {
       if (key.startsWith('___')) {
@@ -95,7 +102,7 @@ export class ClientManager {
     }
 
     cloudEvent['data'] = data;
-    return new CloudEvent<any>(cloudEvent, false);
+    return new CloudEvent<Record<string, unknown>>(cloudEvent, false);
   }
 
   public removeClient(clientId: string) {

@@ -64,125 +64,117 @@ export class {{ type_name | pascal }}
     {%- for allOfType in type.allOf -%}
         {%- if loop.first -%}
         {%- if allOfType['$ref'] -%}
-            : {{ allOfType['$ref'] | schema_type( project_name, root) | pascal }}
+ extends {{ allOfType['$ref'] | schema_type( project_name, root) | pascal }}
         {%- endif -%}
         {%- endif -%}
     {%- endfor -%}
 {%- endif %}
 {
-    static fromData(data? : any)
+    static fromData(data?: Record<string, unknown>): {{ type_name | pascal }}
     {
         return new {{ type_name | pascal }}( data );
     }
 
-    public toByteArray() 
+    public toByteArray(): Uint8Array 
     {
         const jsonString = JSON.stringify(this);
         const utf8Encoded = new TextEncoder().encode(jsonString);
         return utf8Encoded;
     }
 {% if type.properties %}
-     constructor(data?: any) {
+     constructor(data?: Record<string, unknown>) {
 {% for pn, property in type.properties.items()  -%}
     {%- set propertyName = pn | strip_invalid_identifier_characters %}
     {%- set typeScriptType = getTypeScriptType(propertyName, property )%}
-    {%- if property.enum %}
-        this._{{ propertyName | camel }} = (data.{{ propertyName | camel }} as {{ propertyName | pascal }}Enum);
-    {%- else %}
-        this._{{ propertyName | camel }} = (data.{{ propertyName | camel }} as {{ typeScriptType }});
-    {%- endif %}
+        if (data?.{{ propertyName | camel }} !== undefined) {
+            this._{{ propertyName | camel }} = data.{{ propertyName | camel }} as {{ typeScriptType }};
+        } else {
+            this._{{ propertyName | camel }} = {} as {{ typeScriptType }};
+        }
 {%- endfor %}
      }
 {% for pn, property in type.properties.items()  -%}
     {%- set propertyName = pn | strip_invalid_identifier_characters %}
     {%- set typeScriptType = getTypeScriptType(propertyName, property )%}
     {%- if property.enum %}
-        public enum {{ propertyName | pascal }}Enum
+    _{{ propertyName | camel }}: string = "{{ property.enum[0] }}";
+    {%- if property.description %} 
+    /** {{property.description}} */
+    {%- endif %}
+    get {{ propertyName | camel }}(): string
+    {
+        return this._{{ propertyName | camel }};
+    }
+    set {{ propertyName | camel }}(value: string)
+    {
+        const validValues = [{% for value in property.enum %}"{{ value }}"{% if not loop.last %}, {% endif %}{% endfor %}];
+        if (!validValues.includes(value))
         {
-            {% for value in property.enum %}
-                {{ value | pascal }} = {{ loop.index - 1 }},
-            {% endfor %}
+            throw new RangeError(`Invalid value for {{ propertyName | pascal }}: ${value}. Valid values are: ${validValues.join(", ")}`);
         }
-        private {{ propertyName | pascal }}Enum _{{ propertyName }} = {{ propertyName | pascal }}Enum.{{ property.enum[0] | pascal }};
-        {%- if property.description %} 
-        /// <description>{{property.description}}</description> 
-        {%- endif %}
-        [JsonPropertyName("{{ propertyName }}")]
-        public {{ propertyName | pascal }}Enum {{ propertyName | pascal }}
-        {
-            get
-            {
-                return _{{ propertyName }};
-            }
-            set
-            {
-                if (!Enum.IsDefined(typeof({{ propertyName | pascal }}Enum), value))
-                {
-                    throw new RangeError("{{ propertyName | pascal }}", ExceptionMessages.ValueIsInvalid);
-                }
-                _{{ propertyName }} = value;
-            }
-        }
+        this._{{ propertyName | camel }} = value;
+    }
     {%- else %}
     _{{ propertyName | camel }}: {{ typeScriptType }};
     {%- if property.description %} 
-    /// <description>{{property.description}}</description> 
+    /** {{property.description}} */
     {%- endif %}
-    get {{ propertyName | camel }}()
+    get {{ propertyName | camel }}(): {{ typeScriptType }}
     {
-        return this._{{ propertyName }};
+        return this._{{ propertyName | camel }};
     }
-    set {{ propertyName | camel }}(value)
+    set {{ propertyName | camel }}(value: {{ typeScriptType }})
     {
-        {%- if property.minimum -%}
-        if (value < {{ property.minimum }})
+        {%- if property.minimum is defined %}
+        if (typeof value === 'number' && value < {{ property.minimum }})
         {
-            throw new RangeError("{{ propertyName | pascal }}", string.Format(ExceptionMessages.ValueIsTooSmall, value, {{ property.minimum }}));
+            throw new RangeError(`Value for {{ propertyName | pascal }} (${value}) is too small. Minimum is {{ property.minimum }}.`);
         }
         {%- endif -%}
-        {%- if property.exclusiveMinimum -%}
-        if (value <= {{ property.exclusiveMinimum }})
+        {%- if property.exclusiveMinimum is defined %}
+        if (typeof value === 'number' && value <= {{ property.exclusiveMinimum }})
         {
-            throw new RangeError("{{ propertyName | pascal }}", string.Format(ExceptionMessages.ValueIsTooSmall, value, {{ property.exclusiveMinimum }}));
+            throw new RangeError(`Value for {{ propertyName | pascal }} (${value}) must be greater than {{ property.exclusiveMinimum }}.`);
         }
         {%- endif -%}
-        {%- if property.maximum -%}
-        if (value > {{ property.maximum }})
+        {%- if property.maximum is defined %}
+        if (typeof value === 'number' && value > {{ property.maximum }})
         {
-            throw new RangeError("{{ propertyName | pascal }}", string.Format(ExceptionMessages.ValueIsTooBig, value, {{ property.maximum }}));
+            throw new RangeError(`Value for {{ propertyName | pascal }} (${value}) is too large. Maximum is {{ property.maximum }}.`);
         }
         {%- endif -%}
-        {%- if property.exclusiveMaximum -%}
-        if (value >= {{ property.exclusiveMaximum }})
+        {%- if property.exclusiveMaximum is defined %}
+        if (typeof value === 'number' && value >= {{ property.exclusiveMaximum }})
         {
-            throw new RangeError("{{ propertyName | pascal }}", string.Format(ExceptionMessages.ValueIsTooBig, value, {{ property.exclusiveMaximum }}));
+            throw new RangeError(`Value for {{ propertyName | pascal }} (${value}) must be less than {{ property.exclusiveMaximum }}.`);
         }
         {%- endif -%}
-            {%- if property.maxLength -%}
-        if (value.ToString().Length > {{ property.maxLength }})
+        {%- if property.maxLength is defined %}
+        if (typeof value === 'string' && value.length > {{ property.maxLength }})
         {
-            throw new RangeError("{{ propertyName | pascal }}", string.Format(ExceptionMessages.ValueIsTooLong, value, {{ property.maxLength }}));
+            throw new RangeError(`Value for {{ propertyName | pascal }} is too long (${value.length} characters). Maximum length is {{ property.maxLength }}.`);
         }
         {%- endif -%}
-        {%- if property.minLength -%}
-        if (value.ToString().Length < {{ property.minLength }})
+        {%- if property.minLength is defined %}
+        if (typeof value === 'string' && value.length < {{ property.minLength }})
         {
-            throw new RangeError("{{ propertyName | pascal }}", string.Format(ExceptionMessages.ValueIsTooShort, value, {{ property.minLength }}));
+            throw new RangeError(`Value for {{ propertyName | pascal }} is too short (${value.length} characters). Minimum length is {{ property.minLength }}.`);
         }
         {%- endif -%}
-        {%- if property.pattern -%}
-        if (!System.Text.RegularExpressions.Regex.IsMatch(value.ToString(), RegexPatterns.{{ property.pattern | pascal }}))
+        {%- if property.pattern %}
+        if (typeof value === 'string' && !/{{ property.pattern }}/.test(value))
         {
-            throw new RangeError("{{ propertyName | pascal }}", ExceptionMessages.ValueIsInvalid);
+            throw new RangeError(`Value for {{ propertyName | pascal }} does not match required pattern: {{ property.pattern }}`);
         }
         {%- endif -%}
-        {%- if property.format == "email" -%}
-        if (!System.Text.RegularExpressions.Regex.IsMatch(System.Text.Json.JsonSerializer.Serialize(value), RegexPatterns.Email, System.Text.RegularExpressions.RegexOptions.Singleline))
+        {%- if property.format == "email" %}
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (typeof value === 'string' && !emailRegex.test(value))
         {
-            throw new System.ArgumentException(ExceptionMessages.ValueIsNotAnEmail, "{{ propertyName | pascal }}");
+            throw new TypeError(`Value for {{ propertyName | pascal }} is not a valid email address.`);
         }
         {%- endif %}
-        this._{{ propertyName }} = value;
+        this._{{ propertyName | camel }} = value;
     }
     {% endif -%}
 {%- endfor -%}

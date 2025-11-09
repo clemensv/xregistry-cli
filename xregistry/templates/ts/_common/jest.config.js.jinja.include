@@ -16,7 +16,7 @@ export default {
   testMatch: ['**/test/**/*.test.ts'],
   collectCoverageFrom: ['src/**/*.ts'],
   coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
-  coverageThreshold: {
+  coverageThresholds: {
     global: {
       branches: 70,
       functions: 70,

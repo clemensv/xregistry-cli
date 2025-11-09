@@ -6,9 +6,10 @@
 
 
 {%- macro body_type(data_project_name, root, message) -%}
+{%- set data_module_name = data_project_name | strip_invalid_identifier_characters -%}
 {%- if message.dataschemauri or message.dataschema -%}
-{{ data_project_name }}.{{ (message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat) | pascal | replace(".", "_") }}
+{{ data_module_name }}.{{ (message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( data_project_name, root, message.dataschemaformat) | pascal | replace(".", "_") }}
 {%- else -%}
-any
+Record<string, unknown>
 {%- endif %} 
 {%- endmacro -%}

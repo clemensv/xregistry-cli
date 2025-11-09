@@ -9,16 +9,16 @@ export class EventRouter {
     this.clientManager = clientManager;
   }
 
-  public routeEvents(events: CloudEventV1<any>[]) {
+  public routeEvents(events: CloudEventV1<unknown>[]): void {
     this.clientManager.getClients().forEach((client, clientId) => {
-      let matchingEvents = events.filter((event) => this.eventMatchesFilters(event, client.filters));
-      if ( matchingEvents.length > 0 ) {
+      const matchingEvents = events.filter((event) => this.eventMatchesFilters(event, client.filters));
+      if (matchingEvents.length > 0) {
         client.socket.emit('event', matchingEvents);
       }
     });
   }
 
-  private eventMatchesFilters(event: CloudEventV1<any>, filters: ClientFilters[]): boolean {
+  private eventMatchesFilters(event: CloudEventV1<unknown>, filters: ClientFilters[]): boolean {
     return filters.some((filter) => {
       const typeMatches = filter.type === event.type;
       const subjectMatches = event.subject?.startsWith(filter.subjectPrefix || '') || !filter.subjectPrefix || !event.subject;

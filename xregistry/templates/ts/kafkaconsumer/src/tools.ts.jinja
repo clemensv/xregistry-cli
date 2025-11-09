@@ -3,6 +3,7 @@
 // Changes to this file may cause incorrect behavior and will be lost if the code is regenerated.
 
 import { Consumer, Kafka, EachMessagePayload } from 'kafkajs';
+import { Logger, createLogger } from './logger.js';
 
 /**
  * A simple wrapper for the KafkaJS consumer that processes messages
@@ -11,6 +12,7 @@ export class KafkaProcessor {
     private consumer: Consumer;
     private running: boolean = false;
     private topicName: string;
+    private logger: Logger;
     
     /**
      * Event handler for processing messages
@@ -26,10 +28,12 @@ export class KafkaProcessor {
      * Create a new KafkaProcessor
      * @param consumer The KafkaJS consumer instance
      * @param topicName The topic to subscribe to
+     * @param logger Optional logger instance
      */
-    constructor(consumer: Consumer, topicName: string) {
+    constructor(consumer: Consumer, topicName: string, logger?: Logger) {
         this.consumer = consumer;
         this.topicName = topicName;
+        this.logger = logger ?? createLogger({ component: 'KafkaProcessor' });
     }
     
     /**
@@ -41,6 +45,7 @@ export class KafkaProcessor {
         }
         
         this.running = true;
+        this.logger.info('Starting Kafka processor', { topic: this.topicName });
         
         await this.consumer.connect();
         await this.consumer.subscribe({ topic: this.topicName, fromBeginning: true });
@@ -52,7 +57,11 @@ export class KafkaProcessor {
                         await this.processMessage(payload);
                     }
                 } catch (error) {
-                    console.error('Error processing message:', error);
+                    this.logger.error('Error processing message', error as Error, {
+                        topic: payload.topic,
+                        partition: payload.partition,
+                        offset: payload.message.offset
+                    });
                     if (this.processError && error instanceof Error) {
                         await this.processError(error);
                     }
@@ -69,6 +78,7 @@ export class KafkaProcessor {
             return;
         }
         
+        this.logger.info('Stopping Kafka processor');
         this.running = false;
         await this.consumer.disconnect();
     }

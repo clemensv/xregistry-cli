@@ -46,8 +46,8 @@ true
   {%- if attrname in ["id"] %}
   {{ attrname | lower }} : uuidv4()
   {%- endif -%}
-  {%- if attrname not in ["id", "time"] %}
-  {{ attrname | lower }} : {%- if attribute.value -%}"{{ attribute.value }}"{%- else -%}{{ attrname }}{%- endif -%}
+  {%- if attrname not in ["id", "time", "datacontenttype", "dataschema"] %}
+  {{ attrname | lower }} : {%- if attribute.value -%}{%- if attribute.type == "uritemplate" -%}`{{ attribute.value | regex_replace('\\{([A-Za-z0-9_]+)\\}', '${\\1}') }}`{%- else -%}"{{ attribute.value }}"{%- endif -%}{%- else -%}{{ attrname }}{%- endif -%}
   {% endif -%}
   {%- if not loop.last -%},{%- else -%}, data : data{%- endif -%}
   {%- endfor -%}

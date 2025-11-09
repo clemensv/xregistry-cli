@@ -53,7 +53,8 @@ export class AmqpConsumer {
                 connectionOptions.password = this.password;
             }
             
-            this.connection = (rhea as any).connect(connectionOptions);
+            // Type assertion for rhea library's missing type definition
+            this.connection = (rhea as unknown as { connect(opts: rhea.ConnectionOptions): rhea.Connection }).connect(connectionOptions);
             
             this.connection!.on('connection_open', () => {
                 this.receiver = this.connection!.open_receiver({

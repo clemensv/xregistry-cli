@@ -4,23 +4,50 @@
 {%- if not uses_cloudevents_message %}
 {%- exit -%}
 {%- endif -%}
-import * as types from "./types" 
+import * as types from "./types.js";
 import { httpTransport, emitterFor, CloudEvent } from "cloudevents";
 import { v4 as uuidv4 } from "uuid";
+
+/**
+ * Configuration options for the event producer
+ */
+export interface ProducerOptions {
+    [key: string]: string | number | boolean;
+}
+
+/**
+ * Credentials for authenticating with the endpoint
+ */
+export interface ProducerCredential {
+    type: 'bearer' | 'basic' | 'none';
+    token?: string;
+    username?: string;
+    password?: string;
+}
 
 {% for messagegroupid, messagegroup in messagegroups.items() -%}
 {%- set groupname = messagegroupid  | pascal -%}
 
 export class {{ groupname | strip_dots }}EventProducer
 {
-    credential : any;
-    endpoints : any;
-    options : any;
+    private credential: ProducerCredential;
+    private endpoints: string[];
+    private options: ProducerOptions;
+    private mode: 'binary' | 'structured';
+    private format: string;
 
-    constructor(credential : any, endpoints : any, options : any) {
+    constructor(
+        credential: ProducerCredential, 
+        endpoints: string[], 
+        options: ProducerOptions = {},
+        mode: 'binary' | 'structured' = 'structured',
+        format: string = 'application/json'
+    ) {
         this.credential = credential;
         this.endpoints = endpoints;
         this.options = options;
+        this.mode = mode;
+        this.format = format;
     } 
   
     {%- if root.endpoints -%} 
@@ -30,19 +57,19 @@ export class {{ groupname | strip_dots }}EventProducer
       {%- set options = endpoint.protocoloptions -%}
       {%- set endpoints = endpoint.endpoints %}
            
-   static createFor{{ endpointid | pascal | strip_dots }}(credential : any) 
+   static createFor{{ endpointid | pascal | strip_dots }}(credential: ProducerCredential): {{ groupname | strip_dots }}EventProducer
    {       
        {%- if options %}
-       var options = { 
+       const options: ProducerOptions = { 
        {%- for key, value in options.items()%}
-           { "{{ key }}" , "{{ value }}" }
+           "{{ key }}": "{{ value }}"
            {%- if not loop.last -%},{%- endif %}
        {%- endfor %}
        };
        {%- else -%}
-       var options = {};
+       const options: ProducerOptions = {};
        {%- endif %}
-       var endpoints = [
+       const endpoints: string[] = [
        {%- for epo in endpoints %}
            "{{ epo.uri }}"
            {%- if not loop.last -%},{%- endif %}
@@ -63,23 +90,34 @@ export class {{ groupname | strip_dots }}EventProducer
    {%- if message.dataschemauri or message.dataschema -%}
    {% set dataType = "types." + ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | strip_namespace | pascal) %}
    {%- else -%}
-   {% set dataType = "any" %}
+   {% set dataType = "Record<string, unknown>" %}
    {%- endif %}    
-   data : {{ dataType }}
+   data: {{ dataType }}
    {{- cloudEvents.DeclareUriTemplateArguments(message) -}}
-   )
+   ): Promise<void>
    {
        {{ cloudEvents.DeclareCloudEvent("cloudEvent", message, dataType) | indent(9) }}
        await this._sendAsync(cloudEvent);
    }
    {% endfor %}
 
-   async _sendAsync<T>(cloudEvent : CloudEvent<T>)
+   private async _sendAsync<T>(cloudEvent: CloudEvent<T>): Promise<void>
    {
-       var transport = httpTransport(this.endpoints[0]);
-       var emitter = emitterFor(transport);
-       var result = await emitter(cloudEvent);
-       return result;
+       const headers: Record<string, string> = {};
+       
+       if (this.credential.type === 'bearer' && this.credential.token) {
+           headers['Authorization'] = `Bearer ${this.credential.token}`;
+       } else if (this.credential.type === 'basic' && this.credential.username && this.credential.password) {
+           const encoded = Buffer.from(`${this.credential.username}:${this.credential.password}`).toString('base64');
+           headers['Authorization'] = `Basic ${encoded}`;
+       }
+       
+       // Note: CloudEvents library's httpTransport and emitterFor handle
+       // binary vs structured mode automatically based on the CloudEvent object.
+       // The mode and format fields are available for future enhancements.
+       const transport = httpTransport(this.endpoints[0], { headers });
+       const emitter = emitterFor(transport);
+       await emitter(cloudEvent);
    }
 }
 

@@ -24,8 +24,8 @@ export class KqlClient {
 
   public async queryInChunks(
     tableName: string,
-    filters: { [key: string]: any },
-    onRows: (rows: { [key: string]: any }[]) => void,
+    filters: Record<string, string | Date | [Date, Date]>,
+    onRows: (rows: Record<string, unknown>[]) => void,
     chunkSize : number = 10000
   ): Promise<void> {
     let hasMoreData = true;
@@ -81,7 +81,7 @@ export class KqlClient {
           const table = queryResults.primaryResults[0];
           const rows = table.toJSON();
 
-          onRows(rows.data.map((row: { [key: string]: any }) => row));
+          onRows(rows.data.map((row: Record<string, unknown>) => row));
 
           if (rows.data.length < chunkSize) {
             hasMoreData = false;
@@ -90,8 +90,8 @@ export class KqlClient {
 
           // Update lastTime and lastId for the next chunk
           const lastRow = rows.data[rows.data.length - 1];
-          lastTime = new Date(lastRow['___time']);
-          lastId = lastRow['___id'];
+          lastTime = new Date(String(lastRow['___time']));
+          lastId = String(lastRow['___id']);
         } catch (error) {
           this.logger.error(`Error executing query: ${error}`);
           throw error;

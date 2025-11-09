@@ -34,8 +34,16 @@ const toWinstonLogLevel = (kafkaLogLevel: logLevel) => {
   }
 };
 
+interface KafkaLogEntry {
+  level: number;
+  log: {
+    message: string;
+    [key: string]: unknown;
+  };
+}
+
 // Custom KafkaJS logger function to be passed to KafkaJS
-export const kafkaLogger = ({ level, log }: any) => {
+export const kafkaLogger = ({ level, log }: KafkaLogEntry): void => {
   const { message, ...extra } = log;
   appLogger.log({
     level: toWinstonLogLevel(level),

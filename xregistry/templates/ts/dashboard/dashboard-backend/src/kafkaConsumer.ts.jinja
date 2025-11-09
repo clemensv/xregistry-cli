@@ -14,14 +14,23 @@ import { CloudEventV1, KafkaMessage } from 'cloudevents';
 import { Logger } from 'winston';
 import { parseCloudEvent } from './cloudeventParser.js';
 
+interface KafkaConsumerConfig {
+  KAFKA_BROKERS: string;
+  KAFKA_SSL: string;
+  KAFKA_USERNAME?: string;
+  KAFKA_PASSWORD?: string;
+  KAFKA_TOPIC: string;
+  CONSUMER_GROUP: string;
+}
+
 export class KafkaConsumer {
   private consumer: Consumer;
   private admin: Admin;
   private eventRouter: EventRouter;
   private logger: Logger;
-  private config: any;
+  private config: KafkaConsumerConfig;
 
-  constructor(eventRouter: EventRouter, config: any, logger: Logger) {
+  constructor(eventRouter: EventRouter, config: KafkaConsumerConfig, logger: Logger) {
     this.eventRouter = eventRouter;
     this.logger = logger;
     this.config = config;
@@ -56,9 +65,9 @@ export class KafkaConsumer {
 
       await this.consumer.run({
         eachBatch: async (payload: EachBatchPayload) => {
-          let events: CloudEventV1<any>[] = [];
-          let topic = payload.batch.topic;
-          let partition = payload.batch.partition;
+          const events: CloudEventV1<unknown>[] = [];
+          const topic = payload.batch.topic;
+          const partition = payload.batch.partition;
           payload.batch.messages.forEach((message, num, batch) => {
             try {
               const msg: KafkaMessage = {
@@ -73,7 +82,7 @@ export class KafkaConsumer {
                   ])
                 )
               };
-              const event = parseCloudEvent<any>(msg);
+              const event = parseCloudEvent<unknown>(msg);
               if (event) {
                 events.push(event);
               } else {
