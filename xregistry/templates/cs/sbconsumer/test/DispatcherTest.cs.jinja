@@ -79,7 +79,8 @@ namespace {{ project_name | pascal }}.Test
         {
             try
             {
-                CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                // Increase timeout for CI environments where container startup is slower
+                CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
                 Network = new NetworkBuilder()
                     .WithName(Guid.NewGuid().ToString("D"))
                     .Build();
@@ -96,6 +97,7 @@ namespace {{ project_name | pascal }}.Test
                     .WithNetworkAliases("sqledge")
                     .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(1431))
                     .WithOutputConsumer(outputConsumer)
+                    .WithStartupCallback((container, ct) => Task.Delay(2000, ct)) // Extra settling time
                     .Build();
 
                 EmulatorContainer = new ContainerBuilder()
@@ -109,13 +111,14 @@ namespace {{ project_name | pascal }}.Test
                     .WithEnvironment("ACCEPT_EULA", "Y")
                     .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*Emulator Service is Successfully Up!"))
                     .WithOutputConsumer(outputConsumer)
+                    .WithStartupCallback((container, ct) => Task.Delay(2000, ct)) // Extra settling time
                     .Build();
 
                 await Network.CreateAsync(cts.Token);
                 await SqlEdgeContainer.StartAsync(cts.Token);
                 await EmulatorContainer.StartAsync(cts.Token);
 
-                await Task.Delay(5000); // Wait for emulator to be settled
+                await Task.Delay(10000); // Wait for emulator to be fully settled
 
                 ServiceBusConnectionString = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;";
             }
