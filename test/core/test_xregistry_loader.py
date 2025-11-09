@@ -605,5 +605,253 @@ class TestIntegration(unittest.TestCase):
             self.assertEqual(order_version["schema"]["type"], "object")
 
 
+class TestDocumentStacking(unittest.TestCase):
+    """Test document stacking and merging functionality."""
+    
+    def setUp(self):
+        """Set up test fixtures for stacking tests."""
+        self.temp_dir = tempfile.mkdtemp()
+        
+        # Mock the Model class to return a mock with the expected structure
+        with patch('xregistry.generator.xregistry_loader.Model') as MockModel:
+            mock_model = Mock()
+            mock_model.groups = {
+                "messagegroups": {
+                    "resources": {
+                        "messages": {"singular": "message"}
+                    }
+                },
+                "schemagroups": {
+                    "resources": {
+                        "schemas": {"singular": "schema"}
+                    }
+                },
+                "endpoints": {
+                    "resources": {}
+                }
+            }
+            MockModel.return_value = mock_model
+            self.loader = XRegistryLoader()
+        
+        # Create base document
+        self.base_doc = {
+            "specversion": "1.0-rc2",
+            "messagegroups": {
+                "test.base": {
+                    "id": "test.base",
+                    "format": "CloudEvents/1.0",
+                    "messages": {
+                        "BaseMessage": {
+                            "id": "BaseMessage",
+                            "description": "A base message",
+                            "format": "CloudEvents/1.0",
+                            "metadata": {
+                                "type": {"value": "com.example.base"}
+                            }
+                        },
+                        "OnlyInBase": {
+                            "id": "OnlyInBase",
+                            "description": "Only in base",
+                            "format": "CloudEvents/1.0"
+                        }
+                    }
+                }
+            },
+            "schemagroups": {
+                "test.base": {
+                    "id": "test.base",
+                    "schemas": {
+                        "BaseSchema": {
+                            "id": "BaseSchema",
+                            "format": "JSONSchema/draft-07"
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Create overlay document
+        self.overlay_doc = {
+            "specversion": "1.0-rc2",
+            "messagegroups": {
+                "test.base": {
+                    "id": "test.base",
+                    "format": "CloudEvents/1.0",
+                    "messages": {
+                        "BaseMessage": {
+                            "id": "BaseMessage",
+                            "description": "OVERRIDDEN: Base message was shadowed",
+                            "format": "CloudEvents/1.0",
+                            "metadata": {
+                                "type": {"value": "com.example.base.overridden"}
+                            }
+                        },
+                        "OnlyInOverlay": {
+                            "id": "OnlyInOverlay",
+                            "description": "Only in overlay",
+                            "format": "CloudEvents/1.0"
+                        }
+                    }
+                }
+            },
+            "schemagroups": {
+                "test.base": {
+                    "id": "test.base",
+                    "schemas": {
+                        "OverlaySchema": {
+                            "id": "OverlaySchema",
+                            "format": "JSONSchema/draft-07"
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Write test files
+        self.base_file = os.path.join(self.temp_dir, "base.json")
+        self.overlay_file = os.path.join(self.temp_dir, "overlay.json")
+        
+        with open(self.base_file, 'w') as f:
+            json.dump(self.base_doc, f)
+        
+        with open(self.overlay_file, 'w') as f:
+            json.dump(self.overlay_doc, f)
+    
+    def tearDown(self):
+        """Clean up test files."""
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+    
+    def test_load_stacked_single_file(self):
+        """Test that load_stacked works with a single file."""
+        result_uri, result_data = self.loader.load_stacked([self.base_file])
+        
+        self.assertEqual(result_uri, self.base_file)
+        self.assertIsNotNone(result_data)
+        self.assertIn("messagegroups", result_data)
+        self.assertEqual(len(result_data["messagegroups"]["test.base"]["messages"]), 2)
+    
+    def test_load_stacked_multiple_files(self):
+        """Test loading and stacking multiple files."""
+        result_uri, result_data = self.loader.load_stacked([self.base_file, self.overlay_file])
+        
+        self.assertEqual(result_uri, self.overlay_file)  # Should return last URI
+        self.assertIsNotNone(result_data)
+        
+        # Verify messagegroups were merged
+        messages = result_data["messagegroups"]["test.base"]["messages"]
+        self.assertEqual(len(messages), 3)  # BaseMessage (overridden), OnlyInBase, OnlyInOverlay
+        
+        # Verify BaseMessage was overridden
+        self.assertIn("BaseMessage", messages)
+        self.assertTrue(messages["BaseMessage"]["description"].startswith("OVERRIDDEN:"))
+        self.assertEqual(
+            messages["BaseMessage"]["metadata"]["type"]["value"],
+            "com.example.base.overridden"
+        )
+        
+        # Verify OnlyInBase exists from base
+        self.assertIn("OnlyInBase", messages)
+        self.assertEqual(messages["OnlyInBase"]["description"], "Only in base")
+        
+        # Verify OnlyInOverlay exists from overlay
+        self.assertIn("OnlyInOverlay", messages)
+        self.assertEqual(messages["OnlyInOverlay"]["description"], "Only in overlay")
+    
+    def test_stacked_schemas_merge(self):
+        """Test that schemas from multiple files are merged."""
+        result_uri, result_data = self.loader.load_stacked([self.base_file, self.overlay_file])
+        
+        schemas = result_data["schemagroups"]["test.base"]["schemas"]
+        self.assertEqual(len(schemas), 2)  # BaseSchema and OverlaySchema
+        
+        self.assertIn("BaseSchema", schemas)
+        self.assertIn("OverlaySchema", schemas)
+    
+    def test_stacking_order_matters(self):
+        """Test that stacking order determines which document shadows."""
+        # Load in reverse order
+        result_uri, result_data = self.loader.load_stacked([self.overlay_file, self.base_file])
+        
+        messages = result_data["messagegroups"]["test.base"]["messages"]
+        
+        # When base is loaded second, it should override the overlay version
+        self.assertIn("BaseMessage", messages)
+        self.assertEqual(messages["BaseMessage"]["description"], "A base message")
+        self.assertEqual(
+            messages["BaseMessage"]["metadata"]["type"]["value"],
+            "com.example.base"  # Not overridden
+        )
+    
+    def test_stacking_empty_list(self):
+        """Test that stacking with empty list returns error."""
+        result_uri, result_data = self.loader.load_stacked([])
+        
+        self.assertEqual(result_uri, "")
+        self.assertIsNone(result_data)
+    
+    def test_stacking_with_nonexistent_file(self):
+        """Test that stacking fails gracefully with nonexistent file."""
+        nonexistent = os.path.join(self.temp_dir, "nonexistent.json")
+        result_uri, result_data = self.loader.load_stacked([self.base_file, nonexistent])
+        
+        self.assertEqual(result_uri, nonexistent)
+        self.assertIsNone(result_data)
+    
+    def test_merge_documents_direct(self):
+        """Test the _merge_documents method directly."""
+        base = {
+            "messagegroups": {
+                "group1": {
+                    "messages": {
+                        "msg1": {"id": "msg1", "data": "base"}
+                    }
+                }
+            },
+            "other_key": "base_value"
+        }
+        
+        overlay = {
+            "messagegroups": {
+                "group1": {
+                    "messages": {
+                        "msg2": {"id": "msg2", "data": "overlay"}
+                    }
+                },
+                "group2": {
+                    "messages": {
+                        "msg3": {"id": "msg3", "data": "overlay"}
+                    }
+                }
+            },
+            "other_key": "overlay_value"
+        }
+        
+        result = self.loader._merge_documents(base, overlay)
+        
+        # Check that groups are merged
+        self.assertIn("group1", result["messagegroups"])
+        self.assertIn("group2", result["messagegroups"])
+        
+        # Check that messages within group1 are merged
+        self.assertIn("msg1", result["messagegroups"]["group1"]["messages"])
+        self.assertIn("msg2", result["messagegroups"]["group1"]["messages"])
+        
+        # Check that non-collection keys are replaced
+        self.assertEqual(result["other_key"], "overlay_value")
+    
+    def test_stacking_preserves_specversion(self):
+        """Test that overlay specversion replaces base specversion."""
+        overlay_with_new_version = self.overlay_doc.copy()
+        overlay_with_new_version["specversion"] = "0.6"
+        
+        with open(self.overlay_file, 'w') as f:
+            json.dump(overlay_with_new_version, f)
+        
+        result_uri, result_data = self.loader.load_stacked([self.base_file, self.overlay_file])
+        
+        self.assertEqual(result_data["specversion"], "0.6")
+
+
 if __name__ == '__main__':
     unittest.main()

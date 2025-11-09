@@ -9,12 +9,14 @@ class GeneratorContext:
     def __init__(self, 
                  current_dir: str = "", 
                  messagegroup_filter: str = "", 
+                 endpoint_filter: str = "",
                  model_path: str | None = None,
                  language: str = "",
                  project_name: str = "",
                  style: str = "",
                  output_directory: str = "") -> None:
         self.messagegroup_filter: str = messagegroup_filter
+        self.endpoint_filter: str = endpoint_filter
         self.base_uri: str = ""
         self.uses_avro: bool = False
         self.uses_protobuf: bool = False

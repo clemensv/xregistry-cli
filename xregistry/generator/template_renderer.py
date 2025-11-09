@@ -23,7 +23,7 @@ import urllib.parse
 
 from xregistry.cli import logger
 from xregistry.generator.generator_context import GeneratorContext
-from xregistry.generator.jinja_extensions import JinjaExtensions
+from xregistry.generator.jinja_extensions import JinjaExtensions, TemplateError
 from xregistry.generator.jinja_filters import JinjaFilters
 from xregistry.generator.schema_utils import SchemaUtils
 from xregistry.generator.url_utils import URLUtils
@@ -78,17 +78,43 @@ class TemplateRenderer:
         """Generate code and schemas from templates."""
 
         self.ctx.base_uri = self.xreg_file_arg
-        if self.xreg_file_arg.startswith("http"):
-            parsed_uri = urllib.parse.urlparse(self.xreg_file_arg)
-            path_segments = parsed_uri.path.split('/')
-            groups_index = next((i for i, segment in enumerate(path_segments) if segment.endswith("groups")), None)
-            if groups_index is not None:
-                self.ctx.base_uri = urllib.parse.urlunparse(parsed_uri._replace(path='/'.join(path_segments[:groups_index])))
+        
+        # Check if this is a stacked file list (marked with | separator)
+        if "|" in self.xreg_file_arg and not self.xreg_file_arg.startswith("http"):
+            # Multiple files to stack
+            definitions_files = self.xreg_file_arg.split("|")
+            # Use the first file for base_uri
+            if definitions_files[0].startswith("http"):
+                parsed_uri = urllib.parse.urlparse(definitions_files[0])
+                path_segments = parsed_uri.path.split('/')
+                groups_index = next((i for i, segment in enumerate(path_segments) if segment.endswith("groups")), None)
+                if groups_index is not None:
+                    self.ctx.base_uri = urllib.parse.urlunparse(parsed_uri._replace(path='/'.join(path_segments[:groups_index])))
+                else:
+                    self.ctx.base_uri = definitions_files[0]
             else:
-                self.ctx.base_uri = self.xreg_file_arg
+                self.ctx.base_uri = definitions_files[0]
+            
+            xreg_file, xregistry_document = self.ctx.loader.load_stacked(
+                definitions_files, self.headers, self.style == "schema",
+                messagegroup_filter=self.ctx.messagegroup_filter,
+                endpoint_filter=self.ctx.endpoint_filter)
+        else:
+            # Single file
+            if self.xreg_file_arg.startswith("http"):
+                parsed_uri = urllib.parse.urlparse(self.xreg_file_arg)
+                path_segments = parsed_uri.path.split('/')
+                groups_index = next((i for i, segment in enumerate(path_segments) if segment.endswith("groups")), None)
+                if groups_index is not None:
+                    self.ctx.base_uri = urllib.parse.urlunparse(parsed_uri._replace(path='/'.join(path_segments[:groups_index])))
+                else:
+                    self.ctx.base_uri = self.xreg_file_arg
 
-        xreg_file, xregistry_document = self.ctx.loader.load(
-            self.xreg_file_arg, self.headers, self.style == "schema", messagegroup_filter=self.ctx.messagegroup_filter)
+            xreg_file, xregistry_document = self.ctx.loader.load(
+                self.xreg_file_arg, self.headers, self.style == "schema", 
+                messagegroup_filter=self.ctx.messagegroup_filter, 
+                endpoint_filter=self.ctx.endpoint_filter)
+        
         if not xreg_file or not xregistry_document:
             raise RuntimeError(
                 f"Definitions file not found or invalid {self.xreg_file_arg}")
@@ -598,6 +624,9 @@ class TemplateRenderer:
         except TemplateNotFound as err:
             logger.error("%s: Include file not found: %s", template.name, err)
             exit(1)
+        except TemplateError as err:
+            logger.error("%s: Template error: %s", template.name, err)
+            exit(1)
         except TemplateRuntimeError as err:
             import traceback
             logger.error("%s: %s", template.name, err)
@@ -735,7 +764,7 @@ class TemplateRenderer:
             "Setting up Jinja environment with template dirs: %s", template_dirs)
         loader = jinja2.FileSystemLoader(template_dirs, followlinks=True)
         env = jinja2.Environment(loader=loader, extensions=[
-                                 JinjaExtensions.ExitExtension, JinjaExtensions.TimeExtension])
+                                 JinjaExtensions.ExitExtension, JinjaExtensions.TimeExtension, JinjaExtensions.ErrorExtension])
         env.filters['regex_search'] = JinjaFilters.regex_search
         env.filters['regex_replace'] = JinjaFilters.regex_replace
         env.filters['pascal'] = JinjaFilters.pascal

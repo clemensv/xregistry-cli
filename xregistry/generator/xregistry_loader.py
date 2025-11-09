@@ -416,6 +416,201 @@ class ResourceResolver:
                                             self.resolve_resource(resource, headers, resource_field_name)
 
 
+class MessageResolver:
+    """Resolves basemessage references in message definitions."""
+    
+    def __init__(self, loader: 'XRegistryLoader'):
+        self.loader = loader
+        self.logger = logging.getLogger(__name__ + ".MessageResolver")
+    
+    def _deep_merge(self, base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
+        """Deep merge two dictionaries with overlay shadowing base.
+        
+        Args:
+            base: The base dictionary
+            overlay: The overlay dictionary that shadows the base
+            
+        Returns:
+            Merged dictionary
+        """
+        result = dict(base)
+        
+        for key, value in overlay.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                # Deep merge nested dictionaries
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                # Scalar or list: complete replacement
+                result[key] = value
+        
+        return result
+    
+    def _resolve_basemessage_chain(self, message: Dict[str, Any], xreg_doc: Dict[str, Any], 
+                                   visited: Set[str]) -> Optional[Dict[str, Any]]:
+        """Resolve the basemessage chain for a message definition.
+        
+        Args:
+            message: The message definition to resolve
+            xreg_doc: The full xRegistry document for resolving references
+            visited: Set of visited message XID/URLs to detect circular references
+            
+        Returns:
+            The fully resolved message with all base messages merged, or None if circular reference detected
+        """
+        # Check for basemessageurl reference
+        base_ref = message.get('basemessageurl')
+        if not base_ref:
+            # No base message - return as-is
+            return dict(message)
+        
+        # Check for circular reference
+        if base_ref in visited:
+            self.logger.error(f"Circular basemessage reference detected: {base_ref}")
+            return None
+        
+        visited.add(base_ref)
+        
+        # Find the base message in the document
+        base_message = self._find_message_by_ref(base_ref, xreg_doc)
+        if not base_message:
+            self.logger.warning(f"Base message not found: {base_ref}")
+            # Per spec: "If the referenced message can not be found then an error MUST NOT be generated"
+            # Return current message without base, but remove basemessageurl
+            result = dict(message)
+            if 'basemessageurl' in result:
+                del result['basemessageurl']
+            return result
+        
+        # Recursively resolve the base message's chain
+        resolved_base = self._resolve_basemessage_chain(base_message, xreg_doc, visited)
+        if resolved_base is None:
+            # Circular reference in base chain
+            return None
+        
+        # Remove basemessageurl from both before merging
+        current = dict(message)
+        if 'basemessageurl' in current:
+            del current['basemessageurl']
+        if 'basemessageurl' in resolved_base:
+            del resolved_base['basemessageurl']
+        
+        # Merge: base first, then overlay with current message
+        merged = self._deep_merge(resolved_base, current)
+        
+        return merged
+    
+    def _find_message_by_ref(self, ref: str, xreg_doc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Find a message definition by XID or URL reference.
+        
+        Args:
+            ref: The XID or URL reference (e.g., "/messagegroups/group1/messages/msg1")
+            xreg_doc: The xRegistry document to search in
+            
+        Returns:
+            The message definition, or None if not found
+        """
+        # Parse the reference - handle both absolute and fragment identifiers
+        ref = ref.lstrip('#')  # Remove fragment prefix if present
+        
+        # Handle XID format: /messagegroups/{groupid}/messages/{messageid}[/versions/{versionid}]
+        parts = [p for p in ref.split('/') if p]
+        
+        if len(parts) < 4:
+            self.logger.warning(f"Invalid message reference format: {ref}")
+            return None
+        
+        # Extract path components
+        group_collection = parts[0]  # e.g., "messagegroups"
+        group_id = parts[1]
+        resource_collection = parts[2]  # e.g., "messages"
+        message_id = parts[3]
+        
+        # Navigate to the message
+        if group_collection not in xreg_doc:
+            return None
+        
+        groups = xreg_doc[group_collection]
+        if not isinstance(groups, dict) or group_id not in groups:
+            return None
+        
+        group = groups[group_id]
+        if not isinstance(group, dict) or resource_collection not in group:
+            return None
+        
+        messages = group[resource_collection]
+        if not isinstance(messages, dict) or message_id not in messages:
+            return None
+        
+        message = messages[message_id]
+        if not isinstance(message, dict):
+            return None
+        
+        # Check if specific version is requested
+        if len(parts) >= 6 and parts[4] == "versions":
+            version_id = parts[5]
+            if "versions" in message and isinstance(message["versions"], dict):
+                if version_id in message["versions"]:
+                    return message["versions"][version_id]
+            return None
+        
+        return message
+    
+    def resolve_all_basemessages(self, xreg_doc: Dict[str, Any]) -> None:
+        """Resolve all basemessage references in an xRegistry document.
+        
+        This processes both messagegroups and endpoints (which can contain embedded messages).
+        
+        Args:
+            xreg_doc: The xRegistry document to process
+        """
+        if not isinstance(xreg_doc, dict):
+            return
+        
+        # Process messagegroups
+        if "messagegroups" in xreg_doc and isinstance(xreg_doc["messagegroups"], dict):
+            for group_id, group in xreg_doc["messagegroups"].items():
+                if isinstance(group, dict) and "messages" in group:
+                    messages = group["messages"]
+                    if isinstance(messages, dict):
+                        self._resolve_messages_in_collection(messages, xreg_doc)
+        
+        # Process endpoints (which can have embedded messages)
+        if "endpoints" in xreg_doc and isinstance(xreg_doc["endpoints"], dict):
+            for endpoint_id, endpoint in xreg_doc["endpoints"].items():
+                if isinstance(endpoint, dict) and "messages" in endpoint:
+                    messages = endpoint["messages"]
+                    if isinstance(messages, dict):
+                        self._resolve_messages_in_collection(messages, xreg_doc)
+    
+    def _resolve_messages_in_collection(self, messages: Dict[str, Any], xreg_doc: Dict[str, Any]) -> None:
+        """Resolve basemessage references for all messages in a collection.
+        
+        Args:
+            messages: Dictionary of message definitions
+            xreg_doc: The full xRegistry document for resolving references
+        """
+        for message_id, message in list(messages.items()):
+            if not isinstance(message, dict):
+                continue
+            
+            # Check if this message has a basemessageurl
+            if 'basemessageurl' not in message:
+                continue
+            
+            self.logger.debug(f"Resolving basemessage for message: {message_id}")
+            
+            # Resolve the basemessage chain
+            visited: Set[str] = set()
+            resolved_message = self._resolve_basemessage_chain(message, xreg_doc, visited)
+            
+            if resolved_message is not None:
+                # Replace the message with the resolved version
+                messages[message_id] = resolved_message
+                self.logger.debug(f"Successfully resolved basemessage for: {message_id}")
+            else:
+                self.logger.error(f"Failed to resolve basemessage for: {message_id} (circular reference)")
+
+
 class XRegistryLoader:
     """Main loader class for xRegistry documents with dependency resolution."""
     
@@ -423,6 +618,7 @@ class XRegistryLoader:
         self.model = Model(model_path)
         self.dependency_resolver = DependencyResolver(self.model, self)
         self.resource_resolver = ResourceResolver(self)
+        self.message_resolver = MessageResolver(self)
         self.logger = logging.getLogger(__name__ + ".XRegistryLoader")
         
         # Schema handling state for template rendering compatibility
@@ -431,7 +627,7 @@ class XRegistryLoader:
     
     def load(self, uri: str, headers: Optional[Dict[str, str]] = None, 
              is_schema_style: bool = False, expand_refs: bool = False,
-             messagegroup_filter: str = "") -> Tuple[str, Optional[JsonNode]]:
+             messagegroup_filter: str = "", endpoint_filter: str = "") -> Tuple[str, Optional[JsonNode]]:
         """Load an xRegistry document with basic preprocessing.
         
         Args:
@@ -440,6 +636,7 @@ class XRegistryLoader:
             is_schema_style: Whether to use schema-style loading
             expand_refs: Whether to expand references (legacy parameter)
             messagegroup_filter: Filter for message groups
+            endpoint_filter: Filter for endpoints
             
         Returns:
             Tuple of (resolved_uri, document) or (uri, None) on error
@@ -455,9 +652,17 @@ class XRegistryLoader:
             # Apply basic resource resolution
             self.resource_resolver.resolve_all_resources(document, headers)
             
+            # Resolve basemessage references
+            if isinstance(document, dict):
+                self.message_resolver.resolve_all_basemessages(document)
+            
             # Apply message group filtering if needed
             if messagegroup_filter and isinstance(document, dict):
                 document = self._apply_messagegroup_filter(document, messagegroup_filter)
+            
+            # Apply endpoint filtering if needed
+            if endpoint_filter and isinstance(document, dict):
+                document = self._apply_endpoint_filter(document, endpoint_filter)
             
             return resolved_uri, document
             
@@ -465,14 +670,154 @@ class XRegistryLoader:
             self.logger.error(f"Failed to load document from {uri}: {e}")
             return uri, None
     
+    def load_stacked(self, uris: List[str], headers: Optional[Dict[str, str]] = None,
+                     is_schema_style: bool = False, expand_refs: bool = False,
+                     messagegroup_filter: str = "", endpoint_filter: str = "") -> Tuple[str, Optional[JsonNode]]:
+        """Load multiple xRegistry documents and stack them with later documents shadowing earlier ones.
+        
+        Documents are loaded in the order provided. When documents are stacked:
+        - Top-level keys from later documents override those from earlier documents
+        - Within collections (messagegroups, schemagroups, endpoints, etc.), items are merged by ID
+        - Later items with the same ID completely replace earlier items
+        
+        Args:
+            uris: List of URIs to load from (files or URLs can be mixed)
+            headers: HTTP headers for authentication
+            is_schema_style: Whether to use schema-style loading
+            expand_refs: Whether to expand references (legacy parameter)
+            messagegroup_filter: Filter for message groups
+            endpoint_filter: Filter for endpoints
+            
+        Returns:
+            Tuple of (last_resolved_uri, stacked_document) or (first_uri, None) on error
+        """
+        if headers is None:
+            headers = {}
+        
+        if not uris:
+            self.logger.error("No URIs provided for stacking")
+            return "", None
+        
+        try:
+            stacked_document: Optional[Dict[str, Any]] = None
+            last_resolved_uri = uris[0]
+            
+            for uri in uris:
+                self.logger.debug(f"Loading document for stacking: {uri}")
+                resolved_uri, document = self._load_core(uri, headers)
+                last_resolved_uri = resolved_uri
+                
+                if document is None:
+                    self.logger.error(f"Failed to load document from {uri}")
+                    return uri, None
+                
+                if not isinstance(document, dict):
+                    self.logger.error(f"Document from {uri} is not a dictionary")
+                    return uri, None
+                
+                # Apply basic resource resolution to this document
+                self.resource_resolver.resolve_all_resources(document, headers)
+                
+                # Stack/merge this document
+                if stacked_document is None:
+                    stacked_document = document
+                else:
+                    stacked_document = self._merge_documents(stacked_document, document)
+            
+            if stacked_document is None:
+                return uris[0], None
+            
+            # Resolve basemessage references in the final stacked document
+            if isinstance(stacked_document, dict):
+                self.message_resolver.resolve_all_basemessages(stacked_document)
+            
+            # Apply filters to the final stacked document
+            if messagegroup_filter and isinstance(stacked_document, dict):
+                stacked_document = self._apply_messagegroup_filter(stacked_document, messagegroup_filter)
+            
+            if endpoint_filter and isinstance(stacked_document, dict):
+                stacked_document = self._apply_endpoint_filter(stacked_document, endpoint_filter)
+            
+            return last_resolved_uri, stacked_document
+            
+        except Exception as e:
+            self.logger.error(f"Failed to stack documents: {e}")
+            return uris[0], None
+    
+    def _merge_documents(self, base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge two xRegistry documents with overlay shadowing base.
+        
+        For xRegistry collection keys (messagegroups, schemagroups, endpoints, etc.), items
+        are merged by ID with overlay items replacing base items. Within each collection,
+        group instances are also merged, and within groups, resource collections (messages,
+        schemas, etc.) are merged by ID.
+        
+        Args:
+            base: The base document
+            overlay: The overlay document that shadows the base
+            
+        Returns:
+            Merged document
+        """
+        result = dict(base)
+        
+        # Get model groups to identify xRegistry collections
+        model_groups = self.model.groups
+        collection_keys = set(model_groups.keys())
+        
+        for key, value in overlay.items():
+            if key in collection_keys and isinstance(value, dict) and isinstance(result.get(key), dict):
+                # This is an xRegistry collection (e.g., messagegroups, schemagroups)
+                # Merge group instances within the collection
+                merged_collection = dict(result[key])
+                
+                for group_id, group_data in value.items():
+                    if group_id in merged_collection and isinstance(group_data, dict) and isinstance(merged_collection[group_id], dict):
+                        # This group exists in both - merge the group contents
+                        merged_group = dict(merged_collection[group_id])
+                        
+                        # Get resource collection names for this group type from the model
+                        group_def = model_groups.get(key, {})
+                        resource_collections = group_def.get("resources", {})
+                        
+                        if isinstance(resource_collections, dict):
+                            resource_collection_names = set(resource_collections.keys())
+                        else:
+                            resource_collection_names = set()
+                        
+                        for group_key, group_value in group_data.items():
+                            if group_key in resource_collection_names and isinstance(group_value, dict) and isinstance(merged_group.get(group_key), dict):
+                                # This is a resource collection (e.g., messages, schemas)
+                                # Merge resources by ID within the collection
+                                merged_resources = dict(merged_group[group_key])
+                                for resource_id, resource_data in group_value.items():
+                                    merged_resources[resource_id] = resource_data
+                                merged_group[group_key] = merged_resources
+                            else:
+                                # Not a resource collection - replace completely
+                                merged_group[group_key] = group_value
+                        
+                        merged_collection[group_id] = merged_group
+                    else:
+                        # Group doesn't exist in base or types don't match - replace completely
+                        merged_collection[group_id] = group_data
+                
+                result[key] = merged_collection
+            else:
+                # Not a collection or types don't match - replace completely
+                result[key] = value
+        
+        return result
+    
     def load_with_dependencies(self, uri: str, headers: Optional[Dict[str, str]] = None,
-                              messagegroup_filter: str = "") -> Tuple[str, Optional[JsonNode]]:
+                              messagegroup_filter: str = "", endpoint_filter: str = "") -> Tuple[str, Optional[JsonNode]]:
         """Load an xRegistry document with full dependency resolution.
         
         Args:
             uri: The URI to load from
             headers: HTTP headers for authentication
             messagegroup_filter: Filter for message groups
+            endpoint_filter: Filter for endpoints
             
         Returns:
             Tuple of (resolved_uri, document) or (uri, None) on error
@@ -493,9 +838,17 @@ class XRegistryLoader:
             # Resolve all resource references in the composed document
             self.resource_resolver.resolve_all_resources(composed_document, headers)
             
+            # Resolve basemessage references
+            if isinstance(composed_document, dict):
+                self.message_resolver.resolve_all_basemessages(composed_document)
+            
             # Apply message group filtering if needed
             if messagegroup_filter and isinstance(composed_document, dict):
                 composed_document = self._apply_messagegroup_filter(composed_document, messagegroup_filter)
+            
+            # Apply endpoint filtering if needed
+            if endpoint_filter and isinstance(composed_document, dict):
+                composed_document = self._apply_endpoint_filter(composed_document, endpoint_filter)
             
             return resolved_uri, composed_document
             
@@ -594,6 +947,77 @@ class XRegistryLoader:
                 if messagegroup_filter in group_id:
                     filtered_messagegroups[group_id] = group_data
             filtered_doc["messagegroups"] = filtered_messagegroups
+        
+        # Also filter schemagroups to match the filtered messagegroups
+        if isinstance(filtered_doc.get("schemagroups"), dict):
+            filtered_schemagroups = {}
+            for group_id, group_data in filtered_doc["schemagroups"].items():
+                if messagegroup_filter in group_id:
+                    filtered_schemagroups[group_id] = group_data
+            filtered_doc["schemagroups"] = filtered_schemagroups
+        
+        return filtered_doc
+    
+    def _apply_endpoint_filter(self, document: Dict[str, Any], 
+                              endpoint_filter: str) -> Dict[str, Any]:
+        """Apply endpoint filtering to the document.
+        
+        This filters:
+        1. The endpoints section to only include endpoints matching the filter
+        2. The messagegroups section to only include messagegroups referenced by filtered endpoints
+        3. The schemagroups section to match the filtered messagegroups
+        """
+        if not endpoint_filter or "endpoints" not in document:
+            return document
+        
+        filtered_doc = dict(document)
+        
+        # Step 1: Filter endpoints by ID
+        if isinstance(filtered_doc.get("endpoints"), dict):
+            filtered_endpoints = {}
+            for endpoint_id, endpoint_data in filtered_doc["endpoints"].items():
+                if endpoint_filter in endpoint_id:
+                    filtered_endpoints[endpoint_id] = endpoint_data
+            filtered_doc["endpoints"] = filtered_endpoints
+            
+            # Step 2: Collect messagegroup IDs referenced by filtered endpoints
+            referenced_messagegroups = set()
+            for endpoint_data in filtered_endpoints.values():
+                if isinstance(endpoint_data, dict):
+                    # Check for messagegroups at top level
+                    messagegroups = endpoint_data.get("messagegroups", [])
+                    if isinstance(messagegroups, list):
+                        for mg_ref in messagegroups:
+                            if isinstance(mg_ref, str):
+                                # Handle both direct IDs and #/messagegroups/... references
+                                mg_id = mg_ref.split("/")[-1] if "/" in mg_ref else mg_ref
+                                referenced_messagegroups.add(mg_id)
+                    
+                    # Also check for messagegroups in config (alternative structure)
+                    config = endpoint_data.get("config", {})
+                    if isinstance(config, dict):
+                        config_messagegroups = config.get("messagegroups", [])
+                        if isinstance(config_messagegroups, list):
+                            for mg_ref in config_messagegroups:
+                                if isinstance(mg_ref, str):
+                                    mg_id = mg_ref.split("/")[-1] if "/" in mg_ref else mg_ref
+                                    referenced_messagegroups.add(mg_id)
+            
+            # Step 3: Filter messagegroups to only those referenced by filtered endpoints
+            if referenced_messagegroups and isinstance(filtered_doc.get("messagegroups"), dict):
+                filtered_messagegroups = {}
+                for group_id, group_data in filtered_doc["messagegroups"].items():
+                    if group_id in referenced_messagegroups:
+                        filtered_messagegroups[group_id] = group_data
+                filtered_doc["messagegroups"] = filtered_messagegroups
+            
+            # Step 4: Filter schemagroups to match the filtered messagegroups
+            if referenced_messagegroups and isinstance(filtered_doc.get("schemagroups"), dict):
+                filtered_schemagroups = {}
+                for group_id, group_data in filtered_doc["schemagroups"].items():
+                    if group_id in referenced_messagegroups:
+                        filtered_schemagroups[group_id] = group_data
+                filtered_doc["schemagroups"] = filtered_schemagroups
         
         return filtered_doc
     

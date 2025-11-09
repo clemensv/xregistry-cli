@@ -11,8 +11,8 @@ from xregistry.generator.xregistry_loader import XRegistryLoader
 
 def validate_definition(args) -> int:
     """Validate the definitions file using the JSON schema in schemas/xregistry_messaging_catalog.json"""
-    if args.definitions_file:
-        definitions_file = args.definitions_file
+    definitions_files = args.definitions_files if isinstance(args.definitions_files, list) else [args.definitions_files]
+    
     if args.headers:
         # ok to have = in base64 values
         headers = {
@@ -23,18 +23,38 @@ def validate_definition(args) -> int:
         headers = {}
 
     # Call the validate() function with the parsed arguments
-    return validate(definitions_file, headers, True)
+    return validate(definitions_files, headers, True)
 
 
-def validate(definitions_uri, headers, verbose=False):
-    """Validate the definitions file using the JSON schema in schemas/xregistry_messaging_catalog.json"""
-    # load the definitions file
+def validate(definitions_uris, headers, verbose=False):
+    """Validate the definitions file(s) using the JSON schema in schemas/xregistry_messaging_catalog.json
+    
+    Args:
+        definitions_uris: A single URI string or a list of URI strings to load and stack
+        headers: HTTP headers for authentication
+        verbose: Whether to print verbose output
+    
+    Returns:
+        0 on success, 1 on validation error, 2 on load error
+    """
+    # Normalize to list
+    if isinstance(definitions_uris, str):
+        definitions_uris = [definitions_uris]
+    
+    # load the definitions file(s)
     loader = XRegistryLoader()
-    definitions_file, docroot = loader.load(
-        definitions_uri, headers, False, True)
+    
+    if len(definitions_uris) == 1:
+        definitions_file, docroot = loader.load(definitions_uris[0], headers, False, True)
+        display_name = definitions_uris[0]
+    else:
+        definitions_file, docroot = loader.load_stacked(definitions_uris, headers, False, True)
+        display_name = " + ".join(definitions_uris)
+    
     if not docroot:
-        print(f"Error: could not load definitions file {definitions_uri}")
+        print(f"Error: could not load definitions file(s) {display_name}")
         return 2
+    
     try:
         basepath = os.path.realpath(
             os.path.join(os.path.dirname(__file__), ".."))
@@ -59,5 +79,5 @@ def validate(definitions_uri, headers, verbose=False):
         return 1
 
     if verbose:
-        print(f"OK: definitions file {definitions_uri} is valid")
+        print(f"OK: definitions file(s) {display_name} is valid")
     return 0

@@ -152,7 +152,8 @@ class ResourceProcessor:
                 # External URL - use the loader
                 _, resource_data = self.ctx.loader.load(
                     reference, {},
-                    messagegroup_filter=self.ctx.messagegroup_filter
+                    messagegroup_filter=self.ctx.messagegroup_filter,
+                    endpoint_filter=self.ctx.endpoint_filter
                 )
                 return resource_data
         except (jsonpointer.JsonPointerException, Exception) as e:

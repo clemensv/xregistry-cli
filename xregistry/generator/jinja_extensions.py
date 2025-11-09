@@ -13,6 +13,11 @@ from jinja2.ext import Extension
 from xregistry.cli import logger
 
 
+class TemplateError(Exception):
+    """Custom exception for template error() calls."""
+    pass
+
+
 class JinjaExtensions:
     """Custom Jinja2 extensions."""
 
@@ -44,3 +49,21 @@ class JinjaExtensions:
             current_time = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             logger.debug("Rendering time: %s", current_time)
             return current_time
+
+    class ErrorExtension(Extension):
+        """Jinja2 extension to raise an error with a custom message."""
+        tags = {'error'}
+
+        def parse(self, parser: Parser) -> nodes.CallBlock:
+            lineno = next(parser.stream).lineno
+            # Parse the error message argument
+            args = [parser.parse_expression()]
+            logger.debug("Parsing error extension at line: %s", lineno)
+            return nodes.CallBlock(
+                self.call_method('_raise_error', args, lineno=lineno), 
+                [], [], []
+            ).set_lineno(lineno) # type: ignore
+
+        def _raise_error(self, message: str, caller: Any) -> None: # pylint: disable=unused-argument
+            logger.error("Template error: %s", message)
+            raise TemplateError(message)

@@ -4,7 +4,7 @@ Read the following document and then ask me for requirements to generate such a 
 
 {
     "$schema": "https://cloudevents.io/schemas/registry",
-    "specversion": "0.5-wip",
+    "specversion": "1.0-rc2",
     "id": "urn:uuid:((generate a uuid here!))}",
     "messagegroups": {
         "example.app.group": {

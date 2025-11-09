@@ -51,6 +51,7 @@ def generate_code(args: Any) -> int:
     suppress_schema_output = args.no_schema
     suppress_code_output = args.no_code
     messagegroup_filter = args.messagegroup
+    endpoint_filter = args.endpoint
 
     headers = {header.split("=", 1)[0]: header.split("=", 1)[1] for header in args.headers} if args.headers else {}
 
@@ -60,7 +61,7 @@ def generate_code(args: Any) -> int:
             key, value = arg.split("=", 1)
             template_args[key] = value
 
-    generator_context = GeneratorContext(output_dir, messagegroup_filter, getattr(args, 'model', None))
+    generator_context = GeneratorContext(output_dir, messagegroup_filter, endpoint_filter, getattr(args, 'model', None))
 
     SchemaUtils.schema_files_collected = set()
     generator_context.loader.reset_schemas_handled()
@@ -68,14 +69,23 @@ def generate_code(args: Any) -> int:
     generator_context.loader.set_current_url(None)
 
     try:
-        # if the definitions file is a URL, we skip the validation
-        if not args.definitions_file.startswith("http"):
-            if validate(args.definitions_file, headers, False) != 0:
+        # Validate definitions files if they are not URLs
+        definitions_files = args.definitions_files if isinstance(args.definitions_files, list) else [args.definitions_files]
+        non_url_files = [f for f in definitions_files if not f.startswith("http")]
+        if non_url_files:
+            if validate(non_url_files, headers, False) != 0:
                 return 1
+        
+        # Use stacked loading if multiple files, otherwise use single file
+        if len(definitions_files) > 1:
+            # Store the list in the generator context for stacked loading
+            primary_definitions_file = "|".join(definitions_files)  # Marker for stacked loading
+        else:
+            primary_definitions_file = definitions_files[0]
         
         renderer = TemplateRenderer(generator_context,
             project_name, language, style, output_dir,
-            args.definitions_file, headers, args.template_dirs, template_args,
+            primary_definitions_file, headers, args.template_dirs, template_args,
             suppress_code_output, suppress_schema_output
         )
         renderer.generate()

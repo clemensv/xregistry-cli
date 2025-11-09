@@ -1,0 +1,295 @@
+{
+  "endpoints": {
+    "ProductionEndpoint": {
+      "usage": ["producer"],
+      "protocol": "AMQP/1.0",
+      "messagegroups": [
+        "#/messagegroups/Telemetry.Metrics",
+        "#/messagegroups/Telemetry.Logs"
+      ],
+      "envelope": "CloudEvents/1.0",
+      "protocoloptions": {
+        "deployed": false,
+        "endpoints": [
+          {
+            "uri": "amqps://production.example.com/events"
+          }
+        ]
+      }
+    },
+    "DevelopmentEndpoint": {
+      "usage": ["producer"],
+      "protocol": "AMQP/1.0",
+      "messagegroups": [
+        "#/messagegroups/Diagnostics.Debug",
+        "#/messagegroups/Diagnostics.Trace"
+      ],
+      "envelope": "CloudEvents/1.0",
+      "protocoloptions": {
+        "deployed": false,
+        "endpoints": [
+          {
+            "uri": "amqps://development.example.com/events"
+          }
+        ]
+      }
+    },
+    "TestEndpoint": {
+      "usage": ["consumer"],
+      "protocol": "AMQP/1.0",
+      "messagegroups": [
+        "#/messagegroups/Telemetry.Metrics"
+      ],
+      "envelope": "CloudEvents/1.0",
+      "protocoloptions": {
+        "deployed": false,
+        "endpoints": [
+          {
+            "uri": "amqps://test.example.com/events"
+          }
+        ]
+      }
+    }
+  },
+  "messagegroups": {
+    "Telemetry.Metrics": {
+      "protocol": "AMQP/1.0",
+      "envelope": "CloudEvents/1.0",
+      "description": "Telemetry metrics messages",
+      "messages": {
+        "Telemetry.Metrics.CpuUsage": {
+          "description": "CPU usage metric",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "type": {
+              "value": "Telemetry.Metrics.CpuUsage"
+            },
+            "datacontenttype": {
+              "value": "application/json"
+            }
+          },
+          "dataschemaformat": "JsonSchema/draft-07",
+          "dataschemauri": "#/schemagroups/Telemetry.Metrics/schemas/CpuUsageData"
+        },
+        "Telemetry.Metrics.MemoryUsage": {
+          "description": "Memory usage metric",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "type": {
+              "value": "Telemetry.Metrics.MemoryUsage"
+            },
+            "datacontenttype": {
+              "value": "application/json"
+            }
+          },
+          "dataschemaformat": "JsonSchema/draft-07",
+          "dataschemauri": "#/schemagroups/Telemetry.Metrics/schemas/MemoryUsageData"
+        }
+      }
+    },
+    "Telemetry.Logs": {
+      "protocol": "AMQP/1.0",
+      "envelope": "CloudEvents/1.0",
+      "description": "Telemetry log messages",
+      "messages": {
+        "Telemetry.Logs.ErrorLog": {
+          "description": "Error log entry",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "type": {
+              "value": "Telemetry.Logs.ErrorLog"
+            },
+            "datacontenttype": {
+              "value": "application/json"
+            }
+          },
+          "dataschemaformat": "JsonSchema/draft-07",
+          "dataschemauri": "#/schemagroups/Telemetry.Logs/schemas/ErrorLogData"
+        }
+      }
+    },
+    "Diagnostics.Debug": {
+      "protocol": "AMQP/1.0",
+      "envelope": "CloudEvents/1.0",
+      "description": "Diagnostics debug messages",
+      "messages": {
+        "Diagnostics.Debug.DebugInfo": {
+          "description": "Debug information",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "type": {
+              "value": "Diagnostics.Debug.DebugInfo"
+            },
+            "datacontenttype": {
+              "value": "application/json"
+            }
+          },
+          "dataschemaformat": "JsonSchema/draft-07",
+          "dataschemauri": "#/schemagroups/Diagnostics.Debug/schemas/DebugInfoData"
+        }
+      }
+    },
+    "Diagnostics.Trace": {
+      "protocol": "AMQP/1.0",
+      "envelope": "CloudEvents/1.0",
+      "description": "Diagnostics trace messages",
+      "messages": {
+        "Diagnostics.Trace.TraceEvent": {
+          "description": "Trace event",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "type": {
+              "value": "Diagnostics.Trace.TraceEvent"
+            },
+            "datacontenttype": {
+              "value": "application/json"
+            }
+          },
+          "dataschemaformat": "JsonSchema/draft-07",
+          "dataschemauri": "#/schemagroups/Diagnostics.Trace/schemas/TraceEventData"
+        }
+      }
+    }
+  },
+  "schemagroups": {
+    "Telemetry.Metrics": {
+      "schemas": {
+        "CpuUsageData": {
+          "format": "JsonSchema/draft-07",
+          "versions": {
+            "1": {
+              "format": "JsonSchema/draft-07",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "percentage": {
+                    "type": "number",
+                    "description": "CPU usage percentage"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": ["percentage", "timestamp"]
+              }
+            }
+          }
+        },
+        "MemoryUsageData": {
+          "format": "JsonSchema/draft-07",
+          "versions": {
+            "1": {
+              "format": "JsonSchema/draft-07",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "usedMB": {
+                    "type": "number",
+                    "description": "Used memory in MB"
+                  },
+                  "totalMB": {
+                    "type": "number",
+                    "description": "Total memory in MB"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": ["usedMB", "totalMB", "timestamp"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Telemetry.Logs": {
+      "schemas": {
+        "ErrorLogData": {
+          "format": "JsonSchema/draft-07",
+          "versions": {
+            "1": {
+              "format": "JsonSchema/draft-07",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "description": "Error message"
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["error", "critical"]
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": ["message", "severity", "timestamp"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Diagnostics.Debug": {
+      "schemas": {
+        "DebugInfoData": {
+          "format": "JsonSchema/draft-07",
+          "versions": {
+            "1": {
+              "format": "JsonSchema/draft-07",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "debugMessage": {
+                    "type": "string"
+                  },
+                  "threadId": {
+                    "type": "integer"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": ["debugMessage", "timestamp"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Diagnostics.Trace": {
+      "schemas": {
+        "TraceEventData": {
+          "format": "JsonSchema/draft-07",
+          "versions": {
+            "1": {
+              "format": "JsonSchema/draft-07",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "traceMessage": {
+                    "type": "string"
+                  },
+                  "traceLevel": {
+                    "type": "string",
+                    "enum": ["verbose", "info", "warning"]
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": ["traceMessage", "traceLevel", "timestamp"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
