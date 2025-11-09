@@ -266,14 +266,33 @@ namespace {{ project_name | pascal }}.Test
                                 });
 
                                 // Send message using producer
+                                {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+                                {%- set is_amqp = amqp.is_amqp(message) %}
+                                {%- if isCloudEvent %}
+                                {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) %}
+                                {%- elif is_amqp %}
+                                {%- set uriargs = amqp.DeclareUriTemplateArguments(message) %}
+                                {%- endif %}
                                 {%- if message_body_type != "byte[]" %}
                                 var eventDataTest = new {{ message_body_type }}Tests();
                                 var eventData = eventDataTest.CreateInstance();
+                                await producer.Send{{ messagename }}Async(eventData
+                                {%- if uriargs -%}
+                                {%- for arg in uriargs.split(',') if arg.strip() -%}
+                                , {{ arg.strip().split(' ')[1] -}}: "test"
+                                {%- endfor -%}
+                                {%- endif -%}
+                                );
                                 {%- else %}
                                 var eventData = System.Text.Encoding.UTF8.GetBytes("test data");
+                                await producer.Send{{ messagename }}Async(eventData
+                                {%- if uriargs -%}
+                                {%- for arg in uriargs.split(',') if arg.strip() -%}
+                                , {{ arg.strip().split(' ')[1] -}}: "test"
+                                {%- endfor -%}
+                                {%- endif -%}
+                                );
                                 {%- endif %}
-                                
-                                await producer.Send{{ messagename }}Async(eventData, "test-tenant", "test-device", "test-subject", "application/json");
                                 _logger.LogInformation("{{ messagename }} message sent");
 
                                 // Wait for message to be received
