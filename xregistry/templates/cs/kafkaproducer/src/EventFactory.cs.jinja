@@ -30,7 +30,7 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
 
         {%- if root.endpoints -%}
         {%- for endpointid, endpoint in root.endpoints.items() -%}
-                {%- if endpoint.usage == "producer" -%}
+                {%- if endpoint.usage and "producer" in endpoint.usage -%}
         {%- set protocol = endpoint.protocol | lower -%}
         {%- if protocol == "kafka" -%}
         {%- set options = endpoint.protocoloptions -%}
@@ -69,8 +69,11 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         /// <param name="contentType">The content type of the message data.</param>
         /// <param name="bodySerializer">The serializer to use for the message data.</param>
         /// <param name="formatter">The CloudEvent formatter to use for the message.</param>
+        /// <param name="kafkaKey">Optional Kafka message key.</param>
+        /// <param name="kafkaPartition">Optional Kafka partition.</param>
+        /// <param name="kafkaHeaders">Optional Kafka headers to add.</param>
         /// <returns>A `Message&lt;byte[], byte[]&gt;` instance for the specified message.</returns>
-        private static Message<byte[], byte[]> CreateMessage<T>(CloudEvent? cloudEvent, T data, string contentType, Serialize<T>? bodySerializer = null, CloudEventFormatter? formatter = null) where T : notnull
+        private static Message<byte[], byte[]> CreateMessage<T>(CloudEvent? cloudEvent, T data, string contentType, Serialize<T>? bodySerializer = null, CloudEventFormatter? formatter = null, byte[]? kafkaKey = null, int? kafkaPartition = null, Dictionary<string, string>? kafkaHeaders = null) where T : notnull
         {
             if (formatter == null)
             {
@@ -83,10 +86,18 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
                 var message = new Message<byte[], byte[]>
                 {
                     Value = eventPayload,
+                    Key = kafkaKey,
                     Headers = new Headers() {
                         new Header("content-type", System.Text.Encoding.UTF8.GetBytes(contentType))
                     }
                 };
+                if (kafkaHeaders != null)
+                {
+                    foreach (var header in kafkaHeaders)
+                    {
+                        message.Headers.Add(header.Key, System.Text.Encoding.UTF8.GetBytes(header.Value));
+                    }
+                }
                 if (cloudEvent != null)
                 {
                     foreach (var attr in cloudEvent.GetPopulatedAttributes())
@@ -129,10 +140,18 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
                 var message = new Message<byte[], byte[]>
                 {
                     Value = eventBody.ToArray(),
+                    Key = kafkaKey,
                     Headers = new Headers() {
                         new Header("content-type", System.Text.Encoding.UTF8.GetBytes(eventContentType.ToString()))
                     }
                 };
+                if (kafkaHeaders != null)
+                {
+                    foreach (var header in kafkaHeaders)
+                    {
+                        message.Headers.Add(header.Key, System.Text.Encoding.UTF8.GetBytes(header.Value));
+                    }
+                }
                 return message;
             }
         }
@@ -177,22 +196,50 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         {%- endif %}
         {%- if is_cloudevent %}, CloudEventFormatter? formatter = null{% endif %})
         {
+            {%- if "protocolmetadata" in message %}
+            {%- if "key" in message.protocolmetadata and "value" in message.protocolmetadata.key %}
+            byte[]? kafkaKey = System.Text.Encoding.UTF8.GetBytes("{{ message.protocolmetadata.key.value }}");
+            {%- else %}
+            byte[]? kafkaKey = null;
+            {%- endif %}
+            {%- if "partition" in message.protocolmetadata and "value" in message.protocolmetadata.partition %}
+            int? kafkaPartition = {{ message.protocolmetadata.partition.value }};
+            {%- else %}
+            int? kafkaPartition = null;
+            {%- endif %}
+            {%- if "headers" in message.protocolmetadata and "properties" in message.protocolmetadata.headers %}
+            var kafkaHeaders = new Dictionary<string, string>
+            {
+                {%- for headername, header in message.protocolmetadata.headers.properties.items() %}
+                {%- if "value" in header %}
+                { "{{ headername }}", "{{ header.value }}" },
+                {%- endif %}
+                {%- endfor %}
+            };
+            {%- else %}
+            Dictionary<string, string>? kafkaHeaders = null;
+            {%- endif %}
+            {%- else %}
+            byte[]? kafkaKey = null;
+            int? kafkaPartition = null;
+            Dictionary<string, string>? kafkaHeaders = null;
+            {%- endif %}
             {% if type_name != "byte[]" %}
             Serialize<{{ type_name }}>? bodySerializer = (formatter != null) ? null : ({{ type_name }} data, string contentType) => {
                 return data.ToByteArray(contentType);
             };
             {%- if is_cloudevent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
-            return CreateMessage(cloudEvent, data, contentType, bodySerializer, formatter);
+            return CreateMessage(cloudEvent, data, contentType, bodySerializer, formatter, kafkaKey, kafkaPartition, kafkaHeaders);
             {%- elif isKafka %}
-            return CreateMessage(null, data, contentType, bodySerializer, null);
+            return CreateMessage(null, data, contentType, bodySerializer, null, kafkaKey, kafkaPartition, kafkaHeaders);
             {%- endif %}
             {% else %}
             {%- if is_cloudevent %}
             {{ cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", message) | indent(12) }}
-            return CreateMessage(cloudEvent, data, contentType, null, formatter);
+            return CreateMessage(cloudEvent, data, contentType, null, formatter, kafkaKey, kafkaPartition, kafkaHeaders);
             {%- elif isKafka %}
-            return CreateMessage(null, data, contentType, null, null);
+            return CreateMessage(null, data, contentType, null, null, kafkaKey, kafkaPartition, kafkaHeaders);
             {%- endif %}
             {% endif %}
             

@@ -77,7 +77,7 @@ public class {{ className | strip_namespace }}
     {%- if root.endpoints -%} 
     {%- for endpoint_key in root.endpoints.keys() -%}
     {%- set endpoint = root.endpoints[endpoint_key] -%}
-    {%- if endpoint.usage == "producer" -%}
+    {%- if endpoint.usage and "producer" in endpoint.usage -%}
     {%- set protocol = endpoint.config.protocol | lower -%}
     {%- set options = endpoint.config.options -%}
     {%- set endpoints = endpoint.config.endpoints %}

@@ -247,7 +247,11 @@ namespace {{ project_name | pascal }}.Test
                 var eventData = new EventData(new BinaryData(""));
                 {%- endif %}
                 eventData.ContentType = "application/json";
+                {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+                eventData.Properties["cloudEvents_type"] = "{{ message.envelopemetadata["type"]["value"] }}";
+                {%- else %}
                 eventData.Properties["cloudEvents_type"] = "{{ messageid }}";
+                {%- endif %}
                 eventData.Properties["cloudEvents_specversion"] = "1.0";
                 eventData.Properties["cloudEvents_source"] = "/test";
                 eventData.Properties["cloudEvents_id"] = Guid.NewGuid().ToString();

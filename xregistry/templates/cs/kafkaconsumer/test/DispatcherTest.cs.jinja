@@ -203,7 +203,11 @@ namespace {{ project_name | pascal }}.Test
                     Headers = new Headers
                     {
                         new Header("content-type", Encoding.UTF8.GetBytes("application/json")),
+                        {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+                        new Header("ce_type", Encoding.UTF8.GetBytes("{{ message.envelopemetadata["type"]["value"] }}")),
+                        {%- else %}
                         new Header("ce_type", Encoding.UTF8.GetBytes("{{ messageid }}")),
+                        {%- endif %}
                         new Header("ce_specversion", Encoding.UTF8.GetBytes("1.0")),
                         new Header("ce_source", Encoding.UTF8.GetBytes("/test")),
                         new Header("ce_id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))

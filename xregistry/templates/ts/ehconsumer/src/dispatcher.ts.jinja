@@ -136,7 +136,11 @@ export class {{ class_name }} {
             {% for messageid, message in messagegroup.messages.items() if cloudEvents.isCloudEvent(message) -%}
             {%- set messagename = messageid | pascal %}
             {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+            {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] -%}
+            case "{{ message.envelopemetadata["type"]["value"] }}":
+            {%- else -%}
             case "{{ messageid }}":
+            {%- endif %}
                 if (this.{{ messagename | strip_namespace }}Handler) {
                     const data = cloudEvent.data as unknown as {{ message_body_type }};
                     await this.{{ messagename | strip_namespace }}Handler(eventData, cloudEvent, data);

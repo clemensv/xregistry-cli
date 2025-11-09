@@ -262,7 +262,11 @@ namespace {{ project_name | pascal }}.Test
                                 };
                                 amqpMessage.ApplicationProperties = new ApplicationProperties();
                                 amqpMessage.ApplicationProperties["cloudEvents:specversion"] = "1.0";
+                                {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+                                amqpMessage.ApplicationProperties["cloudEvents:type"] = "{{ message.envelopemetadata["type"]["value"] }}";
+                                {%- else %}
                                 amqpMessage.ApplicationProperties["cloudEvents:type"] = "{{ messageid }}";
+                                {%- endif %}
                                 amqpMessage.ApplicationProperties["cloudEvents:id"] = Guid.NewGuid().ToString();
                                 amqpMessage.ApplicationProperties["cloudEvents:source"] = "urn:example-com:example-source";
                                 amqpMessage.ApplicationProperties["cloudEvents:time"] = DateTime.UtcNow.ToString("O");

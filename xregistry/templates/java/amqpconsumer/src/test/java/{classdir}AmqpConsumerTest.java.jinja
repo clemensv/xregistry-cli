@@ -145,7 +145,11 @@ public class {{ class_name | strip_namespace }} {
             // Build CloudEvent
             io.cloudevents.CloudEvent cloudEvent = io.cloudevents.core.builder.CloudEventBuilder.v1()
                 .withId(UUID.randomUUID().toString())
+                {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+                .withType("{{ message.envelopemetadata["type"]["value"] }}")
+                {%- else %}
                 .withType("{{ messageid }}")
+                {%- endif %}
                 .withSource(URI.create("urn:example-com:test-source"))
                 .withDataContentType("application/json")
                 .withData(eventData)

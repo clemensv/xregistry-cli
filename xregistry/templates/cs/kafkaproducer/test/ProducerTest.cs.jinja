@@ -167,6 +167,9 @@ namespace {{ project_name | pascal }}.Test
                 , {{ arg.strip().split(' ')[1] -}}: "test"
                 {%- endfor -%}
                 {%- endif -%}
+                {%- if not (message.protocolmetadata and "topic" in message.protocolmetadata) -%}
+                , topic: _fixture.TopicName
+                {%- endif -%}
                 );
                 {%- else %}
                 await _producer.Send{{ messagename }}Async(new byte[0]
@@ -174,6 +177,9 @@ namespace {{ project_name | pascal }}.Test
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}: "test"
                 {%- endfor -%}
+                {%- endif -%}
+                {%- if not (message.protocolmetadata and "topic" in message.protocolmetadata) -%}
+                , topic: _fixture.TopicName
                 {%- endif -%}
                 );
                 {%- endif %}
@@ -211,6 +217,9 @@ namespace {{ project_name | pascal }}.Test
                 , {{ arg.strip().split(' ')[1] -}}:"test"
                 {%- endfor -%}
                 {%- endif -%}
+                {%- if not (message.protocolmetadata and "topic" in message.protocolmetadata) -%}
+                , topic: _fixture.TopicName
+                {%- endif -%}
                 );
                 {%- else %}
                 var eventDataInstances = new byte[10][];
@@ -223,6 +232,9 @@ namespace {{ project_name | pascal }}.Test
                 {%- for arg in uriargs.split(',') if arg.strip() -%}
                 , {{ arg.strip().split(' ')[1] -}}:"test"
                 {%- endfor -%}
+                {%- endif -%}
+                {%- if not (message.protocolmetadata and "topic" in message.protocolmetadata) -%}
+                , topic: _fixture.TopicName
                 {%- endif -%}
                 );
                 {%- endif %}

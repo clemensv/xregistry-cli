@@ -62,7 +62,7 @@ public class {{ class_name }} {
 
     {%- if root.endpoints %}
     {%- for endpointid, endpoint in root.endpoints.items() %}
-    {%- if endpoint.usage == "producer" %}
+    {%- if endpoint.usage and "producer" in endpoint.usage %}
     {%- set protocol = endpoint.protocol | lower %}
     {%- if protocol == "amqp" %}
     {%- set options = endpoint.protocoloptions %}

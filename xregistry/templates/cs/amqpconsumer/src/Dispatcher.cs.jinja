@@ -150,7 +150,11 @@ namespace {{ project_name | pascal }}
                 {% for messageid, message in messagegroup.messages.items() -%}
                 {%- set messagename = messageid | strip_dots | pascal -%}
                 {%- set message_body_type = util.body_type(data_project_name, root, message) %}
+                {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] -%}
+                case "{{ message.envelopemetadata["type"]["value"] }}":
+                {%- else -%}
                 case "{{ messageid }}":
+                {%- endif %}
                     if ({{ messagename }}Async != null)
                     {
                         var tasks = new List<Task>();
@@ -300,7 +304,7 @@ namespace {{ project_name | pascal }}
 
         {%- if root.endpoints -%}
         {%- for endpointid, endpoint in root.endpoints.items() -%}
-        {%- if endpoint.usage == "consumer" -%}
+        {%- if endpoint.usage and "consumer" in endpoint.usage -%}
         {%- set protocol = endpoint.protocol | lower -%}
         {%- set options = endpoint.protocoloptions -%}
         {%- set endpoints = endpoint.endpoints %}

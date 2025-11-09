@@ -9,7 +9,7 @@ info:
 servers:
 {%- for endpointid, endpoint in root.endpoints.items() -%}
 {%- set protocol = endpoint.protocol | lower -%}
-{%- if endpoint.usage == "subscriber" and protocol == "http" -%}
+{%- if endpoint.usage and "subscriber" in endpoint.usage and protocol == "http" -%}
 {%- set options = endpoint.protocoloptions -%}
 {%- set endpoints = endpoint.endpoints -%}
 {%- for endpointObject in endpoints %}

@@ -93,7 +93,11 @@ namespace {{ project_name | pascal }}
                     {% for messageid, message in messagegroup.messages.items() if cloudEvents.isCloudEvent(message) -%}
                     {%- set messagename = messageid | pascal %}
                     {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+                    {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] -%}
+                    case "{{ message.envelopemetadata["type"]["value"] }}":
+                    {%- else -%}
                     case "{{ messageid }}":
+                    {%- endif %}
                         if ({{ messagename | strip_namespace }}Async != null)
                         {
                             var tasks = new List<Task>();
@@ -244,7 +248,7 @@ namespace {{ project_name | pascal }}
     {%- if root.endpoints -%} 
     {%- for endpointid, endpoint in root.endpoints.items() -%}
     {%- set endpointname = endpointid | default(endpointid) | pascal -%}
-    {%- if endpoint.usage == "consumer" -%}
+    {%- if endpoint.usage and "consumer" in endpoint.usage -%}
     {%- set protocol = endpoint.protocol | lower -%}
     {%- if protocol.startswith("amqp") -%}
     {%- set options = endpoint.protocoloptions -%}

@@ -135,6 +135,15 @@ def test_kafkaproducer_lightbulb_cs():
                         tmpdirname, "TestProject", "kafkaproducer")
 
 
+# Skipped: inkjet-protocol-variants contains MQTT-specific metadata (URI template topics)
+# that is incompatible with Kafka producer templates which expect literal topic names
+# def test_kafkaproducer_inkjet_protocol_variants_cs():
+#     """ Test the Kafka producer for Inkjet Protocol Variants with basemessage inheritance."""
+#     tmpdirname = tempfile.mkdtemp()
+#     run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet-protocol-variants.xreg.json".replace(
+#             '/', os.sep)), tmpdirname, "TestProject", "kafkaproducer")
+
+
 def test_kafkaconsumer_contoso_erp_cs():
     """ Test the Kafka consumer for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
@@ -163,6 +172,13 @@ def test_kafkaconsumer_lightbulb_cs():
                         tmpdirname, "TestProject", "kafkaconsumer")
 
 
+def test_kafkaconsumer_inkjet_protocol_variants_cs():
+    """ Test the Kafka consumer for Inkjet Protocol Variants with basemessage inheritance."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet-protocol-variants.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "TestProject", "kafkaconsumer")
+
+
 def test_mqttclient_contoso_erp_cs():
     """ Test the MQTT client for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
@@ -189,6 +205,13 @@ def test_mqttclient_lightbulb_cs():
     tmpdirname = tempfile.mkdtemp()
     run_dotnet_test(os.path.join(
             project_root, "test/xreg/lightbulb.xreg.json"), tmpdirname, "TestProject", "mqttclient")
+
+
+def test_mqttclient_inkjet_protocol_variants_cs():
+    """ Test the MQTT client for Inkjet Protocol Variants with basemessage inheritance."""
+    tmpdirname = tempfile.mkdtemp()
+    run_dotnet_test(os.path.join(project_root, "test/xreg/inkjet-protocol-variants.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "TestProject", "mqttclient")
 
 
 def test_sbproducer_contoso_erp_cs():

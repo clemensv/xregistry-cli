@@ -26,7 +26,7 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
     {
         {%- if root.endpoints -%}
         {%- for endpointid, endpoint in root.endpoints.items() -%}
-                {%- if endpoint.usage == "producer" -%}
+                {%- if endpoint.usage and "producer" in endpoint.usage -%}
         {%- set protocol = endpoint.protocol | lower -%}
         {%- if protocol == "mqtt" -%}
         {%- set options = endpoint.protocoloptions -%}

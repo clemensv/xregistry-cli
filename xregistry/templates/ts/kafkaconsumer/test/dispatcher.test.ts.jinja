@@ -125,7 +125,11 @@ describe('{{ project_name }} Kafka Consumer Tests', () => {
             {%- if isCloudEvent %}
             const testData = { test: 'data' };
             const cloudEvent = new CloudEvent({
+                {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+                type: '{{ message.envelopemetadata["type"]["value"] }}',
+                {%- else %}
                 type: '{{ messageid }}',
+                {%- endif %}
                 source: 'test/source',
                 data: testData
             });
@@ -163,7 +167,11 @@ describe('{{ project_name }} Kafka Consumer Tests', () => {
             // Verify
             expect(receivedMessages.length).toBeGreaterThan(0);
             {%- if isCloudEvent %}
+            {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+            expect(receivedMessages[0].cloudEvent.type).toBe('{{ message.envelopemetadata["type"]["value"] }}');
+            {%- else %}
             expect(receivedMessages[0].cloudEvent.type).toBe('{{ messageid }}');
+            {%- endif %}
             {%- endif %}
             expect(receivedMessages[0].data).toMatchObject({ test: 'data' });
         }, 30000);

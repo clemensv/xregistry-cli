@@ -90,7 +90,11 @@ namespace {{ project_name | pascal }}
                     {%- set messagename = messageid | pascal %}
                     {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
                     {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
+                    {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] -%}
+                    case "{{ message.envelopemetadata["type"]["value"] }}":
+                    {%- else -%}
                     case "{{ messageid }}":
+                    {%- endif %}
                         if ({{ messagename | strip_namespace }}Async != null)
                         {
                             var tasks = new List<Task>();
@@ -226,7 +230,7 @@ namespace {{ project_name | pascal }}
     {%- if root.endpoints -%}
     {%- for endpointid, endpoint in root.endpoints.items() -%}
     {%- set endpointname = endpointid | default(endpointid) | pascal -%}
-    {%- if endpoint.usage == "consumer" -%}
+    {%- if endpoint.usage and "consumer" in endpoint.usage -%}
     {%- set protocol = endpoint.protocol | lower -%}
     {%- if protocol.startswith("kafka") -%}
     {%- set options = endpoint.protocoloptions -%}
@@ -270,8 +274,28 @@ namespace {{ project_name | pascal }}
         {%- set class_name = ( endpointname | strip_namespace )+"KafkaProcessorFactory" %}
         public class {{ class_name }}
         {
-            public static KafkaProcessor<byte[], byte[]> CreateKafkaProcessorFor{{ endpointid | pascal | strip_namespace }}(ConsumerConfig config, string topicName, {{ MessageGroupArgs() }}, ILoggerFactory? _loggerFactory = null)
+            public static KafkaProcessor<byte[], byte[]> CreateKafkaProcessorFor{{ endpointid | pascal | strip_namespace }}(ConsumerConfig config, 
+                {%- if not (options and "topic" in options) %}
+                string topicName, 
+                {%- endif %}
+                {%- if not (options and "consumergroup" in options) %}
+                string consumerGroup, 
+                {%- endif %}
+                {{ MessageGroupArgs() }}, ILoggerFactory? _loggerFactory = null)
             {
+                {%- if options and "consumergroup" in options %}
+                config.GroupId = "{{ options.consumergroup }}";
+                {%- else %}
+                config.GroupId = consumerGroup ?? throw new ArgumentNullException(nameof(consumerGroup), "Consumer group must be specified either in endpoint metadata or as a parameter");
+                {%- endif %}
+                {%- if options and "topic" in options %}
+                string topicName = "{{ options.topic }}";
+                {%- else %}
+                if (string.IsNullOrEmpty(topicName))
+                {
+                    throw new ArgumentNullException(nameof(topicName), "Topic must be specified either in endpoint metadata or as a parameter");
+                }
+                {%- endif %}
                 {{ createforbody(class_name, endpoints, options) | indent(8) }}
             }
         }

@@ -58,7 +58,7 @@ public class {{ class_name }} {
     
     {%- if root.endpoints %}
     {%- for endpointid, endpoint in root.endpoints.items() %}
-    {%- if endpoint.usage == "consumer" %}
+    {%- if endpoint.usage and "consumer" in endpoint.usage %}
     {%- set protocol = endpoint.protocol | lower %}
     {%- set options = endpoint.protocoloptions %}
     {%- set endpoints = endpoint.endpoints %}
@@ -215,7 +215,11 @@ public class {{ class_name }} {
             {%- set messagename = messageid | pascal | strip_namespace %}
             {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
             {%- if cloudEvents.isCloudEvent(message) %}
+            {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] -%}
+            case "{{ message.envelopemetadata["type"]["value"] }}":
+            {%- else -%}
             case "{{ messageid }}":
+            {%- endif %}
                 if ({{ messagename | lower }}Handler != null) {
                     byte[] dataBytes = {{ cloudEvents.GetCloudEventData("cloudEvent") }};
                     {{ message_body_type }} data;

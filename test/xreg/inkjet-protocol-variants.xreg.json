@@ -1,0 +1,614 @@
+{
+  "specversion": "1.0-rc2",
+  "id": "urn:fabrikam:inkjetprinter:protocolVariants",
+  "description": "Fabrikam InkJet Printer events with protocol-specific variants demonstrating basemessage inheritance",
+  "messagegroups": {
+    "Fabrikam.InkJetPrinter.CloudEvents": {
+      "description": "Base CloudEvents definitions for inkjet printer operational events",
+      "messages": {
+        "Fabrikam.InkJetPrinter.CloudEvents.PrintJobStarted": {
+          "messageid": "Fabrikam.InkJetPrinter.CloudEvents.PrintJobStarted",
+          "description": "Event for when a print job starts",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.PrintJobStarted",
+              "description": "Event raised when a print job is initiated"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "Source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Identifier of the print job"
+            },
+            "time": {
+              "required": true
+            }
+          },
+          "dataschemaformat": "Avro/1.11.1",
+          "dataschemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobStartedEventData"
+        },
+        "Fabrikam.InkJetPrinter.CloudEvents.PrintJobCompleted": {
+          "messageid": "Fabrikam.InkJetPrinter.CloudEvents.PrintJobCompleted",
+          "description": "Event for when a print job is completed",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.PrintJobCompleted",
+              "description": "Event raised when a print job is completed"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "Source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Identifier of the print job"
+            },
+            "time": {
+              "required": true
+            }
+          },
+          "dataschemaformat": "Avro/1.11.1",
+          "dataschemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PrintJobCompletedEventData"
+        },
+        "Fabrikam.InkJetPrinter.CloudEvents.InkLow": {
+          "messageid": "Fabrikam.InkJetPrinter.CloudEvents.InkLow",
+          "description": "Event for when ink levels are low",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.InkLow",
+              "description": "Event raised when ink levels are detected to be low"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "Source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Identifier of the affected ink cartridge"
+            },
+            "time": {
+              "required": true
+            }
+          },
+          "dataschemaformat": "Avro/1.11.1",
+          "dataschemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.InkLowEventData"
+        },
+        "Fabrikam.InkJetPrinter.CloudEvents.PaperJam": {
+          "messageid": "Fabrikam.InkJetPrinter.CloudEvents.PaperJam",
+          "description": "Event for when a paper jam occurs",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.PaperJam",
+              "description": "Event raised when a paper jam is detected"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "Source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Location of the jam within the printer"
+            },
+            "time": {
+              "required": true
+            }
+          },
+          "dataschemaformat": "Avro/1.11.1",
+          "dataschemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.PaperJamEventData"
+        },
+        "Fabrikam.InkJetPrinter.CloudEvents.MaintenanceRequired": {
+          "messageid": "Fabrikam.InkJetPrinter.CloudEvents.MaintenanceRequired",
+          "description": "Event for when the printer requires maintenance",
+          "envelope": "CloudEvents/1.0",
+          "envelopemetadata": {
+            "id": {
+              "required": true
+            },
+            "type": {
+              "value": "Fabrikam.InkJetPrinter.MaintenanceRequired",
+              "description": "Event raised when maintenance is required for the printer"
+            },
+            "source": {
+              "type": "uritemplate",
+              "description": "Source of the event",
+              "value": "{tenantid}/{deviceid}"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Type of maintenance required"
+            },
+            "time": {
+              "required": true
+            }
+          },
+          "dataschemaformat": "Avro/1.11.1",
+          "dataschemaurl": "#/schemagroups/Fabrikam.InkJetPrinter/schemas/Fabrikam.InkJetPrinter.MaintenanceRequiredEventData"
+        }
+      }
+    },
+    "Fabrikam.InkJetPrinter.Kafka": {
+      "description": "Kafka-specific message variants with key definitions, inheriting from CloudEvents base messages",
+      "messages": {
+        "Fabrikam.InkJetPrinter.Kafka.PrintJobStarted": {
+          "messageid": "Fabrikam.InkJetPrinter.Kafka.PrintJobStarted",
+          "description": "Kafka variant of PrintJobStarted with message key",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.PrintJobStarted",
+          "protocol": "Kafka",
+          "protocolmetadata": {
+            "key": {
+              "type": "string",
+              "description": "Kafka message key for partitioning",
+              "value": "{tenantid}-{deviceid}"
+            },
+            "headers": {
+              "type": "object",
+              "properties": {
+                "correlationId": {
+                  "type": "string",
+                  "description": "Correlation identifier for tracing"
+                }
+              }
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.Kafka.PrintJobCompleted": {
+          "messageid": "Fabrikam.InkJetPrinter.Kafka.PrintJobCompleted",
+          "description": "Kafka variant of PrintJobCompleted with message key",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.PrintJobCompleted",
+          "protocol": "Kafka",
+          "protocolmetadata": {
+            "key": {
+              "type": "string",
+              "description": "Kafka message key for partitioning",
+              "value": "{tenantid}-{deviceid}"
+            },
+            "headers": {
+              "type": "object",
+              "properties": {
+                "correlationId": {
+                  "type": "string",
+                  "description": "Correlation identifier for tracing"
+                }
+              }
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.Kafka.InkLow": {
+          "messageid": "Fabrikam.InkJetPrinter.Kafka.InkLow",
+          "description": "Kafka variant of InkLow with message key",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.InkLow",
+          "protocol": "Kafka",
+          "protocolmetadata": {
+            "key": {
+              "type": "string",
+              "description": "Kafka message key for partitioning by device",
+              "value": "{tenantid}-{deviceid}"
+            },
+            "headers": {
+              "type": "object",
+              "properties": {
+                "alertPriority": {
+                  "type": "string",
+                  "description": "Priority level for alert processing"
+                }
+              }
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.Kafka.PaperJam": {
+          "messageid": "Fabrikam.InkJetPrinter.Kafka.PaperJam",
+          "description": "Kafka variant of PaperJam with message key",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.PaperJam",
+          "protocol": "Kafka",
+          "protocolmetadata": {
+            "key": {
+              "type": "string",
+              "description": "Kafka message key for partitioning by device",
+              "value": "{tenantid}-{deviceid}"
+            },
+            "headers": {
+              "type": "object",
+              "properties": {
+                "alertPriority": {
+                  "type": "string",
+                  "description": "Priority level for alert processing"
+                }
+              }
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.Kafka.MaintenanceRequired": {
+          "messageid": "Fabrikam.InkJetPrinter.Kafka.MaintenanceRequired",
+          "description": "Kafka variant of MaintenanceRequired with message key",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.MaintenanceRequired",
+          "protocol": "Kafka",
+          "protocolmetadata": {
+            "key": {
+              "type": "string",
+              "description": "Kafka message key for partitioning by device",
+              "value": "{tenantid}-{deviceid}"
+            },
+            "headers": {
+              "type": "object",
+              "properties": {
+                "maintenanceSchedule": {
+                  "type": "string",
+                  "description": "Scheduled maintenance window"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Fabrikam.InkJetPrinter.MQTT": {
+      "description": "MQTT-specific message variants with topic and QoS settings, inheriting from CloudEvents base messages",
+      "messages": {
+        "Fabrikam.InkJetPrinter.MQTT.PrintJobStarted": {
+          "messageid": "Fabrikam.InkJetPrinter.MQTT.PrintJobStarted",
+          "description": "MQTT variant of PrintJobStarted with topic and QoS",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.PrintJobStarted",
+          "protocol": "MQTT/5.0",
+          "protocolmetadata": {
+            "topic": {
+              "value": "fabrikam/inkjet/{tenantid}/{deviceid}/printjob/started",
+              "description": "MQTT topic for print job started events"
+            },
+            "qos": {
+              "value": 1,
+              "description": "Quality of Service level (at least once delivery)"
+            },
+            "retain": {
+              "value": false,
+              "description": "Do not retain this event"
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.MQTT.PrintJobCompleted": {
+          "messageid": "Fabrikam.InkJetPrinter.MQTT.PrintJobCompleted",
+          "description": "MQTT variant of PrintJobCompleted with topic and QoS",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.PrintJobCompleted",
+          "protocol": "MQTT/5.0",
+          "protocolmetadata": {
+            "topic": {
+              "value": "fabrikam/inkjet/{tenantid}/{deviceid}/printjob/completed",
+              "description": "MQTT topic for print job completed events"
+            },
+            "qos": {
+              "value": 1,
+              "description": "Quality of Service level (at least once delivery)"
+            },
+            "retain": {
+              "value": false,
+              "description": "Do not retain this event"
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.MQTT.InkLow": {
+          "messageid": "Fabrikam.InkJetPrinter.MQTT.InkLow",
+          "description": "MQTT variant of InkLow with topic and QoS",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.InkLow",
+          "protocol": "MQTT/5.0",
+          "protocolmetadata": {
+            "topic": {
+              "value": "fabrikam/inkjet/{tenantid}/{deviceid}/alerts/inklow",
+              "description": "MQTT topic for ink low alerts"
+            },
+            "qos": {
+              "value": 2,
+              "description": "Quality of Service level (exactly once delivery for important alerts)"
+            },
+            "retain": {
+              "value": true,
+              "description": "Retain last ink low status"
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.MQTT.PaperJam": {
+          "messageid": "Fabrikam.InkJetPrinter.MQTT.PaperJam",
+          "description": "MQTT variant of PaperJam with topic and QoS",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.PaperJam",
+          "protocol": "MQTT/5.0",
+          "protocolmetadata": {
+            "topic": {
+              "value": "fabrikam/inkjet/{tenantid}/{deviceid}/alerts/paperjam",
+              "description": "MQTT topic for paper jam alerts"
+            },
+            "qos": {
+              "value": 2,
+              "description": "Quality of Service level (exactly once delivery for critical alerts)"
+            },
+            "retain": {
+              "value": true,
+              "description": "Retain last jam status"
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.MQTT.MaintenanceRequired": {
+          "messageid": "Fabrikam.InkJetPrinter.MQTT.MaintenanceRequired",
+          "description": "MQTT variant of MaintenanceRequired with topic and QoS",
+          "basemessageurl": "/messagegroups/Fabrikam.InkJetPrinter.CloudEvents/messages/Fabrikam.InkJetPrinter.CloudEvents.MaintenanceRequired",
+          "protocol": "MQTT/5.0",
+          "protocolmetadata": {
+            "topic": {
+              "value": "fabrikam/inkjet/{tenantid}/{deviceid}/maintenance/required",
+              "description": "MQTT topic for maintenance required notifications"
+            },
+            "qos": {
+              "value": 1,
+              "description": "Quality of Service level (at least once delivery)"
+            },
+            "retain": {
+              "value": true,
+              "description": "Retain last maintenance status"
+            }
+          }
+        }
+      }
+    }
+  },
+  "schemagroups": {
+    "Fabrikam.InkJetPrinter": {
+      "schemas": {
+        "Fabrikam.InkJetPrinter.PrintJobStartedEventData": {
+          "format": "Avro/1.11.1",
+          "defaultversionid": "1",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.1",
+              "schema": {
+                "type": "record",
+                "name": "PrintJobStartedEventData",
+                "namespace": "Fabrikam.InkJetPrinter",
+                "doc": "Data schema for starting a print job",
+                "fields": [
+                  {
+                    "name": "tenantid",
+                    "doc": "Tenant identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "deviceid",
+                    "doc": "Device identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "jobId",
+                    "doc": "Unique identifier for the print job",
+                    "type": "string"
+                  },
+                  {
+                    "name": "documentName",
+                    "doc": "Name of the document being printed",
+                    "type": "string"
+                  },
+                  {
+                    "name": "startTime",
+                    "doc": "Timestamp when the print job started",
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.PrintJobCompletedEventData": {
+          "format": "Avro/1.11.1",
+          "defaultversionid": "1",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.1",
+              "schema": {
+                "type": "record",
+                "name": "PrintJobCompletedEventData",
+                "namespace": "Fabrikam.InkJetPrinter",
+                "doc": "Data schema for a completed print job",
+                "fields": [
+                  {
+                    "name": "tenantid",
+                    "doc": "Tenant identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "deviceid",
+                    "doc": "Device identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "jobId",
+                    "doc": "Unique identifier for the completed print job",
+                    "type": "string"
+                  },
+                  {
+                    "name": "documentName",
+                    "doc": "Name of the document printed",
+                    "type": "string"
+                  },
+                  {
+                    "name": "completionTime",
+                    "doc": "Timestamp when the print job was completed",
+                    "type": "string"
+                  },
+                  {
+                    "name": "outcome",
+                    "doc": "Outcome of the print job (successful, failed, cancelled)",
+                    "type": {
+                      "type": "enum",
+                      "name": "PrintJobOutcome",
+                      "symbols": [
+                        "Successful",
+                        "Failed",
+                        "Cancelled"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.InkLowEventData": {
+          "format": "Avro/1.11.1",
+          "defaultversionid": "1",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.1",
+              "schema": {
+                "type": "record",
+                "name": "InkLowEventData",
+                "namespace": "Fabrikam.InkJetPrinter",
+                "doc": "Data schema for low ink level event",
+                "fields": [
+                  {
+                    "name": "tenantid",
+                    "doc": "Tenant identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "deviceid",
+                    "doc": "Device identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "cartridgeId",
+                    "doc": "Identifier of the low ink cartridge",
+                    "type": "string"
+                  },
+                  {
+                    "name": "inkColor",
+                    "doc": "Color of the ink that is low",
+                    "type": {
+                      "type": "enum",
+                      "name": "InkColor",
+                      "symbols": [
+                        "Black",
+                        "Cyan",
+                        "Magenta",
+                        "Yellow"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "remainingLevel",
+                    "doc": "Remaining ink level percentage",
+                    "type": "int"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.PaperJamEventData": {
+          "format": "Avro/1.11.1",
+          "defaultversionid": "1",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.1",
+              "schema": {
+                "type": "record",
+                "name": "PaperJamEventData",
+                "namespace": "Fabrikam.InkJetPrinter",
+                "doc": "Data schema for a paper jam event",
+                "fields": [
+                  {
+                    "name": "tenantid",
+                    "doc": "Tenant identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "deviceid",
+                    "doc": "Device identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "jamLocation",
+                    "doc": "Location within the printer where the jam occurred",
+                    "type": "string"
+                  },
+                  {
+                    "name": "cleared",
+                    "doc": "Whether the jam has been cleared (true/false)",
+                    "type": "boolean"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "Fabrikam.InkJetPrinter.MaintenanceRequiredEventData": {
+          "format": "Avro/1.11.1",
+          "defaultversionid": "1",
+          "versions": {
+            "1": {
+              "format": "Avro/1.11.1",
+              "schema": {
+                "type": "record",
+                "name": "MaintenanceRequiredEventData",
+                "namespace": "Fabrikam.InkJetPrinter",
+                "doc": "Data schema for maintenance required event",
+                "fields": [
+                  {
+                    "name": "tenantid",
+                    "doc": "Tenant identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "deviceid",
+                    "doc": "Device identifier",
+                    "type": "string"
+                  },
+                  {
+                    "name": "maintenanceType",
+                    "doc": "Type of maintenance required (e.g., 'cleaning', 'mechanical adjustment')",
+                    "type": {
+                      "type": "enum",
+                      "name": "MaintenanceType",
+                      "symbols": [
+                        "Cleaning",
+                        "MechanicalAdjustment"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "urgency",
+                    "doc": "Urgency of the maintenance required (e.g., 'immediate', 'routine')",
+                    "type": {
+                      "type": "enum",
+                      "name": "Urgency",
+                      "symbols": [
+                        "Immediate",
+                        "Routine"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

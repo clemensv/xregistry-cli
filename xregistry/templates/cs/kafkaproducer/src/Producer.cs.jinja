@@ -25,7 +25,7 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
     {
         {%- if root.endpoints -%}
         {%- for endpointid, endpoint in root.endpoints.items() -%}
-                {%- if endpoint.usage == "producer" -%}
+                {%- if endpoint.usage and "producer" in endpoint.usage -%}
         {%- set protocol = endpoint.protocol | lower -%}
         {%- if protocol == "kafka" -%}
         {%- set options = endpoint.protocoloptions -%}
@@ -38,9 +38,12 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
             var config = new ProducerConfig
             {
                 BootstrapServers = string.Join(",", bootstrapServers?.Select(uri => uri.AbsoluteUri))
+                {%- if options and "acks" in options -%}
+                , Acks = Acks.{{ "All" if options.acks == -1 else ("None" if options.acks == 0 else "Leader") }}
+                {%- endif %}
             };
             var producer = new ProducerBuilder<byte[], byte[]>(config).Build();
-            return new {{ class_name }}(producer);
+            return new {{ class_name }}(producer, {{ '"' + options.topic + '"' if options and "topic" in options else "null" }});
         {%- endmacro %}
 
         /// <summary>
@@ -59,15 +62,24 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         /// <summary>
         /// Constructor
         /// </summary>
-        public {{ class_name }}(IProducer<byte[], byte[]> producer)
+        public {{ class_name }}(IProducer<byte[], byte[]> producer, string? defaultTopic = null)
         {
             this.Producer = producer;
+            this.DefaultTopic = defaultTopic;
         }
 
         /// <summary>
         /// Kafka producer client
         /// </summary>
         public IProducer<byte[], byte[]> Producer
+        {
+            get; private set;
+        }
+
+        /// <summary>
+        /// Default topic for messages (from endpoint configuration)
+        /// </summary>
+        public string? DefaultTopic
         {
             get; private set;
         }
@@ -99,6 +111,9 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         {%- if isCloudEvent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
+        {%- if not ("protocolmetadata" in message and "topic" in message.protocolmetadata and "value" in message.protocolmetadata.topic) %}
+        /// <param name="topic">The Kafka topic to send to. Required when not specified in endpoint or message metadata.</param>
+        {%- endif %}
         /// <returns>A `Task` object representing the asynchronous publish operation.</returns>
         public Task Send{{ messagename | strip_namespace }}Async(
         {{ type_name }} data
@@ -110,7 +125,10 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         {%- else -%}
         , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
         {%- endif %}
-        {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
+        {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %}
+        {%- if not ("protocolmetadata" in message and "topic" in message.protocolmetadata and "value" in message.protocolmetadata.topic) %}
+        , string? topic = null
+        {%- endif %})
         {
             var message = {{groupname | strip_namespace}}EventFactory.Create{{ messagename | strip_namespace }}Message(data,
                 {%- if uriargs %}
@@ -122,7 +140,12 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
                 contentType
                 {%- if isCloudEvent %}, formatter{% endif -%}
             );
-            return this.Producer.ProduceAsync("{{ messagename }}", message);
+            {%- if "protocolmetadata" in message and "topic" in message.protocolmetadata and "value" in message.protocolmetadata.topic %}
+            string resolvedTopic = "{{ message.protocolmetadata.topic.value }}";
+            {%- else %}
+            string resolvedTopic = topic ?? this.DefaultTopic ?? throw new ArgumentNullException(nameof(topic), "Topic must be specified either in metadata, endpoint configuration, or as a parameter");
+            {%- endif %}
+            return this.Producer.ProduceAsync(resolvedTopic, message);
         }
 
         /// <summary>
@@ -142,6 +165,9 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         {%- if isCloudEvent %}
         /// <param name="formatter">The CloudEvent formatter to use for structured mode, e.g. JsonEventFormatter.</param>
         {%- endif %}
+        {%- if not ("protocolmetadata" in message and "topic" in message.protocolmetadata and "value" in message.protocolmetadata.topic) %}
+        /// <param name="topic">The Kafka topic to send to. Required when not specified in endpoint or message metadata.</param>
+        {%- endif %}
         /// <returns>A `Task` object representing the asynchronous batch publish operation.</returns>
         public async Task Send{{ messagename | strip_namespace }}BatchAsync(
         {{ type_name }}[] data
@@ -153,7 +179,10 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
         {%- else -%}
         , string contentType = System.Net.Mime.MediaTypeNames.Application.Json
         {%- endif %}
-        {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %})
+        {%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %}
+        {%- if not ("protocolmetadata" in message and "topic" in message.protocolmetadata and "value" in message.protocolmetadata.topic) %}
+        , string? topic = null
+        {%- endif %})
         {
             var messages = data.Select(record =>
                 {{groupname | strip_namespace}}EventFactory.Create{{ messagename | strip_namespace }}Message(record,
@@ -168,9 +197,14 @@ namespace {{ groupname | concat_namespace(project_name) | pascal }}
                 )
             ).ToArray();
             
+            {%- if "protocolmetadata" in message and "topic" in message.protocolmetadata and "value" in message.protocolmetadata.topic %}
+            string resolvedTopic = "{{ message.protocolmetadata.topic.value }}";
+            {%- else %}
+            string resolvedTopic = topic ?? this.DefaultTopic ?? throw new ArgumentNullException(nameof(topic), "Topic must be specified either in metadata, endpoint configuration, or as a parameter");
+            {%- endif %}
             foreach (var message in messages)
             {
-                await this.Producer.ProduceAsync("{{ messagename }}", message);
+                await this.Producer.ProduceAsync(resolvedTopic, message);
             }
         }
         {% endfor %}
