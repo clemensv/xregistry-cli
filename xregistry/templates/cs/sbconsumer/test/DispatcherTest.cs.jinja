@@ -109,7 +109,7 @@ namespace {{ project_name | pascal }}.Test
                     .WithEnvironment("SQL_SERVER", "sqledge")
                     .WithEnvironment("MSSQL_SA_PASSWORD", "StrongPassword!1")
                     .WithEnvironment("ACCEPT_EULA", "Y")
-                    .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*Emulator Service is Successfully Up!").WithTimeout(TimeSpan.FromMinutes(4)))
+                    .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(".*Emulator Service is Successfully Up!"))
                     .WithOutputConsumer(outputConsumer)
                     .WithStartupCallback((container, ct) => Task.Delay(2000, ct)) // Extra settling time
                     .Build();
