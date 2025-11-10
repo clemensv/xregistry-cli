@@ -1,6 +1,25 @@
-# {{ project_name }} AMQP 1.0 Producer
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Producer" %}
+# {{ project_name }} - AMQP 1.0 Producer
 
-This project contains a TypeScript AMQP 1.0 producer generated from an xRegistry definition.
+Auto-generated TypeScript producer for sending CloudEvents via AMQP 1.0 protocol.
+
+## Overview
+
+This library provides a type-safe AMQP 1.0 producer client for {{ groupname }} message group. Built on `rhea` for Node.js AMQP messaging.
+
+## What is AMQP 1.0?
+
+**AMQP (Advanced Message Queuing Protocol) 1.0** is an open standard for business messaging that supports:
+- **Message queuing** for reliable asynchronous communication
+- **Request/response** and publish/subscribe patterns
+- **Message durability** with persistent storage
+- **Transactions** and flow control
+
+Common brokers: Azure Service Bus, Apache ActiveMQ Artemis, Apache Qpid, RabbitMQ.
 
 ## Installation
 
@@ -20,29 +39,93 @@ npm run build
 npm test
 ```
 
-## Usage
+## Quick Start
+
+### 1. Basic Usage
 
 ```typescript
-import { {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "Producer" %}{{ class_name }}{% if not loop.last %}, {% endif %}{% endfor %} } from './src';
+import { {{ class_name }} } from './src';
 
-const producer = new {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "Producer" %}{{ class_name }}{% if loop.first %}{% endif %}{% endfor %}(
+// Connect to AMQP broker
+const producer = new {{ class_name }}(
     'localhost',
     5672,
-    'test-queue'
+    'test-queue',
+    {
+        username: 'guest',
+        password: 'guest'
+    }
 );
 
-// Send single message
-{% set ns = namespace(done=false) %}
-{% for messagegroupid, messagegroup in root.messagegroups.items() if not ns.done -%}
-{% set message_list = messagegroup.messages.items() | list %}
-{% for messageid, message in message_list[:1] -%}
-{%- set messagename = messageid | strip_namespace | pascal -%}
-await producer.send{{ messagename }}({
-    // your data here
-});
-{% endfor %}
-{% set ns.done = true %}
-{% endfor %}
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
 
+// Send single message
+await producer.send{{ messagename }}({
+    // Your {{ message_body_type | strip_namespace }} data here
+});
+{%- endif %}
+
+// Close connection
 await producer.close();
 ```
+
+## Available Event Sending Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### send{{ messagename }}
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+await producer.send{{ messagename }}(data: {{ message_body_type | strip_namespace }}): Promise<void>
+```
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Connection Configuration
+
+The `{{ class_name }}` constructor accepts the following parameters:
+
+```typescript
+new {{ class_name }}(
+    host: string,           // AMQP broker hostname
+    port: number,           // AMQP broker port (typically 5672)
+    address: string,        // Queue or topic address
+    options?: {
+        username?: string,  // Authentication username
+        password?: string,  // Authentication password
+        transport?: 'tcp' | 'tls',  // Transport protocol
+        reconnect?: boolean // Auto-reconnect on disconnect
+    }
+)
+```
+
+## Error Handling
+
+```typescript
+try {
+    await producer.send{{ messagename }}(eventData);
+} catch (error) {
+    console.error('Failed to send {{ messagename }}:', error);
+    // Handle send failure (retry, log, alert, etc.)
+}
+```
+
+## Best Practices
+
+1. **Reuse producer instances** - create once, use multiple times
+2. **Always close connections** when shutting down
+3. **Handle send errors** with appropriate retry logic
+4. **Use connection pooling** for high-throughput scenarios
+5. **Enable TLS** for production environments
+{% endfor %}

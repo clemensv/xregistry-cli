@@ -1,6 +1,25 @@
-# {{ project_name }} Kafka Producer
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Producer" %}
+# {{ project_name }} - Kafka Producer
 
-This project contains a TypeScript Kafka producer generated from an xRegistry definition.
+Auto-generated TypeScript producer for sending CloudEvents to Apache Kafka.
+
+## Overview
+
+This library provides a type-safe Kafka producer client for {{ groupname }} message group. Built on `kafkajs`.
+
+## What is Apache Kafka?
+
+**Apache Kafka** is a distributed event streaming platform that:
+- **Handles high throughput** with millions of messages per second
+- **Provides durability** through replicated, distributed logs
+- **Scales horizontally** across clusters
+- **Supports stream processing** with Kafka Streams and ksqlDB
+
+Use cases: Event sourcing, log aggregation, real-time analytics, microservices messaging.
 
 ## Installation
 
@@ -20,30 +39,127 @@ npm run build
 npm test
 ```
 
-## Usage
+## Quick Start
+
+### 1. Basic Usage
 
 ```typescript
 import { Kafka } from 'kafkajs';
-import { {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "Producer" %}{{ class_name }}{% if not loop.last %}, {% endif %}{% endfor %} } from './src';
+import { {{ class_name }} } from './src';
 
 const kafka = new Kafka({
     clientId: 'my-app',
     brokers: ['localhost:9092']
 });
 
-{% set ns = namespace(done=false) %}
-{% for messagegroupid, messagegroup in root.messagegroups.items() if not ns.done -%}
-{%- set class_name = (messagegroupid | pascal | strip_namespace) + "Producer" %}
-const producer = await {{ class_name }}.createFor{{ messagegroupid | pascal | strip_namespace }}(kafka);
+const producer = await {{ class_name }}.createFor{{ groupname | strip_namespace }}(kafka);
 
-// Send messages
-{% set message_list = messagegroup.messages.items() | list %}
-{% for messageid, message in message_list[:3] -%}
-{%- set messagename = messageid | strip_namespace | pascal -%}
-await producer.send{{ messagename }}({ test: 'data' });
-{% endfor %}
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Send single message
+await producer.send{{ messagename }}({
+    // Your {{ message_body_type | strip_namespace }} data here
+});
+{%- endif %}
 
 await producer.disconnect();
-{% set ns.done = true %}
-{% endfor %}
 ```
+
+### 2. Using SASL/SSL (Recommended for Production)
+
+```typescript
+const kafka = new Kafka({
+    clientId: 'my-app',
+    brokers: ['broker1:9093', 'broker2:9093'],
+    ssl: true,
+    sasl: {
+        mechanism: 'plain', // or 'scram-sha-256', 'scram-sha-512'
+        username: 'my-username',
+        password: 'my-password'
+    }
+});
+```
+
+## Available Event Sending Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### send{{ messagename }}
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+await producer.send{{ messagename }}(data: {{ message_body_type | strip_namespace }}): Promise<void>
+```
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Configuration Options
+
+### Partition Keys
+
+Control message distribution across partitions:
+
+```typescript
+await producer.send{{ messagename }}(data, {
+    key: 'device-123'  // Messages with same key go to same partition
+});
+```
+
+### Custom Headers
+
+Add metadata to messages:
+
+```typescript
+await producer.send{{ messagename }}(data, {
+    headers: {
+        'source': 'device-gateway',
+        'priority': 'high'
+    }
+});
+```
+
+### Producer Configuration
+
+```typescript
+const kafka = new Kafka({
+    clientId: 'my-app',
+    brokers: ['localhost:9092'],
+    retry: {
+        initialRetryTime: 100,
+        retries: 8
+    },
+    connectionTimeout: 3000,
+    requestTimeout: 30000
+});
+```
+
+## Error Handling
+
+```typescript
+try {
+    await producer.send{{ messagename }}(eventData);
+} catch (error) {
+    console.error('Failed to send {{ messagename }}:', error);
+    // Handle send failure (retry, log, alert, etc.)
+}
+```
+
+## Best Practices
+
+1. **Reuse producer instances** - create once, use multiple times
+2. **Use partition keys** for ordered processing of related events
+3. **Enable idempotence** to prevent duplicate messages
+4. **Batch messages** when possible for better throughput
+5. **Configure appropriate timeouts** based on your network
+6. **Use SSL/SASL** for production deployments
+{% endfor %}

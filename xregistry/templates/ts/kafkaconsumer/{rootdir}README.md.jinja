@@ -1,6 +1,25 @@
-# {{ project_name }} Kafka Consumer
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventDispatcher" %}
+# {{ project_name }} - Kafka Consumer
 
-This project contains a TypeScript Kafka consumer generated from an xRegistry definition.
+Auto-generated TypeScript consumer for receiving CloudEvents from Apache Kafka.
+
+## Overview
+
+This library provides a type-safe Kafka consumer client for {{ groupname }} message group. Built on `kafkajs`.
+
+## What is Apache Kafka?
+
+**Apache Kafka** is a distributed event streaming platform that:
+- **Handles high throughput** with millions of messages per second
+- **Provides durability** through replicated, distributed logs
+- **Scales horizontally** across clusters
+- **Supports stream processing** with Kafka Streams and ksqlDB
+
+Use cases: Event sourcing, log aggregation, real-time analytics, microservices messaging.
 
 ## Installation
 
@@ -20,11 +39,13 @@ npm run build
 npm test
 ```
 
-## Usage
+## Quick Start
+
+### 1. Basic Usage
 
 ```typescript
 import { Kafka } from 'kafkajs';
-import { KafkaProcessor, {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "EventDispatcher" %}{{ class_name }}{% if not loop.last %}, {% endif %}{% endfor %} } from './src';
+import { KafkaProcessor, {{ class_name }} } from './src';
 
 const kafka = new Kafka({
     clientId: 'my-app',
@@ -32,25 +53,138 @@ const kafka = new Kafka({
 });
 
 const consumer = kafka.consumer({ groupId: 'my-group' });
-const dispatcher = new {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "EventDispatcher" %}{{ class_name }}{% if loop.first %}{% endif %}{% endfor %}();
+const dispatcher = new {{ class_name }}();
 const processor = new KafkaProcessor(consumer, 'my-topic');
 
-// Register handlers
-{% set ns = namespace(done=false) %}
-{% for messagegroupid, messagegroup in root.messagegroups.items() if not ns.done -%}
-{% set message_list = messagegroup.messages.items() | list %}
-{% for messageid, message in message_list[:3] -%}
-{%- set messagename = messageid | strip_namespace | pascal -%}
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Register handler for {{ messagename }}
 dispatcher.{{ messagename }}Handler = async (message, data) => {
     console.log('Received {{ messagename }}:', data);
+    // Process your event data here
 };
-{% endfor %}
-{% set ns.done = true %}
-{% endfor %}
+{%- endif %}
 
 processor.processMessage = async (payload) => {
     await dispatcher.processMessage(payload);
 };
 
 await processor.start();
+
+// Later: stop gracefully
+await processor.stop();
 ```
+
+### 2. Using SASL/SSL (Recommended for Production)
+
+```typescript
+const kafka = new Kafka({
+    clientId: 'my-app',
+    brokers: ['broker1:9093', 'broker2:9093'],
+    ssl: true,
+    sasl: {
+        mechanism: 'plain', // or 'scram-sha-256', 'scram-sha-512'
+        username: 'my-username',
+        password: 'my-password'
+    }
+});
+```
+
+## Available Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}Handler
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+dispatcher.{{ messagename }}Handler = async (message, data: {{ message_body_type | strip_namespace }}) => {
+    // Handle {{ messagename }} event
+    console.log('Processing {{ messagename }}:', data);
+};
+```
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Configuration Options
+
+### Consumer Groups
+
+Consumer groups enable parallel processing:
+
+```typescript
+const consumer = kafka.consumer({
+    groupId: 'my-group',
+    sessionTimeout: 30000,
+    heartbeatInterval: 3000,
+    rebalanceTimeout: 60000
+});
+```
+
+### Manual Offset Management
+
+Control when offsets are committed:
+
+```typescript
+const consumer = kafka.consumer({
+    groupId: 'my-group',
+    autoCommit: false  // Manually commit after processing
+});
+
+// After successful processing
+await consumer.commitOffsets([{
+    topic: 'my-topic',
+    partition: 0,
+    offset: '123'
+}]);
+```
+
+### Subscribe to Multiple Topics
+
+```typescript
+await consumer.subscribe({
+    topics: ['topic1', 'topic2'],
+    fromBeginning: false  // Only consume new messages
+});
+```
+
+## Error Handling
+
+```typescript
+dispatcher.{{ messagename }}Handler = async (message, data) => {
+    try {
+        // Process message
+        await processEvent(data);
+    } catch (error) {
+        console.error('Failed to process {{ messagename }}:', error);
+        // Message will not be committed and may be retried
+        throw error;
+    }
+};
+
+// Configure retry behavior
+const processor = new KafkaProcessor(consumer, 'my-topic', {
+    maxRetries: 3,
+    retryDelay: 1000
+});
+```
+
+## Best Practices
+
+1. **Use consumer groups** for parallel processing and fault tolerance
+2. **Enable auto-commit carefully** - manual commit provides better control
+3. **Handle rebalancing** gracefully to avoid duplicate processing
+4. **Monitor consumer lag** to ensure timely processing
+5. **Use SSL/SASL** for production deployments
+6. **Implement idempotent handlers** to handle duplicate messages
+{% endfor %}

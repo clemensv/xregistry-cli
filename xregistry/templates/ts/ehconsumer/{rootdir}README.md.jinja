@@ -1,6 +1,25 @@
-# {{ project_name }} Azure Event Hubs Consumer
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventDispatcher" %}
+# {{ project_name }} - Azure Event Hubs Consumer
 
-This project contains a TypeScript Azure Event Hubs consumer generated from an xRegistry definition.
+Auto-generated TypeScript consumer for receiving CloudEvents from Azure Event Hubs.
+
+## Overview
+
+This library provides a type-safe Event Hubs consumer client for {{ groupname }} message group. Built on `@azure/event-hubs` SDK.
+
+## What is Azure Event Hubs?
+
+**Azure Event Hubs** is a fully managed, real-time data ingestion service that:
+- **Scales automatically** to handle millions of events per second
+- **Supports multiple protocols** including AMQP, Kafka, and HTTPS
+- **Provides event replay** with configurable retention (1-90 days)
+- **Integrates seamlessly** with Azure services and Stream Analytics
+
+Use cases: Telemetry ingestion, log aggregation, IoT data streams, event sourcing.
 
 ## Installation
 
@@ -20,37 +39,146 @@ npm run build
 npm test
 ```
 
-## Usage
+## Quick Start
+
+### 1. Using Connection String
 
 ```typescript
 import { EventHubConsumerClient } from '@azure/event-hubs';
-import { EventHubsProcessor, {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "EventDispatcher" %}{{ class_name }}{% if not loop.last %}, {% endif %}{% endfor %} } from './src';
+import { EventHubsProcessor, {{ class_name }} } from './src';
 
 const client = new EventHubConsumerClient(
-    '$Default', // consumer group
-    'connection-string',
+    '$Default',  // consumer group
+    'Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=...',
     'event-hub-name'
 );
 
-const dispatcher = new {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "EventDispatcher" %}{{ class_name }}{% if loop.first %}{% endif %}{% endfor %}();
+const dispatcher = new {{ class_name }}();
 const processor = new EventHubsProcessor(client);
 
-// Register handlers
-{% set ns = namespace(done=false) %}
-{% for messagegroupid, messagegroup in root.messagegroups.items() if not ns.done -%}
-{% set message_list = messagegroup.messages.items() | list %}
-{% for messageid, message in message_list[:3] -%}
-{%- set messagename = messageid | strip_namespace | pascal -%}
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Register handler for {{ messagename }}
 dispatcher.{{ messagename }}Handler = async (eventData, data) => {
     console.log('Received {{ messagename }}:', data);
+    // Process your event data here
 };
-{% endfor %}
-{% set ns.done = true %}
-{% endfor %}
+{%- endif %}
 
 processor.processEvent = async (eventData) => {
     await dispatcher.processEvent(eventData);
 };
 
 await processor.start();
+
+// Later: stop gracefully
+await processor.stop();
 ```
+
+### 2. Using Azure Identity (Recommended for Production)
+
+```typescript
+import { DefaultAzureCredential } from '@azure/identity';
+import { EventHubConsumerClient } from '@azure/event-hubs';
+
+const credential = new DefaultAzureCredential();
+const client = new EventHubConsumerClient(
+    '$Default',
+    'fully-qualified-namespace.servicebus.windows.net',
+    'event-hub-name',
+    credential
+);
+```
+
+## Available Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}Handler
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+dispatcher.{{ messagename }}Handler = async (eventData, data: {{ message_body_type | strip_namespace }}) => {
+    // Handle {{ messagename }} event
+    console.log('Processing {{ messagename }}:', data);
+};
+```
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Configuration Options
+
+### Consumer Groups
+
+Consumer groups enable multiple applications to independently consume the same event stream:
+
+```typescript
+const client = new EventHubConsumerClient(
+    'my-consumer-group',  // Create consumer groups in Azure Portal
+    connectionString,
+    eventHubName
+);
+```
+
+### Checkpointing
+
+Enable automatic checkpointing for fault tolerance:
+
+```typescript
+import { BlobCheckpointStore } from '@azure/eventhubs-checkpointstore-blob';
+import { ContainerClient } from '@azure/storage-blob';
+
+const containerClient = new ContainerClient(
+    'DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net',
+    'checkpoint-container'
+);
+
+await containerClient.createIfNotExists();
+
+const checkpointStore = new BlobCheckpointStore(containerClient);
+const client = new EventHubConsumerClient(
+    '$Default',
+    connectionString,
+    eventHubName,
+    checkpointStore
+);
+```
+
+## Error Handling
+
+```typescript
+dispatcher.{{ messagename }}Handler = async (eventData, data) => {
+    try {
+        // Process message
+        await processEvent(data);
+    } catch (error) {
+        console.error('Failed to process {{ messagename }}:', error);
+        // Optionally skip checkpoint to retry processing
+        throw error;
+    }
+};
+
+processor.processError = async (error, context) => {
+    console.error(`Error from partition ${context.partitionId}:`, error);
+};
+```
+
+## Best Practices
+
+1. **Use consumer groups** for parallel processing across applications
+2. **Enable checkpointing** to track processing progress
+3. **Handle errors gracefully** to prevent data loss
+4. **Use Azure Identity** instead of connection strings for production
+5. **Monitor partition distribution** to ensure balanced load
+6. **Set appropriate batch sizes** based on message volume
+{% endfor %}
