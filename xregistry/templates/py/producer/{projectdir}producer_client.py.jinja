@@ -32,7 +32,7 @@ class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
         self.content_mode = content_mode
 
     {% for messageid, message in messagegroup.messages.items() -%}
-    {%- set parts = message.messageid.split('.') -%}
+    {%- set parts = messageid.split('.') -%}
     {%- set messageName = parts|join('_')|lower %}
     def send_{{messageName.split('.')[-1]}}(self,
     {%- for attrname in message.envelopemetadata -%}
