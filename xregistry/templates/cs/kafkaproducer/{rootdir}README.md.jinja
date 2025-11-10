@@ -42,10 +42,11 @@ public static KafkaProducerClient CreateFor{{ endpointid | pascal | strip_namesp
 | `credential` | `TokenCredential`, `AzureNamedKeyCredential`, or `AzureSasCredential` | The credential to use for authentication. |
 | `fullyQualifiedNamespace` | `string` | The fully qualified namespace of the Kafka topic, optionally overriding the value defined for the endpoint |
 | `KafkaName` | `string` | The name of the Kafka topic, optionally overriding the value defined for the endpoint |
-{%- endfor -%}
+{% endfor %}
+
 {% endif %}
 
-{% for messageid, message in messagegroup.messages.items() -%}
+{% for messageid, message in messagegroup.messages.items() %}
 {%- set messagename = messageid | pascal %}
 {%- set is_cloudevent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
 {%- set is_amqp = not is_cloudevent and message.envelope.lower().startswith("amqp") %}
