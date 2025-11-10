@@ -1,0 +1,304 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Client" %}
+# {{ project_name | pascal }} - MQTT 5.0 Client
+
+Auto-generated Java MQTT client for publish/subscribe with QoS support.
+
+## Overview
+
+Type-safe MQTT 5.0 client for {{ groupname }} message group using Eclipse Paho Java SDK with CloudEvents support.
+
+## What is MQTT?
+
+**MQTT (Message Queuing Telemetry Transport)** is a lightweight publish-subscribe protocol ideal for:
+- **IoT devices** with limited bandwidth/battery
+- **Telemetry** and sensor data
+- **Mobile applications** with unreliable networks
+- **Real-time messaging** with minimal overhead
+
+MQTT 5.0 adds: user properties, reason codes, message expiry, topic aliases.
+
+## Quick Start
+
+### 1. Add Dependency
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>{{ groupid }}</groupId>
+    <artifactId>{{ project_name | snake }}</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+**Gradle:**
+```gradle
+implementation '{{ groupid }}:{{ project_name | snake }}:1.0.0'
+```
+
+### 2. Publish and Subscribe
+
+```java
+import {{ project_name | snake }}.{{ class_name }};
+
+String broker = "tcp://localhost:1883";
+String clientId = "java-client-" + System.currentTimeMillis();
+
+{{ class_name }} client = new {{ class_name }}(broker, clientId);
+client.connect();
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Subscribe to topic
+client.subscribe{{ messagename }}((data, context) -> {
+    System.out.println("Topic: " + context.getTopic());
+    System.out.println("QoS: " + context.getQos());
+    System.out.println("Data: " + data);
+});
+
+// Publish message
+{{ message_body_type }} data = new {{ message_body_type }}();
+client.publish{{ messagename }}(data);
+{%- endif %}
+
+client.disconnect();
+```
+
+## Available Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### publish{{ messagename }}
+
+```java
+void publish{{ messagename }}({{ message_body_type }} data)
+void publish{{ messagename }}({{ message_body_type }} data, int qos)
+void publish{{ messagename }}({{ message_body_type }} data, PublishOptions options)
+```
+
+### subscribe{{ messagename }}
+
+```java
+void subscribe{{ messagename }}(MessageHandler<{{ message_body_type }}> handler)
+void subscribe{{ messagename }}(MessageHandler<{{ message_body_type }}> handler, int qos)
+```
+{% if message.description %}
+{{ message.description }}
+{% endif %}
+
+{% endfor %}
+
+## Quality of Service (QoS)
+
+MQTT supports three QoS levels:
+
+### QoS 0 - At Most Once (Fire and Forget)
+
+```java
+client.publishEventName(data, 0);  // No acknowledgment
+```
+
+### QoS 1 - At Least Once (Acknowledged)
+
+```java
+client.publishEventName(data, 1);  // Acknowledged, may duplicate
+```
+
+### QoS 2 - Exactly Once (Assured)
+
+```java
+client.publishEventName(data, 2);  // Exactly once delivery
+```
+
+## Topic Wildcards
+
+Subscribe to multiple topics using wildcards:
+
+```java
+// Single-level wildcard (+)
+client.subscribe("sensors/+/temperature", handler);  // Matches: sensors/room1/temperature
+
+// Multi-level wildcard (#)
+client.subscribe("sensors/#", handler);  // Matches: sensors/*, sensors/*/*, etc.
+```
+
+## Advanced Publishing
+
+```java
+PublishOptions options = new PublishOptions();
+options.setQos(1);
+options.setRetained(true);                          // Retain for new subscribers
+options.setMessageExpiryInterval(300);              // Expire after 5 minutes
+options.setUserProperty("priority", "high");        // MQTT 5.0 user properties
+
+client.publishEventName(data, options);
+```
+
+## Clean/Persistent Sessions
+
+### Clean Session (Default)
+
+```java
+// No session persistence - new session each connection
+{{ class_name }} client = new {{ class_name }}(broker, clientId, true);
+```
+
+### Persistent Session
+
+```java
+// Session persists across connections - receives offline messages
+{{ class_name }} client = new {{ class_name }}(broker, clientId, false);
+```
+
+## Last Will and Testament (LWT)
+
+Send message when client disconnects unexpectedly:
+
+```java
+{{ class_name }} client = {{ class_name }}.builder()
+    .broker(broker)
+    .clientId(clientId)
+    .lastWill()
+        .topic("status/" + clientId)
+        .payload("offline".getBytes())
+        .qos(1)
+        .retained(true)
+        .build()
+    .build();
+
+client.connect();
+```
+
+## Authentication
+
+### Username/Password
+
+```java
+{{ class_name }} client = {{ class_name }}.builder()
+    .broker("tcp://localhost:1883")
+    .clientId(clientId)
+    .username("user")
+    .password("pass".toCharArray())
+    .build();
+```
+
+### TLS/SSL
+
+```java
+{{ class_name }} client = {{ class_name }}.builder()
+    .broker("ssl://localhost:8883")
+    .clientId(clientId)
+    .sslProperties(sslProps)
+    .build();
+```
+
+## Connection Callbacks
+
+```java
+client.onConnect(() -> {
+    System.out.println("Connected to broker");
+});
+
+client.onDisconnect(() -> {
+    System.out.println("Disconnected from broker");
+});
+
+client.onConnectionLost((cause) -> {
+    System.err.println("Connection lost: " + cause.getMessage());
+    // Auto-reconnect enabled by default
+});
+```
+
+## Error Handling
+
+```java
+try {
+    client.publishEventName(data);
+} catch (MqttException e) {
+    System.err.println("Publish failed: " + e.getMessage());
+    System.err.println("Reason code: " + e.getReasonCode());
+}
+```
+
+## Configuration
+
+```java
+{{ class_name }} client = {{ class_name }}.builder()
+    .broker("tcp://localhost:1883")
+    .clientId(clientId)
+    .automaticReconnect(true)
+    .maxReconnectDelay(30000)           // Max 30s between retries
+    .keepAliveInterval(60)              // Ping every 60 seconds
+    .connectionTimeout(30)              // 30s connection timeout
+    .maxInflight(10)                    // Max 10 unacknowledged messages
+    .cleanSession(true)
+    .build();
+```
+
+## Testing
+
+```java
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class {{ class_name }}Test {
+    @Test
+    void testPublishSubscribe() throws Exception {
+        {{ class_name }} client = new {{ class_name }}("tcp://localhost:1883", "test-client");
+        client.connect();
+        
+{%- if first_message %}
+        CompletableFuture<EventData> received = new CompletableFuture<>();
+        
+        client.subscribeEventName((data, ctx) -> {
+            received.complete(data);
+        });
+        
+        EventData testData = new EventData();
+        client.publishEventName(testData);
+        
+        EventData result = received.get(5, TimeUnit.SECONDS);
+        assertNotNull(result);
+{%- endif %}
+        
+        client.disconnect();
+    }
+}
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Connection refused | Verify broker is running and broker URL is correct |
+| Authentication failed | Check username/password credentials |
+| Messages not received | Verify subscription topic matches publish topic |
+| Client disconnects | Check keep-alive interval and network stability |
+| Duplicate messages | Use QoS 2 or implement idempotency |
+
+## Dependencies
+
+- Eclipse Paho MQTT Client 5.3+
+- CloudEvents Java SDK 2.5+
+- SLF4J 1.7+
+
+## Learn More
+
+- [MQTT 5.0 Specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)
+- [Eclipse Paho Java](https://eclipse.dev/paho/index.php?page=clients/java/index.php)
+- [HiveMQ MQTT Essentials](https://www.hivemq.com/mqtt-essentials/)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+{% endfor %}

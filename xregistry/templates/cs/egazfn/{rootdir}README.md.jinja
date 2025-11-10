@@ -1,0 +1,405 @@
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (project_name | pascal | strip_namespace) + "Function" %}
+# {{ project_name | pascal }} - Azure Event Grid Function
+
+Auto-generated Azure Function that receives events from Azure Event Grid for the {{ groupname }} message group.
+
+## Overview
+
+This Azure Function automatically processes events from Azure Event Grid. It receives CloudEvents, deserializes them, and calls your custom handlers. All the complex plumbing is handled for you - just add your business logic!
+
+## What is an Azure Event Grid Function?
+
+Azure Functions is a serverless compute service that lets you run code without managing servers. When you connect an Azure Function to Event Grid, it automatically runs whenever an event is published to a subscribed Event Grid topic. This is perfect for event-driven architectures where you want to respond to events in real-time.
+
+## Quick Start
+
+### 1. Understanding the Generated Code
+
+The generated function includes:
+- **{{ class_name }}.cs**: The main Azure Function that receives Event Grid events
+- **Event handlers**: Pre-configured methods for each event type
+- **Startup.cs**: Dependency injection setup
+- **Tests**: Unit tests to verify your function works
+
+### 2. Adding Your Business Logic
+
+Open `{{ class_name }}.cs` and find your event handlers:
+
+```csharp
+{% for messageid, message in messagegroup.messages.items() | list | slice(0, 1) -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+// This method is called automatically when a {{ messagename }} event arrives
+protected async Task Handle{{ messagename }}Async(
+    CloudEvent cloudEvent,
+    {{ message_body_type }} data)
+{
+    _logger.LogInformation("Received {{ messagename }} event with ID: {EventId}", 
+        cloudEvent.Id);
+    
+    // TODO: Add your business logic here
+    // Example: Save to database, call another service, etc.
+}
+{% endfor %}
+```
+
+### 3. Running Locally
+
+```bash
+# Install Azure Functions Core Tools first (if you haven't)
+# https://learn.microsoft.com/azure/azure-functions/functions-run-local
+
+# Start the function locally
+cd {{ project_name }}
+func start
+
+# The function will listen on http://localhost:7071
+```
+
+### 4. Testing Locally
+
+Send a test event using curl or Postman:
+
+```bash
+curl -X POST http://localhost:7071/runtime/webhooks/eventgrid?functionName={{ class_name }} \
+  -H "Content-Type: application/json" \
+  -H "aeg-event-type: Notification" \
+  -d '[{
+    "id": "test-id",
+    "source": "/test/source",
+    "type": "{{ messagegroup.messages.keys() | first }}",
+    "data": {
+      // Your event data here
+    },
+    "specversion": "1.0"
+  }]'
+```
+
+### 5. Deploying to Azure
+
+```bash
+# Create a function app in Azure (one-time setup)
+az functionapp create \
+  --name your-function-app-name \
+  --resource-group your-resource-group \
+  --consumption-plan-location westus \
+  --runtime dotnet \
+  --functions-version 4
+
+# Publish your function
+func azure functionapp publish your-function-app-name
+```
+
+### 6. Connect to Event Grid
+
+After deployment, create an Event Grid subscription:
+
+```bash
+# Get your function's Event Grid endpoint
+FUNCTION_URL=$(az functionapp function show \
+  --name your-function-app-name \
+  --resource-group your-resource-group \
+  --function-name {{ class_name }} \
+  --query "invokeUrlTemplate" -o tsv)
+
+# Create Event Grid subscription
+az eventgrid event-subscription create \
+  --name my-function-subscription \
+  --source-resource-id /subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/YOUR_RG/providers/Microsoft.EventGrid/topics/YOUR_TOPIC \
+  --endpoint $FUNCTION_URL \
+  --endpoint-type azurefunction
+```
+
+Or use the Azure Portal:
+1. Go to your Event Grid topic
+2. Click "+ Event Subscription"
+3. Select "Azure Function" as endpoint type
+4. Choose your function app and function
+
+## Event Handlers
+
+The function can process these event types automatically:
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Event Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`  
+{% if message.description -%}**Description:** {{ message.description }}{%- endif %}
+
+**Handler Method:** `Handle{{ messagename }}Async`
+
+```csharp
+protected async Task Handle{{ messagename }}Async(
+    CloudEvent cloudEvent, 
+    {{ message_body_type }} data)
+{
+    // Your code here
+}
+```
+
+**Example Usage:**
+```csharp
+protected async Task Handle{{ messagename }}Async(
+    CloudEvent cloudEvent, 
+    {{ message_body_type }} data)
+{
+    _logger.LogInformation("Processing {{ messagename }}: {EventId}", cloudEvent.Id);
+    
+    // Validate the data
+    if (data == null)
+    {
+        _logger.LogWarning("Received null data for event {EventId}", cloudEvent.Id);
+        return;
+    }
+    
+    // Process the event
+    await _myService.ProcessAsync(data);
+    
+    _logger.LogInformation("Completed processing {{ messagename }}");
+}
+```
+
+{% endfor %}
+
+## Error Handling
+
+### Built-in Error Handling
+
+The function automatically handles:
+- Deserialization errors (logs warning and continues)
+- Missing event handlers (logs information about unhandled events)
+- Null data (passes null to your handler, check for it)
+
+### Adding Custom Error Handling
+
+```csharp
+protected async Task Handle{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(
+    CloudEvent cloudEvent, 
+    {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }} data)
+{
+    try
+    {
+        await ProcessEventAsync(data);
+    }
+    catch (ValidationException ex)
+    {
+        _logger.LogWarning(ex, "Validation failed for event {EventId}", cloudEvent.Id);
+        // Event Grid will retry if you throw
+        // Don't throw if you want to skip this event
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to process event {EventId}", cloudEvent.Id);
+        throw; // Re-throw to trigger Event Grid retry
+    }
+}
+```
+
+### Retry Policy
+
+Event Grid automatically retries failed events based on your subscription settings. By default:
+- **Max retries**: 30 attempts
+- **Event time-to-live**: 24 hours
+- **Retry schedule**: Exponential backoff
+
+Configure in your Event Grid subscription:
+```bash
+az eventgrid event-subscription create \
+  --name my-subscription \
+  --max-delivery-attempts 10 \
+  --event-ttl 1440 \
+  # ... other parameters
+```
+
+## Dependency Injection
+
+Add your services in `Startup.cs`:
+
+```csharp
+public override void Configure(IFunctionsHostBuilder builder)
+{
+    // Add your services
+    builder.Services.AddSingleton<IMyService, MyService>();
+    builder.Services.AddDbContext<MyDbContext>();
+    
+    // Add HTTP clients
+    builder.Services.AddHttpClient<IExternalApiClient, ExternalApiClient>();
+}
+```
+
+Then inject them into your function:
+
+```csharp
+private readonly IMyService _myService;
+
+public {{ class_name }}(ILoggerFactory loggerFactory, IMyService myService)
+    : base(loggerFactory)
+{
+    _myService = myService;
+}
+```
+
+## Configuration
+
+### Local Settings (local.settings.json)
+
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "MyConnectionString": "your-connection-string",
+    "MyApiKey": "your-api-key"
+  }
+}
+```
+
+**Important**: Don't commit `local.settings.json` to source control!
+
+### Azure Settings
+
+Set application settings in Azure:
+
+```bash
+az functionapp config appsettings set \
+  --name your-function-app-name \
+  --resource-group your-resource-group \
+  --settings "MyConnectionString=your-connection-string"
+```
+
+Or use Azure Key Vault references:
+```bash
+az functionapp config appsettings set \
+  --settings "MySecret=@Microsoft.KeyVault(SecretUri=https://myvault.vault.azure.net/secrets/mysecret/)"
+```
+
+### Accessing Configuration in Code
+
+```csharp
+// Add to your constructor
+private readonly string _connectionString;
+
+public {{ class_name }}(ILoggerFactory loggerFactory, IConfiguration configuration)
+    : base(loggerFactory)
+{
+    _connectionString = configuration["MyConnectionString"];
+}
+```
+
+## Monitoring
+
+### View Logs in Azure
+
+```bash
+# Stream logs from Azure
+func azure functionapp logstream your-function-app-name
+```
+
+### Application Insights
+
+The function automatically logs to Application Insights if configured:
+
+```bash
+# Enable Application Insights
+az monitor app-insights component create \
+  --app your-app-insights-name \
+  --location westus \
+  --resource-group your-resource-group
+
+# Link to function app
+az functionapp config appsettings set \
+  --name your-function-app-name \
+  --resource-group your-resource-group \
+  --settings "APPINSIGHTS_INSTRUMENTATIONKEY=your-instrumentation-key"
+```
+
+### View in Azure Portal
+
+1. Go to your Function App
+2. Click "Monitor" or "Application Insights"
+3. View traces, exceptions, and performance metrics
+
+## Testing
+
+### Running Unit Tests
+
+```bash
+dotnet test
+```
+
+### Test Structure
+
+The generated tests use:
+- **xUnit**: Test framework
+- **Moq**: Mocking dependencies
+- **FluentAssertions**: Readable assertions
+
+### Writing Your Own Tests
+
+```csharp
+[Fact]
+public async Task Handle{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}_ProcessesEventSuccessfully()
+{
+    // Arrange
+    var function = new {{ class_name }}(loggerFactory, mockService.Object);
+    var cloudEvent = new CloudEvent { /* ... */ };
+    var data = new {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }} { /* ... */ };
+    
+    // Act
+    await function.Handle{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(cloudEvent, data);
+    
+    // Assert
+    mockService.Verify(x => x.ProcessAsync(data), Times.Once);
+}
+```
+
+## Performance Tips
+
+1. **Use async/await**: All handlers are async - use async I/O operations
+2. **Batch operations**: If processing multiple items, batch database calls
+3. **Connection pooling**: Reuse HTTP clients and database connections
+4. **Timeout handling**: Add timeouts to external calls
+5. **Cold start optimization**: Keep functions warm in production
+
+## Troubleshooting
+
+**Function not receiving events**: Check Event Grid subscription is active and endpoint is correct
+
+**Deserialization errors**: Verify event data matches your schema
+
+**Timeouts**: Increase function timeout in `host.json` (default is 5 minutes for consumption plan)
+
+**Out of memory**: Consider using a Premium plan for memory-intensive operations
+
+## Learn More
+
+- [Azure Functions Documentation](https://learn.microsoft.com/azure/azure-functions/)
+- [Event Grid Trigger for Azure Functions](https://learn.microsoft.com/azure/azure-functions/functions-bindings-event-grid-trigger)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Dependencies
+
+- `Microsoft.Azure.Functions.Worker` - Azure Functions runtime
+- `Microsoft.Azure.Functions.Worker.Extensions.EventGrid` - Event Grid binding
+- `CloudNative.CloudEvents` - CloudEvents support
+- `Microsoft.Extensions.Logging` - Logging framework
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Trigger:** Azure Event Grid  
+**Runtime:** Azure Functions (Isolated Worker)  
+**Envelope:** CloudEvents 1.0
+{% endfor %}

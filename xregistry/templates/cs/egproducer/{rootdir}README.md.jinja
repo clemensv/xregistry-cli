@@ -1,0 +1,297 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "ProducerClient" %}
+# {{ project_name | pascal }} - Azure Event Grid Producer
+
+Auto-generated Azure Event Grid producer for {{ groupname }} message group.
+
+## Overview
+
+This producer provides an easy-to-use, strongly-typed client for publishing events to Azure Event Grid. It handles CloudEvents formatting, authentication, and error handling automatically, so you can focus on your application logic.
+
+## What is Azure Event Grid?
+
+Azure Event Grid is a highly scalable, serverless event broker that allows you to build event-driven applications. It supports CloudEvents format and can deliver events to multiple Azure services (Azure Functions, Logic Apps, Event Hubs) or custom webhooks.
+
+## Quick Start
+
+### Basic Usage (Simple Authentication)
+
+```csharp
+using {{ project_name | pascal }};
+using Azure;
+using Azure.Core;
+
+// Connect to Event Grid using an access key
+var credential = new AzureKeyCredential("your-access-key");
+var endpoint = new Uri("https://your-topic.westus-1.eventgrid.azure.net/api/events");
+
+// Create the producer (it handles CloudEvents for you)
+var producer = {{ class_name }}.CreateForYourEndpoint(credential, endpoint);
+
+// Send an event - that's it!
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+var eventData = new {{ message_body_type }}
+{
+    // Fill in your event properties
+};
+
+await producer.Send{{ messagename }}Async(eventData);
+{%- endif %}
+
+// Close when done
+producer.Dispose();
+```
+
+### Using Azure Identity (Recommended for Production)
+
+```csharp
+using Azure.Identity;
+
+// Uses your Azure credentials (managed identity, Visual Studio login, etc.)
+var credential = new DefaultAzureCredential();
+var producer = {{ class_name }}.CreateForYourEndpoint(credential);
+
+// Send your events
+await producer.Send{{ messagename }}Async(eventData);
+```
+
+### Manual Setup (If You Need More Control)
+
+```csharp
+using Azure.Messaging.EventGrid;
+
+// Create Event Grid client yourself
+var client = new EventGridPublisherClient(
+    new Uri("https://your-topic.westus-1.eventgrid.azure.net/api/events"),
+    new AzureKeyCredential("your-access-key"));
+
+// Pass it to the producer
+var producer = new {{ class_name }}(client);
+```
+
+## Available Events
+
+This producer can send the following event types:
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Event Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`  
+{% if message.description -%}**Description:** {{ message.description }}{%- endif %}
+
+```csharp
+var data = new {{ message_body_type }}
+{
+    // Set your event properties here
+};
+
+await producer.Send{{ messagename }}Async(data);
+```
+
+{% endfor %}
+
+## Authentication Options
+
+Azure Event Grid supports multiple authentication methods:
+
+### 1. Access Key (Simplest)
+
+```csharp
+var credential = new AzureKeyCredential("your-access-key");
+```
+
+Good for: Development, testing  
+**Security Note:** Don't commit access keys to source control!
+
+### 2. Azure AD (Default Credential - Recommended)
+
+```csharp
+var credential = new DefaultAzureCredential();
+```
+
+Good for: Production, Azure-hosted applications  
+**Benefits:** Automatic credential management, no secrets in code
+
+### 3. SAS Token
+
+```csharp
+var credential = new AzureSasCredential("your-sas-token");
+```
+
+Good for: Time-limited access, delegated access scenarios
+
+## What You Get
+
+### Automatic CloudEvents Formatting
+
+The producer automatically wraps your data in CloudEvents format:
+- Sets proper `type`, `source`, and `id` fields
+- Handles JSON serialization
+- Manages required CloudEvents headers
+
+### Error Handling
+
+```csharp
+try
+{
+    await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data);
+}
+catch (RequestFailedException ex) when (ex.Status == 401)
+{
+    // Authentication failed
+    Console.WriteLine("Check your credentials");
+}
+catch (RequestFailedException ex) when (ex.Status == 404)
+{
+    // Topic not found
+    Console.WriteLine("Check your endpoint URL");
+}
+catch (RequestFailedException ex)
+{
+    // Other Azure-specific errors
+    Console.WriteLine($"Event Grid error: {ex.Message}");
+}
+```
+
+### Batch Sending (Coming Soon)
+
+For high-throughput scenarios, you can send multiple events at once (when supported by your template version).
+
+## Configuration
+
+### Getting Your Event Grid Endpoint
+
+1. Go to Azure Portal
+2. Navigate to your Event Grid Topic
+3. Copy the "Topic Endpoint" URL
+4. Copy one of the access keys
+
+### Setting Up Credentials in Your App
+
+**For Development:**
+```json
+// appsettings.Development.json
+{
+  "EventGrid": {
+    "Endpoint": "https://your-topic.westus-1.eventgrid.azure.net/api/events",
+    "AccessKey": "your-key-here"
+  }
+}
+```
+
+**For Production (using Azure AD):**
+```json
+// appsettings.json
+{
+  "EventGrid": {
+    "Endpoint": "https://your-topic.westus-1.eventgrid.azure.net/api/events"
+  }
+}
+```
+
+Then grant your application the "Event Grid Data Sender" role on the Event Grid topic.
+
+## Dependency Injection Integration
+
+```csharp
+// In Program.cs or Startup.cs
+services.AddSingleton<{{ class_name }}>(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var endpoint = new Uri(config["EventGrid:Endpoint"]);
+    
+    var credential = new DefaultAzureCredential();
+    return {{ class_name }}.CreateForYourEndpoint(credential, endpoint);
+});
+
+// In your service or controller
+public class MyService
+{
+    private readonly {{ class_name }} _producer;
+    
+    public MyService({{ class_name }} producer)
+    {
+        _producer = producer;
+    }
+    
+    public async Task PublishEvent()
+    {
+        await _producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data);
+    }
+}
+```
+
+## Testing
+
+The generated project includes unit tests. To run them:
+
+```bash
+dotnet test
+```
+
+## Disposal
+
+Always dispose the producer to release resources:
+
+```csharp
+// Using statement (automatic disposal)
+using var producer = {{ class_name }}.CreateForYourEndpoint(credential);
+await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data);
+// Automatically disposed here
+
+// Or dispose manually
+var producer = {{ class_name }}.CreateForYourEndpoint(credential);
+try
+{
+    await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data);
+}
+finally
+{
+    producer.Dispose();
+}
+```
+
+## Dependencies
+
+This package uses the following NuGet packages (already included):
+
+- `Azure.Messaging.EventGrid` - Azure Event Grid client
+- `Azure.Identity` - Azure authentication
+- `CloudNative.CloudEvents` - CloudEvents support
+- `System.Text.Json` - JSON serialization
+
+## Troubleshooting
+
+**"Unable to authenticate"**: Check your credentials and ensure the Event Grid topic exists.
+
+**"404 Not Found"**: Verify your endpoint URL is correct.
+
+**"403 Forbidden"**: Ensure your credential has the "Event Grid Data Sender" role.
+
+**Events not received**: Check your Event Grid subscriptions are configured correctly.
+
+## Learn More
+
+- [Azure Event Grid Documentation](https://learn.microsoft.com/azure/event-grid/)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [Azure Identity Documentation](https://learn.microsoft.com/dotnet/api/overview/azure/identity-readme)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** Azure Event Grid  
+**Envelope:** CloudEvents 1.0
+{% endfor %}

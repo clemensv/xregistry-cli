@@ -1,0 +1,520 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "HttpProducer" %}
+# {{ project_name | pascal }} - HTTP Event Producer
+
+Auto-generated HTTP producer for sending CloudEvents via HTTP/HTTPS.
+
+## Overview
+
+This producer sends CloudEvents over HTTP using the [CloudEvents HTTP Protocol Binding](https://github.com/cloudevents/spec/blob/v1.0/http-protocol-binding.md). Perfect for webhooks, serverless functions, and HTTP-based event streaming!
+
+## What is HTTP Event Streaming?
+
+HTTP is a simple, universal protocol that works everywhere:
+- **Webhooks**: Send events to web endpoints
+- **Serverless**: Trigger Azure Functions, AWS Lambda, Google Cloud Functions
+- **REST APIs**: Send events to any HTTP endpoint
+- **Browser-compatible**: Can be used in web applications
+
+This library handles CloudEvents formatting, HTTP headers, retries, and error handling automatically.
+
+## Quick Start
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Send Events
+
+```typescript
+import { {{ class_name }} } from './src';
+
+// Create producer with target endpoint
+const producer = new {{ class_name }}('https://your-endpoint.com/events');
+
+// Send event
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+const data: {{ message_body_type }} = {
+  // Your event data
+};
+
+await producer.send{{ messagename }}(data);
+{%- endif %}
+
+// Close when done
+await producer.close();
+```
+
+### 3. With Authentication
+
+```typescript
+// Bearer token
+const producer = new {{ class_name }}(
+  'https://api.example.com/events',
+  {
+    headers: {
+      'Authorization': 'Bearer YOUR-TOKEN'
+    }
+  }
+);
+
+// API Key
+const producer = new {{ class_name }}(
+  'https://api.example.com/events',
+  {
+    headers: {
+      'X-API-Key': 'YOUR-API-KEY'
+    }
+  }
+);
+```
+
+## Available Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### send{{ messagename }}
+
+**Event Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`  
+{% if message.description -%}**Description:** {{ message.description }}{%- endif %}
+
+```typescript
+async send{{ messagename }}(
+  data: {{ message_body_type }},
+  options?: EventOptions
+): Promise<void>
+```
+
+**Example:**
+```typescript
+const data: {{ message_body_type }} = {
+  // Fill in your properties
+};
+
+await producer.send{{ messagename }}(data);
+```
+
+**With options:**
+```typescript
+await producer.send{{ messagename }}(data, {
+  id: 'custom-event-id',
+  source: '/custom/source',
+  time: new Date(),
+  headers: {
+    'X-Custom-Header': 'value'
+  }
+});
+```
+
+{% endfor %}
+
+## CloudEvents Format
+
+This producer sends events in CloudEvents format. You can choose between two content modes:
+
+### Structured Content Mode (Default)
+
+Event and data are both in the HTTP body as JSON:
+
+```http
+POST /events HTTP/1.1
+Content-Type: application/cloudevents+json
+
+{
+  "specversion": "1.0",
+  "type": "{{ messagegroup.messages.keys() | first }}",
+  "source": "/your/source",
+  "id": "A234-1234-1234",
+  "time": "2025-11-10T12:00:00Z",
+  "data": {
+    // Your event data
+  }
+}
+```
+
+### Binary Content Mode
+
+CloudEvents attributes in HTTP headers, data in body:
+
+```http
+POST /events HTTP/1.1
+Content-Type: application/json
+ce-specversion: 1.0
+ce-type: {{ messagegroup.messages.keys() | first }}
+ce-source: /your/source
+ce-id: A234-1234-1234
+ce-time: 2025-11-10T12:00:00Z
+
+{
+  // Your event data (just the data, no CloudEvents wrapper)
+}
+```
+
+**Configure content mode:**
+```typescript
+const producer = new {{ class_name }}(endpoint, {
+  contentMode: 'binary'  // or 'structured' (default)
+});
+```
+
+## Authentication
+
+### Bearer Token (OAuth 2.0, JWT)
+
+```typescript
+const producer = new {{ class_name }}(endpoint, {
+  headers: {
+    'Authorization': `Bearer ${accessToken}`
+  }
+});
+
+// Refresh token automatically
+producer.on('before-send', async (req) => {
+  const token = await getAccessToken();
+  req.headers['Authorization'] = `Bearer ${token}`;
+});
+```
+
+### API Key
+
+```typescript
+const producer = new {{ class_name }}(endpoint, {
+  headers: {
+    'X-API-Key': 'your-api-key',
+    // or
+    'Api-Key': 'your-api-key'
+  }
+});
+```
+
+### Basic Authentication
+
+```typescript
+const username = 'user';
+const password = 'pass';
+const auth = Buffer.from(`${username}:${password}`).toString('base64');
+
+const producer = new {{ class_name }}(endpoint, {
+  headers: {
+    'Authorization': `Basic ${auth}`
+  }
+});
+```
+
+### Custom Authentication
+
+```typescript
+producer.on('before-send', async (req) => {
+  // Add custom auth logic
+  const signature = await signRequest(req);
+  req.headers['X-Signature'] = signature;
+});
+```
+
+## Retry Logic
+
+Automatic retry for transient failures:
+
+```typescript
+const producer = new {{ class_name }}(endpoint, {
+  retry: {
+    attempts: 3,
+    delay: 1000,      // Initial delay (ms)
+    backoff: 2,       // Exponential backoff multiplier
+    maxDelay: 10000   // Max delay between retries
+  }
+});
+```
+
+**Retry behavior:**
+- 1st retry: After 1 second
+- 2nd retry: After 2 seconds (1s × 2)
+- 3rd retry: After 4 seconds (2s × 2)
+
+**Retries on:**
+- Network errors
+- HTTP 408 (Timeout)
+- HTTP 429 (Too Many Requests)
+- HTTP 5xx (Server Errors)
+
+**No retry on:**
+- HTTP 4xx (except 408, 429) - Client errors
+- HTTP 2xx - Success
+
+## Timeouts
+
+Configure request timeout:
+
+```typescript
+const producer = new {{ class_name }}(endpoint, {
+  timeout: 30000  // 30 seconds
+});
+```
+
+## Custom Headers
+
+Add custom HTTP headers:
+
+```typescript
+// Global headers (all requests)
+const producer = new {{ class_name }}(endpoint, {
+  headers: {
+    'X-Custom-Header': 'value',
+    'X-Client-Version': '1.0.0'
+  }
+});
+
+// Per-request headers
+await producer.send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}(data, {
+  headers: {
+    'X-Request-ID': 'unique-id',
+    'X-Priority': 'high'
+  }
+});
+```
+
+## Webhook Targets
+
+### Azure Functions
+
+```typescript
+const producer = new {{ class_name }}(
+  'https://your-function-app.azurewebsites.net/api/your-function',
+  {
+    headers: {
+      'x-functions-key': 'YOUR-FUNCTION-KEY'
+    }
+  }
+);
+```
+
+### AWS Lambda (Function URL)
+
+```typescript
+const producer = new {{ class_name }}(
+  'https://your-lambda-id.lambda-url.us-east-1.on.aws/',
+  {
+    headers: {
+      'Authorization': `Bearer ${awsToken}`
+    }
+  }
+);
+```
+
+### Google Cloud Functions
+
+```typescript
+const producer = new {{ class_name }}(
+  'https://REGION-PROJECT-ID.cloudfunctions.net/your-function',
+  {
+    headers: {
+      'Authorization': `Bearer ${gcpToken}`
+    }
+  }
+);
+```
+
+## Event Validation
+
+Validate events before sending:
+
+```typescript
+producer.on('before-send', async (req, cloudEvent) => {
+  // Validate required fields
+  if (!cloudEvent.data.someRequiredField) {
+    throw new Error('Missing required field');
+  }
+  
+  // Validate business rules
+  if (cloudEvent.data.amount < 0) {
+    throw new Error('Invalid amount');
+  }
+});
+```
+
+## Error Handling
+
+```typescript
+try {
+  await producer.send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}(data);
+} catch (error) {
+  if (error.response) {
+    // HTTP error response
+    console.error(`HTTP ${error.response.status}: ${error.response.statusText}`);
+    console.error('Response body:', error.response.data);
+  } else if (error.request) {
+    // Network error (no response)
+    console.error('Network error:', error.message);
+  } else {
+    // Other errors
+    console.error('Error:', error.message);
+  }
+}
+```
+
+## Events (Hooks)
+
+Listen to producer events:
+
+```typescript
+// Before sending
+producer.on('before-send', async (request, cloudEvent) => {
+  console.log('Sending event:', cloudEvent.type);
+});
+
+// After success
+producer.on('success', async (response, cloudEvent) => {
+  console.log('Event sent successfully:', response.status);
+});
+
+// After error
+producer.on('error', async (error, cloudEvent) => {
+  console.error('Failed to send event:', error);
+});
+
+// Retry attempt
+producer.on('retry', async (attempt, error) => {
+  console.log(`Retry attempt ${attempt}:`, error.message);
+});
+```
+
+## Batch Sending
+
+Send multiple events efficiently:
+
+```typescript
+const events = [data1, data2, data3];
+
+// Option 1: Sequential
+for (const data of events) {
+  await producer.send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}(data);
+}
+
+// Option 2: Parallel
+await Promise.all(
+  events.map(data => producer.send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}(data))
+);
+
+// Option 3: Controlled concurrency
+const concurrency = 5;
+for (let i = 0; i < events.length; i += concurrency) {
+  const batch = events.slice(i, i + concurrency);
+  await Promise.all(
+    batch.map(data => producer.send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}(data))
+  );
+}
+```
+
+## Testing
+
+Run tests:
+
+```bash
+npm test
+```
+
+Mock HTTP endpoints for testing:
+
+```typescript
+import nock from 'nock';
+
+describe('{{ class_name }}', () => {
+  it('sends events', async () => {
+    // Mock HTTP endpoint
+    nock('https://api.example.com')
+      .post('/events')
+      .reply(200, { success: true });
+    
+    const producer = new {{ class_name }}('https://api.example.com/events');
+    await producer.send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}(testData);
+    
+    // Assertions
+  });
+});
+```
+
+## Logging
+
+Enable debug logging:
+
+```typescript
+const producer = new {{ class_name }}(endpoint, {
+  logger: console,  // or your custom logger
+  logLevel: 'debug'
+});
+
+// Logs:
+// - Request details
+// - Response status
+// - Retry attempts
+// - Errors
+```
+
+## Browser Usage
+
+This producer can run in browsers (with webpack/vite/etc.):
+
+```typescript
+import { {{ class_name }} } from './src';
+
+// Works in browser!
+const producer = new {{ class_name }}('https://api.example.com/events');
+
+document.getElementById('send-btn').addEventListener('click', async () => {
+  await producer.send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}(data);
+});
+```
+
+**Note**: Be aware of CORS! The target endpoint must allow requests from your domain.
+
+## Configuration Reference
+
+```typescript
+interface ProducerOptions {
+  contentMode?: 'structured' | 'binary';
+  headers?: Record<string, string>;
+  timeout?: number;
+  retry?: {
+    attempts: number;
+    delay: number;
+    backoff: number;
+    maxDelay: number;
+  };
+  logger?: Logger;
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+}
+```
+
+## Dependencies
+
+- `axios` - HTTP client
+- `cloudevents` - CloudEvents SDK
+- `uuid` - Event ID generation
+
+## Learn More
+
+- [CloudEvents HTTP Protocol Binding](https://github.com/cloudevents/spec/blob/v1.0/http-protocol-binding.md)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [Axios Documentation](https://axios-http.com/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** HTTP/HTTPS  
+**Envelope:** CloudEvents 1.0  
+**Content Modes:** Structured, Binary
+{% endfor %}

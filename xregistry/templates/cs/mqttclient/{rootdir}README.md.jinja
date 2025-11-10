@@ -1,0 +1,410 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Client" %}
+# {{ project_name | pascal }} - MQTT 5.0 Client
+
+Auto-generated MQTT client for {{ groupname }} message group.
+
+## Overview
+
+This client library makes it easy to publish and subscribe to MQTT messages. MQTT is perfect for IoT devices, mobile apps, and any scenario requiring lightweight, reliable messaging.
+
+## What is MQTT?
+
+MQTT (Message Queuing Telemetry Transport) is a lightweight pub/sub messaging protocol designed for:
+- **IoT devices**: Sensors, smart home, industrial equipment
+- **Mobile apps**: Push notifications, chat applications
+- **Low bandwidth**: Optimized for unreliable networks
+- **Battery-powered devices**: Minimal overhead
+
+Version 5.0 adds enhanced features like message expiry, user properties, and better error reporting.
+
+## Quick Start
+
+### 1. Connect and Subscribe
+
+```csharp
+using {{ project_name | pascal }};
+using MQTTnet.Client;
+
+// Create client
+var client = new {{ class_name }}(
+    "mqtt://broker.example.com:1883",
+    "my-client-id",
+    loggerFactory);
+
+// Register message handlers
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+client.{{ messagename }}Async += async (topic, qos, data) =>
+{
+    Console.WriteLine($"Received {{ messagename }} from {topic}");
+    await ProcessAsync(data);
+};
+{%- endif %}
+
+// Connect to broker
+await client.ConnectAsync();
+
+// Client is now receiving messages!
+```
+
+### 2. Publish Messages
+
+```csharp
+{%- if first_message %}
+var data = new {{ message_body_type }}
+{
+    // Set your properties
+};
+
+await client.Publish{{ messagename }}Async(
+    data,
+    "devices/sensor-1/telemetry",  // Topic
+    MqttQualityOfServiceLevel.AtLeastOnce);
+{%- endif %}
+```
+
+## Message Handlers (Subscribe)
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Message Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`
+
+**Subscribe:**
+```csharp
+client.{{ messagename }}Async += async (topic, qos, data) =>
+{
+    _logger.LogInformation("Received from topic: {Topic}, QoS: {QoS}", topic, qos);
+    
+    if (data != null)
+    {
+        await ProcessDataAsync(data);
+    }
+};
+```
+
+**Publish:**
+```csharp
+var data = new {{ message_body_type }} { /* ... */ };
+
+await client.Publish{{ messagename }}Async(
+    data,
+    "your/topic/here",
+    MqttQualityOfServiceLevel.AtLeastOnce);
+```
+
+{% endfor %}
+
+## MQTT Topics
+
+Topics are hierarchical paths for routing messages.
+
+### Topic Patterns
+
+```
+devices/sensor-1/temperature    ← Specific device
+devices/+/temperature           ← All devices (+ = single-level wildcard)
+devices/#                       ← All device messages (# = multi-level wildcard)
+```
+
+### Subscribe to Topics
+
+```csharp
+// Subscribe to specific topic
+await client.SubscribeAsync("devices/sensor-1/data");
+
+// Subscribe with wildcard
+await client.SubscribeAsync("devices/+/temperature");
+
+// Subscribe to everything under a path
+await client.SubscribeAsync("devices/#");
+```
+
+### Publish to Topics
+
+```csharp
+await client.Publish{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async(
+    data,
+    "devices/sensor-1/telemetry",
+    MqttQualityOfServiceLevel.AtLeastOnce);
+```
+
+## Quality of Service (QoS)
+
+MQTT provides three QoS levels:
+
+### QoS 0: At Most Once (Fire and Forget)
+
+```csharp
+await client.PublishAsync(data, topic, MqttQualityOfServiceLevel.AtMostOnce);
+```
+
+- **Fastest**: No acknowledgment
+- **Use for**: Non-critical data, high-frequency updates
+- **Example**: Temperature readings every second
+
+### QoS 1: At Least Once (Acknowledged)
+
+```csharp
+await client.PublishAsync(data, topic, MqttQualityOfServiceLevel.AtLeastOnce);
+```
+
+- **Reliable**: Message delivered at least once
+- **May duplicate**: Receiver might get message multiple times
+- **Use for**: Important data that can handle duplicates
+- **Example**: Sensor alerts, status updates
+
+### QoS 2: Exactly Once (Guaranteed)
+
+```csharp
+await client.PublishAsync(data, topic, MqttQualityOfServiceLevel.ExactlyOnce);
+```
+
+- **Most reliable**: Exactly-once delivery guaranteed
+- **Slowest**: Four-way handshake
+- **Use for**: Critical data, financial transactions
+- **Example**: Payment confirmations, command execution
+
+## Authentication
+
+### Username/Password
+
+```csharp
+var options = new MqttClientOptionsBuilder()
+    .WithTcpServer("broker.example.com", 1883)
+    .WithCredentials("username", "password")
+    .Build();
+
+var client = new {{ class_name }}(options, loggerFactory);
+```
+
+### TLS/SSL
+
+```csharp
+var options = new MqttClientOptionsBuilder()
+    .WithTcpServer("broker.example.com", 8883)
+    .WithCredentials("username", "password")
+    .WithTls(new MqttClientOptionsBuilderTlsParameters
+    {
+        UseTls = true,
+        SslProtocol = System.Security.Authentication.SslProtocols.Tls12
+    })
+    .Build();
+```
+
+### Client Certificates
+
+```csharp
+var options = new MqttClientOptionsBuilder()
+    .WithTcpServer("broker.example.com", 8883)
+    .WithTls(new MqttClientOptionsBuilderTlsParameters
+    {
+        UseTls = true,
+        Certificates = new[] { 
+            new X509Certificate2("client-cert.pfx", "password") 
+        }
+    })
+    .Build();
+```
+
+## Connection Management
+
+### Clean Session vs Persistent Session
+
+```csharp
+// Clean session: Start fresh (default)
+.WithCleanSession(true)
+
+// Persistent session: Resume on reconnect
+.WithCleanSession(false)
+```
+
+With persistent session:
+- Broker remembers subscriptions
+- Queues messages while disconnected (QoS 1 & 2)
+- Client receives missed messages on reconnect
+
+### Automatic Reconnection
+
+```csharp
+var options = new MqttClientOptionsBuilder()
+    .WithAutomaticReconnect()
+    .WithAutomaticReconnectDelay(TimeSpan.FromSeconds(5))
+    .Build();
+```
+
+The client automatically reconnects if connection is lost.
+
+### Connection Status
+
+```csharp
+client.ConnectedAsync += async e =>
+{
+    _logger.LogInformation("Connected to MQTT broker");
+    // Re-subscribe if needed
+    await client.SubscribeAsync("my/topic");
+};
+
+client.DisconnectedAsync += async e =>
+{
+    _logger.LogWarning("Disconnected from MQTT broker: {Reason}", e.Reason);
+    // Will auto-reconnect if configured
+};
+```
+
+## Last Will and Testament (LWT)
+
+Configure a message to be sent if the client unexpectedly disconnects:
+
+```csharp
+var options = new MqttClientOptionsBuilder()
+    .WithTcpServer("broker.example.com")
+    .WithWillTopic("devices/sensor-1/status")
+    .WithWillPayload("offline")
+    .WithWillQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
+    .WithWillRetain(true)
+    .Build();
+```
+
+If the client crashes or loses connection, the broker automatically publishes this "offline" message.
+
+## Retained Messages
+
+Retained messages are stored by the broker and delivered immediately to new subscribers:
+
+```csharp
+await client.PublishAsync(
+    data,
+    topic,
+    qos,
+    retain: true);  // This message is retained
+
+// New subscribers immediately receive the last retained message
+```
+
+**Use cases:**
+- Device status (online/offline)
+- Configuration settings
+- Current sensor values
+
+## Message Properties (MQTT 5.0)
+
+MQTT 5.0 adds user properties for custom metadata:
+
+```csharp
+var properties = new Dictionary<string, string>
+{
+    ["sensor-type"] = "temperature",
+    ["unit"] = "celsius",
+    ["location"] = "warehouse-A"
+};
+
+await client.PublishAsync(data, topic, qos, properties);
+```
+
+Access in handler:
+```csharp
+client.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (topic, qos, data, properties) =>
+{
+    var sensorType = properties?["sensor-type"];
+    _logger.LogInformation("Sensor type: {Type}", sensorType);
+};
+```
+
+## Error Handling
+
+```csharp
+client.ErrorAsync += async (exception) =>
+{
+    _logger.LogError(exception, "MQTT client error");
+};
+
+client.DeserializationErrorAsync += async (topic, exception) =>
+{
+    _logger.LogWarning(exception, "Failed to deserialize message from {Topic}", topic);
+};
+```
+
+## Testing
+
+```bash
+dotnet test
+```
+
+Use a public test broker for development:
+- `test.mosquitto.org` (port 1883)
+- `broker.hivemq.com` (port 1883)
+
+```csharp
+var client = new {{ class_name }}(
+    "mqtt://test.mosquitto.org:1883",
+    "test-client",
+    loggerFactory);
+```
+
+## Performance Tips
+
+1. **Use QoS 0 for high-frequency data**: Fastest, no acknowledgment overhead
+2. **Batch messages**: Send multiple data points in one message
+3. **Use persistent sessions carefully**: Can accumulate many queued messages
+4. **Keep-alive interval**: Balance between responsiveness and network traffic
+5. **Message size**: Keep under 256MB (MQTT limit), ideally much smaller
+
+## Configuration Example
+
+```json
+{
+  "Mqtt": {
+    "BrokerUrl": "mqtt://broker.example.com:1883",
+    "ClientId": "my-app-instance-1",
+    "Username": "user",
+    "Password": "pass",
+    "CleanSession": false,
+    "KeepAlivePeriod": 60
+  }
+}
+```
+
+## Troubleshooting
+
+**Can't connect**: Check broker URL, port, and firewall rules
+
+**Not receiving messages**: Verify subscription topics and wildcards
+
+**Duplicate messages**: Expected with QoS 1; use QoS 2 or make handlers idempotent
+
+**Connection drops**: Check keep-alive settings and network stability
+
+**Retained messages piling up**: Clear with empty retained message: `Publish("", topic, retain: true)`
+
+## Learn More
+
+- [MQTT 5.0 Specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)
+- [MQTTnet Documentation](https://github.com/dotnet/MQTTnet)
+- [CloudEvents for MQTT](https://github.com/cloudevents/spec/blob/v1.0/mqtt-protocol-binding.md)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Dependencies
+
+- `MQTTnet` - MQTT client library
+- `CloudNative.CloudEvents` - CloudEvents support
+- `Microsoft.Extensions.Logging` - Logging
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** MQTT 5.0  
+**Envelope:** CloudEvents 1.0
+{% endfor %}

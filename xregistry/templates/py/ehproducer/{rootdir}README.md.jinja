@@ -1,85 +1,91 @@
+{%- import "util.include.jinja" as util -%}
 {%- set messagegroups = root.messagegroups %}
-{%- filter wordwrap(80) %}
-# {{ project_name | capitalize }} Azure Event Hubs Producer SDK for Python
+{%- filter wordwrap(120) %}
+# {{ project_name | capitalize }} Event Producer for Azure Event Hubs
 
-This is the {{ project_name | capitalize }} Azure Event Hubs Producer SDK for Python. It was generated from the xRegistry CLI tool
-based on message catalog messages for {% for messagegroupid, _ in messagegroups.items() %}"{{ messagegroupid }}"{%- if not loop.last %}, {% endif %}{%- endfor %}.
+This module provides an event producer for sending events to Azure Event Hubs. It supports both plain AMQP messages and CloudEvents.
 
-## Quick Install
+## Table of Contents
+1. [Overview](#overview)
+2. [Generated Event Producers](#generated-event-producers)
+    - {% for messagegroupid, messagegroup in messagegroups.items() %}{{ (messagegroupid | pascal | strip_dots ) + "EventProducer" }}{% if not loop.last %}, {% endif %}
+    {% endfor %}
 
-To get started quickly, the main package can be installed with the `install.sh`
-script (or `install.bat` on Windows) in the root of the repository.
+## Overview
 
-### Contents
+This module defines an event producing framework for Azure Event Hubs,
+providing the necessary classes and methods to send various types of events.
+It includes both plain AMQP messages and CloudEvents, offering a versatile
+solution for event-driven applications.
 
-The repository contains two projects.
-* The `{{project_name}}_eventhubs_producer` project is the main project that
-  contains the Event Hubs producer client code.
-* The `{{ data_project_name }}` project contains the data classes for the event
-  payload data.
+## Generated Event Producers
 
-The classes defined in `{{project_name}}_eventhubs_producer` are documented
-in the project [README](./{{project_name}}_eventhubs_producer/README.md).
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_amqp_message = (messagegroup | exists("protocol","AMQP/1.0")) %}
 
-The `{{project_name}}_eventhubs_producer` project depends on the
-`{{ data_project_name }}` project.
+### {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}
 
-If you want to install the producer project, you can run the following command:
+`{{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}` sends events for the {{ messagegroupid }} message group.
 
-```bash
-pip install ./{{project_name}}_eventhubs_producer
-```
+#### Methods:
 
-This will install both packages. If you only want to install the data project,
-you can run the following command:
-
-```bash
-pip install ./{{ data_project_name }}
-```
-
-## Build and Test
-
-The SDK comes with a full test suite for the data classes and the producers
-that uses the `pytest` framework and Docker containers to run the tests.
-
-If you have Docker installed and if you have `make`, you can run the tests with
-the following command:
-
-```bash
-make test
-```
-
-If you don't have `make` installed, you can run the following commands:
-
-```bash
-pip install ./{{main_project_name}}
-pytest ./{{main_project_name}}/tests ./{{data_project_name}}/tests
-```
-
-## Usage
-
-The sample code in [samples/sample.py](samples/sample.py) demonstrates how to
-use the Event Hubs producer client to send messages to an Event Hub.
-
-Event producers wrap the `EventHubProducerClient` and are responsible for
-constructing and sending messages to the Event Hub using that client. Multiple
-producers can be used concurrently with the same `EventHubProducerClient`.
-
-{%- set messagegroupid, messagegroup = messagegroups.items()|first %}
-{%- set message_id, message = messagegroup.messages.items()|first %}
-{%- set groupname = messagegroupid | pascal %}
-{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
-The required parameters for the generated `send` methods are:
-* `data`: The event data to be sent.
-* `content_type`: The content type that the event data shall be sent with.
-* additional parameters depend on the message catalog information.
-
-The example below shows how to create and send an event:
+##### `__init__`:
 
 ```python
-producer = EventHubProducerClient.from_connection_string("your-connection-string", eventhub_name="your-eventhub-name")
-event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
-data = {{ data_type | strip_namespace }}(...)  # Construct your event data here
-await event_producer.send_{{ messageid | dotunderscore | lower }}(data=data, content_type="application/json")
+__init__(self, producer: EventHubProducerClient, content_mode: Literal['structured', 'binary'] = 'structured') -> None
 ```
+
+Initializes the producer.
+
+Args:
+- `producer`: The EventHub producer client.
+- `content_mode`: The content mode to use for sending events.
+
+#### Event Sending Methods
+
+{% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0") )%}
+{%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+##### `send_{{ messageid | dotunderscore | snake }}`
+
+```python
+async def send_{{ messageid | dotunderscore | snake }}(self,
+    {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
+        _{{ attrname }}: str, 
+    {%- endfor %}
+    data: {{ data_type | strip_namespace }}, content_type: str = "application/json"
+    {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
+        , _{{ attrname }}: Optional[str] = None
+    {%- endfor -%} ) -> None:
+```
+
+Sends the `{{ messageid }}` event to the EventHub.
+
+Args:
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
+- `_{{ attrname }}(str)`: {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+{%- endfor %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+    {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+- `_{{ placeholder | snake }}(str)`:  Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+    {%- endfor %}
+{%- endfor %}
+- `data({{ data_type | strip_namespace }})`: The event data to be sent.
+- `content_type(str)`: The content type that the event data shall be sent with.
+{%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined %}
+- `_{{ attrname }}(Optional[str])`: {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+{%- endfor %}
+
+Example:
+
+```python
+async def send_event():
+    producer = EventHubProducerClient.from_connection_string("your-connection-string", eventhub_name="your-eventhub-name")
+    event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
+    data = {{ data_type | strip_namespace }}(...)  # Construct your event data here
+    await event_producer.send_{{ messageid | dotunderscore | lower }}(data=data, content_type="application/json")
+```
+
+{% endfor %}
+{% endfor %}
 {%- endfilter %}

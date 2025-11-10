@@ -1,0 +1,217 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventProducer" %}
+# {{ project_name | pascal }} - Azure Service Bus Producer
+
+Auto-generated Azure Service Bus producer for {{ groupname }} message group.
+
+## Overview
+
+This producer makes it simple to send strongly-typed messages to Azure Service Bus queues and topics. It handles CloudEvents formatting, serialization, and connection management automatically.
+
+## Quick Start
+
+### 1. Get Connection String
+
+From Azure Portal → Service Bus Namespace → Shared access policies → Copy connection string
+
+### 2. Send to Queue
+
+```csharp
+using {{ project_name | pascal }};
+using Microsoft.Extensions.Logging;
+
+// Create producer
+var producer = new {{ class_name }}(
+    "YOUR-CONNECTION-STRING",
+    "your-queue-name",
+    loggerFactory);
+
+// Send message
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+var data = new {{ message_body_type }}
+{
+    // Set properties
+};
+
+await producer.Send{{ messagename }}Async(data);
+{%- endif %}
+
+// Cleanup
+await producer.DisposeAsync();
+```
+
+### 3. Send to Topic
+
+```csharp
+var producer = new {{ class_name }}(
+    "YOUR-CONNECTION-STRING",
+    "your-topic-name",
+    loggerFactory);
+
+await producer.Send{{ messagename }}Async(data);
+```
+
+### 4. Azure AD Authentication
+
+```csharp
+using Azure.Identity;
+
+var credential = new DefaultAzureCredential();
+var producer = new {{ class_name }}(
+    "your-namespace.servicebus.windows.net",
+    "queue-or-topic-name",
+    credential,
+    loggerFactory);
+```
+
+## Available Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### Send{{ messagename }}Async
+
+**Message Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`
+
+```csharp
+await producer.Send{{ messagename }}Async(data);
+```
+
+**With message customization:**
+```csharp
+await producer.Send{{ messagename }}Async(
+    data,
+    messageId: "custom-id",
+    correlationId: "correlation-id",
+    sessionId: "session-123",  // For session-enabled queues
+    timeToLive: TimeSpan.FromMinutes(5),
+    scheduledEnqueueTime: DateTimeOffset.Now.AddMinutes(10));
+```
+
+{% endfor %}
+
+## Advanced Features
+
+### Message Properties
+
+Add custom properties:
+```csharp
+var properties = new Dictionary<string, object>
+{
+    ["priority"] = "high",
+    ["customer-id"] = "12345",
+    ["region"] = "us-west"
+};
+
+await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data, properties);
+```
+
+### Scheduled Messages
+
+Send messages for future delivery:
+```csharp
+// Deliver in 1 hour
+await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(
+    data,
+    scheduledEnqueueTime: DateTimeOffset.Now.AddHours(1));
+```
+
+### Sessions (Ordered Processing)
+
+For session-enabled queues, group related messages:
+```csharp
+await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(
+    data,
+    sessionId: "customer-12345");  // All messages with this session ID processed in order
+```
+
+### Time-To-Live
+
+Set message expiration:
+```csharp
+await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(
+    data,
+    timeToLive: TimeSpan.FromMinutes(5));  // Expires after 5 minutes
+```
+
+### Batch Sending
+
+Send multiple messages efficiently:
+```csharp
+var messages = new List<{{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }}>
+{
+    new {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }} { /* ... */ },
+    new {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }} { /* ... */ },
+    new {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }} { /* ... */ }
+};
+
+await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}BatchAsync(messages);
+```
+
+### Duplicate Detection
+
+Prevent duplicate messages:
+```csharp
+// Use same messageId for idempotent operations
+var messageId = $"order-{orderId}-payment";
+
+await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(
+    data,
+    messageId: messageId);
+
+// If you send again with same messageId within detection window, it's ignored
+```
+
+## Error Handling
+
+```csharp
+try
+{
+    await producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data);
+}
+catch (ServiceBusException ex) when (ex.Reason == ServiceBusFailureReason.MessagingEntityNotFound)
+{
+    _logger.LogError("Queue or topic does not exist");
+}
+catch (ServiceBusException ex) when (ex.Reason == ServiceBusFailureReason.Unauthorized)
+{
+    _logger.LogError("Authentication failed - check credentials");
+}
+catch (ServiceBusException ex) when (ex.IsTransient)
+{
+    _logger.LogWarning("Transient error - can retry: {Message}", ex.Message);
+    // Implement retry logic
+}
+catch (Exception ex)
+{
+    _logger.LogError(ex, "Failed to send message");
+}
+```
+
+## Testing
+
+```bash
+dotnet test
+```
+
+## Learn More
+
+- [Azure Service Bus Documentation](https://learn.microsoft.com/azure/service-bus-messaging/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** Azure Service Bus  
+**Envelope:** CloudEvents 1.0
+{% endfor %}

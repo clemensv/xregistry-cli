@@ -1,0 +1,452 @@
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventConsumer" %}
+# {{ project_name | pascal }} - Azure Service Bus Consumer
+
+Auto-generated Azure Service Bus consumer for {{ groupname }} message group.
+
+## Overview
+
+This library makes it simple to receive messages from Azure Service Bus queues and topics. Service Bus is an enterprise messaging service that provides reliable, ordered message delivery with advanced features like sessions, transactions, and dead-lettering.
+
+## What is Azure Service Bus?
+
+Azure Service Bus is a fully managed enterprise message broker with message queues and publish-subscribe topics. It's ideal for:
+- **Decoupling applications**: Reliable async communication between services
+- **Load leveling**: Smooth out traffic spikes with queues
+- **Enterprise messaging**: Transactions, sessions, duplicate detection
+- **Event-driven architectures**: Pub/sub with topics and subscriptions
+
+## Quick Start
+
+### 1. Get Your Connection String
+
+From Azure Portal:
+1. Go to your Service Bus Namespace
+2. Click "Shared access policies"
+3. Select a policy (or create one with Listen permission)
+4. Copy the "Primary Connection String"
+
+### 2. Basic Usage (Queue)
+
+```csharp
+using {{ project_name | pascal }};
+using Microsoft.Extensions.Logging;
+
+// Create consumer for a queue
+var consumer = new {{ class_name }}(
+    "YOUR-CONNECTION-STRING",
+    "your-queue-name",
+    loggerFactory);
+
+// Register message handlers
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+consumer.{{ messagename }}Async += async (serviceBusMessage, cloudEvent, data) =>
+{
+    Console.WriteLine($"Processing message: {cloudEvent.Id}");
+    await ProcessDataAsync(data);
+};
+{%- endif %}
+
+// Start consuming
+await consumer.StartAsync();
+
+// Keep running
+await Task.Delay(Timeout.Infinite, cancellationToken);
+
+// Cleanup
+await consumer.StopAsync();
+```
+
+### 3. Topic with Subscription
+
+```csharp
+// For topics, specify both topic and subscription
+var consumer = new {{ class_name }}(
+    "YOUR-CONNECTION-STRING",
+    "your-topic-name",
+    "your-subscription-name",
+    loggerFactory);
+```
+
+### 4. Using Azure Identity (Recommended)
+
+```csharp
+using Azure.Identity;
+
+var credential = new DefaultAzureCredential();
+
+var consumer = new {{ class_name }}(
+    "your-namespace.servicebus.windows.net",
+    "queue-name",
+    credential,
+    loggerFactory);
+```
+
+## Message Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Message Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`
+
+```csharp
+consumer.{{ messagename }}Async += async (serviceBusMessage, cloudEvent, data) =>
+{
+    // serviceBusMessage: Full Service Bus message with metadata
+    // cloudEvent: CloudEvents envelope
+    // data: Strongly-typed message data
+    
+    _logger.LogInformation("Message ID: {MessageId}, Enqueued: {EnqueuedTime}",
+        serviceBusMessage.MessageId,
+        serviceBusMessage.EnqueuedTime);
+    
+    if (data != null)
+    {
+        await ProcessDataAsync(data);
+    }
+};
+```
+
+**Common Patterns:**
+```csharp
+// Database persistence
+consumer.{{ messagename }}Async += async (msg, ce, data) =>
+{
+    await _repository.SaveAsync(data);
+};
+
+// API forwarding
+consumer.{{ messagename }}Async += async (msg, ce, data) =>
+{
+    await _httpClient.PostAsJsonAsync("https://api.example.com/process", data);
+};
+
+// Message routing
+consumer.{{ messagename }}Async += async (msg, ce, data) =>
+{
+    var targetQueue = DetermineTargetQueue(data);
+    await _sender.SendMessageAsync(new ServiceBusMessage(data));
+};
+```
+
+{% endfor %}
+
+## Message Completion
+
+Service Bus requires explicit message completion (acknowledgment).
+
+### Automatic Completion (Default)
+
+Messages are automatically completed after your handler succeeds:
+
+```csharp
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (msg, ce, data) =>
+{
+    await ProcessAsync(data);
+    // Message automatically completed here
+};
+```
+
+If an exception is thrown, the message is **not** completed and returns to the queue.
+
+### Manual Completion
+
+For more control:
+
+```csharp
+var consumer = new {{ class_name }}(
+    connectionString,
+    queueName,
+    new ServiceBusProcessorOptions
+    {
+        AutoCompleteMessages = false
+    },
+    loggerFactory);
+
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (msg, ce, data) =>
+{
+    try
+    {
+        await ProcessAsync(data);
+        await consumer.CompleteMessageAsync(msg);
+    }
+    catch (TransientException ex)
+    {
+        // Will be retried
+        await consumer.AbandonMessageAsync(msg);
+    }
+    catch (Exception ex)
+    {
+        // Move to dead-letter queue
+        await consumer.DeadLetterMessageAsync(msg, "Processing failed", ex.Message);
+    }
+};
+```
+
+## Dead-Letter Queue
+
+Messages that fail processing can be moved to a dead-letter queue for later inspection.
+
+### Automatic Dead-Lettering
+
+After max delivery attempts (default: 10), messages automatically go to dead-letter queue.
+
+### Manual Dead-Lettering
+
+```csharp
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (msg, ce, data) =>
+{
+    if (!IsValid(data))
+    {
+        await consumer.DeadLetterMessageAsync(
+            msg,
+            "Validation failed",
+            "Data does not meet requirements");
+        return;
+    }
+    
+    await ProcessAsync(data);
+};
+```
+
+### Process Dead-Letter Queue
+
+```csharp
+// Connect to dead-letter queue
+var dlqConsumer = new {{ class_name }}(
+    connectionString,
+    "your-queue-name/$DeadLetterQueue",  // Note: add /$DeadLetterQueue
+    loggerFactory);
+
+dlqConsumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (msg, ce, data) =>
+{
+    _logger.LogWarning("Dead-lettered message: {Reason}", msg.DeadLetterReason);
+    
+    // Inspect, fix, and re-submit if needed
+    await AnalyzeAndRetryAsync(msg, data);
+};
+```
+
+## Sessions
+
+Service Bus sessions guarantee **ordered processing** for related messages.
+
+### Enable Sessions
+
+```csharp
+var consumer = new {{ class_name }}(
+    connectionString,
+    queueName,
+    new ServiceBusProcessorOptions
+    {
+        MaxConcurrentSessions = 5,  // Process up to 5 sessions concurrently
+        SessionIdleTimeout = TimeSpan.FromMinutes(1)
+    },
+    loggerFactory);
+```
+
+### Session-Aware Handler
+
+```csharp
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (msg, ce, data) =>
+{
+    var sessionId = msg.SessionId;
+    _logger.LogInformation("Processing message from session: {SessionId}", sessionId);
+    
+    // All messages with same SessionId processed in order
+    await ProcessInOrderAsync(sessionId, data);
+};
+```
+
+**Use sessions for:**
+- Processing events for a specific customer in order
+- Maintaining state across related messages
+- Transaction-like processing
+
+## Prefetch and Performance
+
+### Prefetch Count
+
+Pre-fetch messages for better throughput:
+
+```csharp
+var options = new ServiceBusProcessorOptions
+{
+    PrefetchCount = 100  // Pre-fetch up to 100 messages
+};
+```
+
+### Max Concurrent Calls
+
+Process multiple messages in parallel:
+
+```csharp
+var options = new ServiceBusProcessorOptions
+{
+    MaxConcurrentCalls = 10  // Process 10 messages concurrently
+};
+```
+
+**Important**: Only use concurrent processing if message order doesn't matter!
+
+## Error Handling
+
+```csharp
+consumer.ProcessingErrorAsync += async (msg, ce, exception) =>
+{
+    _logger.LogError(exception, "Failed to process message {MessageId}", msg?.MessageId);
+    
+    // Optionally dead-letter
+    if (IsPermanentError(exception))
+    {
+        await consumer.DeadLetterMessageAsync(msg, "Permanent failure", exception.Message);
+    }
+};
+
+consumer.DeserializationErrorAsync += async (msg, ce, exception) =>
+{
+    _logger.LogWarning(exception, "Bad message format: {MessageId}", msg?.MessageId);
+    
+    // Dead-letter malformed messages
+    await consumer.DeadLetterMessageAsync(msg, "Deserialization failed", exception.Message);
+};
+```
+
+## Duplicate Detection
+
+Service Bus can automatically detect and discard duplicate messages.
+
+**Enable on queue/topic** (in Azure Portal or via ARM/Bicep):
+- Set "Duplicate detection history time window" (e.g., 10 minutes)
+
+**Set Message ID** when sending:
+```csharp
+var message = new ServiceBusMessage(data)
+{
+    MessageId = GenerateIdempotentId(data)  // Same data = same ID
+};
+```
+
+Duplicates within the time window are automatically dropped.
+
+## Message Deferral
+
+Defer message processing for later:
+
+```csharp
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (msg, ce, data) =>
+{
+    if (ShouldDeferProcessing(data))
+    {
+        await consumer.DeferMessageAsync(msg);
+        // Store sequence number to retrieve later
+        await _storage.SaveDeferredMessageAsync(msg.SequenceNumber);
+        return;
+    }
+    
+    await ProcessAsync(data);
+};
+
+// Later, retrieve deferred message
+var sequenceNumber = await _storage.GetDeferredMessageAsync();
+var deferredMessage = await consumer.ReceiveDeferredMessageAsync(sequenceNumber);
+```
+
+## Monitoring
+
+### Service Bus Metrics (Azure Portal)
+
+- **Active messages**: Messages waiting in queue
+- **Dead-lettered messages**: Failed messages
+- **Incoming/Outgoing messages**: Throughput
+- **Server errors**: Processing failures
+
+### Application Logging
+
+```csharp
+var loggerFactory = LoggerFactory.Create(builder =>
+{
+    builder
+        .AddConsole()
+        .AddApplicationInsights()
+        .SetMinimumLevel(LogLevel.Information);
+});
+```
+
+## Testing
+
+```bash
+dotnet test
+```
+
+Integration test example:
+```csharp
+[Fact]
+public async Task ProcessesServiceBusMessage()
+{
+    // Arrange: Send test message
+    var sender = new ServiceBusClient(connectionString).CreateSender(queueName);
+    await sender.SendMessageAsync(CreateTestMessage());
+    
+    var consumer = new {{ class_name }}(connectionString, queueName, loggerFactory);
+    var received = new TaskCompletionSource<bool>();
+    
+    consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (msg, ce, data) =>
+    {
+        received.SetResult(true);
+    };
+    
+    await consumer.StartAsync();
+    
+    // Assert
+    Assert.True(await received.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+    await consumer.StopAsync();
+}
+```
+
+## Configuration
+
+```json
+{
+  "ServiceBus": {
+    "ConnectionString": "Endpoint=sb://...",
+    "QueueName": "my-queue",
+    "MaxConcurrentCalls": 10,
+    "PrefetchCount": 100
+  }
+}
+```
+
+## Learn More
+
+- [Azure Service Bus Documentation](https://learn.microsoft.com/azure/service-bus-messaging/)
+- [Service Bus .NET SDK](https://learn.microsoft.com/dotnet/api/overview/azure/messaging.servicebus-readme)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Dependencies
+
+- `Azure.Messaging.ServiceBus` - Service Bus SDK
+- `Azure.Identity` - Azure AD authentication
+- `CloudNative.CloudEvents` - CloudEvents support
+- `Microsoft.Extensions.Logging` - Logging
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** Azure Service Bus (AMQP)  
+**Envelope:** CloudEvents 1.0
+{% endfor %}

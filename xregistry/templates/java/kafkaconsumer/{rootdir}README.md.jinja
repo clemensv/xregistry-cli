@@ -1,0 +1,281 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Consumer" %}
+# {{ project_name | pascal }} - Apache Kafka Consumer
+
+Auto-generated Java consumer for Apache Kafka with consumer group management.
+
+## Overview
+
+Type-safe Kafka consumer for {{ groupname }} message group using Apache Kafka Clients 3.x with CloudEvents support.
+
+## What is Apache Kafka?
+
+**Apache Kafka** is a distributed streaming platform that:
+- Handles **high-throughput** publish-subscribe messaging
+- Stores streams with **configurable retention**
+- Distributes data across **partitions** for parallelism
+- Provides **strong durability** with replication
+
+Used for: event streaming, log aggregation, real-time analytics, microservices communication.
+
+## Quick Start
+
+### 1. Add Dependency
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>{{ groupid }}</groupId>
+    <artifactId>{{ project_name | snake }}</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+**Gradle:**
+```gradle
+implementation '{{ groupid }}:{{ project_name | snake }}:1.0.0'
+```
+
+### 2. Consume Messages
+
+```java
+import {{ project_name | snake }}.{{ class_name }};
+
+Properties props = new Properties();
+props.put("bootstrap.servers", "localhost:9092");
+props.put("group.id", "my-consumer-group");
+
+{{ class_name }} consumer = new {{ class_name }}(props, "my-topic");
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Register message handler
+consumer.on{{ messagename }}((data, context) -> {
+    System.out.println("Partition: " + context.partition());
+    System.out.println("Offset: " + context.offset());
+    System.out.println("Data: " + data);
+    
+    // Offset committed automatically (default)
+});
+{%- endif %}
+
+// Start consuming
+consumer.start();
+
+// Later: stop gracefully
+consumer.stop();
+```
+
+## Available Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### on{{ messagename }}
+
+```java
+consumer.on{{ messagename }}(({{ message_body_type }} data, RecordContext context) -> {
+    // Access Kafka metadata
+    String topic = context.topic();
+    int partition = context.partition();
+    long offset = context.offset();
+    long timestamp = context.timestamp();
+    
+    // Process message
+    
+    // Manual commit (if enabled)
+    context.commit();
+});
+```
+{% if message.description %}
+{{ message.description }}
+{% endif %}
+
+{% endfor %}
+
+## Consumer Groups
+
+Multiple consumers can share workload using consumer groups:
+
+```java
+// All consumers with same group.id share partitions
+Properties props = new Properties();
+props.put("bootstrap.servers", "localhost:9092");
+props.put("group.id", "my-consumer-group");  // Same group shares load
+
+{{ class_name }} consumer = new {{ class_name }}(props, "my-topic");
+```
+
+## Offset Management
+
+### Auto Commit (Default)
+
+```java
+Properties props = new Properties();
+props.put("enable.auto.commit", "true");
+props.put("auto.commit.interval.ms", "5000");  // Commit every 5 seconds
+
+{{ class_name }} consumer = new {{ class_name }}(props, "my-topic");
+```
+
+### Manual Commit
+
+```java
+Properties props = new Properties();
+props.put("enable.auto.commit", "false");
+
+{{ class_name }} consumer = new {{ class_name }}(props, "my-topic");
+
+consumer.onEventName((data, context) -> {
+    // Process message
+    
+    // Explicitly commit after successful processing
+    context.commit();
+});
+```
+
+## Authentication
+
+### SASL/PLAIN
+
+```java
+Properties props = new Properties();
+props.put("bootstrap.servers", "kafka:9093");
+props.put("security.protocol", "SASL_SSL");
+props.put("sasl.mechanism", "PLAIN");
+props.put("sasl.jaas.config", 
+    "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+    "username=\"user\" password=\"pass\";");
+
+{{ class_name }} consumer = new {{ class_name }}(props, "my-topic");
+```
+
+### SASL/SCRAM
+
+```java
+props.put("sasl.mechanism", "SCRAM-SHA-256");
+props.put("sasl.jaas.config",
+    "org.apache.kafka.common.security.scram.ScramLoginModule required " +
+    "username=\"user\" password=\"pass\";");
+```
+
+### SSL Client Authentication
+
+```java
+props.put("security.protocol", "SSL");
+props.put("ssl.truststore.location", "/path/to/truststore.jks");
+props.put("ssl.truststore.password", "password");
+props.put("ssl.keystore.location", "/path/to/keystore.jks");
+props.put("ssl.keystore.password", "password");
+props.put("ssl.key.password", "password");
+```
+
+## Error Handling
+
+```java
+consumer.onError((exception, context) -> {
+    System.err.println("Error processing record: " + exception.getMessage());
+    
+    if (context != null) {
+        System.err.println("Topic: " + context.topic());
+        System.err.println("Partition: " + context.partition());
+        System.err.println("Offset: " + context.offset());
+    }
+    
+    // Don't commit on error - will reprocess
+});
+```
+
+## Configuration
+
+```java
+Properties props = new Properties();
+props.put("bootstrap.servers", "localhost:9092");
+props.put("group.id", "my-group");
+props.put("auto.offset.reset", "earliest");        // Start from beginning
+props.put("max.poll.records", "500");              // Records per poll
+props.put("session.timeout.ms", "30000");          // Consumer heartbeat
+props.put("enable.auto.commit", "true");
+props.put("auto.commit.interval.ms", "5000");
+
+{{ class_name }} consumer = new {{ class_name }}(props, "my-topic");
+```
+
+## Seeking to Specific Offset
+
+```java
+consumer.seekToBeginning();  // Reprocess all messages
+consumer.seekToEnd();        // Skip to latest
+consumer.seekToOffset(partition, offset);  // Specific offset
+```
+
+## Testing
+
+```java
+import org.junit.jupiter.api.Test;
+import org.testcontainers.kafka.KafkaContainer;
+
+class {{ class_name }}Test {
+    @Test
+    void testConsumeMessage() {
+        // Use Testcontainers for integration testing
+        try (KafkaContainer kafka = new KafkaContainer()) {
+            kafka.start();
+            
+            Properties props = new Properties();
+            props.put("bootstrap.servers", kafka.getBootstrapServers());
+            props.put("group.id", "test-group");
+            
+            {{ class_name }} consumer = new {{ class_name }}(props, "test-topic");
+            
+{%- if first_message %}
+            AtomicInteger count = new AtomicInteger(0);
+            consumer.on{{ messagename }}((data, ctx) -> {
+                count.incrementAndGet();
+            });
+            
+            consumer.start();
+            
+            // Produce test messages...
+            
+            assertTrue(count.get() > 0);
+{%- endif %}
+        }
+    }
+}
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Consumer not in group | Check `group.id` configuration |
+| Offset reset errors | Set `auto.offset.reset` to `earliest` or `latest` |
+| Rebalancing issues | Tune `session.timeout.ms` and `heartbeat.interval.ms` |
+| Duplicate messages | Use manual commit and commit after successful processing |
+| Performance issues | Increase `max.poll.records` and `fetch.min.bytes` |
+
+## Dependencies
+
+- Apache Kafka Clients 3.6+
+- CloudEvents Kafka SDK 2.5+
+- SLF4J 1.7+
+
+## Learn More
+
+- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
+- [Kafka Clients Java](https://kafka.apache.org/36/javadoc/index.html)
+- [CloudEvents Kafka Protocol Binding](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/bindings/kafka-protocol-binding.md)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+{% endfor %}

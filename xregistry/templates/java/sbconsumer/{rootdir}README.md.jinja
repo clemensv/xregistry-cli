@@ -1,0 +1,283 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Consumer" %}
+# {{ project_name | pascal }} - Azure Service Bus Consumer
+
+Auto-generated Java consumer for Azure Service Bus with advanced enterprise messaging features.
+
+## Overview
+
+Type-safe consumer for {{ groupname }} message group using Azure Service Bus Java SDK 7.x with dead-letter queue support.
+
+## What is Azure Service Bus?
+
+**Azure Service Bus** is a fully managed enterprise message broker that provides:
+- **Reliable message delivery** with sessions and duplicate detection
+- **Dead-letter queues** for failed messages
+- **Scheduled messages** for delayed delivery
+- **Transactions** across multiple entities
+
+Perfect for: decoupling applications, reliable async communication, enterprise integration.
+
+## Quick Start
+
+### 1. Add Dependency
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>{{ groupid }}</groupId>
+    <artifactId>{{ project_name | snake }}</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+**Gradle:**
+```gradle
+implementation '{{ groupid }}:{{ project_name | snake }}:1.0.0'
+```
+
+### 2. Receive Messages
+
+```java
+import {{ project_name | snake }}.{{ class_name }};
+
+String connectionString = "Endpoint=sb://namespace.servicebus.windows.net/;...";
+String queueName = "my-queue";
+
+{{ class_name }} consumer = new {{ class_name }}(connectionString, queueName);
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Register message handler
+consumer.on{{ messagename }}((data, context) -> {
+    System.out.println("Message ID: " + context.getMessageId());
+    System.out.println("Data: " + data);
+    
+    // Complete message (removes from queue)
+    context.complete();
+});
+{%- endif %}
+
+// Start processing
+consumer.start();
+
+// Later: stop gracefully
+consumer.stop();
+```
+
+## Available Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### on{{ messagename }}
+
+```java
+consumer.on{{ messagename }}(({{ message_body_type }} data, MessageContext context) -> {
+    // Access message metadata
+    String messageId = context.getMessageId();
+    String correlationId = context.getCorrelationId();
+    Map<String, Object> properties = context.getApplicationProperties();
+    
+    // Process message
+    
+    // Complete (success)
+    context.complete();
+    
+    // Or abandon (retry)
+    // context.abandon();
+    
+    // Or dead-letter (permanent failure)
+    // context.deadLetter("Processing failed", "Invalid data format");
+});
+```
+{% if message.description %}
+{{ message.description }}
+{% endif %}
+
+{% endfor %}
+
+## Message Settlement
+
+Azure Service Bus requires explicit message settlement:
+
+### Complete (Success)
+
+```java
+context.complete();  // Message processed successfully, remove from queue
+```
+
+### Abandon (Retry)
+
+```java
+context.abandon();  // Release message for redelivery
+```
+
+### Dead-Letter (Permanent Failure)
+
+```java
+context.deadLetter("Validation failed", "Missing required field");
+```
+
+### Defer (Process Later)
+
+```java
+long sequenceNumber = context.defer();
+// Later: retrieve using sequenceNumber
+```
+
+## Sessions (Ordered Processing)
+
+For FIFO message processing within a session:
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .connectionString(connectionString)
+    .queueName(queueName)
+    .sessionEnabled(true)
+    .build();
+
+consumer.onEventName((data, context) -> {
+    String sessionId = context.getSessionId();
+    // All messages with same sessionId processed in order
+    context.complete();
+});
+```
+
+## Dead-Letter Queue Processing
+
+Process messages that failed:
+
+```java
+{{ class_name }} dlqConsumer = {{ class_name }}.builder()
+    .connectionString(connectionString)
+    .queueName(queueName + "/$deadletterqueue")
+    .build();
+
+dlqConsumer.onEventName((data, context) -> {
+    System.out.println("Dead-letter reason: " + context.getDeadLetterReason());
+    System.out.println("Error description: " + context.getDeadLetterErrorDescription());
+    
+    // Analyze and potentially resubmit
+    context.complete();
+});
+```
+
+## Authentication
+
+### Connection String (Shared Access Key)
+
+```java
+String connectionString = "Endpoint=sb://mybus.servicebus.windows.net/;" +
+    "SharedAccessKeyName=RootManageSharedAccessKey;" +
+    "SharedAccessKey=...";
+
+{{ class_name }} consumer = new {{ class_name }}(connectionString, queueName);
+```
+
+### Azure AD / Managed Identity (Recommended)
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .fullyQualifiedNamespace("mybus.servicebus.windows.net")
+    .queueName(queueName)
+    .credential(new DefaultAzureCredentialBuilder().build())
+    .build();
+```
+
+## Error Handling
+
+```java
+consumer.onError((context, throwable) -> {
+    System.err.println("Error: " + throwable.getMessage());
+    
+    if (context != null) {
+        // Abandon message on error for retry
+        context.abandon();
+    }
+});
+```
+
+## Configuration
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .connectionString(connectionString)
+    .queueName(queueName)
+    .maxConcurrentCalls(10)                     // Process up to 10 messages concurrently
+    .prefetchCount(20)                          // Prefetch 20 messages
+    .maxAutoLockRenewDuration(Duration.ofMinutes(5))  // Auto-renew lock for 5 minutes
+    .sessionEnabled(false)
+    .build();
+```
+
+## Duplicate Detection
+
+Service Bus automatically detects duplicates:
+
+```java
+// Messages with same MessageId within detection window are discarded
+context.setMessageId("unique-id-12345");
+```
+
+## Testing
+
+```java
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class {{ class_name }}Test {
+    @Test
+    void testReceiveMessage() throws Exception {
+        {{ class_name }} consumer = new {{ class_name }}(connectionString, "test-queue");
+        
+{%- if first_message %}
+        AtomicBoolean received = new AtomicBoolean(false);
+        consumer.on{{ messagename }}((data, ctx) -> {
+            received.set(true);
+            ctx.complete();
+        });
+        
+        consumer.start();
+        
+        // Send test message...
+        
+        assertTrue(received.get(), "Should receive message");
+{%- endif %}
+    }
+}
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| MessageLockLostException | Increase `maxAutoLockRenewDuration` or process faster |
+| Messages in dead-letter | Check processing logic and error messages |
+| Duplicate messages | Verify `MessageId` is set correctly |
+| Session errors | Ensure queue/topic has sessions enabled |
+
+## Dependencies
+
+- Azure Service Bus SDK 7.17+
+- Azure Identity 1.11+ (for Azure AD authentication)
+- CloudEvents Java SDK 2.5+
+
+## Learn More
+
+- [Azure Service Bus Documentation](https://learn.microsoft.com/azure/service-bus-messaging/)
+- [Service Bus Java SDK](https://github.com/Azure/azure-sdk-for-java/tree/main/sdk/servicebus)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+{% endfor %}
