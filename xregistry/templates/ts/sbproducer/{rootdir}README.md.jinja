@@ -1,0 +1,189 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Producer" %}
+# {{ project_name }} - Azure Service Bus Producer
+
+Auto-generated TypeScript producer for sending CloudEvents to Azure Service Bus.
+
+## Overview
+
+This library provides a type-safe Service Bus producer client for {{ groupname }} message group. Built on `@azure/service-bus` SDK.
+
+## What is Azure Service Bus?
+
+**Azure Service Bus** is a fully managed enterprise message broker that:
+- **Provides reliable messaging** with queues and publish/subscribe topics
+- **Supports advanced features** like sessions, dead-lettering, and scheduled delivery
+- **Ensures at-least-once delivery** with automatic retries
+- **Integrates with Azure** services for hybrid and cloud architectures
+
+Use cases: Decoupling applications, load leveling, transaction processing, workflow orchestration.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+## Quick Start
+
+### 1. Using Connection String (Queue)
+
+```typescript
+import { ServiceBusClient } from '@azure/service-bus';
+import { {{ class_name }} } from './src';
+
+const client = new ServiceBusClient('Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=...');
+
+// For queue
+const producer = new {{ class_name }}(client, 'queue-name');
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Send single message
+await producer.send{{ messagename }}({
+    // Your {{ message_body_type | strip_namespace }} data here
+});
+{%- endif %}
+
+await producer.close();
+```
+
+### 2. Using Topic
+
+```typescript
+// For topic (isQueue = false)
+const producer = new {{ class_name }}(client, 'topic-name', false);
+```
+
+### 3. Using Azure Identity (Recommended for Production)
+
+```typescript
+import { DefaultAzureCredential } from '@azure/identity';
+import { ServiceBusClient } from '@azure/service-bus';
+
+const credential = new DefaultAzureCredential();
+const client = new ServiceBusClient(
+    'fully-qualified-namespace.servicebus.windows.net',
+    credential
+);
+```
+
+### 4. Send Batch of Messages
+
+```typescript
+{%- if first_message %}
+await producer.send{{ messagename }}Batch([
+    { /* data 1 */ },
+    { /* data 2 */ },
+    { /* data 3 */ }
+]);
+{%- endif %}
+```
+
+## Available Event Sending Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### send{{ messagename }}
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+await producer.send{{ messagename }}(data: {{ message_body_type | strip_namespace }}): Promise<void>
+```
+
+Send a single {{ messagename }} message.
+
+### send{{ messagename }}Batch
+
+```typescript
+await producer.send{{ messagename }}Batch(dataArray: {{ message_body_type | strip_namespace }}[]): Promise<void>
+```
+
+Send multiple {{ messagename }} messages in a single batch for better throughput.
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Configuration Options
+
+### Session IDs
+
+Enable message sessions for ordered processing:
+
+```typescript
+await producer.send{{ messagename }}(data, {
+    sessionId: 'session-123'  // Messages with same session processed in order
+});
+```
+
+### Scheduled Delivery
+
+Schedule messages for future delivery:
+
+```typescript
+const scheduleTime = new Date(Date.now() + 3600000); // 1 hour from now
+await producer.send{{ messagename }}(data, {
+    scheduledEnqueueTimeUtc: scheduleTime
+});
+```
+
+### Message Properties
+
+Add application-specific metadata:
+
+```typescript
+await producer.send{{ messagename }}(data, {
+    applicationProperties: {
+        priority: 'high',
+        source: 'device-gateway'
+    },
+    messageId: 'unique-message-id',
+    correlationId: 'correlation-id',
+    contentType: 'application/json'
+});
+```
+
+## Error Handling
+
+```typescript
+try {
+    await producer.send{{ messagename }}(eventData);
+} catch (error) {
+    console.error('Failed to send {{ messagename }}:', error);
+    // Handle send failure (retry, log, alert, etc.)
+}
+```
+
+## Best Practices
+
+1. **Reuse client instances** - create once, use multiple times
+2. **Use batch sending** for high-throughput scenarios
+3. **Implement retry logic** with exponential backoff
+4. **Use sessions** when message ordering is required
+5. **Monitor throttling** and adjust send rate accordingly
+6. **Use Azure Identity** instead of connection strings for production
+{% endfor %}

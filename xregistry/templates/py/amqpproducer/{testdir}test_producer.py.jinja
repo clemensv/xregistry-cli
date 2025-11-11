@@ -1,0 +1,255 @@
+{%- import "util.include.jinja" as util -%}
+{%- set messagegroups = root.messagegroups %}
+# pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, missing-class-docstring
+
+"""
+Tests for {{ main_project_name }}
+"""
+import base64
+import json
+import os
+import sys
+import tempfile
+from typing import Optional
+from urllib.parse import quote_plus
+
+import pytest
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
+from proton.utils import BlockingConnection
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}/src')))
+
+from {{ main_project_name|dotunderscore|lower }} import *
+
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + (type_name | pascal | strip_namespace) %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+ARTEMIS_BROKER_XML = """<?xml version='1.0'?>
+<configuration xmlns="urn:activemq"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="urn:activemq /schema/artemis-configuration.xsd">
+    <core xmlns="urn:activemq:core">
+        <name>0.0.0.0</name>
+        <persistence-enabled>false</persistence-enabled>
+        <acceptors>
+            <acceptor name="amqp">tcp://0.0.0.0:5672?protocols=AMQP;saslMechanisms=PLAIN,ANONYMOUS</acceptor>
+        </acceptors>
+        <security-settings>
+            <security-setting match="#">
+                <permission type="createNonDurableQueue" roles="amq"/>
+                <permission type="deleteNonDurableQueue" roles="amq"/>
+                <permission type="createDurableQueue" roles="amq"/>
+                <permission type="deleteDurableQueue" roles="amq"/>
+                <permission type="createAddress" roles="amq"/>
+                <permission type="deleteAddress" roles="amq"/>
+                <permission type="consume" roles="amq"/>
+                <permission type="browse" roles="amq"/>
+                <permission type="send" roles="amq"/>
+                <permission type="manage" roles="amq"/>
+            </security-setting>
+        </security-settings>
+        <address-settings>
+            <address-setting match="#">
+                <dead-letter-address>DLQ</dead-letter-address>
+                <expiry-address>ExpiryQueue</expiry-address>
+                <auto-create-queues>true</auto-create-queues>
+                <auto-create-addresses>true</auto-create-addresses>
+            </address-setting>
+        </address-settings>
+        <addresses>
+            <address name="test-queue">
+                <anycast>
+                    <queue name="test-queue" />
+                </anycast>
+            </address>
+        </addresses>
+    </core>
+</configuration>
+"""
+
+@pytest.fixture(scope="module")
+def artemis_container():
+    """Create and start an ActiveMQ Artemis container for testing"""
+    # Create temp file for broker configuration
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
+        f.write(ARTEMIS_BROKER_XML)
+        config_file = f.name
+    
+    try:
+        container = DockerContainer("apache/activemq-artemis:latest")
+        container.with_bind_ports(5672, 5672)
+        container.with_env("ARTEMIS_USER", "guest")
+        container.with_env("ARTEMIS_PASSWORD", "guest")
+        container.with_volume_mapping(config_file, "/var/lib/artemis-instance/etc-override/broker.xml")
+        container.with_exposed_ports(5672)
+        
+        # Wait for Artemis to be ready
+        container.start()
+        # Wait for broker to log that it's ready (AMQ241004 = "Artemis Server is now live")
+        wait_for_logs(container, "AMQ241004", timeout=60)
+        
+        yield {
+            "host": container.get_container_host_ip(),
+            "port": int(container.get_exposed_port(5672)),
+            "username": "guest",
+            "password": "guest",
+            "address": "test-queue"
+        }
+        
+        container.stop()
+    finally:
+        if os.path.exists(config_file):
+            os.unlink(config_file)
+
+def _connection_url(host: str, port: int, username: Optional[str] = None, password: Optional[str] = None) -> str:
+    if username and password:
+        return f"amqp://{quote_plus(username)}:{quote_plus(password)}@{host}:{port}"
+    return f"amqp://{host}:{port}"
+
+
+def _receive_single_message(config: dict, timeout: int = 30):
+    connection = BlockingConnection(
+        _connection_url(
+            config["host"],
+            config["port"],
+            config.get("username"),
+            config.get("password"),
+        ),
+        timeout=timeout,
+    )
+    receiver = connection.create_receiver(config["address"], credit=1)
+    try:
+        message = receiver.receive(timeout=timeout)
+        receiver.accept()  # Explicitly accept/settle the message to remove it from the queue
+        return message
+    finally:
+        receiver.close()
+        connection.close()
+
+
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set class_name = (messagegroupid | pascal | strip_dots) + "Producer" %}
+
+class Test{{ class_name }}:
+    """Test cases for {{ class_name }}"""
+    
+    def test_producer_initialization(self, artemis_container):
+        """Test that producer initializes correctly"""
+        producer = {{ class_name }}(
+            host=artemis_container["host"],
+            address=artemis_container["address"],
+            port=artemis_container["port"],
+            username=artemis_container["username"],
+            password=artemis_container["password"]
+        )
+        assert producer is not None
+        assert producer.host == artemis_container["host"]
+        assert producer.address == artemis_container["address"]
+        assert producer.port == artemis_container["port"]
+        assert producer.username == artemis_container["username"]
+        producer.close()
+    
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+    
+    def test_send_{{ messagename | snake }}(self, artemis_container):
+        """Send and receive a {{ messagename }} message via ActiveMQ Artemis."""
+        payload = {"message": "{{ messageid }}-payload"}
+        payload_json = json.dumps(payload)
+
+        producer = {{ class_name }}(
+            host=artemis_container["host"],
+            address=artemis_container["address"],
+            port=artemis_container["port"],
+            username=artemis_container["username"],
+            password=artemis_container["password"],
+            content_mode='structured'
+        )
+        
+        try:
+            assert producer.host == artemis_container["host"]
+            assert producer.address == artemis_container["address"]
+            assert producer.port == artemis_container["port"]
+            assert producer.username == artemis_container["username"]
+            assert producer.content_mode == 'structured'
+            {%- set extra_args = namespace(items=[]) %}
+            {%- if isCloudEvent %}
+                {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+                    {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+                        {%- set _ = extra_args.items.append('_' + (placeholder | snake)) %}
+                    {%- endfor %}
+                {%- endfor %}
+                {%- for attrname, attribute in message.envelopemetadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] %}
+                    {%- set _ = extra_args.items.append('_' + attrname) %}
+                {%- endfor %}
+            {%- endif %}
+            producer.send_{{ messagename | snake }}(
+                data=payload,
+            {%- for arg in extra_args.items %}
+                {{ arg }}="value"{% if not loop.last %},
+            {% endif %}
+            {%- endfor %}
+            {% if extra_args.items %},
+            {% endif %}content_type="application/json"
+            )
+
+            received = _receive_single_message(artemis_container)
+
+            if {{ 'True' if isCloudEvent else 'False' }}:
+                body = received.body
+                if isinstance(body, memoryview):
+                    body_text = body.tobytes().decode('utf-8')
+                elif isinstance(body, bytes):
+                    body_text = body.decode('utf-8')
+                elif isinstance(body, str):
+                    body_text = body
+                elif isinstance(body, dict):
+                    body_text = json.dumps(body)
+                else:
+                    body_text = str(body)
+                cloud_event_payload = json.loads(body_text)
+                assert cloud_event_payload.get("type") == "{{ messageid }}"
+                encoded_data = cloud_event_payload.get("data_base64")
+                if encoded_data:
+                    decoded = base64.b64decode(encoded_data.encode('utf-8')).decode('utf-8')
+                    assert json.loads(decoded) == payload
+                elif "data" in cloud_event_payload:
+                    data_section = cloud_event_payload["data"]
+                    if isinstance(data_section, str):
+                        assert json.loads(data_section) == payload
+                    else:
+                        assert data_section == payload
+            else:
+                properties = received.properties or {}
+                assert properties.get('subject') == '{{ messageid }}'
+                body = received.body
+                if isinstance(body, memoryview):
+                    body_text = body.tobytes().decode('utf-8')
+                elif isinstance(body, bytes):
+                    body_text = body.decode('utf-8')
+                elif isinstance(body, str):
+                    body_text = body
+                else:
+                    body_text = json.dumps(body)
+                assert json.loads(body_text) == payload
+        finally:
+            producer.close()
+    
+    {%- endfor %}
+
+{% endfor %}

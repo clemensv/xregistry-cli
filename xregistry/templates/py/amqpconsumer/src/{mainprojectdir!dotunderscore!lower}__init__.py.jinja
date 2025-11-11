@@ -1,0 +1,13 @@
+{%- set messagegroups = root.messagegroups -%}
+"""
+{{ main_project_name }} - AMQP 1.0 Consumer
+"""
+
+from .dispatcher import *
+
+__all__ = [
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set class_name = (messagegroupid | pascal | strip_dots) + "EventConsumer" %}
+    "{{ class_name }}",
+{%- endfor %}
+]

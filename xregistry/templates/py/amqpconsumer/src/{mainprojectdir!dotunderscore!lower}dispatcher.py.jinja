@@ -1,0 +1,304 @@
+{%- import "util.include.jinja" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+
+# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
+
+"""
+Dispatcher module for processing messages from AMQP 1.0 broker.
+"""
+
+import typing
+import json
+import logging
+from proton import Message
+from cloudevents.http import CloudEvent, from_json
+
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set class_name = type_name | strip_namespace %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + class_name %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+logger = logging.getLogger(__name__)
+
+
+class MessageContext:
+    """
+    Context object for AMQP message processing.
+    
+    Provides methods to accept, reject, or release a message back to the broker.
+    """
+    
+    def __init__(self, delivery):
+        """
+        Initialize the message context.
+        
+        Args:
+            delivery: The proton delivery object for message settlement
+        """
+        self._delivery = delivery
+        self._settled = False
+    
+    def accept(self) -> None:
+        """Accept the message (successful processing)"""
+        if not self._settled and self._delivery:
+            self._delivery.update(self._delivery.ACCEPTED)
+            self._delivery.settle()
+            self._settled = True
+    
+    def reject(self) -> None:
+        """Reject the message (permanent failure, don't retry)"""
+        if not self._settled and self._delivery:
+            self._delivery.update(self._delivery.REJECTED)
+            self._delivery.settle()
+            self._settled = True
+    
+    def release(self) -> None:
+        """Release the message (temporary failure, allow retry)"""
+        if not self._settled and self._delivery:
+            self._delivery.update(self._delivery.RELEASED)
+            self._delivery.settle()
+            self._settled = True
+    
+    @property
+    def is_settled(self) -> bool:
+        """Check if the message has been settled"""
+        return self._settled
+
+
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_amqp_message = true %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"EventConsumer" %}
+
+class {{ class_name }}:
+    """
+    Event consumer for the {{ messagegroupid }} message group.
+    
+    This class receives and dispatches AMQP messages, supporting both CloudEvents and plain AMQP messages.
+    """
+    
+    def __init__(self):
+        """Initialize the event consumer"""
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        {%- set message_body_type = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+        {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+        self.{{ messagename | snake }}_handler: typing.Optional[typing.Callable[[{% if isCloudEvent %}CloudEvent, {% else %}Message, {% endif %}{{ message_body_type }}, MessageContext], typing.Awaitable[None]]] = None
+        {%- endfor %}
+        
+        {%- if uses_amqp_message %}
+        self.unhandled_message_handler: typing.Optional[typing.Callable[[Message, MessageContext], typing.Awaitable[None]]] = None
+        {%- endif %}
+        
+        {%- if uses_cloudevents_message %}
+        self.unhandled_event_handler: typing.Optional[typing.Callable[[CloudEvent, MessageContext], typing.Awaitable[None]]] = None
+        {%- endif %}
+    
+    async def process_message(self, message: Message, delivery=None) -> None:
+        """
+        Process an AMQP message.
+        
+        Args:
+            message (Message): The AMQP message to process
+            delivery: The proton delivery object for message settlement (optional for testing)
+        """
+        context = MessageContext(delivery)
+        
+        {%- if uses_cloudevents_message %}
+        if self._is_cloud_event(message):
+            cloud_event = self._cloud_event_from_message(message)
+            await self._dispatch_cloud_event(cloud_event, context)
+            return
+        {%- endif %}
+        
+        await self._dispatch_message(message, context)
+    
+    {%- if uses_cloudevents_message %}
+    
+    def _is_cloud_event(self, message: Message) -> bool:
+        """
+        Check if an AMQP message is a CloudEvent.
+        
+        Args:
+            message (Message): The AMQP message to check
+            
+        Returns:
+            bool: True if the message is a CloudEvent, False otherwise
+        """
+        # Check for structured mode CloudEvent
+        content_type = message.content_type
+        if content_type and (content_type.startswith('application/cloudevents+json') or 
+                            content_type.startswith('application/cloudevents')):
+            return True
+        
+        # Check for binary mode CloudEvent
+        if message.properties:
+            app_props = message.properties
+            if 'cloudEvents:specversion' in app_props or 'ce_specversion' in app_props:
+                return True
+        
+        return False
+    
+    def _cloud_event_from_message(self, message: Message) -> CloudEvent:
+        """
+        Convert an AMQP message to a CloudEvent.
+        
+        Args:
+            message (Message): The AMQP message to convert
+            
+        Returns:
+            CloudEvent: The converted CloudEvent
+        """
+        content_type = message.content_type
+        
+        # Structured mode
+        if content_type and content_type.startswith('application/cloudevents'):
+            body = message.body
+            if isinstance(body, bytes):
+                body = body.decode('utf-8')
+            if isinstance(body, str):
+                return from_json(body)
+            elif isinstance(body, dict):
+                return CloudEvent(body)
+        
+        # Binary mode
+        app_props = message.properties or {}
+        
+        # Handle different property name formats
+        def get_prop(name: str) -> typing.Optional[str]:
+            """Get property value from application properties with multiple name formats"""
+            for prefix in ['cloudEvents:', 'cloudEvents_', 'ce_', 'ce-']:
+                key = prefix + name
+                if key in app_props:
+                    val = app_props[key]
+                    return val.decode('utf-8') if isinstance(val, bytes) else str(val)
+            return None
+        
+        attributes = {
+            'specversion': get_prop('specversion') or '1.0',
+            'type': get_prop('type'),
+            'source': get_prop('source'),
+            'id': get_prop('id'),
+        }
+        
+        # Add optional attributes
+        time_val = get_prop('time')
+        if time_val:
+            attributes['time'] = time_val
+        
+        subject_val = get_prop('subject')
+        if subject_val:
+            attributes['subject'] = subject_val
+        
+        # Get data and content type
+        data = message.body
+        attributes['datacontenttype'] = content_type or 'application/json'
+        
+        return CloudEvent(attributes, data)
+    
+    async def _dispatch_cloud_event(self, cloud_event: CloudEvent, context: MessageContext) -> None:
+        """
+        Dispatch a CloudEvent message to the appropriate handler.
+        
+        Args:
+            cloud_event (CloudEvent): The CloudEvent to dispatch
+            context (MessageContext): The message context for settlement
+        """
+        cloud_event_type = cloud_event['type']
+        
+        {% for messageid, message in messagegroup.messages.items() -%}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+        {%- set message_body_type = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+        {%- if isCloudEvent %}
+        if cloud_event_type == '{{ messageid }}':
+            if self.{{ messagename | snake }}_handler:
+                {%- if message_body_type == 'object' %}
+                # No data schema defined for this message
+                await self.{{ messagename | snake }}_handler(cloud_event, None, context)
+                {%- else %}
+                body_data = cloud_event.data
+                content_type = cloud_event.get('datacontenttype', 'application/json')
+                
+                # Convert memoryview to bytes if needed
+                if isinstance(body_data, memoryview):
+                    body_data = body_data.tobytes()
+                
+                # Deserialize using the generated from_data method
+                data = {{ message_body_type }}.from_data(body_data, content_type)
+                await self.{{ messagename | snake }}_handler(cloud_event, data, context)
+                {%- endif %}
+                return
+        
+        {% endif %}
+        {%- endfor %}
+        # No handler found
+        if self.unhandled_event_handler:
+            await self.unhandled_event_handler(cloud_event, context)
+        else:
+            logger.warning(f"No handler for CloudEvent type: {cloud_event_type}")
+    {%- endif %}
+    
+    {%- if uses_amqp_message %}
+    
+    async def _dispatch_message(self, message: Message, context: MessageContext) -> None:
+        """
+        Dispatch a plain AMQP message to the appropriate handler.
+        
+        Args:
+            message (Message): The AMQP message to dispatch
+            context (MessageContext): The message context for settlement
+        """
+        # Get subject from application properties
+        message_subject = None
+        if message.properties:
+            app_props = message.properties
+            for key in ['subject', 'Subject']:
+                if key in app_props:
+                    val = app_props[key]
+                    message_subject = val.decode('utf-8') if isinstance(val, bytes) else str(val)
+                    break
+        
+        {% for messageid, message in messagegroup.messages.items() if not (message | exists("envelope","CloudEvents/1.0")) -%}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        {%- set message_body_type = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+        if message_subject == '{{ messageid }}':
+            if self.{{ messagename | snake }}_handler:
+                {%- if message_body_type == 'object' %}
+                # No data schema defined for this message
+                await self.{{ messagename | snake }}_handler(message, None, context)
+                {%- else %}
+                body_data = message.body
+                content_type = message.content_type or 'application/json'
+                
+                # Convert memoryview to bytes if needed
+                if isinstance(body_data, memoryview):
+                    body_data = body_data.tobytes()
+                
+                # Deserialize using the generated from_data method
+                data = {{ message_body_type }}.from_data(body_data, content_type)
+                await self.{{ messagename | snake }}_handler(message, data, context)
+                {%- endif %}
+                return
+        
+        {% endfor %}
+        # No handler found
+        if self.unhandled_message_handler:
+            await self.unhandled_message_handler(message, context)
+        else:
+            logger.warning(f"No handler for message subject: {message_subject}")
+    {%- endif %}
+
+{% endfor %}

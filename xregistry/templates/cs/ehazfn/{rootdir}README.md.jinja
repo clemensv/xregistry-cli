@@ -1,4 +1,441 @@
-# {{ project_name | pascal }} Event Hubs Azure Functions Package
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (project_name | pascal | strip_namespace) + "Function" %}
+# {{ project_name | pascal }} - Azure Event Hubs Function
+
+Auto-generated Azure Function that receives events from Azure Event Hubs for the {{ groupname }} message group.
 
 ## Overview
 
+This Azure Function automatically processes events from Azure Event Hubs. It receives events in batches, handles CloudEvents format, and calls your custom handlers. Perfect for building real-time event processing pipelines without managing infrastructure!
+
+## What is Azure Event Hubs?
+
+Azure Event Hubs is a big data streaming platform and event ingestion service. Think of it as a massive event buffer that can receive millions of events per second. It's perfect for:
+- Real-time analytics
+- Telemetry and logging
+- IoT device data ingestion
+- Application monitoring
+
+This generated function lets you process those events easily without worrying about the complex streaming APIs.
+
+## Quick Start
+
+### 1. Understanding the Generated Code
+
+The function includes:
+- **{{ class_name }}.cs**: Receives Event Hubs events in batches
+- **Event handlers**: Methods for each event type you can override
+- **Automatic deserialization**: Converts events to strongly-typed objects
+- **Error handling**: Built-in error logging and recovery
+
+### 2. Add Your Business Logic
+
+```csharp
+{% for messageid, message in messagegroup.messages.items() | list | slice(0, 1) -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+// Called automatically for each {{ messagename }} event
+protected async Task Handle{{ messagename }}Async(
+    CloudEvent cloudEvent, 
+    {{ message_body_type }} data)
+{
+    _logger.LogInformation("Processing {{ messagename }}: {EventId}", cloudEvent.Id);
+    
+    // TODO: Add your business logic here
+    // Examples:
+    // - Save to database: await _dbContext.SaveAsync(data);
+    // - Call an API: await _httpClient.PostAsync("...", data);
+    // - Process data: var result = ProcessData(data);
+}
+{% endfor %}
+```
+
+### 3. Configure Connection String
+
+**Local Development** (`local.settings.json`):
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "EventHubConnectionString": "Endpoint=sb://YOUR-NAMESPACE.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=YOUR-KEY"
+  }
+}
+```
+
+Get your connection string from Azure Portal:
+1. Go to your Event Hubs Namespace
+2. Click "Shared access policies"
+3. Copy the connection string
+
+### 4. Run Locally
+
+```bash
+# Start the function
+func start
+
+# The function will listen for Event Hubs events
+```
+
+To test locally, send events to your Event Hub using the Azure Portal, SDK, or CLI.
+
+### 5. Deploy to Azure
+
+```bash
+# Create a function app
+az functionapp create \
+  --name your-function-name \
+  --resource-group your-resource-group \
+  --consumption-plan-location westus \
+  --runtime dotnet \
+  --functions-version 4
+
+# Deploy
+func azure functionapp publish your-function-name
+
+# Configure the Event Hub connection
+az functionapp config appsettings set \
+  --name your-function-name \
+  --resource-group your-resource-group \
+  --settings "EventHubConnectionString=YOUR-CONNECTION-STRING"
+```
+
+## Event Handlers
+
+The function automatically recognizes and processes these event types:
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Event Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`  
+{% if message.description -%}**Description:** {{ message.description }}{%- endif %}
+
+**Handler Method:**
+```csharp
+protected async Task Handle{{ messagename }}Async(
+    CloudEvent cloudEvent, 
+    {{ message_body_type }} data)
+{
+    // Your processing logic here
+}
+```
+
+**Common scenarios:**
+```csharp
+// Database persistence
+protected async Task Handle{{ messagename }}Async(CloudEvent ce, {{ message_body_type }} data)
+{
+    await _repository.SaveAsync(data);
+}
+
+// API call
+protected async Task Handle{{ messagename }}Async(CloudEvent ce, {{ message_body_type }} data)
+{
+    await _httpClient.PostAsJsonAsync("https://api.example.com/process", data);
+}
+
+// Data transformation
+protected async Task Handle{{ messagename }}Async(CloudEvent ce, {{ message_body_type }} data)
+{
+    var transformed = TransformData(data);
+    await _outputQueue.SendAsync(transformed);
+}
+```
+
+{% endfor %}
+
+## Batch Processing
+
+The function receives events in **batches** for better performance. Each event is processed individually by calling the appropriate handler.
+
+**How it works:**
+1. Event Hubs delivers a batch of events (up to 100 by default)
+2. Function deserializes each event
+3. Calls your handler for each event
+4. Continues with next batch
+
+**Configure batch size** in `host.json`:
+```json
+{
+  "extensions": {
+    "eventHubs": {
+      "maxEventBatchSize": 50,
+      "batchCheckpointFrequency": 10
+    }
+  }
+}
+```
+
+## Error Handling
+
+### Automatic Error Recovery
+
+The function automatically:
+- Logs deserialization errors (doesn't crash on bad data)
+- Continues processing other events if one fails
+- Logs unhandled event types
+
+### Add Your Error Handling
+
+```csharp
+protected async Task Handle{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(
+    CloudEvent cloudEvent, 
+    {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }} data)
+{
+    try
+    {
+        // Validate
+        if (data == null)
+        {
+            _logger.LogWarning("Null data for event {EventId}", cloudEvent.Id);
+            return; // Skip this event
+        }
+        
+        // Process
+        await ProcessAsync(data);
+    }
+    catch (ValidationException ex)
+    {
+        _logger.LogWarning(ex, "Validation failed: {EventId}", cloudEvent.Id);
+        // Don't re-throw - event will be skipped
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Processing failed: {EventId}", cloudEvent.Id);
+        throw; // Re-throw to retry the entire batch
+    }
+}
+```
+
+**Important**: If you throw an exception, Event Hubs will retry the **entire batch**, not just the failed event.
+
+## Checkpointing
+
+Event Hubs uses **checkpointing** to track which events have been processed. This happens automatically!
+
+**How it works:**
+- After successfully processing a batch, a checkpoint is saved
+- If the function crashes, it resumes from the last checkpoint
+- No events are lost or processed twice (under normal conditions)
+
+**Manual checkpoint control** (advanced):
+```json
+// In host.json
+{
+  "extensions": {
+    "eventHubs": {
+      "batchCheckpointFrequency": 1  // Checkpoint after every batch
+    }
+  }
+}
+```
+
+## Dependency Injection
+
+Add your services in `Startup.cs`:
+
+```csharp
+public override void Configure(IFunctionsHostBuilder builder)
+{
+    // Database
+    builder.Services.AddDbContext<MyDbContext>(options =>
+        options.UseSqlServer(Environment.GetEnvironmentVariable("SqlConnectionString")));
+    
+    // Services
+    builder.Services.AddScoped<IMyService, MyService>();
+    
+    // HTTP clients
+    builder.Services.AddHttpClient<IApiClient, ApiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.example.com");
+    });
+}
+```
+
+Use in your function:
+```csharp
+private readonly IMyService _service;
+
+public {{ class_name }}(ILoggerFactory loggerFactory, IMyService service)
+    : base(loggerFactory)
+{
+    _service = service;
+}
+
+protected async Task Handle{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(CloudEvent ce, var data)
+{
+    await _service.ProcessAsync(data);
+}
+```
+
+## Performance & Scaling
+
+### Automatic Scaling
+
+Azure Functions automatically scales based on Event Hubs load:
+- Starts with 1 instance
+- Scales up to handle backlog
+- Scales down when idle
+
+### Scaling Configuration
+
+Control scaling in `host.json`:
+```json
+{
+  "extensions": {
+    "eventHubs": {
+      "targetUnprocessedEventThreshold": 1000,
+      "maxEventBatchSize": 100
+    }
+  }
+}
+```
+
+### Performance Tips
+
+1. **Use async/await**: All I/O should be async
+2. **Batch database operations**: Don't save one-by-one
+3. **Reuse HTTP clients**: Inject via DI, don't create in handlers
+4. **Avoid blocking calls**: Never use `.Result` or `.Wait()`
+5. **Consider parallel processing**: For independent events
+
+## Monitoring
+
+### View Logs
+
+```bash
+# Stream logs from Azure
+func azure functionapp logstream your-function-name
+
+# Or in Azure Portal
+# Go to Function App → Monitor → Log stream
+```
+
+### Application Insights
+
+Automatically enabled when configured:
+
+```bash
+# Create Application Insights
+az monitor app-insights component create \
+  --app your-app-insights \
+  --location westus \
+  --resource-group your-resource-group
+
+# Connect to function
+az functionapp config appsettings set \
+  --name your-function-name \
+  --resource-group your-resource-group \
+  --settings "APPLICATIONINSIGHTS_CONNECTION_STRING=YOUR-CONNECTION-STRING"
+```
+
+**View in Portal:**
+1. Go to your Function App
+2. Click "Application Insights"
+3. View live metrics, traces, exceptions
+
+### Key Metrics to Watch
+
+- **Execution count**: How many batches processed
+- **Execution duration**: How long processing takes
+- **Errors**: Failed executions
+- **Event Hubs metrics**: Incoming messages, consumer lag
+
+## Testing
+
+### Run Tests
+
+```bash
+dotnet test
+```
+
+### Write Custom Tests
+
+```csharp
+[Fact]
+public async Task Handle{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}_ProcessesSuccessfully()
+{
+    // Arrange
+    var function = new {{ class_name }}(loggerFactory, mockService.Object);
+    var cloudEvent = CreateTestCloudEvent();
+    var data = new {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }}
+    {
+        // Set test properties
+    };
+    
+    // Act
+    await function.Handle{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(cloudEvent, data);
+    
+    // Assert
+    mockService.Verify(x => x.ProcessAsync(It.IsAny<{{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }}>()), Times.Once);
+}
+```
+
+## Troubleshooting
+
+**Events not being received**: Check Event Hub connection string and consumer group name
+
+**High memory usage**: Reduce `maxEventBatchSize` in host.json
+
+**Slow processing**: Check if you're doing blocking I/O or synchronous operations
+
+**Duplicate events**: This can happen after crashes; implement idempotent handlers
+
+**Consumer lag building up**: Function can't keep up with incoming rate; consider scaling or optimizing
+
+## Configuration Reference
+
+### Connection String Format
+
+```
+Endpoint=sb://YOUR-NAMESPACE.servicebus.windows.net/;SharedAccessKeyName=YOUR-POLICY;SharedAccessKey=YOUR-KEY;EntityPath=YOUR-HUB
+```
+
+### host.json Settings
+
+```json
+{
+  "version": "2.0",
+  "extensions": {
+    "eventHubs": {
+      "maxEventBatchSize": 100,
+      "prefetchCount": 300,
+      "batchCheckpointFrequency": 1,
+      "targetUnprocessedEventThreshold": 1000
+    }
+  },
+  "functionTimeout": "00:05:00"
+}
+```
+
+## Learn More
+
+- [Azure Event Hubs Documentation](https://learn.microsoft.com/azure/event-hubs/)
+- [Azure Functions Event Hubs Trigger](https://learn.microsoft.com/azure/azure-functions/functions-bindings-event-hubs-trigger)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Dependencies
+
+- `Microsoft.Azure.Functions.Worker` - Azure Functions runtime
+- `Microsoft.Azure.Functions.Worker.Extensions.EventHubs` - Event Hubs binding
+- `CloudNative.CloudEvents` - CloudEvents support
+- `Microsoft.Extensions.Logging` - Logging
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Trigger:** Azure Event Hubs (Batch)  
+**Runtime:** Azure Functions (Isolated Worker)  
+**Envelope:** CloudEvents 1.0
+{% endfor %}

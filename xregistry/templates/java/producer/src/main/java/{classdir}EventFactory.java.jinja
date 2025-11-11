@@ -53,7 +53,7 @@ public class {{ className | strip_namespace }}
     {%- endif -%}
     ) throws Exception {
         {% if isCloudEvent %}
-        {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", toBytes, message, 'contentType') | indent(12)}}
+        {{- cloudEvents.BuildCloudEvent(message, toBytes) | indent(8) }}
         return cloudEvent;
         {%- elif is_amqp %}
         {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", message) | indent(12)}}

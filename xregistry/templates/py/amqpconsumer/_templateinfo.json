@@ -1,0 +1,8 @@
+{
+  "description": "Python AMQP 1.0 Consumer",
+  "template_kind": "consumer",
+  "priority": 1,
+  "main_project_name": "{project_name|dotunderscore|lower}AmqpConsumer",
+  "data_project_name": "{project_name|dotunderscore|lower}Data",
+  "src_layout": false
+}

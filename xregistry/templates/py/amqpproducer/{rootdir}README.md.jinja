@@ -1,0 +1,189 @@
+{%- import "util.include.jinja" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{%- filter wordwrap(120) %}
+# {{ project_name | capitalize }} - AMQP 1.0 Producer
+
+Auto-generated Python producer for sending messages via AMQP 1.0 protocol.
+
+## Overview
+
+This module provides a type-safe AMQP 1.0 producer for sending events with optional CloudEvents envelope format. Built on the `python-qpid-proton` library for Python.
+
+## What is AMQP 1.0?
+
+**AMQP (Advanced Message Queuing Protocol) 1.0** is an open standard for business messaging that supports:
+- **Protocol-level interoperability** between different platforms and vendors
+- **Reliable message delivery** with settlement modes and flow control
+- **Multiple messaging patterns** including queues, topics, and request-reply
+- **Built-in security** with SASL authentication and TLS encryption
+
+Use cases: Enterprise integration, IoT messaging, financial services, cloud-native applications.
+
+**Note:** This library uses AMQP 1.0, which is fundamentally different from AMQP 0.9.x (used by RabbitMQ). Make sure your broker supports AMQP 1.0 (e.g., Azure Service Bus, Apache ActiveMQ, Apache Qpid).
+
+## Installation
+
+```bash
+pip install python-qpid-proton cloudevents
+```
+
+## Generated Producers
+
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_amqp_message = not uses_cloudevents_message %}
+
+### {{ (messagegroupid | pascal | strip_dots) + "Producer" }}
+
+`{{ (messagegroupid | pascal | strip_dots) + "Producer" }}` sends messages for the {{ messagegroupid }} message group.
+
+#### Quick Start
+
+```python
+from {{ project_name | snake }} import {{ (messagegroupid | pascal | strip_dots) + "Producer" }}
+
+# Create producer
+producer = {{ (messagegroupid | pascal | strip_dots) + "Producer" }}(
+    host="localhost",
+    address="my-queue",
+    port=5672,
+    username="guest",
+    password="guest"
+)
+
+# Send a message
+{% for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+producer.send_{{ messagename | snake }}(
+    data={{ type_name }}(...),
+    {%- if isCloudEvent and message.metadata %}
+    {%- for attrname, attribute in message.metadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] and attribute.required %}
+    _{{ attrname }}="value",
+    {%- endfor %}
+    {%- endif %}
+    content_type="application/json"
+)
+{% endfor %}
+
+# Close producer
+producer.close()
+```
+
+#### Configuration Options
+
+The producer constructor accepts:
+
+- `host` (str): AMQP broker hostname
+- `address` (str): AMQP address (queue or topic name)
+- `port` (int): AMQP broker port (default: 5672, for TLS typically 5671)
+- `username` (Optional[str]): Username for SASL authentication
+- `password` (Optional[str]): Password for SASL authentication
+{%- if uses_cloudevents_message %}
+- `content_mode` (Literal['structured', 'binary']): CloudEvents encoding mode (default: 'structured')
+  - **structured**: Entire CloudEvent as JSON in message body
+  - **binary**: Event data in body, CloudEvents attributes in AMQP application properties
+- `format_type` (str): Content type for structured mode (default: 'application/json')
+{%- endif %}
+
+#### Available Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+{%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+
+##### `send_{{ messagename | snake }}()`
+
+{%- if message.description %}
+{{ message.description }}
+{%- endif %}
+
+**Parameters:**
+- `data` ({{ type_name }}): The message data object
+{%- if isCloudEvent %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+{%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+- `_{{ placeholder | snake }}` (str): Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+{%- endfor %}
+{%- endfor %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] %}
+- `_{{ attrname }}` ({% if not attribute.required %}Optional[str]{% else %}str{% endif %}): CloudEvent {{ attrname }} attribute
+{%- endfor %}
+{%- endif %}
+- `content_type` (str): Content type of the message data (default: 'application/json')
+
+##### `send_{{ messagename | snake }}_batch()`
+
+Send multiple {{ messagename }} messages in sequence.
+
+**Parameters:**
+- `data_array` (List[{{ type_name }}]): Array of message data objects
+{%- if isCloudEvent %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+{%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+- `_{{ placeholder | snake }}` (str): Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+{%- endfor %}
+{%- endfor %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] %}
+- `_{{ attrname }}` ({% if not attribute.required %}Optional[str]{% else %}str{% endif %}): CloudEvent {{ attrname }} attribute
+{%- endfor %}
+{%- endif %}
+- `content_type` (str): Content type of the message data
+
+{% endfor %}
+{% endfor %}
+
+## AMQP Broker Compatibility
+
+This library has been tested with:
+- **Azure Service Bus** (AMQP 1.0 over TLS on port 5671)
+- **Apache ActiveMQ Artemis** (AMQP 1.0 on port 5672)
+- **Apache Qpid Broker-J** (AMQP 1.0 on port 5672)
+
+## Security Considerations
+
+- Always use TLS/SSL encryption in production (port 5671)
+- Store credentials securely (environment variables, key vaults)
+- Use SASL authentication mechanisms appropriate for your broker
+- Consider using token-based authentication (OAuth, JWT) where supported
+
+## Error Handling
+
+```python
+from uamqp import errors
+
+try:
+    producer.send_message(data)
+except errors.AMQPConnectionError as e:
+    print(f"Connection error: {e}")
+except errors.MessageException as e:
+    print(f"Message error: {e}")
+finally:
+    producer.close()
+```
+
+## Building and Testing
+
+```bash
+# Install dependencies
+poetry install
+
+# Run tests
+poetry run pytest
+
+# Build package
+poetry build
+```
+
+## Dependencies
+
+- `uamqp>=1.6.10` - AMQP 1.0 client library
+- `cloudevents>=1.10.1` - CloudEvents SDK
+- Python 3.10+
+
+## License
+
+This generated code is provided as-is for use in your projects.
+{%- endfilter %}

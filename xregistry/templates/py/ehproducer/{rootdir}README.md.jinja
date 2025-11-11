@@ -1,85 +1,187 @@
+{%- import "util.include.jinja" as util -%}
 {%- set messagegroups = root.messagegroups %}
-{%- filter wordwrap(80) %}
-# {{ project_name | capitalize }} Azure Event Hubs Producer SDK for Python
+{%- filter wordwrap(120) %}
+# {{ project_name | capitalize }} - Azure Event Hubs Producer
 
-This is the {{ project_name | capitalize }} Azure Event Hubs Producer SDK for Python. It was generated from the xRegistry CLI tool
-based on message catalog messages for {% for messagegroupid, _ in messagegroups.items() %}"{{ messagegroupid }}"{%- if not loop.last %}, {% endif %}{%- endfor %}.
+Auto-generated Python producer for sending CloudEvents to Azure Event Hubs.
 
-## Quick Install
+## Overview
 
-To get started quickly, the main package can be installed with the `install.sh`
-script (or `install.bat` on Windows) in the root of the repository.
+This module provides a type-safe Event Hubs producer for sending events with CloudEvents envelope format. Built on `azure-eventhub` SDK.
 
-### Contents
+## What is Azure Event Hubs?
 
-The repository contains two projects.
-* The `{{project_name}}_eventhubs_producer` project is the main project that
-  contains the Event Hubs producer client code.
-* The `{{ data_project_name }}` project contains the data classes for the event
-  payload data.
+**Azure Event Hubs** is a fully managed, real-time data ingestion service that:
+- **Scales automatically** to handle millions of events per second
+- **Supports multiple protocols** including AMQP, Kafka, and HTTPS
+- **Provides event replay** with configurable retention (1-90 days)
+- **Integrates seamlessly** with Azure services and Stream Analytics
 
-The classes defined in `{{project_name}}_eventhubs_producer` are documented
-in the project [README](./{{project_name}}_eventhubs_producer/README.md).
+Use cases: Telemetry ingestion, log aggregation, IoT data streams, event sourcing.
 
-The `{{project_name}}_eventhubs_producer` project depends on the
-`{{ data_project_name }}` project.
-
-If you want to install the producer project, you can run the following command:
+## Installation
 
 ```bash
-pip install ./{{project_name}}_eventhubs_producer
+pip install azure-eventhub azure-identity
 ```
 
-This will install both packages. If you only want to install the data project,
-you can run the following command:
+## Generated Event Producers
 
-```bash
-pip install ./{{ data_project_name }}
-```
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_amqp_message = (messagegroup | exists("protocol","AMQP/1.0")) %}
 
-## Build and Test
+### {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}
 
-The SDK comes with a full test suite for the data classes and the producers
-that uses the `pytest` framework and Docker containers to run the tests.
+`{{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}` sends events for the {{ messagegroupid }} message group.
 
-If you have Docker installed and if you have `make`, you can run the tests with
-the following command:
+#### Quick Start
 
-```bash
-make test
-```
-
-If you don't have `make` installed, you can run the following commands:
-
-```bash
-pip install ./{{main_project_name}}
-pytest ./{{main_project_name}}/tests ./{{data_project_name}}/tests
-```
-
-## Usage
-
-The sample code in [samples/sample.py](samples/sample.py) demonstrates how to
-use the Event Hubs producer client to send messages to an Event Hub.
-
-Event producers wrap the `EventHubProducerClient` and are responsible for
-constructing and sending messages to the Event Hub using that client. Multiple
-producers can be used concurrently with the same `EventHubProducerClient`.
-
-{%- set messagegroupid, messagegroup = messagegroups.items()|first %}
-{%- set message_id, message = messagegroup.messages.items()|first %}
-{%- set groupname = messagegroupid | pascal %}
-{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
-The required parameters for the generated `send` methods are:
-* `data`: The event data to be sent.
-* `content_type`: The content type that the event data shall be sent with.
-* additional parameters depend on the message catalog information.
-
-The example below shows how to create and send an event:
+##### Using Connection String
 
 ```python
-producer = EventHubProducerClient.from_connection_string("your-connection-string", eventhub_name="your-eventhub-name")
-event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
-data = {{ data_type | strip_namespace }}(...)  # Construct your event data here
-await event_producer.send_{{ messageid | dotunderscore | lower }}(data=data, content_type="application/json")
+from azure.eventhub.aio import EventHubProducerClient
+from {{ project_name | snake }} import {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}
+
+async def send_event():
+    producer = EventHubProducerClient.from_connection_string(
+        conn_str="Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=...",
+        eventhub_name="your-eventhub-name"
+    )
+    
+    event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
+    
+    # Send event
+    {%- set first_message = messagegroup.messages.items() | first %}
+    {%- if first_message %}
+    {%- set messageid, message = first_message %}
+    {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+    data = {{ data_type | strip_namespace }}(...)  # Your event data
+    await event_producer.send_{{ messageid | dotunderscore | snake }}(data=data)
+    {%- endif %}
+    
+    await producer.close()
 ```
+
+##### Using Azure Identity (Recommended for Production)
+
+```python
+from azure.identity.aio import DefaultAzureCredential
+from azure.eventhub.aio import EventHubProducerClient
+
+async def send_event():
+    credential = DefaultAzureCredential()
+    producer = EventHubProducerClient(
+        fully_qualified_namespace="your-namespace.servicebus.windows.net",
+        eventhub_name="your-eventhub-name",
+        credential=credential
+    )
+    
+    event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
+    # ... send events
+    await producer.close()
+```
+
+#### Constructor
+
+```python
+__init__(self, producer: EventHubProducerClient, content_mode: Literal['structured', 'binary'] = 'structured') -> None
+```
+
+**Args:**
+- `producer`: The EventHub producer client
+- `content_mode`: CloudEvents content mode ('structured' or 'binary')
+
+#### Event Sending Methods
+
+{% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0") )%}
+{%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+##### `send_{{ messageid | dotunderscore | snake }}`
+
+```python
+async def send_{{ messageid | dotunderscore | snake }}(self,
+    {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
+        _{{ attrname }}: str, 
+    {%- endfor %}
+    data: {{ data_type | strip_namespace }}, content_type: str = "application/json"
+    {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
+        , _{{ attrname }}: Optional[str] = None
+    {%- endfor -%} ) -> None
+```
+
+Sends the `{{ messageid }}` event to Event Hubs.
+
+**Args:**
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
+- `_{{ attrname }}` (str): {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+{%- endfor %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+    {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+- `_{{ placeholder | snake }}` (str): Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+    {%- endfor %}
+{%- endfor %}
+- `data` ({{ data_type | strip_namespace }}): The event data to be sent
+- `content_type` (str): The content type for the event data
+{%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined %}
+- `_{{ attrname }}` (Optional[str]): {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+{%- endfor %}
+
+**Example:**
+
+```python
+data = {{ data_type | strip_namespace }}(...)  # Construct your event data
+await event_producer.send_{{ messageid | dotunderscore | snake }}(data=data, content_type="application/json")
+```
+
+{% endfor %}
+
+## Configuration Options
+
+### Content Modes
+
+**Structured Mode (Default):** CloudEvents envelope and data both in message body
+```python
+producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(client, content_mode='structured')
+```
+
+**Binary Mode:** CloudEvents attributes in message properties, data in body
+```python
+producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(client, content_mode='binary')
+```
+
+### Partition Keys
+
+Control event distribution across partitions:
+```python
+# Events with same partition key go to same partition
+await producer.send_event(data, partition_key="device-123")
+```
+
+## Error Handling
+
+```python
+from azure.core.exceptions import HttpResponseError
+
+async def send_with_error_handling():
+    try:
+        await event_producer.send_{{ messageid | dotunderscore | snake }}(data=data)
+    except HttpResponseError as e:
+        print(f"Failed to send event: {e}")
+        # Implement retry logic or alternative handling
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise
+```
+
+## Best Practices
+
+1. **Reuse client instances** - create once, use for multiple events
+2. **Use async context managers** for automatic resource cleanup
+3. **Implement retry logic** with exponential backoff for transient failures
+4. **Use Azure Identity** instead of connection strings for production
+5. **Monitor Event Hubs metrics** in Azure Portal
+6. **Use batch sending** for high-throughput scenarios
+7. **Handle throttling** by respecting retry-after headers
+
+{% endfor %}
 {%- endfilter %}

@@ -40,7 +40,7 @@ import java.util.ArrayList;
 
 
 {% for messagegroup_key, messagegroup in messagegroups.items() -%}
-{%- set pascalGroupName = messagegroup.id  | pascal -%}
+{%- set pascalGroupName = messagegroup_key | pascal -%}
 {%- set className = (pascalGroupName | strip_namespace)+"EventProducer" %}
 public class {{ className | strip_namespace }}
 {
@@ -125,7 +125,7 @@ public class {{ className | strip_namespace }}
     {%- endif -%}
     ) throws Exception {
         {% if isCloudEvent %}
-        {{- cloudEvents.DeclareCloudNativeCloudEvent("cloudEvent", toBytes, definition, 'contentType') | indent(12)}}
+        {{- cloudEvents.BuildCloudEvent(definition, toBytes) | indent(8) }}
         return endpoint.sendAsync(cloudEvent, encoding, eventFormat);
         {%- elif isAmqp %}
         {{- amqp.DeclareAmqpNetLiteMessage("amqpMessage", definition) | indent(12)}}

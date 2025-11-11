@@ -1,145 +1,316 @@
-# {{ project_name | pascal }} Event Hubs Consumer SDK
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventConsumer" %}
+# {{ project_name | pascal }} - Apache Kafka Consumer
+
+Auto-generated Apache Kafka consumer for {{ groupname }} message group.
 
 ## Overview
 
-The `{{ project_name | pascal }}` library provides a robust and strongly-typed
-API for obtaining and processing events from Azure Event Hubs and Microsoft
-Fabric Event Streams custom output endpoints that are associated with {% for
-messagegroupid, messagegroup in root.messagegroups.items() -%}
-`{{- messagegroupid -}}`{%- if not loop.last -%}, {%- elif not loop.first -%},
-and {%- endif -%} {%- endfor %} message group{% if (root.messagegroups.items() |
-length) %}s{% endif %}.
+This consumer library makes it simple to receive and process messages from Apache Kafka topics. It handles connection management, deserialization, and error recovery so you can focus on your business logic.
 
-This documentation will help you getting started.
+## What is Apache Kafka?
 
-## Prerequisites
+Apache Kafka is a distributed event streaming platform used for:
+- Building real-time data pipelines
+- Streaming analytics
+- Event-driven microservices
+- Log aggregation
 
-Before using the `{{ project_name | pascal }}` library, ensure you have the following prerequisites:
-- .NET SDK 8.0 installed.
-- For running the unit tests: Docker or a compatible container runtime.
+This library lets you consume Kafka messages without dealing with the low-level Kafka consumer API.
 
-For Azure Event Hubs:
-- An Azure account with access to Event Hubs and an Azure Storage account.
+## Quick Start
 
-For Microsoft Fabric Event Streams:
-  - A Microsoft Fabric Event Streams with a custom output endpoint.
-  - An Azure Storage account. 
+### 1. Basic Usage
 
-To use the `{{ project_name | pascal }}` library, add the necessary NuGet
-packages to your project:
+```csharp
+using {{ project_name | pascal }};
+using Microsoft.Extensions.Logging;
 
-```bash
-dotnet add package Azure.Messaging.EventHubs
-dotnet add package Azure.Messaging.EventHubs.Processor
-dotnet add package Azure.Storage.Blobs
+// Create consumer
+var consumer = new {{ class_name }}(
+    "localhost:9092",           // Bootstrap servers
+    "my-consumer-group",         // Consumer group
+    new[] { "my-topic" },        // Topics to subscribe
+    loggerFactory);
+
+// Register event handlers
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+consumer.{{ messagename }}Async += async (record, cloudEvent, data) =>
+{
+    Console.WriteLine($"Received: {cloudEvent.Id}");
+    await ProcessAsync(data);
+};
+{%- endif %}
+
+// Start consuming
+await consumer.StartAsync();
+
+// Keep running
+await Task.Delay(Timeout.Infinite, cancellationToken);
+
+// Cleanup
+await consumer.StopAsync();
 ```
 
-## Building, testing and packaging the SDK
+### 2. Configuration Options
 
-The code in this SDK is complete and ready for use. It includes unit tests that
-can be run using the `dotnet test` command and which verify the correctness of 
-the components, which includes running them against the Azure Event Hubs emulator.
+```csharp
+var config = new Dictionary<string, string>
+{
+    ["bootstrap.servers"] = "localhost:9092",
+    ["group.id"] = "my-consumer-group",
+    ["auto.offset.reset"] = "earliest",  // Start from beginning
+    ["enable.auto.commit"] = "true"      // Auto-commit offsets
+};
 
-The SDK can be packaged into a NuGet package using the `dotnet pack` command.
+var consumer = {{ class_name }}.CreateConsumer(
+    config,
+    new[] { "my-topic" },
+    loggerFactory);
+```
+
+## Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Event Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`
+
+```csharp
+consumer.{{ messagename }}Async += async (record, cloudEvent, data) =>
+{
+    // record: Kafka ConsumerRecord with metadata
+    // cloudEvent: CloudEvents envelope
+    // data: Strongly-typed message data
+    
+    _logger.LogInformation("Processing from partition {Partition}, offset {Offset}",
+        record.Partition, record.Offset);
+    
+    await ProcessDataAsync(data);
+};
+```
+
+{% endfor %}
+
+## Consumer Groups
+
+Consumer groups enable parallel processing. All consumers in the same group share the workload.
+
+```csharp
+// Instance 1 (e.g., server-1)
+var consumer1 = new {{ class_name }}("localhost:9092", "my-group", topics, logger);
+
+// Instance 2 (e.g., server-2)  
+var consumer2 = new {{ class_name }}("localhost:9092", "my-group", topics, logger);
+
+// Kafka automatically distributes partitions between them!
+```
+
+**Different groups** process independently:
+```csharp
+// Analytics consumer (processes all messages)
+var analyticsConsumer = new {{ class_name }}("localhost:9092", "analytics-group", topics, logger);
+
+// Storage consumer (also processes all messages independently)
+var storageConsumer = new {{ class_name }}("localhost:9092", "storage-group", topics, logger);
+```
+
+## Authentication
+
+### SASL/PLAIN (Username/Password)
+
+```csharp
+var config = new Dictionary<string, string>
+{
+    ["bootstrap.servers"] = "kafka.example.com:9093",
+    ["security.protocol"] = "SASL_SSL",
+    ["sasl.mechanism"] = "PLAIN",
+    ["sasl.username"] = "your-username",
+    ["sasl.password"] = "your-password"
+};
+```
+
+### SASL/SCRAM (More Secure)
+
+```csharp
+var config = new Dictionary<string, string>
+{
+    ["bootstrap.servers"] = "kafka.example.com:9093",
+    ["security.protocol"] = "SASL_SSL",
+    ["sasl.mechanism"] = "SCRAM-SHA-256",
+    ["sasl.username"] = "your-username",
+    ["sasl.password"] = "your-password"
+};
+```
+
+### SSL/TLS with Certificates
+
+```csharp
+var config = new Dictionary<string, string>
+{
+    ["bootstrap.servers"] = "kafka.example.com:9093",
+    ["security.protocol"] = "SSL",
+    ["ssl.ca.location"] = "/path/to/ca-cert",
+    ["ssl.certificate.location"] = "/path/to/client-cert",
+    ["ssl.key.location"] = "/path/to/client-key"
+};
+```
+
+## Offset Management
+
+**Offsets** track which messages have been processed.
+
+### Auto-commit (Default)
+
+```csharp
+var config = new Dictionary<string, string>
+{
+    ["enable.auto.commit"] = "true",
+    ["auto.commit.interval.ms"] = "5000"  // Commit every 5 seconds
+};
+```
+
+Messages are automatically marked as processed. Simple but less control.
+
+### Manual Commit (More Control)
+
+```csharp
+var config = new Dictionary<string, string>
+{
+    ["enable.auto.commit"] = "false"
+};
+
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (record, cloudEvent, data) =>
+{
+    try
+    {
+        await ProcessAsync(data);
+        await consumer.CommitAsync(record); // Explicit commit
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Processing failed, will retry");
+        // Don't commit - message will be reprocessed
+    }
+};
+```
+
+### Offset Reset Strategy
+
+```csharp
+// Start from earliest available message
+["auto.offset.reset"] = "earliest"
+
+// Start from latest (skip old messages)
+["auto.offset.reset"] = "latest"
+```
+
+## Error Handling
+
+```csharp
+consumer.ProcessingErrorAsync += async (record, cloudEvent, exception) =>
+{
+    _logger.LogError(exception, "Failed processing offset {Offset}", record.Offset);
+    
+    // Send to dead-letter topic
+    await _deadLetterProducer.ProduceAsync("errors", cloudEvent);
+};
+
+consumer.DeserializationErrorAsync += async (record, cloudEvent, exception) =>
+{
+    _logger.LogWarning(exception, "Bad message at offset {Offset}", record.Offset);
+    // Message is skipped
+};
+```
+
+## Testing
 
 ```bash
 dotnet test
-dotnet pack
 ```
 
-## Usage
-
-### Creating the Event Processor Client 
-
-To start processing events from Event Hubs, create an instance of the
-`EventProcessorClient` using one of the provided methods in the {{ project_name | pascal | strip_dots}}Dispatcher class. These methods help configure the processor with
-various authentication mechanisms.
-
+Sample test:
 ```csharp
-var checkpointBlobClient = new BlobContainerClient("<connection-string>", "<container-name>");
-var credential = new DefaultAzureCredential();
-var dispatcher = new {{ class_name }}();
-
-var eventProcessorClient = dispatcher.CreateEventProcessorClient(
-    checkpointBlobClient,
-    credential,
-    "<fully-qualified-namespace>",
-    "<event-hub-name>",
-    "<consumer-group-name>"
-);
-```
-
-### Events and Handlers
-
-The `{{ class_name }}` class provides strongly-typed event handlers for
-different types of events. You can choose whether to handle all events or 
-only specific ones. 
-
-Below is a list of events and how to subscribe to them:
-
-{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
-{%- set groupname = messagegroupid  | pascal %}
-{%- set class_name = ( groupname | strip_namespace )+"EventDispatcher" %}
-
-#### {{ groupname | pascal }} Events
-
-{%- for messageid, message in messagegroup.messages.items() %}
-{%- set messagename = messageid | strip_namespace | pascal %}
-{%- if message.dataschemauri or message.dataschema %}
-{%- set dataType = 'global::' + (( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal) %}
-{%- else %}
-{%- set dataType = "object" %}
-{%- endif %}
-
-- **{{ messagename }}Async**: {{ message.description }}
-
-  Arguments:
-    - `eventData`: [`Azure.EventHubs.EventData`](): The Event Hubs event data.
-    {%- if message.envelope == 'CloudEvents/1.0' %}
-    - `cloudEvent`: [`CloudNative.CloudEvent`](): The CloudEvent envelope information.
-    {%- endif %}
-    - `data`: [`{{ dataType | lstrip('global::')}}`](): The event data.
-
-  ```csharp
-  dispatcher.{{ messagename }}Async += async (eventData, {{ 'cloudEvent, ' if message.envelope == 'CloudEvents/1.0' }}{{dataType}} data) =>
-  {
-      // Your event handling logic here
-  };
-  ```
-{%- endfor %}
-{%- endfor %}
-
-
-### Handling Unhandled Events
-
-If an event does not match any of the specified handlers, the
-`UnhandledMessageAsync` event will be invoked. Events that are understood but
-not subscribed by any of the handlers do not trigger this event.
-
-```csharp
-dispatcher.UnhandledMessageAsync += async (eventData) =>
+[Fact]
+public async Task ConsumesKafkaMessage()
 {
-    // Handle unhandled messages here
-    await Task.CompletedTask;
-};
+    // Arrange: Start Kafka container
+    using var kafka = new KafkaContainer();
+    await kafka.StartAsync();
+    
+    var consumer = new {{ class_name }}(
+        kafka.BootstrapServers,
+        "test-group",
+        new[] { "test-topic" },
+        loggerFactory);
+    
+    var received = new TaskCompletionSource<bool>();
+    consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (r, ce, data) =>
+    {
+        received.SetResult(true);
+    };
+    
+    await consumer.StartAsync();
+    
+    // Act: Produce test message
+    await ProduceTestMessageAsync(kafka);
+    
+    // Assert
+    Assert.True(await received.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+    await consumer.StopAsync();
+}
 ```
 
-### Handling Errors
+## Performance Tips
 
-Error handling is built-in and can be customized by subscribing to the
-`ErrorAsync` event.
+1. **Batch processing**: Process multiple messages before committing
+2. **Parallel handlers**: Use Task.WhenAll for independent operations
+3. **Optimize serialization**: Use efficient formats (Avro, Protobuf)
+4. **Increase partitions**: More partitions = more parallel consumers
+5. **Tune fetch settings**: Adjust `fetch.min.bytes` and `fetch.max.wait.ms`
 
-```csharp
-dispatcher.ErrorAsync += async (eventArgs) =>
-{
-    Console.WriteLine($"Error: {eventArgs.Exception.Message}");
-    await Task.CompletedTask;
-};
-```
+## Configuration Reference
 
-## Event Schema Documentation
+Common Kafka consumer settings:
 
-Detailed documentation for the classes returned by the `schema_type()` can be
-found in the [data.md](data.md) document. Each class is documented with its
-corresponding properties and usage examples.
+| Setting | Description | Example |
+|---------|-------------|---------|
+| `bootstrap.servers` | Kafka brokers | `"localhost:9092"` |
+| `group.id` | Consumer group | `"my-app"` |
+| `auto.offset.reset` | Where to start | `"earliest"` or `"latest"` |
+| `enable.auto.commit` | Auto-commit offsets | `"true"` or `"false"` |
+| `max.poll.records` | Max messages per poll | `"500"` |
+| `session.timeout.ms` | Consumer heartbeat timeout | `"30000"` |
 
+## Learn More
+
+- [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
+- [Confluent Kafka .NET Client](https://docs.confluent.io/kafka-clients/dotnet/current/overview.html)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Dependencies
+
+- `Confluent.Kafka` - Kafka .NET client
+- `CloudNative.CloudEvents` - CloudEvents support
+- `Microsoft.Extensions.Logging` - Logging
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** Apache Kafka  
+**Envelope:** CloudEvents 1.0
+{% endfor %}

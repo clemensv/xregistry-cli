@@ -1,0 +1,217 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "MqttClient" %}
+# {{ project_name }} - MQTT 5.0 Client
+
+Auto-generated TypeScript client for MQTT messaging.
+
+## Overview
+
+This library provides a type-safe MQTT client for {{ groupname }} message group. Built on `mqtt` (MQTT.js) for Node.js.
+
+## What is MQTT?
+
+**MQTT (Message Queuing Telemetry Transport)** is a lightweight pub/sub messaging protocol that:
+- **Minimizes bandwidth** usage for resource-constrained devices
+- **Supports QoS levels** (0: at-most-once, 1: at-least-once, 2: exactly-once)
+- **Enables bi-directional communication** for IoT devices
+- **Works over unreliable networks** with automatic reconnection
+
+Use cases: IoT telemetry, smart devices, mobile applications, home automation.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+## Quick Start
+
+### 1. Basic Usage (TCP)
+
+```typescript
+import { {{ class_name }} } from './src';
+
+const client = new {{ class_name }}('mqtt://localhost:1883', {
+    clientId: 'my-client-id',
+    clean: true,
+    connectTimeout: 4000
+});
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Register handler for {{ messagename }}
+client.{{ messagename }}Handler = async (data) => {
+    console.log('Received {{ messagename }}:', data);
+    // Process your event data here
+};
+{%- endif %}
+
+// Subscribe to topics
+await client.subscribe();
+
+// Publish a message
+{%- if first_message %}
+await client.publish{{ messagename }}({
+    // Your {{ message_body_type | strip_namespace }} data here
+});
+{%- endif %}
+
+// Later: disconnect
+await client.disconnect();
+```
+
+### 2. Using TLS/SSL (Recommended for Production)
+
+```typescript
+import * as fs from 'fs';
+
+const client = new {{ class_name }}('mqtts://broker.example.com:8883', {
+    ca: fs.readFileSync('./ca.crt'),
+    cert: fs.readFileSync('./client.crt'),
+    key: fs.readFileSync('./client.key'),
+    rejectUnauthorized: true
+});
+```
+
+### 3. Using Authentication
+
+```typescript
+const client = new {{ class_name }}('mqtt://broker.example.com:1883', {
+    username: 'my-username',
+    password: 'my-password'
+});
+```
+
+## Available Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}Handler
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+client.{{ messagename }}Handler = async (data: {{ message_body_type | strip_namespace }}) => {
+    // Handle {{ messagename }} event
+    console.log('Processing {{ messagename }}:', data);
+};
+```
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Publishing Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### publish{{ messagename }}
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+await client.publish{{ messagename }}(data: {{ message_body_type | strip_namespace }}, options?: {
+    qos?: 0 | 1 | 2,
+    retain?: boolean
+}): Promise<void>
+```
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Configuration Options
+
+### Quality of Service (QoS)
+
+```typescript
+// QoS 0: At most once (fire and forget)
+await client.publish{{ messagename }}(data, { qos: 0 });
+
+// QoS 1: At least once (acknowledged delivery)
+await client.publish{{ messagename }}(data, { qos: 1 });
+
+// QoS 2: Exactly once (assured delivery)
+await client.publish{{ messagename }}(data, { qos: 2 });
+```
+
+### Retained Messages
+
+```typescript
+// Retain message on broker for new subscribers
+await client.publish{{ messagename }}(data, { retain: true });
+```
+
+### Last Will and Testament
+
+```typescript
+const client = new {{ class_name }}('mqtt://localhost:1883', {
+    will: {
+        topic: 'status/{{ groupname | strip_namespace | snake }}',
+        payload: JSON.stringify({ status: 'offline' }),
+        qos: 1,
+        retain: true
+    }
+});
+```
+
+## Error Handling
+
+```typescript
+client.{{ messagename }}Handler = async (data) => {
+    try {
+        // Process message
+        await processEvent(data);
+    } catch (error) {
+        console.error('Failed to process {{ messagename }}:', error);
+        // Handle error appropriately
+    }
+};
+
+client.on('error', (error) => {
+    console.error('MQTT error:', error);
+});
+
+client.on('offline', () => {
+    console.log('Client is offline');
+});
+
+client.on('reconnect', () => {
+    console.log('Reconnecting...');
+});
+```
+
+## Best Practices
+
+1. **Use unique client IDs** to avoid connection conflicts
+2. **Enable clean sessions** unless you need persistent subscriptions
+3. **Implement reconnection logic** for unreliable networks
+4. **Use appropriate QoS levels** - higher levels consume more bandwidth
+5. **Use TLS/SSL** for production deployments
+6. **Implement Last Will** for client availability monitoring
+{% endfor %}

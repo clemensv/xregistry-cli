@@ -1,145 +1,478 @@
-# {{ project_name | pascal }} Event Hubs Consumer SDK
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = cloudEvents.usesCloudEvents(root) %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventConsumer" %}
+# {{ project_name | pascal }} - Azure Event Hubs Consumer
+
+Auto-generated Event Hubs consumer for {{ groupname }} message group.
 
 ## Overview
 
-The `{{ project_name | pascal }}` library provides a robust and strongly-typed
-API for obtaining and processing events from Azure Event Hubs and Microsoft
-Fabric Event Streams custom output endpoints that are associated with {% for
-messagegroupid, messagegroup in root.messagegroups.items() -%}
-`{{- messagegroupid -}}`{%- if not loop.last -%}, {%- elif not loop.first -%},
-and {%- endif -%} {%- endfor %} message group{% if (root.messagegroups.items() |
-length) %}s{% endif %}.
+This consumer makes it easy to receive and process events from Azure Event Hubs. It handles all the complexity of connecting, consuming, checkpointing, and error handling - you just write your business logic!
 
-This documentation will help you getting started.
+## What is Azure Event Hubs?
 
-## Prerequisites
+Azure Event Hubs is a real-time data streaming platform for receiving millions of events per second. It's commonly used for:
+- Telemetry and logging at scale
+- IoT device data
+- Real-time analytics pipelines
+- Application monitoring
 
-Before using the `{{ project_name | pascal }}` library, ensure you have the following prerequisites:
-- .NET SDK 8.0 installed.
-- For running the unit tests: Docker or a compatible container runtime.
+This library gives you a simple way to consume those events without dealing with complex streaming APIs.
 
-For Azure Event Hubs:
-- An Azure account with access to Event Hubs and an Azure Storage account.
+## Quick Start
 
-For Microsoft Fabric Event Streams:
-  - A Microsoft Fabric Event Streams with a custom output endpoint.
-  - An Azure Storage account. 
-
-To use the `{{ project_name | pascal }}` library, add the necessary NuGet
-packages to your project:
+### 1. Install and Build
 
 ```bash
-dotnet add package Azure.Messaging.EventHubs
-dotnet add package Azure.Messaging.EventHubs.Processor
-dotnet add package Azure.Storage.Blobs
+dotnet build
 ```
 
-## Building, testing and packaging the SDK
+### 2. Get Your Connection String
 
-The code in this SDK is complete and ready for use. It includes unit tests that
-can be run using the `dotnet test` command and which verify the correctness of 
-the components, which includes running them against the Azure Event Hubs emulator.
+From Azure Portal:
+1. Go to your Event Hubs Namespace
+2. Click "Shared access policies"  
+3. Select a policy (or create one with Listen permission)
+4. Copy the "Connection string"
 
-The SDK can be packaged into a NuGet package using the `dotnet pack` command.
+### 3. Basic Usage
+
+```csharp
+using {{ project_name | pascal }};
+using Azure.Storage.Blobs;
+using Azure.Identity;
+using Microsoft.Extensions.Logging;
+
+// Storage is required for checkpointing (tracking which events you've processed)
+var storageClient = new BlobContainerClient(
+    "YOUR-STORAGE-CONNECTION-STRING",
+    "checkpoint-container");
+
+// Create the consumer
+var consumer = new {{ class_name }}(
+    "YOUR-EVENTHUB-CONNECTION-STRING",
+    "YOUR-EVENTHUB-NAME",
+    "$Default",  // Consumer group name
+    storageClient,
+    loggerFactory);
+
+// Register handlers for events you care about
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+consumer.{{ messagename }}Async += async (partition, cloudEvent, data) =>
+{
+    Console.WriteLine($"Received {{ messagename }}: {cloudEvent.Id}");
+    // Process your data here
+    await ProcessDataAsync(data);
+};
+{%- endif %}
+
+// Start consuming
+await consumer.StartAsync();
+
+// Keep running (until you want to stop)
+await Task.Delay(Timeout.Infinite, cancellationToken);
+
+// Cleanup
+await consumer.StopAsync();
+await consumer.DisposeAsync();
+```
+
+### 4. Using Azure AD Authentication (Recommended for Production)
+
+```csharp
+using Azure.Identity;
+
+var credential = new DefaultAzureCredential();
+
+var consumer = new {{ class_name }}(
+    "YOUR-NAMESPACE.servicebus.windows.net",
+    "YOUR-EVENTHUB-NAME",
+    "$Default",
+    storageClient,
+    credential,
+    loggerFactory);
+```
+
+## Event Handlers
+
+Register handlers for the events you want to process:
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Event Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`  
+{% if message.description -%}**Description:** {{ message.description }}{%- endif %}
+
+```csharp
+consumer.{{ messagename }}Async += async (partitionId, cloudEvent, data) =>
+{
+    if (data != null)
+    {
+        // Your processing logic
+        Console.WriteLine($"Processing {{ messagename }} from partition {partitionId}");
+        await SaveToDatabaseAsync(data);
+    }
+};
+```
+
+**Common Patterns:**
+
+```csharp
+// Database persistence
+consumer.{{ messagename }}Async += async (pid, ce, data) =>
+{
+    await _dbContext.{{ messagename }}s.AddAsync(data);
+    await _dbContext.SaveChangesAsync();
+};
+
+// API call
+consumer.{{ messagename }}Async += async (pid, ce, data) =>
+{
+    await _httpClient.PostAsJsonAsync("https://api.example.com/process", data);
+};
+
+// Message forwarding
+consumer.{{ messagename }}Async += async (pid, ce, data) =>
+{
+    await _queueClient.SendMessageAsync(JsonSerializer.Serialize(data));
+};
+```
+
+{% endfor %}
+
+### Unhandled Events
+
+Process events that don't match any registered handler:
+
+```csharp
+consumer.UnhandledEventAsync += async (partitionId, cloudEvent) =>
+{
+    _logger.LogInformation("Received unhandled event type: {Type} from partition {Partition}",
+        cloudEvent.Type, partitionId);
+};
+```
+
+## Checkpointing
+
+**Checkpointing** is how the consumer remembers which events it has processed. This prevents re-processing events after a restart.
+
+### How It Works
+
+1. Consumer reads events from Event Hubs
+2. Your handlers process the events
+3. Consumer automatically saves checkpoints to Azure Blob Storage
+4. If the app restarts, it resumes from the last checkpoint
+
+### Checkpoint Storage Setup
+
+```csharp
+// Option 1: Connection string
+var storageClient = new BlobContainerClient(
+    "DefaultEndpointsProtocol=https;AccountName=...",
+    "checkpoints");
+
+// Option 2: Azure AD (recommended)
+var storageClient = new BlobContainerClient(
+    new Uri("https://YOUR-STORAGE.blob.core.windows.net/checkpoints"),
+    new DefaultAzureCredential());
+
+// Create container if it doesn't exist
+await storageClient.CreateIfNotExistsAsync();
+```
+
+The container will store checkpoint data automatically. Don't modify these files manually!
+
+## Error Handling
+
+### Automatic Error Recovery
+
+The consumer automatically handles:
+- **Deserialization errors**: Logs and continues to next event
+- **Connection failures**: Automatically reconnects
+- **Partition rebalancing**: Handles when partitions move between consumers
+
+### Custom Error Handling
+
+```csharp
+consumer.ProcessingErrorAsync += async (partitionId, cloudEvent, exception) =>
+{
+    _logger.LogError(exception, "Failed to process event {EventId} from partition {Partition}",
+        cloudEvent?.Id, partitionId);
+    
+    // Optionally: Send to dead-letter queue
+    if (cloudEvent != null)
+    {
+        await _deadLetterQueue.SendAsync(cloudEvent);
+    }
+};
+
+consumer.DeserializationErrorAsync += async (partitionId, cloudEvent, exception) =>
+{
+    _logger.LogWarning(exception, "Failed to deserialize event from partition {Partition}",
+        partitionId);
+    
+    // Event is logged but not re-processed
+};
+```
+
+## Consumer Groups
+
+Consumer groups allow multiple applications to read from the same Event Hub independently.
+
+**Default consumer group**: `$Default` (always exists)
+
+**When to create a new consumer group:**
+- You have multiple applications consuming the same Event Hub
+- Each application needs to process all events independently
+
+```csharp
+// Consumer Group 1 - Real-time analytics
+var analyticsConsumer = new {{ class_name }}(
+    connectionString,
+    eventHubName,
+    "analytics-group",  // Separate consumer group
+    analyticsStorageClient,
+    loggerFactory);
+
+// Consumer Group 2 - Data archival
+var archivalConsumer = new {{ class_name }}(
+    connectionString,
+    eventHubName,
+    "archival-group",  // Different consumer group
+    archivalStorageClient,
+    loggerFactory);
+```
+
+Both consumers receive all events independently!
+
+## Partitions
+
+Event Hubs divides data into **partitions** for parallel processing.
+
+### How Partitions Work
+
+- Your Event Hub has N partitions (e.g., 4, 8, 16)
+- Events are distributed across partitions
+- Each consumer instance reads from one or more partitions
+- Partitions provide ordering guarantees within that partition
+
+### Multiple Consumer Instances
+
+Run multiple instances for better throughput:
+
+```bash
+# Instance 1 (processes partitions 0-1)
+dotnet run
+
+# Instance 2 (processes partitions 2-3)
+dotnet run
+
+# Partitions are automatically distributed!
+```
+
+The consumer library handles partition distribution automatically using the checkpoint storage.
+
+## Lifecycle Management
+
+### Start and Stop
+
+```csharp
+// Start consuming (non-blocking)
+await consumer.StartAsync();
+_logger.LogInformation("Consumer started");
+
+// Do other work or wait
+await SomeOtherWorkAsync();
+
+// Graceful shutdown
+await consumer.StopAsync();
+_logger.LogInformation("Consumer stopped gracefully");
+```
+
+### Async Disposal
+
+```csharp
+await using var consumer = new {{ class_name }}(
+    connectionString,
+    eventHubName,
+    consumerGroup,
+    storageClient,
+    loggerFactory);
+
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (p, ce, data) =>
+{
+    await ProcessAsync(data);
+};
+
+await consumer.StartAsync();
+await Task.Delay(TimeSpan.FromMinutes(5)); // Run for 5 minutes
+
+// Automatically stops and disposes
+```
+
+## Configuration
+
+### Connection String Format
+
+```
+Endpoint=sb://YOUR-NAMESPACE.servicebus.windows.net/;SharedAccessKeyName=YOUR-POLICY;SharedAccessKey=YOUR-KEY;EntityPath=YOUR-EVENTHUB
+```
+
+Or without EntityPath (specify Event Hub name separately):
+```
+Endpoint=sb://YOUR-NAMESPACE.servicebus.windows.net/;SharedAccessKeyName=YOUR-POLICY;SharedAccessKey=YOUR-KEY
+```
+
+### Application Settings
+
+```json
+{
+  "EventHubs": {
+    "ConnectionString": "Endpoint=sb://...",
+    "EventHubName": "my-eventhub",
+    "ConsumerGroup": "$Default",
+    "StorageConnectionString": "DefaultEndpointsProtocol=https;..."
+  }
+}
+```
+
+Load in code:
+```csharp
+var config = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json")
+    .Build();
+
+var consumer = new {{ class_name }}(
+    config["EventHubs:ConnectionString"],
+    config["EventHubs:EventHubName"],
+    config["EventHubs:ConsumerGroup"],
+    new BlobContainerClient(config["EventHubs:StorageConnectionString"], "checkpoints"),
+    loggerFactory);
+```
+
+## Monitoring
+
+### Built-in Logging
+
+The consumer logs important events:
+- Connection status
+- Partition assignments
+- Processing errors
+- Checkpoint updates
+
+Configure logging:
+```csharp
+using Microsoft.Extensions.Logging;
+
+var loggerFactory = LoggerFactory.Create(builder =>
+{
+    builder
+        .AddConsole()
+        .AddDebug()
+        .SetMinimumLevel(LogLevel.Information);
+});
+```
+
+### Metrics to Monitor
+
+- **Events processed per second**: Your throughput
+- **Processing latency**: Time from event arrival to completion
+- **Consumer lag**: How far behind real-time you are
+- **Errors**: Failed events or deserialization issues
+
+## Testing
+
+### Run Unit Tests
 
 ```bash
 dotnet test
-dotnet pack
 ```
 
-## Usage
+### Integration Testing
 
-### Creating the Event Processor Client 
-
-To start processing events from Event Hubs, create an instance of the
-`EventProcessorClient` using one of the provided methods in the {{ project_name | pascal | strip_dots}}Dispatcher class. These methods help configure the processor with
-various authentication mechanisms.
+The test project includes examples using Testcontainers or Azure Emulator:
 
 ```csharp
-var checkpointBlobClient = new BlobContainerClient("<connection-string>", "<container-name>");
-var credential = new DefaultAzureCredential();
-var dispatcher = new {{ class_name }}();
-
-var eventProcessorClient = dispatcher.CreateEventProcessorClient(
-    checkpointBlobClient,
-    credential,
-    "<fully-qualified-namespace>",
-    "<event-hub-name>",
-    "<consumer-group-name>"
-);
-```
-
-### Events and Handlers
-
-The `{{ class_name }}` class provides strongly-typed event handlers for
-different types of events. You can choose whether to handle all events or 
-only specific ones. 
-
-Below is a list of events and how to subscribe to them:
-
-{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
-{%- set groupname = messagegroupid  | pascal %}
-{%- set class_name = ( groupname | strip_namespace )+"EventDispatcher" %}
-
-#### {{ groupname | pascal }} Events
-
-{%- for messageid, message in messagegroup.messages.items() %}
-{%- set messagename = messageid | strip_namespace | pascal %}
-{%- if message.dataschemauri or message.dataschema %}
-{%- set dataType = 'global::' + (( message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal) %}
-{%- else %}
-{%- set dataType = "object" %}
-{%- endif %}
-
-- **{{ messagename }}Async**: {{ message.description }}
-
-  Arguments:
-    - `eventData`: [`Azure.EventHubs.EventData`](): The Event Hubs event data.
-    {%- if message.envelope == 'CloudEvents/1.0' %}
-    - `cloudEvent`: [`CloudNative.CloudEvent`](): The CloudEvent envelope information.
-    {%- endif %}
-    - `data`: [`{{ dataType | lstrip('global::')}}`](): The event data.
-
-  ```csharp
-  dispatcher.{{ messagename }}Async += async (eventData, {{ 'cloudEvent, ' if message.envelope == 'CloudEvents/1.0' }}{{dataType}} data) =>
-  {
-      // Your event handling logic here
-  };
-  ```
-{%- endfor %}
-{%- endfor %}
-
-
-### Handling Unhandled Events
-
-If an event does not match any of the specified handlers, the
-`UnhandledMessageAsync` event will be invoked. Events that are understood but
-not subscribed by any of the handlers do not trigger this event.
-
-```csharp
-dispatcher.UnhandledMessageAsync += async (eventData) =>
+[Fact]
+public async Task ConsumesEventsSuccessfully()
 {
-    // Handle unhandled messages here
-    await Task.CompletedTask;
-};
+    // Arrange: Set up test Event Hub
+    var testEventHub = await CreateTestEventHubAsync();
+    var consumer = new {{ class_name }}(/* test config */);
+    
+    var receivedEvents = new List<{{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }}>();
+    consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (p, ce, data) =>
+    {
+        receivedEvents.Add(data);
+    };
+    
+    await consumer.StartAsync();
+    
+    // Act: Send test events
+    await SendTestEventsAsync(testEventHub);
+    
+    // Wait for processing
+    await Task.Delay(2000);
+    
+    // Assert
+    Assert.NotEmpty(receivedEvents);
+    await consumer.StopAsync();
+}
 ```
 
-### Handling Errors
+## Performance Tips
 
-Error handling is built-in and can be customized by subscribing to the
-`ErrorAsync` event.
+1. **Use async/await**: Never block with `.Result` or `.Wait()`
+2. **Batch database operations**: Save multiple records at once
+3. **Parallel processing**: Use multiple consumer instances
+4. **Increase partitions**: More partitions = more parallelism
+5. **Monitor lag**: Watch checkpoint updates and consumer lag metrics
 
-```csharp
-dispatcher.ErrorAsync += async (eventArgs) =>
-{
-    Console.WriteLine($"Error: {eventArgs.Exception.Message}");
-    await Task.CompletedTask;
-};
-```
+## Troubleshooting
 
-## Event Schema Documentation
+**Not receiving events**: Check connection string, Event Hub name, and that events are being sent
 
-Detailed documentation for the classes returned by the `schema_type()` can be
-found in the [data.md](data.md) document. Each class is documented with its
-corresponding properties and usage examples.
+**Slow processing**: Consider running multiple instances or optimizing handlers
 
+**Duplicate events**: Can happen after crashes; make handlers idempotent
+
+**Checkpoint errors**: Verify storage connection string and container exists
+
+**Connection timeouts**: Check network connectivity and firewall rules
+
+## Learn More
+
+- [Azure Event Hubs Documentation](https://learn.microsoft.com/azure/event-hubs/)
+- [Event Hubs .NET SDK](https://learn.microsoft.com/dotnet/api/overview/azure/messaging.eventhubs-readme)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Dependencies
+
+- `Azure.Messaging.EventHubs` - Event Hubs SDK
+- `Azure.Messaging.EventHubs.Processor` - Event processor for checkpointing
+- `Azure.Storage.Blobs` - Checkpoint storage
+- `Azure.Identity` - Azure AD authentication
+- `CloudNative.CloudEvents` - CloudEvents support
+- `Microsoft.Extensions.Logging` - Logging
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** Azure Event Hubs (AMQP)  
+**Envelope:** CloudEvents 1.0  
+**Checkpointing:** Azure Blob Storage
+{% endfor %}

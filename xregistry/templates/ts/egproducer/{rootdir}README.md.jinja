@@ -1,0 +1,164 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventGridProducer" %}
+# {{ project_name }} - Azure Event Grid Producer
+
+Auto-generated TypeScript producer for publishing CloudEvents to Azure Event Grid.
+
+## Overview
+
+This library provides a type-safe Event Grid producer client for {{ groupname }} message group. Built on `@azure/eventgrid` SDK.
+
+## What is Azure Event Grid?
+
+**Azure Event Grid** is a fully managed event routing service that:
+- **Simplifies event-driven architectures** with publish/subscribe model
+- **Provides built-in filtering** to route events to specific handlers
+- **Supports multiple event schemas** including CloudEvents and Event Grid schema
+- **Integrates with Azure services** and custom webhooks
+
+Use cases: Serverless architectures, application integration, reactive programming, event sourcing.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+## Quick Start
+
+### 1. Using Access Key
+
+```typescript
+import { {{ class_name }} } from './src';
+
+const endpoint = 'https://your-topic.region.eventgrid.azure.net/api/events';
+const accessKey = '<your-access-key>';
+
+const producer = new {{ class_name }}(endpoint, accessKey);
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Send single event
+await producer.send{{ messagename }}({
+    // Your {{ message_body_type | strip_namespace }} data here
+});
+{%- endif %}
+```
+
+### 2. Using Azure Identity (Recommended for Production)
+
+```typescript
+import { DefaultAzureCredential } from '@azure/identity';
+
+const endpoint = 'https://your-topic.region.eventgrid.azure.net/api/events';
+const credential = new DefaultAzureCredential();
+
+const producer = new {{ class_name }}(endpoint, credential);
+```
+
+## Available Event Publishing Methods
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### send{{ messagename }}
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+await producer.send{{ messagename }}(data: {{ message_body_type | strip_namespace }}): Promise<void>
+```
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Configuration Options
+
+### Event Grid Topics
+
+Create topics in Azure Portal or CLI:
+
+```bash
+az eventgrid topic create \
+  --name my-topic \
+  --resource-group my-rg \
+  --location eastus \
+  --input-schema cloudevents
+```
+
+### Event Filtering
+
+Configure event subscriptions with filters:
+
+```bash
+az eventgrid event-subscription create \
+  --name my-subscription \
+  --source-resource-id /subscriptions/.../topics/my-topic \
+  --endpoint https://myfunction.azurewebsites.net/api/webhook \
+  --advanced-filter data.eventType StringIn {{ messageid }}
+```
+
+### Batch Publishing
+
+```typescript
+// Event Grid supports batching multiple events
+const events = [
+    { /* event 1 */ },
+    { /* event 2 */ },
+    { /* event 3 */ }
+];
+
+for (const event of events) {
+    await producer.send{{ messagename }}(event);
+}
+```
+
+## Error Handling
+
+```typescript
+try {
+    await producer.send{{ messagename }}(eventData);
+} catch (error) {
+    console.error('Failed to send {{ messagename }}:', error);
+    // Handle send failure (retry, log, alert, etc.)
+}
+```
+
+## Best Practices
+
+1. **Use Azure Identity** instead of access keys for production
+2. **Implement retry logic** with exponential backoff
+3. **Use event filtering** to route events efficiently
+4. **Monitor delivery metrics** in Azure Portal
+5. **Set up dead-letter queues** for failed deliveries
+6. **Use CloudEvents schema** for interoperability
+{% endfor %}
+
+### From Endpoint URL
+
+```typescript
+const endpointWithKey = 'https://<your-topic>.eventgrid.azure.net/api/events?api-key=<key>';
+const producer = {% for messagegroupid, messagegroup in root.messagegroups.items() -%}{%- set class_name = (messagegroupid | pascal | strip_namespace) + "EventGridProducer" %}{{ class_name }}{% if loop.first %}{% endif %}{% endfor %}.createForEndpoint(endpointWithKey);
+```

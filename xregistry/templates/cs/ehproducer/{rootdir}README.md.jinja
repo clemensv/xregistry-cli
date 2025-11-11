@@ -1,0 +1,116 @@
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "amqp.jinja.include" as amqp -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid  | pascal -%}
+
+# C# Azure Event Hubs Event Factory for `{{ messagegroupid }}`
+
+This is a C# library that provides a factory class for creating Azure Event Hubs
+events for the `{{ messagegroupid }}` message group, along with a set of classes
+for the event data.
+
+Namespace: `{{ groupname | namespace(project_name) | pascal }}`
+Class Name: `{{ groupname }}EventFactory`
+
+## Methods and Properties
+
+ {%- if root.endpoints -%} 
+{%- for endpointid, endpoint in root.endpoints.items() -%}
+### CreateFor{{ endpointid | pascal | strip_namespace }} Method
+
+Creates an `EventHubProducerClient` for the {{ endpointid }} endpoint message. 
+
+There are three overloads for this method, each taking a different type of credential:
+
+```csharp
+public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(TokenCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null);
+```
+
+```csharp	
+public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(AzureNamedKeyCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null);
+```
+
+```csharp
+public static EventHubProducerClient CreateFor{{ endpointid | pascal | strip_namespace }}(AzureSasCredential credential, string? fullyQualifiedNamespace = null, string? eventHubName = null) 
+```
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| `credential` | `TokenCredential`, `AzureNamedKeyCredential`, or `AzureSasCredential` | The credential to use for authentication. |
+| `fullyQualifiedNamespace` | `string` | The fully qualified namespace of the Event Hub, optionally overriding the value defined for the endpoint |
+| `eventHubName` | `string` | The name of the Event Hub, optionally overriding the value defined for the endpoint |
+{% endfor %}
+
+{% endif %}
+
+{% for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal %}
+{%- set isCloudEvent = not message.envelope or message.envelope.lower().startswith("cloudevents") -%}
+{%- set is_amqp = not isCloudEvent and message.envelope.lower().startswith("amqp") %}
+
+### Create{{ messagename | strip_namespace }}Event Method
+
+Creates an `EventData` object for the `{{ messageid }}` message.
+
+{%- if message.description %}
+#### Event Description
+
+{{ message.description }}
+{%- endif %}
+
+#### Usage
+
+```csharp
+public static EventData Create{{ messagename | strip_namespace }}Event(
+{%- if message.dataschemauri or message.dataschema -%}
+{%- set type_name = ((message.dataschemauri if message.dataschemauri else message.dataschema) | schema_type( project_name, root, message.dataschemaformat) | pascal )  %}
+{%- if message.dataschemaformat.lower().startswith("jsonschema") %}
+{%- set type_name = type_name | pascal %}
+{%- endif %}
+{%- else -%}
+{%- set type_name = "object" %}
+{%- endif -%}
+{{ type_name }} data
+{%- if isCloudEvent -%}
+{{- cloudEvents.DeclareUriTemplateArguments(message) -}}
+{%- elif is_amqp -%}
+{{- amqp.DeclareUriTemplateArguments(message) -}}
+{%- endif -%}
+{%- if isCloudEvent and "datacontenttype" in message.envelopemetadata and "value" in message.envelopemetadata["datacontenttype"] -%}
+, string contentType = "{{ message.envelopemetadata["datacontenttype"]["value"] }}"
+{%- else -%}
+, string contentType = System.Net.Mime.MediaTypeNames.Application.Json
+{%- endif %}
+{%- if isCloudEvent %}, CloudEventFormatter? formatter = null{% endif %});
+```
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| `data` | `{{ type_name }}` | The data to include in the event |
+{%- if isCloudEvent %}
+{%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) -%}
+{%- elif is_amqp %}
+{%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
+{%- endif %}
+{%- if uriargs %}
+{%- for arg in uriargs.split(',') if arg.strip() %}
+{%- set splitarg = arg.strip().split(' ')%}
+| `{{ splitarg[1] }}` | `{{ splitarg[0] }}` | URI template argument |
+{%- endfor %}
+{%- endif %}
+{%- if isCloudEvent and "datacontenttype" in message.envelopemetadata and "value" in message.envelopemetadata["datacontenttype"] %}
+| `contentType` | `string` | The content type of the event data. Defaults to `{{ message.envelopemetadata["datacontenttype"]["value"] }}` |
+{%- else %}
+| `contentType` | `string` | The content type of the event data. Defaults to `application/json` |
+{%- endif %}
+{%- if isCloudEvent %}
+| `formatter` | `CloudEventFormatter` | The formatter to use for structured CloudEvents mode. Defaults to `null` (binary mode) |
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+

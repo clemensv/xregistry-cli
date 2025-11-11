@@ -1,0 +1,251 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Consumer" %}
+# {{ project_name | pascal }} - Azure Event Hubs Consumer
+
+Auto-generated Java consumer for Azure Event Hubs with partition processing and checkpointing.
+
+## Overview
+
+Type-safe consumer for {{ groupname }} message group using Azure Event Hubs Java SDK 5.x with CloudEvents support.
+
+## What is Azure Event Hubs?
+
+**Azure Event Hubs** is a fully managed, real-time data ingestion service that can:
+- Receive **millions of events per second**
+- Store event streams with **configurable retention** (1-90 days)
+- **Partition data** for parallel processing
+- Support **multiple consumer groups** for independent processing
+
+Perfect for: telemetry, logs, IoT sensors, clickstream data.
+
+## Quick Start
+
+### 1. Add Dependency
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>{{ groupid }}</groupId>
+    <artifactId>{{ project_name | snake }}</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+**Gradle:**
+```gradle
+implementation '{{ groupid }}:{{ project_name | snake }}:1.0.0'
+```
+
+### 2. Receive Events
+
+```java
+import {{ project_name | snake }}.{{ class_name }};
+
+String connectionString = "Endpoint=sb://namespace.servicebus.windows.net/;...";
+String eventHubName = "my-hub";
+String consumerGroup = "$Default";
+
+// Checkpoint store for tracking progress
+BlobContainerAsyncClient checkpointStore = new BlobContainerClientBuilder()
+    .connectionString("DefaultEndpointsProtocol=https;...")
+    .containerName("checkpoints")
+    .buildAsyncClient();
+
+{{ class_name }} consumer = new {{ class_name }}(
+    connectionString, eventHubName, consumerGroup, checkpointStore);
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Register event handler
+consumer.on{{ messagename }}((data, context) -> {
+    System.out.println("Partition: " + context.getPartitionContext().getPartitionId());
+    System.out.println("Offset: " + context.getPartitionContext().getLastEnqueuedEventProperties().getOffset());
+    
+    // Process event
+    System.out.println("Data: " + data);
+    
+    // Checkpoint after successful processing
+    context.updateCheckpoint();
+});
+{%- endif %}
+
+// Start processing all partitions
+consumer.start();
+
+// Later: stop gracefully
+consumer.stop();
+```
+
+## Available Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### on{{ messagename }}
+
+```java
+consumer.on{{ messagename }}(({{ message_body_type }} data, EventContext context) -> {
+    // Access partition information
+    String partitionId = context.getPartitionContext().getPartitionId();
+    long offset = context.getPartitionContext().getLastEnqueuedEventProperties().getOffset();
+    
+    // Process event
+    
+    // Update checkpoint (every N events or on success)
+    context.updateCheckpoint();
+});
+```
+{% if message.description %}
+{{ message.description }}
+{% endif %}
+
+{% endfor %}
+
+## Checkpointing
+
+Checkpoints track which events have been processed per partition:
+
+```java
+// Checkpoint after every event
+context.updateCheckpoint();
+
+// Checkpoint every 100 events
+if (eventCount % 100 == 0) {
+    context.updateCheckpoint();
+}
+
+// Checkpoint after time interval
+if (Duration.between(lastCheckpoint, Instant.now()).toSeconds() > 60) {
+    context.updateCheckpoint();
+    lastCheckpoint = Instant.now();
+}
+```
+
+## Partition Processing
+
+Event Hubs distributes events across partitions for parallelism:
+
+```java
+consumer.onPartitionInitialize((partitionContext) -> {
+    System.out.println("Started processing partition: " + partitionContext.getPartitionId());
+});
+
+consumer.onPartitionClose((partitionContext, reason) -> {
+    System.out.println("Stopped partition: " + partitionContext.getPartitionId());
+    System.out.println("Reason: " + reason);
+});
+```
+
+## Authentication
+
+### Connection String (Shared Access Key)
+
+```java
+String connectionString = "Endpoint=sb://myhub.servicebus.windows.net/;" +
+    "SharedAccessKeyName=RootManageSharedAccessKey;" +
+    "SharedAccessKey=...";
+
+{{ class_name }} consumer = new {{ class_name }}(
+    connectionString, eventHubName, consumerGroup, checkpointStore);
+```
+
+### Azure AD / Managed Identity (Recommended)
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .fullyQualifiedNamespace("myhub.servicebus.windows.net")
+    .eventHubName(eventHubName)
+    .consumerGroup(consumerGroup)
+    .checkpointStore(checkpointStore)
+    .credential(new DefaultAzureCredentialBuilder().build())
+    .build();
+```
+
+## Error Handling
+
+```java
+consumer.onError((context, throwable) -> {
+    System.err.println("Error in partition: " + context.getPartitionContext().getPartitionId());
+    System.err.println("Error: " + throwable.getMessage());
+    
+    // Don't checkpoint on errors - will retry event
+});
+```
+
+## Configuration
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .connectionString(connectionString)
+    .eventHubName(eventHubName)
+    .consumerGroup(consumerGroup)
+    .checkpointStore(checkpointStore)
+    .prefetchCount(300)                    // Events to prefetch per partition
+    .maxBatchSize(100)                     // Max events per batch
+    .maxWaitTime(Duration.ofSeconds(60))   // Max wait for batch
+    .build();
+```
+
+## Testing
+
+```java
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+
+class {{ class_name }}Test {
+    @Test
+    void testProcessEvent() throws Exception {
+        // Use Testcontainers or Azure Storage Emulator
+        {{ class_name }} consumer = new {{ class_name }}(
+            connectionString, eventHubName, "$Default", checkpointStore);
+        
+{%- if first_message %}
+        AtomicInteger count = new AtomicInteger(0);
+        consumer.on{{ messagename }}((data, ctx) -> {
+            count.incrementAndGet();
+            ctx.updateCheckpoint();
+        });
+        
+        consumer.start();
+        
+        // Send test events...
+        
+        assertTrue(count.get() > 0, "Should receive events");
+{%- endif %}
+    }
+}
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Consumer not receiving | Check consumer group name and Event Hub exists |
+| Checkpoint errors | Verify Blob Storage connection string and container exists |
+| Reprocessing events | Checkpoint more frequently or check for errors before checkpointing |
+| Partition not balanced | Ensure multiple consumer instances for load balancing |
+
+## Dependencies
+
+- Azure Event Hubs SDK 5.18+
+- Azure Storage Blobs 12.25+ (for checkpointing)
+- CloudEvents Java SDK 2.5+
+
+## Learn More
+
+- [Azure Event Hubs Documentation](https://learn.microsoft.com/azure/event-hubs/)
+- [Event Hubs Java SDK](https://github.com/Azure/azure-sdk-for-java/tree/main/sdk/eventhubs)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+{% endfor %}

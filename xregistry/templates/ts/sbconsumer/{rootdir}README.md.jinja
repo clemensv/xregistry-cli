@@ -1,0 +1,178 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventDispatcher" %}
+# {{ project_name }} - Azure Service Bus Consumer
+
+Auto-generated TypeScript consumer for receiving CloudEvents from Azure Service Bus.
+
+## Overview
+
+This library provides a type-safe Service Bus consumer client for {{ groupname }} message group. Built on `@azure/service-bus` SDK.
+
+## What is Azure Service Bus?
+
+**Azure Service Bus** is a fully managed enterprise message broker that:
+- **Provides reliable messaging** with queues and publish/subscribe topics
+- **Supports advanced features** like sessions, dead-lettering, and scheduled delivery
+- **Ensures at-least-once delivery** with automatic retries
+- **Integrates with Azure** services for hybrid and cloud architectures
+
+Use cases: Decoupling applications, load leveling, transaction processing, workflow orchestration.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+## Quick Start
+
+### 1. Using Connection String (Queue)
+
+```typescript
+import { ServiceBusClient } from '@azure/service-bus';
+import { ServiceBusProcessor, {{ class_name }} } from './src';
+
+const client = new ServiceBusClient('Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=...');
+
+const dispatcher = new {{ class_name }}();
+const processor = new ServiceBusProcessor(client);
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Register handler for {{ messagename }}
+dispatcher.{{ messagename }}Handler = async (message, data) => {
+    console.log('Received {{ messagename }}:', data);
+    // Process your event data here
+};
+{%- endif %}
+
+processor.processMessage = async (message) => {
+    await dispatcher.processMessage(message);
+};
+
+// Start processing from queue
+await processor.startQueue('queue-name');
+
+// Later: stop gracefully
+await processor.stop();
+```
+
+### 2. Using Topic Subscription
+
+```typescript
+// Start processing from topic subscription
+await processor.startSubscription('topic-name', 'subscription-name');
+```
+
+### 3. Using Azure Identity (Recommended for Production)
+
+```typescript
+import { DefaultAzureCredential } from '@azure/identity';
+import { ServiceBusClient } from '@azure/service-bus';
+
+const credential = new DefaultAzureCredential();
+const client = new ServiceBusClient(
+    'fully-qualified-namespace.servicebus.windows.net',
+    credential
+);
+```
+
+## Available Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}Handler
+
+**Message Type:** `{{ messageid }}`
+**Data Type:** `{{ message_body_type | strip_namespace }}`
+
+```typescript
+dispatcher.{{ messagename }}Handler = async (message, data: {{ message_body_type | strip_namespace }}) => {
+    // Handle {{ messagename }} event
+    console.log('Processing {{ messagename }}:', data);
+};
+```
+
+{% if message.description -%}
+{{ message.description }}
+{% endif %}
+{% endfor %}
+
+## Configuration Options
+
+### Auto-Complete and Lock Renewal
+
+```typescript
+const processor = new ServiceBusProcessor(client, {
+    autoCompleteMessages: false,  // Manual completion for better control
+    maxConcurrentCalls: 5,        // Process up to 5 messages concurrently
+    maxAutoLockRenewalDurationMs: 300000  // Auto-renew locks for 5 minutes
+});
+```
+
+### Receive Modes
+
+```typescript
+// Peek-Lock mode (default) - messages are locked until completed
+const receiver = client.createReceiver('queue-name', {
+    receiveMode: 'peekLock'
+});
+
+// Receive-and-Delete mode - messages are immediately removed
+const receiver = client.createReceiver('queue-name', {
+    receiveMode: 'receiveAndDelete'
+});
+```
+
+## Error Handling
+
+```typescript
+dispatcher.{{ messagename }}Handler = async (message, data) => {
+    try {
+        // Process message
+        await processEvent(data);
+        // Complete message (remove from queue)
+        await message.complete();
+    } catch (error) {
+        console.error('Failed to process {{ messagename }}:', error);
+        // Abandon message (returns to queue for retry)
+        await message.abandon();
+        // Or dead-letter if permanently failed
+        // await message.deadLetter({ reason: 'ProcessingFailed' });
+    }
+};
+
+processor.processError = async (error, context) => {
+    console.error(`Error from ${context.entityPath}:`, error);
+};
+```
+
+## Best Practices
+
+1. **Use Azure Identity** instead of connection strings for production
+2. **Enable auto-lock renewal** for long-running processing
+3. **Implement dead-lettering** for messages that consistently fail
+4. **Use sessions** when message ordering is required
+5. **Monitor queue depth** and adjust concurrent processing accordingly
+6. **Handle duplicate messages** with idempotent processing logic
+{% endfor %}

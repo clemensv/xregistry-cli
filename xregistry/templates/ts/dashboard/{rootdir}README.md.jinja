@@ -1,0 +1,425 @@
+{%- set messagegroups = root.messagegroups %}
+# {{ project_name | pascal }} - Event Dashboard
+
+Auto-generated full-stack dashboard application for monitoring and managing events.
+
+## Overview
+
+This is a complete dashboard application with:
+- **Angular frontend**: Modern web UI for visualizing events
+- **Node.js backend**: API server for event streaming and management
+- **Real-time updates**: Live event monitoring
+- **Event history**: Browse past events
+- **CloudEvents support**: Standards-based event handling
+
+Perfect for monitoring your event-driven systems and debugging message flows!
+
+## What's Included
+
+```
+{{ project_name }}/
+├── dashboard-frontend/     # Angular web application
+├── dashboard-backend/      # Node.js/Express API server
+├── package.json           # Root package configuration
+├── initialize.sh          # Setup script
+└── start_all.sh          # Start both frontend and backend
+```
+
+## Quick Start
+
+### 1. Prerequisites
+
+- **Node.js** 18+ ([Download](https://nodejs.org/))
+- **npm** 9+ (comes with Node.js)
+
+### 2. Initialize Project
+
+```bash
+# Run the initialization script
+chmod +x initialize.sh
+./initialize.sh
+
+# Or manually:
+npm install
+cd dashboard-frontend && npm install && cd ..
+cd dashboard-backend && npm install && cd ..
+```
+
+### 3. Start the Dashboard
+
+```bash
+# Start both frontend and backend
+chmod +x start_all.sh
+./start_all.sh
+
+# Or start individually:
+# Terminal 1 - Backend
+cd dashboard-backend && npm start
+
+# Terminal 2 - Frontend
+cd dashboard-frontend && npm start
+```
+
+### 4. Open in Browser
+
+Navigate to [http://localhost:4200](http://localhost:4200)
+
+The frontend connects to the backend API at `http://localhost:3000`
+
+## Features
+
+### Real-Time Event Monitoring
+
+- **Live event stream**: See events as they arrive
+- **Event filtering**: Filter by event type, source, or time range
+- **Event details**: Drill down into CloudEvents attributes and data
+- **Visual timeline**: See event flow over time
+
+### Event Management
+
+- **Browse history**: Search through past events
+- **Event replay**: Re-send events for testing
+- **Statistics**: View event counts, rates, and trends
+- **Export data**: Download events as JSON or CSV
+
+### CloudEvents Support
+
+Fully compatible with [CloudEvents specification](https://cloudevents.io/):
+- Displays all CloudEvents attributes
+- Shows event data with syntax highlighting
+- Validates CloudEvents format
+- Supports both structured and binary content modes
+
+## Configuration
+
+### Backend Configuration
+
+Edit `dashboard-backend/config.json` or set environment variables:
+
+```json
+{
+  "port": 3000,
+  "eventSource": {
+    "type": "eventhub",
+    "connectionString": "YOUR-CONNECTION-STRING",
+    "eventHubName": "your-eventhub"
+  },
+  "cors": {
+    "origin": "http://localhost:4200"
+  }
+}
+```
+
+**Environment variables:**
+```bash
+export PORT=3000
+export EVENT_HUB_CONNECTION_STRING="..."
+export EVENT_HUB_NAME="your-eventhub"
+```
+
+### Frontend Configuration
+
+Edit `dashboard-frontend/src/environments/environment.ts`:
+
+```typescript
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:3000',
+  wsUrl: 'ws://localhost:3000'
+};
+```
+
+## Event Sources
+
+The dashboard can connect to different event sources:
+
+### Azure Event Hubs
+
+```json
+{
+  "eventSource": {
+    "type": "eventhub",
+    "connectionString": "Endpoint=sb://...",
+    "eventHubName": "your-eventhub",
+    "consumerGroup": "$Default"
+  }
+}
+```
+
+### Apache Kafka
+
+```json
+{
+  "eventSource": {
+    "type": "kafka",
+    "brokers": ["localhost:9092"],
+    "topics": ["your-topic"],
+    "groupId": "dashboard-group"
+  }
+}
+```
+
+### Azure Service Bus
+
+```json
+{
+  "eventSource": {
+    "type": "servicebus",
+    "connectionString": "Endpoint=sb://...",
+    "queueOrTopicName": "your-queue",
+    "subscriptionName": "your-subscription"
+  }
+}
+```
+
+## Development
+
+### Frontend Development
+
+```bash
+cd dashboard-frontend
+
+# Start dev server with live reload
+npm start
+
+# Build for production
+npm run build
+
+# Run tests
+npm test
+
+# Lint code
+npm run lint
+```
+
+### Backend Development
+
+```bash
+cd dashboard-backend
+
+# Start with auto-restart on changes
+npm run dev
+
+# Start production mode
+npm start
+
+# Run tests
+npm test
+
+# Lint code
+npm run lint
+```
+
+## API Endpoints
+
+The backend exposes these REST and WebSocket endpoints:
+
+### REST API
+
+```
+GET  /api/events              # List recent events
+GET  /api/events/:id          # Get specific event
+POST /api/events              # Send new event
+GET  /api/stats               # Get event statistics
+GET  /api/health              # Health check
+```
+
+### WebSocket
+
+```
+WS /ws/events                 # Live event stream
+```
+
+**Example WebSocket client:**
+```javascript
+const ws = new WebSocket('ws://localhost:3000/ws/events');
+
+ws.onmessage = (event) => {
+  const cloudEvent = JSON.parse(event.data);
+  console.log('Received event:', cloudEvent);
+};
+```
+
+## Deployment
+
+### Build for Production
+
+```bash
+# Build frontend
+cd dashboard-frontend
+npm run build
+# Output: dist/dashboard-frontend
+
+# Backend is ready as-is
+cd dashboard-backend
+npm run build  # If using TypeScript
+```
+
+### Deploy to Azure
+
+**Option 1: Azure Static Web Apps + Functions**
+
+```bash
+# Deploy frontend to Static Web Apps
+az staticwebapp create \
+  --name your-dashboard \
+  --resource-group your-rg \
+  --source ./dashboard-frontend/dist \
+  --location westus2
+
+# Deploy backend to Azure Functions
+# (Adapt dashboard-backend to Azure Functions format)
+```
+
+**Option 2: Azure App Service**
+
+```bash
+# Deploy frontend
+az webapp up \
+  --name your-dashboard-frontend \
+  --resource-group your-rg \
+  --runtime "NODE|18-lts" \
+  --src-path ./dashboard-frontend/dist
+
+# Deploy backend
+az webapp up \
+  --name your-dashboard-backend \
+  --resource-group your-rg \
+  --runtime "NODE|18-lts" \
+  --src-path ./dashboard-backend
+```
+
+### Deploy to Docker
+
+```bash
+# Frontend Dockerfile
+cd dashboard-frontend
+docker build -t dashboard-frontend .
+docker run -p 80:80 dashboard-frontend
+
+# Backend Dockerfile
+cd dashboard-backend
+docker build -t dashboard-backend .
+docker run -p 3000:3000 dashboard-backend
+```
+
+## Security
+
+### Authentication
+
+Add authentication to the backend:
+
+```typescript
+// dashboard-backend/src/middleware/auth.ts
+import { expressjwt } from 'express-jwt';
+
+app.use(expressjwt({
+  secret: process.env.JWT_SECRET,
+  algorithms: ['HS256']
+}));
+```
+
+### CORS Configuration
+
+Restrict CORS in production:
+
+```typescript
+// dashboard-backend/src/app.ts
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:4200',
+  credentials: true
+}));
+```
+
+### HTTPS
+
+Always use HTTPS in production:
+- Frontend: Served via HTTPS (Azure Static Web Apps, CDN)
+- Backend: Use HTTPS endpoint
+- WebSocket: Use WSS (secure WebSocket)
+
+## Troubleshooting
+
+**Frontend can't connect to backend**: Check CORS settings and ensure backend is running
+
+**WebSocket disconnects**: Check firewall rules and keep-alive settings
+
+**Events not showing**: Verify event source configuration and credentials
+
+**Build errors**: Delete `node_modules` and run `npm install` again
+
+**Port already in use**: Change port in configuration files
+
+## Testing
+
+### Frontend Tests
+
+```bash
+cd dashboard-frontend
+npm test              # Run unit tests
+npm run e2e          # Run end-to-end tests
+```
+
+### Backend Tests
+
+```bash
+cd dashboard-backend
+npm test              # Run unit tests
+npm run test:integration  # Run integration tests
+```
+
+## Customization
+
+### Adding New Event Types
+
+1. Update the event type filters in `dashboard-frontend/src/app/components/event-list`
+2. Add custom visualization in `dashboard-frontend/src/app/components/event-detail`
+3. The backend automatically handles new event types
+
+### Styling
+
+- Edit `dashboard-frontend/src/styles.css` for global styles
+- Modify Angular components for specific UI elements
+- The dashboard uses Angular Material Design
+
+### Custom Charts
+
+Add custom visualizations using charting libraries:
+
+```bash
+cd dashboard-frontend
+npm install chart.js ng2-charts
+```
+
+## Dependencies
+
+### Frontend
+- **Angular** 17+ - Web framework
+- **RxJS** - Reactive programming
+- **Angular Material** - UI components
+- **Socket.IO Client** - WebSocket communication
+
+### Backend
+- **Express** - Web server
+- **Socket.IO** - WebSocket server
+- **Azure SDK** / **Kafka Client** - Event source connectors
+- **Winston** - Logging
+
+## Learn More
+
+- [Angular Documentation](https://angular.io/docs)
+- [Express.js Documentation](https://expressjs.com/)
+- [Socket.IO Documentation](https://socket.io/docs/)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Project:** {{ project_name }}  
+**Type:** Full-Stack Dashboard  
+**Frontend:** Angular 17+  
+**Backend:** Node.js/Express  
+**Real-Time:** WebSocket (Socket.IO)  
+**Envelope:** CloudEvents 1.0

@@ -1,0 +1,227 @@
+{%- import "util.jinja.include" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Consumer" %}
+# {{ project_name | pascal }} - AMQP 1.0 Consumer
+
+Auto-generated Java consumer for receiving CloudEvents via AMQP 1.0 protocol.
+
+## Overview
+
+This library provides a type-safe AMQP 1.0 consumer client for {{ groupname }} message group. Supports Apache Qpid Proton-J for enterprise messaging.
+
+## What is AMQP 1.0?
+
+**AMQP (Advanced Message Queuing Protocol) 1.0** is an open standard for business messaging that supports:
+- **Message queuing** for reliable asynchronous communication
+- **Request/response** and publish/subscribe patterns
+- **Message durability** with persistent storage
+- **Transactions** and flow control
+
+Common brokers: Azure Service Bus, Apache ActiveMQ Artemis, Apache Qpid, RabbitMQ.
+
+## Quick Start
+
+### 1. Add Dependency
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>{{ groupid }}</groupId>
+    <artifactId>{{ project_name | snake }}</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+**Gradle:**
+```gradle
+implementation '{{ groupid }}:{{ project_name | snake }}:1.0.0'
+```
+
+### 2. Receive Messages
+
+```java
+import {{ project_name | snake }}.{{ class_name }};
+
+String connectionString = "amqp://localhost:5672";
+String queueName = "events";
+
+{{ class_name }} consumer = new {{ class_name }}(connectionString, queueName);
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+// Register handler for {{ messagename }}
+consumer.on{{ messagename }}((data, context) -> {
+    // Process message
+    System.out.println("Received: " + data);
+    
+    // Accept message (removes from queue)
+    context.accept();
+});
+{%- endif %}
+
+// Start receiving
+consumer.start();
+
+// Later: stop gracefully
+consumer.stop();
+```
+
+## Available Event Handlers
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### on{{ messagename }}
+
+```java
+consumer.on{{ messagename }}(({{ message_body_type }} data, MessageContext context) -> {
+    // Process event
+    context.accept();  // or context.reject() / context.release()
+});
+```
+{% if message.description %}
+{{ message.description }}
+{% endif %}
+
+{% endfor %}
+
+## Message Settlement
+
+AMQP 1.0 requires explicit message settlement:
+
+```java
+// Accept: Message processed successfully
+context.accept();
+
+// Reject: Permanent failure, don't redeliver
+context.reject();
+
+// Release: Temporary failure, allow redelivery
+context.release();
+
+// Modify: Partial failure with custom annotations
+context.modify(failed, undeliverableHere, messageAnnotations);
+```
+
+## Authentication
+
+### SASL PLAIN (Username/Password)
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .connectionString("amqp://host:5672")
+    .queueName("events")
+    .username("user")
+    .password("pass")
+    .build();
+```
+
+### SASL ANONYMOUS
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .connectionString("amqp://host:5672")
+    .queueName("events")
+    .saslMechanism("ANONYMOUS")
+    .build();
+```
+
+### TLS/SSL
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .connectionString("amqps://host:5671")  // Note: amqps
+    .queueName("events")
+    .sslEnabled(true)
+    .trustStorePath("/path/to/truststore.jks")
+    .trustStorePassword("password")
+    .build();
+```
+
+## Error Handling
+
+```java
+consumer.onError((exception, context) -> {
+    System.err.println("Error: " + exception.getMessage());
+    
+    // Reject message on error
+    if (context != null) {
+        context.reject();
+    }
+});
+```
+
+## Configuration Options
+
+```java
+{{ class_name }} consumer = {{ class_name }}.builder()
+    .connectionString("amqp://localhost:5672")
+    .queueName("events")
+    .prefetchCount(10)              // Message prefetch window
+    .maxRetries(3)                  // Reconnection attempts
+    .receiveTimeout(30000)          // Receive timeout (ms)
+    .autoAccept(false)              // Require manual settlement
+    .build();
+```
+
+## Testing
+
+```java
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+
+class {{ class_name }}Test {
+    @Test
+    void testReceiveMessage() throws Exception {
+        {{ class_name }} consumer = new {{ class_name }}(
+            "amqp://localhost:5672", "test-queue");
+        
+{%- if first_message %}
+        AtomicBoolean received = new AtomicBoolean(false);
+        consumer.on{{ messagename }}((data, ctx) -> {
+            received.set(true);
+            ctx.accept();
+        });
+        
+        consumer.start();
+        
+        // Send test message...
+        
+        assertTrue(received.get(), "Message should be received");
+{%- endif %}
+    }
+}
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Connection refused | Verify broker is running and connection string is correct |
+| Authentication failed | Check username/password and SASL mechanism |
+| Messages not received | Verify queue name and message routing |
+| Memory leaks | Always call `consumer.stop()` to release resources |
+
+## Dependencies
+
+- Apache Qpid Proton-J 0.34+
+- CloudEvents Java SDK 2.5+
+- SLF4J 1.7+
+
+## Learn More
+
+- [AMQP 1.0 Specification](http://www.amqp.org/specification/1.0/amqp-org-download)
+- [Apache Qpid Proton-J](https://qpid.apache.org/proton/)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+{% endfor %}

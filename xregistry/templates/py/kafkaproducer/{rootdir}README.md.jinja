@@ -1,129 +1,290 @@
+{%- import "util.include.jinja" as util -%}
 {%- set messagegroups = root.messagegroups %}
-{%- filter wordwrap(80) %}
-# {{ project_name | capitalize }} Apache Kafka Producer SDK for Python
+{%- filter wordwrap(120) %}
+# {{ project_name | capitalize }} Event Dispatcher for Apache Kafka
 
-This is the {{ project_name | capitalize }} Apache Kafka Producer SDK for Python. It was generated from the xRegistry CLI tool based on message catalog messages for {% for messagegroupid, _ in messagegroups.items() %}"{{ messagegroupid }}"{%- if not loop.last %}, {% endif %}{%- endfor %}.
+This module provides an event dispatcher for processing events from Apache Kafka. It supports both plain Kafka messages and CloudEvents.
 
-## Quick Install
+## Table of Contents
+1. [Overview](#overview)
+2. [Generated Event Dispatchers](#generated-event-dispatchers)
+    - {% for messagegroupid, messagegroup in messagegroups.items() %}{{ (messagegroupid | pascal | strip_dots ) + "EventDispatcher" }}{% if not loop.last %}, {% endif %}
+    {% endfor %}
+3. [Internals](#internals)
+    - [EventProcessorRunner](#eventprocessorrunner)
+    - [_DispatcherBase](#_dispatcherbase)
 
-To get started quickly, the main package can be installed with the `install.sh` script (or `install.bat` on Windows) in the root of the repository.
+## Overview
 
-### Contents
+This module defines an event processing framework for Apache Kafka,
+providing the necessary classes and methods to handle various types of events.
+It includes both plain Kafka messages and CloudEvents, offering a versatile
+solution for event-driven applications.
 
-The repository contains two projects.
-* The `{{project_name}}_kafka_producer` project is the main project that contains the Kafka producer client code.
-* The `{{ data_project_name }}` project contains the data classes for the event payload data.
+## Generated Event Dispatchers
 
-The classes defined in `{{project_name}}_kafka_producer` are documented in the project [README](./{{project_name}}_kafka_producer/README.md).
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_kafka_message = (messagegroup | exists( "protocol", "kafka" )) %}
 
-The `{{project_name}}_kafka_producer` project depends on the `{{ data_project_name }}` project.
+### {{ (messagegroupid | pascal | strip_dots) + "EventDispatcher" }}
 
-If you want to install the producer project, you can run the following command:
+`{{ (messagegroupid | pascal | strip_dots) + "EventDispatcher" }}` handles events for the {{ messagegroupid }} message group.
 
-```bash
-pip install ./{{project_name}}_kafka_producer
-```
+#### Methods:
 
-This will install both packages. If you only want to install the data project, you can run the following command:
-
-```bash
-pip install ./{{ data_project_name }}
-```
-
-## Build and Test
-
-The SDK comes with a full test suite for the data classes and the dispatchers that uses the `pytest` framework and Docker containers to run the tests.
-
-If you have Docker installed and if you have `make`, you can run the tests with the following command:
-
-```bash
-make test
-```
-
-If you don't have `make` installed, you can run the following commands:
-
-```bash
-pip install ./{{main_project_name}}
-pytest ./{{main_project_name}}/tests ./{{data_project_name}}/tests
-```
-
-## Usage
-
-The sample code in [samples/sample.py](samples/sample.py) demonstrates how to use the Kafka producer client to receive messages from a Kafka topic.
-
-In your code, you create handler functions for each message type that you want to process. The handler functions are called when a message of that type is received. Example:
+##### `__init__`:
 
 ```python
-{%- set messagegroupid, messagegroup = messagegroups.items()|first %}
-{%- set messageid, message = messagegroup.messages.items()|first %}
-async def handle_{{ messageid | dotunderscore | snake }}(record, cloud_event, {{ messageid | dotunderscore | snake }}_event_data):
-    """ Handles the {{ messageid }} event """
-    print(f"{{ messageid }}: { {{- messageid | dotunderscore | snake -}}_event_data.asdict()}")
-    await some_processing_function(record, cloud_event, {{ messageid | dotunderscore | snake }}_event_data)
+__init__(self)-> None
 ```
 
-The handler functions are then assigned to the event dispatcher for the message group. The event dispatcher is responsible for calling the appropriate handler function when a message is received. Example:
+Initializes the dispatcher.
+
+##### `create_processor`:
 
 ```python
-{%- set messagegroupid, messagegroup = messagegroups.items()|first %}
-{%- set groupname = messagegroupid | pascal %}
-{%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
-{{messagegroupid | dotunderscore | snake}}_dispatcher = {{ class_name }}()
-{%- set messageid, message = messagegroup.messages.items()|first %}
-{{messagegroupid | dotunderscore | snake}}_dispatcher.{{ messageid | dotunderscore | snake }}_async = {{ messageid | dotunderscore | snake }}_event
+create_processor(self, bootstrap_servers: str, group_id: str, topics: List[str]) -> EventProcessorRunner
 ```
 
-{% if messagegroups|length == 1 -%}
-You can then create an event processor directly from the event dispatcher. The event processor is responsible for receiving messages from the Kafka topic and will hand them to the dispatcher for processing.
+Creates an `EventProcessorRunner`.
 
-The required parameters for the `create_processor` method are:
-* `bootstrap_servers`: The Kafka bootstrap servers.
-* `group_id`: The producer group ID.
-* `topics`: The list of topics to subscribe to.
+Args:
+- `bootstrap_servers`: The Kafka bootstrap servers.
+- `group_id`: The consumer group ID.
+- `topics`: The list of topics to subscribe to.
 
-The example below shows how to create an event processor and then wait for a signal to stop the processor:
+##### `add_consumer`:
 
 ```python
-async with dispatcher.create_processor(
-            bootstrap_servers,
-            group_id,
-            topics,
-        ) as processor_runner:
-            stop_event = asyncio.Event()
-            loop = asyncio.get_running_loop()
-            loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
-            loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
-            await stop_event.wait()
+add_consumer(self, consumer: KafkaConsumer)
 ```
 
-{%- else -%}
-You can create an event processor and add the event dispatcher to it. The event processor is responsible for receiving messages from the Kafka topic and will hand them to the dispatcher for processing.
+Adds a Kafka consumer to the dispatcher.
 
-The required parameters for the `create` method are:
-* `bootstrap_servers`: The Kafka bootstrap servers.
-* `group_id`: The producer group ID.
-* `topics`: The list of topics to subscribe to.
+Args:
+- `consumer`: The Kafka consumer.
 
-The example below shows how to create an event processor and then wait for a signal to stop the processor:
+#### Event Handlers
+
+The {{ (messagegroupid | pascal | strip_dots) + "EventDispatcher" }} defines the following event handler hooks.
+
+{% for messageid, message in messagegroup.messages.items() %}
+{%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+##### `{{ messageid | dotunderscore | snake }}_async`
 
 ```python
-event_processor = EventStreamProcessor.create(
-    bootstrap_servers,
-    group_id,
-    topics,
-)
-
-{%- for messagegroupid, messagegroup in messagegroups.items() %}
-{%- set groupname = messagegroupid | pascal %}
-{%- set class_name = ( groupname | strip_dots ) + "EventDispatcher" %}
-event_processor.add_dispatcher({{messagegroupid | dotunderscore | snake}}_dispatcher)
-{%- endfor %}
-async with event_processor:
-    stop_event = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
-    loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
-    await stop_event.wait()
+{{ messageid | dotunderscore | snake }}_async:  Callable[[ConsumerRecord, CloudEvent, {{ data_type | strip_namespace }}], Awaitable[None]]
 ```
-{% endif %}
-{%- endfilter %}
+
+Asynchronous handler hook for `{{ messageid }}`: {% if message.description %}{{ message.description }}{%- endif %}
+
+The assigned handler must be a coroutine (`async def`) that accepts the following parameters:
+
+- `record`: The Kafka record.
+- `cloud_event`: The CloudEvent.
+- `data`: The event data of type `{{ data_type }}`.
+
+Example:
+
+```python
+async def {{ messageid | dotunderscore | snake }}_event(record: ConsumerRecord, cloud_event: CloudEvent, data: {{ data_type | strip_namespace }}) -> None:
+    # Process the event data
+    await some_processing_function(record, cloud_event, data)
+```
+
+The handler function is then assigned to the event dispatcher for the message group. The event dispatcher is responsible for calling the appropriate handler function when a message is received. Example:
+
+```python
+{{ messagegroupid | dotunderscore | snake }}_dispatcher.{{ messageid | dotunderscore | snake }}_async = {{ messageid | dotunderscore | snake }}_event
+```
+
+{% endfor %}
+{% endfor %}
+
+## Internals
+
+### Dispatchers
+
+Dispatchers have the following protected methods:
+
+### Methods:
+
+##### `_process_event`
+
+```python
+_process_event(self, record)
+```
+
+Processes an incoming event.
+
+Args:
+- `record`: The Kafka record.
+
+{%- if uses_cloudevents_message %}
+##### `_dispatch_cloud_event`
+
+```python
+_dispatch_cloud_event(self, record, cloud_event)
+```
+
+Dispatches a CloudEvent to the appropriate handler.
+
+Args:
+- `record`: The Kafka record.
+- `cloud_event`: The CloudEvent.
+
+{%- endif %}
+{%- if uses_plain_kafka_message %}
+##### `_dispatch_record`
+
+```python
+_dispatch_record(self, record)
+```
+
+Dispatches a Kafka event to the appropriate handler.
+
+Args:
+- `record`: The Kafka record.
+
+{%- endif %}
+
+### EventProcessorRunner
+
+`EventProcessorRunner` is responsible for managing the event processing loop and dispatching events to the appropriate handlers.
+
+#### Methods
+
+##### `__init__`
+
+```python
+__init__(consumer: KafkaConsumer)
+```
+
+Initializes the runner with a Kafka consumer.
+
+Args:
+- `consumer`: The Kafka consumer.
+
+#####  `__aenter__()`
+
+Enters the asynchronous context and starts the processor.
+
+#####  `__aexit__`
+
+```python
+__aexit__(exc_type, exc_val, exc_tb)
+```
+
+Exits the asynchronous context and stops the processor.
+
+Args:
+- `exc_type`: The exception type.
+- `exc_val`: The exception value.
+- `exc_tb`: The exception traceback.
+
+#####  `add_dispatcher`
+
+```python
+add_dispatcher(dispatcher: _DispatcherBase)
+```
+
+Adds a dispatcher to the runner.
+
+Args:
+- `dispatcher`: The dispatcher to add.
+
+#####  `remove_dispatcher`
+
+```python
+remove_dispatcher(dispatcher: _DispatcherBase)
+```
+
+Removes a dispatcher from the runner.
+
+Args:
+- `dispatcher`: The dispatcher to remove.
+
+#####  `start()`
+
+Starts the event processor.
+
+#####  `cancel()`
+
+Cancels the event processing task.
+
+#####  `create_from_config`
+
+```python
+create_from_config(cls, bootstrap_servers: str, group_id: str, topics: List[str]) -> 'EventProcessorRunner'
+```
+
+Creates a runner from configuration.
+
+Args:
+- `bootstrap_servers`: The Kafka bootstrap servers.
+- `group_id`: The consumer group ID.
+- `topics`: The list of topics to subscribe to.
+
+Returns:
+- An `EventProcessorRunner` instance.
+
+### _DispatcherBase
+
+`_DispatcherBase` is a base class for event dispatchers, handling CloudEvent detection and conversion.
+
+#### Methods
+
+#####  `_strkey`
+
+```python
+_strkey(key: str | bytes) -> str
+```
+
+Converts a key to a string.
+
+Args:
+- `key`: The key to convert.
+
+#####  `_unhandled_event`
+
+```python
+_unhandled_event(self, record, cloud_event, data)
+```
+
+Default event handler.
+
+#####  `_get_cloud_event_attribute`
+
+```python
+_get_cloud_event_attribute(record: ConsumerRecord, key: str) -> Any
+```
+
+Retrieves a CloudEvent attribute from a Kafka record.
+
+Args:
+- `record`: The Kafka record.
+- `key`: The attribute key.
+
+#####  `_is_cloud_event`
+
+```python
+_is_cloud_event(record: ConsumerRecord) -> bool
+```
+
+Checks if the Kafka record is a CloudEvent.
+
+Args:
+- `record`: The Kafka record.
+
+#####  `_cloud_event_from_record`
+
+```python
+_cloud_event_from_record(record: ConsumerRecord) -> CloudEvent
+```
+
+Converts a Kafka record to a CloudEvent.
+
+Args:
+- `record`: The Kafka record.
+{% endfilter %}
