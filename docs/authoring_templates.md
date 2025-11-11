@@ -44,24 +44,114 @@ The full set of templates for the C# language is [here](../xregistry/templates/c
 
 ## Template Info
 
-For tools that wrap the code generator, like the VS Code extension, you can place a `_templateinfo.json` file into the language directory to provide a description for the language:
+For tools that wrap the code generator, like the VS Code extension, you can place a `_templateinfo.json` file into the language directory to provide metadata for the language:
 
 ```json
 {
-  "description": "C# / .NET 6.0"
-}
-```
-
-Inside each style directory, you can place a `_templateinfo.json` file that provides a description for the style and a `priority` for sorting the list of styles in a tool like the VS Code extension by relative importance:
-
-```json
-{
-  "description": "Azure Functions HTTP trigger",
+  "description": "C# / .NET 6.0+",
   "priority": 1
 }
 ```
 
-The default priority is 100, putting a style at/near the bottom of the list if you don't specify a priority.
+Inside each style directory, you can place a `_templateinfo.json` file that provides metadata for the style. This file supports the following properties:
+
+### Template Info Properties
+
+#### `description` (string)
+
+A human-readable description of the template language or style. This is displayed in tools like the VS Code extension to help users understand what the template generates.
+
+Example: `"C# AMQP 1.0 Producer"`, `"TypeScript Apache Kafka Consumer"`
+
+#### `priority` (number, default: 100)
+
+An integer value used for sorting the list of templates in tools. Lower numbers appear higher in the list, indicating higher priority or importance. The default priority is 100, which places templates at/near the bottom of the list.
+
+Example: `1` (high priority), `50` (medium priority), `100` (default/low priority)
+
+#### `main_project_name` (string template, optional)
+
+Specifies the name of the main project to be generated. This overrides the default project name. Supports template syntax with placeholders and filters.
+
+Example: `"{project_name|pascal}AmqpProducer"`, `"{project_name}KafkaConsumer"`
+
+#### `data_project_name` (string template, optional)
+
+Specifies the name of the data/schema project to be generated. This is used for organizing generated data classes separately from the main application code. Supports template syntax with placeholders and filters.
+
+Example: `"{project_name|pascal}Data"`, `"{project_name}Schemas"`
+
+#### `data_project_dir` (string template, optional)
+
+Specifies the directory name for the data project. If not specified, defaults to the value of `data_project_name`. Supports template syntax with placeholders and filters.
+
+Example: `"{project_name|snake}_data"`, `"schemas/{project_name}"`
+
+#### `src_layout` (boolean, optional)
+
+When `true`, indicates that the template uses a source layout convention (e.g., putting code under a `src/` directory). This affects how the generator organizes the output directory structure.
+
+Example: `true` or `false`
+
+### Template String Syntax
+
+String properties like `main_project_name` and `data_project_name` support a template syntax for dynamic value resolution:
+
+**Placeholders:**
+
+- `{variable_name}` - replaced with the value of the variable
+
+**Filters:**
+
+- `{variable|filter}` - apply a filter to transform the value
+- `{variable|filter1|filter2}` - chain multiple filters
+
+**Path Suffixes:**
+
+- `{variable~path~segment}` - append path segments with `/` separators
+
+**Available Variables:**
+
+The following variables are available depending on the context where `resolve_string` is used:
+
+**For `_templateinfo.json` properties** (`main_project_name`, `data_project_name`, `data_project_dir`):
+
+- `project_name` - the project name provided via `--projectname` argument
+
+**Available Filters:**
+
+- `lower` - converts to lowercase
+- `upper` - converts to uppercase
+- `pascal` - converts to PascalCase
+- `camel` - converts to camelCase
+- `snake` - converts to snake_case
+- `dotdash` - replaces `.` with `-`
+- `dashdot` - replaces `-` with `.`
+- `dotunderscore` - replaces `.` with `_`
+- `underscoredot` - replaces `_` with `.`
+
+**Examples:**
+
+```json
+{
+  "main_project_name": "{project_name|pascal}Producer",
+  "data_project_name": "{project_name|snake}_data",
+  "data_project_dir": "{project_name~schemas}"
+}
+```
+
+### Complete Example
+
+```json
+{
+  "description": "C# Azure Event Hubs Consumer",
+  "priority": 5,
+  "src_layout": true,
+  "main_project_name": "{project_name|pascal}EventHubsConsumer",
+  "data_project_name": "{project_name|pascal}Data",
+  "data_project_dir": "{project_name|pascal}Data"
+}
+```
 
 ## Template styles
 
@@ -112,13 +202,85 @@ All files you want to emit must be suffixed with `.jinja` and are run through th
 
 If you prefix a file with an underscore, it will be processed after all regular files and also after all schema files have been generated. This is useful for generating files that must know about all the generated classes or files, like a project file. The underscore prefix is stripped from the output file name.
 
-The filenames of the templates are used to determine the output file name. Unless you use expansion macros, the file name is used as-is. For example, if you have a template named `README.md.jinja`, the output file will be named `README.md`.
+## Template File Names
 
-Expansion macros are used to generate multiple files from a single template or to rename the file based on a variable. The following macros are supported:
+Template file names determine the output file names and can include special macros for dynamic naming and multi-file generation.
 
-- `{projectname}` - expands into the name provided with the `--projectname` argument.
-- `{classname}` - expands into the name of the generated class, which the tool infers from the schema document or the definition document. If the macro is used, the tool will modify the input document for the template such that it is scoped down to the definition or schema type that is supposed to be generated and call the template once for each type.
-- `{classdir}` - this macro works like the `{classname}` option but also creates a subdirectory reflecting the package name. This is specifically meant to help with Java conventions.
+### Basic File Naming
+
+The simplest approach is to use a static file name. The template engine will use the name as-is (minus the `.jinja` extension).
+
+**Example:** A template file named `README.md.jinja` generates an output file named `README.md`.
+
+### File Name Expansion Macros
+
+Expansion macros in file names enable generating multiple files from a single template or dynamically naming files based on project or class information.
+
+#### `{projectname}` Macro
+
+Expands to the name provided with the `--projectname` argument.
+
+**Example:** `{projectname}.csproj.jinja` → `MyProject.csproj` (when `--projectname MyProject`)
+
+#### `{classname}` Macro
+
+Expands to the name of the generated class, inferred from the schema or definition document. When this macro is used:
+
+- The generator calls the template once for each type/class
+- The input document is scoped down to the specific definition or schema type
+- Only the class name (without namespace/package) is used
+
+**Example:** `{classname}.cs.jinja` → `Order.cs`, `Customer.cs`, etc. (one file per class)
+
+#### `{classdir}` Macro
+
+Works like `{classname}` but also creates subdirectories reflecting the package/namespace structure. This is particularly useful for Java conventions where package structure maps to directory structure.
+
+**Example:** `{classdir}.java.jinja` with class `com.example.Order`:
+
+- Creates directory: `com/example/`
+- Generates file: `com/example/Order.java`
+
+### Advanced File Name Templates
+
+File names support the same template variable syntax as `_templateinfo.json` properties, with access to a richer set of variables:
+
+**Available Variables:**
+
+- `projectname` - the code project name
+- `mainprojectname` - the main project name
+- `dataprojectname` - the data project name
+- `mainprojectdir` - main project as path (dots→slashes)
+- `dataprojectdir` - data project as path (dots→slashes)
+- `projectdir` - project as path (dots→slashes)
+- `projectsrc` - project source path (prefixed with `src/`)
+- `testdir` - test directory (`tests/` or `../tests/`)
+- `rootdir` - root directory marker
+- `classname` - class name only
+- `classfull` - fully qualified class name
+- `classpackage` - package/namespace name
+- `classdir` - class formatted for directories
+
+**Available Filters:**
+
+Same filters as in `_templateinfo.json` templates: `lower`, `upper`, `pascal`, `camel`, `snake`, `dotdash`, `dashdot`, `dotunderscore`, `underscoredot`
+
+**Examples:**
+
+```text
+{mainprojectdir}Program.cs.jinja → MyProject/Program.cs
+{dataprojectdir}Models/BaseModel.cs.jinja → MyProjectData/Models/BaseModel.cs
+{testdir}{projectname}Tests.cs.jinja → tests/MyProjectTests.cs
+{rootdir}README.md.jinja → README.md (at output root)
+```
+
+### Scoped Document Context
+
+When using `{classname}` or `{classdir}` macros, the template receives a modified `root` variable that contains only the relevant message group or schema:
+
+- The template is invoked once per class/type
+- `root.messagegroups` contains only the single message group being processed
+- `root.schemagroups` and `root.endpoints` remain available for reference
 
 ## Template variables
 
@@ -139,58 +301,105 @@ If the `--definitions` argument points to a URL or file name that returns/contai
 
 In addition to the many filters [built into Jinja](https://jinja.palletsprojects.com/en/3.0.x/templates/#filters), the following extra filters are available for use in templates:
 
-#### `pascal`
+#### Case Conversion Filters
 
-Converts a string (including those in camelCase and snake_case) to PascalCase
+##### `pascal`
+
+Converts a string (including those in camelCase and snake_case) to PascalCase. Handles namespace separators (`.` and `::`).
 
 Example:
 
 ```jinja
 {{ "foo_bar" | pascal }} -> FooBar
+{{ "com.example.foo" | pascal }} -> Com.Example.Foo
 ```
 
-#### `camel`
+##### `camel`
 
-Converts a string (including those in snake_case and PascalCase) to camelCase
+Converts a string (including those in snake_case and PascalCase) to camelCase. Handles namespace separators (`.` and `::`).
 
 Example:
 
 ```jinja
 {{ "foo_bar" | camel }} -> fooBar
+{{ "FooBar" | camel }} -> fooBar
 ```
 
-#### `snake`
+##### `snake`
 
-Converts a string (including those in camelCase and PascalCase) to snake_case
+Converts a string (including those in camelCase and PascalCase) to snake_case. Handles namespace separators (`.` and `::`).
 
 Example:
 
 ```jinja
 {{ "fooBar" | snake }} -> foo_bar
+{{ "FooBar" | snake }} -> foo_bar
 ```
 
-#### `pad(len)`
+#### String Manipulation Filters
 
-Left-justifies a string with spaces to the specified length. This is useful for sorting version strings in a template.
+##### `dotdash`
+
+Replaces dots with dashes in a string.
 
 Example:
 
 ```jinja
-{{ "1.0" | pad(5) }} -> "  1.0"
-{{ "1.0" | pad(5) }} -> " 11.0"
+{{ "com.example.Foo" | dotdash }} -> com-example-Foo
 ```
 
-#### `strip_namespace`
+##### `dashdot`
 
-Strips the namespace/package portion off an expression
+Replaces dashes with dots in a string.
 
 Example:
 
 ```jinja
-{{ "com.example.Foo" | strip_namespace }} -> Foo
+{{ "com-example-Foo" | dashdot }} -> com.example.Foo
 ```
 
-#### `strip_invalid_identifier_characters`
+##### `dotunderscore`
+
+Replaces dots with underscores in a string.
+
+Example:
+
+```jinja
+{{ "com.example.Foo" | dotunderscore }} -> com_example_Foo
+```
+
+##### `underscoredot`
+
+Replaces underscores with dots in a string.
+
+Example:
+
+```jinja
+{{ "com_example_Foo" | underscoredot }} -> com.example.Foo
+```
+
+##### `lstrip(prefix)`
+
+Strips a prefix from a string.
+
+Example:
+
+```jinja
+{{ "prefix_value" | lstrip("prefix_") }} -> value
+```
+
+##### `pad(len)`
+
+Left-justifies a string with spaces to the specified length. This is useful for aligning version strings in templates.
+
+Example:
+
+```jinja
+{{ "1.0" | pad(5) }} -> "1.0  "
+{{ "11.0" | pad(5) }} -> "11.0 "
+```
+
+##### `strip_invalid_identifier_characters`
 
 Strips invalid characters from an identifier. This is useful for converting strings to identifiers in languages that have stricter rules for identifiers. All unsupported characters are replaced with an underscore.
 
@@ -199,49 +408,90 @@ Example:
 ```jinja
 {{ "foo-bar" | strip_invalid_identifier_characters }} -> foo_bar
 {{ "@foobar" | strip_invalid_identifier_characters }} -> _foobar
-
-
 ```
 
-#### `namespace`
+#### Namespace Manipulation Filters
 
-Gets the namespace/package portion of an expression
+##### `strip_namespace`
+
+Strips the namespace/package portion off an expression, leaving only the class name.
+
+Example:
+
+```jinja
+{{ "com.example.Foo" | strip_namespace }} -> Foo
+```
+
+##### `namespace(namespace_prefix="")`
+
+Gets the namespace/package portion of an expression, optionally prepending a prefix.
 
 Example:
 
 ```jinja
 {{ "com.example.Foo" | namespace }} -> com.example
+{{ "Foo" | namespace("com.example") }} -> com.example
 ```
 
-#### `concat_namespace`
+##### `namespace_dot(namespace_prefix="")`
 
-Concatenates the namespace/package portions of an expression
+Gets the namespace portion of an expression followed by a dot, or an empty string if no namespace exists.
 
 Example:
 
 ```jinja
-{{ "com.example.Foo" | concat_namespace }} -> comexampleFoo
+{{ "com.example.Foo" | namespace_dot }} -> com.example.
+{{ "Foo" | namespace_dot }} -> ""
 ```
 
-If you want to pascal case the expression, use the pascal filter first, e.g.
+##### `concat_namespace(namespace_prefix="")`
+
+Concatenates the namespace/package portions of an expression with an optional prefix.
+
+Example:
 
 ```jinja
-{{ "com.example.Foo" | pascal | concat_namespace }} -> ComExampleFoo
+{{ "com.example.Foo" | concat_namespace }} -> com.example.Foo
 ```
 
-#### `toyaml`
+##### `strip_dots`
 
-Formats the given object as YAML. This is useful for emitting parts of the input document, for instance JSON Schema elements, into YAML documents. `tojson` is already built into Jinja.
+Removes all dots from a string, concatenating namespace portions.
+
+Example:
+
+```jinja
+{{ "com.example.Foo" | strip_dots }} -> comexampleFoo
+```
+
+#### Format Conversion Filters
+
+##### `toyaml(indent=4)`
+
+Formats the given object as YAML with specified indentation. This is useful for emitting parts of the input document, for instance JSON Schema elements, into YAML documents. `tojson` is already built into Jinja.
 
 Example:
 
 ```jinja
 {{ root | toyaml }}
+{{ root | toyaml(2) }}
 ```
 
-#### `exists(prop, value)`
+##### `proto`
 
-Checks whether the given property exists anywhere in the given object scope with the value prefixed with the given string (case-insensitive)
+Formats a proto text string with proper indentation and spacing.
+
+Example:
+
+```jinja
+{{ proto_text | proto }}
+```
+
+#### Search and Pattern Matching Filters
+
+##### `exists(prop, value)`
+
+Recursively checks whether the given property exists anywhere in the given object scope with the value prefixed with the given string (case-insensitive).
 
 Example:
 
@@ -251,7 +501,19 @@ Example:
 {% endif %}
 ```
 
-#### `regex_search(pattern)`
+##### `existswithout(prop, value, propother, valueother)`
+
+Checks whether a property exists with a value prefix, but only if another property does not exist with another value. Useful for conditional checks in templates.
+
+Example:
+
+```jinja
+{% if root | existswithout("format", "amqp", "encoding", "binary") %}
+    // do something
+{% endif %}
+```
+
+##### `regex_search(pattern)`
 
 Performs a regex search. Returns a list of matches.
 
@@ -263,7 +525,7 @@ Example:
 {% endif %}
 ```
 
-#### `regex_replace(pattern, replacement)`
+##### `regex_replace(pattern, replacement)`
 
 Does a regex-based replacement. Returns the result.
 
@@ -273,9 +535,78 @@ Example:
 {{ "foo_bar" | regex_replace("[^A-Za-z_]", "-") }} -> "foo-bar"
 ```
 
+#### Schema Processing Filters
+
+##### `schema_type(project_name, root, schema_format)`
+
+Returns the type name for a schema reference, considering the schema format and project context.
+
+Example:
+
+```jinja
+{{ schema_ref | schema_type(projectname, root, "avro") }}
+```
+
+#### Stack and State Management Filters
+
+##### `push(stack_name)`
+
+Pushes a value onto a named stack. This works across template files. Returns an empty string.
+
+Example:
+
+```jinja
+{{ "value1" | push("mystack") }}
+{{ "value2" | push("mystack") }}
+```
+
+##### `pushfile(name)`
+
+Pushes a file path and value onto the 'files' stack for later processing. Returns an empty string.
+
+Example:
+
+```jinja
+{{ content | pushfile("output.txt") }}
+```
+
+##### `save(prop_name)`
+
+Saves a value in the context dictionary for later retrieval. Returns the value for chaining.
+
+Example:
+
+```jinja
+{{ "important_value" | save("myvar") }}
+```
+
+#### Resource Tracking Filters
+
+##### `mark_handled`
+
+Marks a resource reference as handled by templates. Used for template-driven resource management.
+
+Example:
+
+```jinja
+{{ "#/schemas/myschema" | mark_handled }}
+```
+
+##### `is_handled`
+
+Checks if a resource reference has been marked as handled.
+
+Example:
+
+```jinja
+{% if "#/schemas/myschema" | is_handled %}
+    // skip this resource
+{% endif %}
+```
+
 ### Functions
 
-You can use all expressions and functions defined by the Jinja2 standard library. In addition, the following functions are available:
+You can use all expressions and functions defined by the Jinja2 standard library. In addition, the following functions are available as global functions in templates:
 
 #### `pop(stack_name)`
 
@@ -284,35 +615,39 @@ Pops a value from a named stack collected with `push`. This works across templat
 Example:
 
 ```jinja
-{% "foo" | push("name") %}
-{% "bar" | push("name") %}
-{% "baz" | push("name") %}
+{{ "foo" | push("name") }}
+{{ "bar" | push("name") }}
+{{ "baz" | push("name") }}
 {{ pop("name") }} -> "baz"
 {{ pop("name") }} -> "bar"
 {{ pop("name") }} -> "foo"
 ```
 
-#### `stack(stack_name)`
+#### `stack(stack_name)` _(Note: Currently only available via ctx.stacks.stack() in code)_
 
-Gets the full contents of a named stack collected with `push`. This works across template files.
+Gets the full contents of a named stack collected with `push`. This works across template files. Returns a list.
 
-Example:
+**Important:** This function is currently not exposed as a global in templates but exists in the ContextStacksManager. To iterate over a stack, use `pop()` in a loop or access via internal context.
+
+Example (conceptual):
 
 ```jinja
-{% "foo" | push("name") %}
-{% "bar" | push("name") %}
-{% "baz" | push("name") %}
-{% for x in stack("name") %}{{ x }} {% endif %} -> foo bar faz
+{{ "foo" | push("name") }}
+{{ "bar" | push("name") }}
+{{ "baz" | push("name") }}
+{% for x in stack("name") %}{{ x }} {% endfor %} -> foo bar baz
 ```
 
-#### `get(prop_name)`
+#### `get(prop_name)` _(Note: Currently only available via ctx.stacks.get() in code)_
 
 Gets the value of a named property collected with `save`. This works across template files.
 
-Example:
+**Important:** This function is currently not exposed as a global in templates but exists in the ContextStacksManager. Values saved with `save` filter can be retrieved in code but not directly in templates.
+
+Example (conceptual):
 
 ```jinja
-{% "foo" | save("name") %}
+{{ "foo" | save("name") }}
 {{ get("name") }} -> "foo"
 ```
 
@@ -323,25 +658,80 @@ Gets the "latest" entry from a dictionary, which is specifically designed to wor
 Example:
 
 ```jinja
-{%- set schemaObj = schema_object(root, event.schemaurl ) -%}
-    {%- if schemaObj.format is defined -%}
-       {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
+{%- set schemaObj = schema_object(root, event.schemaurl) -%}
+{%- if schemaObj.versions is defined -%}
+   {%- set schemaVersion = latest_dict_entry(schemaObj.versions) %}
+{%- endif -%}
 ```
 
 #### `schema_object(root, schemaurl)`
 
-Gets an object resolving a given relative URL. This is useful for getting the schema object for a given event or command.
+Gets an object by resolving a given relative URL within the root document. This is useful for getting the schema object for a given event or command.
 
 Example:
 
 ```jinja
-{%- set schemaObj = schema_object(root, event.schemaurl ) -%}
-    {%- if schemaObj.format is defined -%}
+{%- set schemaObj = schema_object(root, event.schemaurl) -%}
+{%- if schemaObj.format is defined -%}
+    // work with schemaObj
+{%- endif -%}
+```
+
+#### URL Utility Functions
+
+##### `geturlhost(url)`
+
+Extracts the hostname from a URL.
+
+Example:
+
+```jinja
+{{ geturlhost("https://example.com:8080/path") }} -> example.com
+```
+
+##### `geturlpath(url)`
+
+Extracts the path from a URL.
+
+Example:
+
+```jinja
+{{ geturlpath("https://example.com:8080/path/to/resource") }} -> /path/to/resource
+```
+
+##### `geturlscheme(url)`
+
+Extracts the scheme (protocol) from a URL.
+
+Example:
+
+```jinja
+{{ geturlscheme("https://example.com/path") }} -> https
+```
+
+##### `geturlport(url)`
+
+Extracts the port from a URL.
+
+Example:
+
+```jinja
+{{ geturlport("https://example.com:8080/path") }} -> 8080
+```
+
+#### `dependency(language, dependency_name, runtime_version)`
+
+Retrieves dependency information for a specific language runtime. Returns the dependency configuration as a string (e.g., XML for Maven dependencies).
+
+Example:
+
+```jinja
+{{ dependency("java", "azure-messaging-eventhubs", "1.11.0") }}
 ```
 
 ### Tags
 
-You can use all tags defined by the Jinja2 standard library. In addition, the following tags are available:
+You can use all tags defined by the Jinja2 standard library. In addition, the following custom tags are available:
 
 #### `{% exit %}`
 
@@ -353,22 +743,25 @@ Example:
 {% if root.type is not defined %}{% exit %}{% endif %}
 ```
 
-#### `{% uuid %}`
-
-Generates a UUID and emits it into the output. This is useful for generating unique identifiers for things like namespaces. **(Consider this tag deprecated. It will turn into a function)**.
-
-Example:
-
-```jinja
-{% uuid %} -> 3e8c0b0a-1b5a-4b3f-8c1c-1b5a4b3f8c1c
-```
-
 #### `{% time %}`
 
-Generates a timestamp and emits it into the output. **(Consider this tag deprecated. It will turn into a function)**.
+Generates a timestamp and emits it into the output. The timestamp is in ISO 8601 format with microseconds.
 
 Example:
 
 ```jinja
-{% time %} -> 2020-01-01T00:00:00Z
+{% time %} -> 2025-11-11T10:30:45.123456Z
 ```
+
+#### `{% error "message" %}`
+
+Raises a template error with a custom message. This stops template rendering and reports the error to the user. Useful for validation and enforcing template preconditions.
+
+Example:
+
+```jinja
+{% if not projectname %}
+    {% error "projectname is required but not provided" %}
+{% endif %}
+```
+
