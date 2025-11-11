@@ -1,0 +1,22 @@
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+/**
+ * Functional interface for consuming three arguments
+ * @param <T> First argument type
+ * @param <U> Second argument type
+ * @param <V> Third argument type
+ */
+@FunctionalInterface
+public interface TriConsumer<T, U, V> {
+    /**
+     * Performs this operation on the given arguments
+     * @param t First argument
+     * @param u Second argument
+     * @param v Third argument
+     */
+    void accept(T t, U u, V v);
+}

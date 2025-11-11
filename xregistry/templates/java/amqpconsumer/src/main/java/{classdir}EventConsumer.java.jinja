@@ -24,7 +24,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.function.BiConsumer;
 
 {%- set class_name = (groupname | strip_namespace) + "EventConsumer" %}
 
@@ -39,17 +38,17 @@ public class {{ class_name }} {
     {%- set messagename = messageid | pascal | strip_namespace %}
     {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
     {%- if cloudEvents.isCloudEvent(message) %}
-    private BiConsumer<io.cloudevents.CloudEvent, {{ message_body_type }}> {{ messagename | lower }}Handler;
+    private TriConsumer<MessageContext, io.cloudevents.CloudEvent, {{ message_body_type }}> {{ messagename | lower }}Handler;
     {%- else %}
-    private BiConsumer<Message<?>, {{ message_body_type }}> {{ messagename | lower }}Handler;
+    private TriConsumer<MessageContext, Message<?>, {{ message_body_type }}> {{ messagename | lower }}Handler;
     {%- endif %}
     {% endfor %}
     
     {%- if uses_amqp_message %}
-    private BiConsumer<Message<?>, Void> unhandledMessageHandler;
+    private TriConsumer<MessageContext, Message<?>, Void> unhandledMessageHandler;
     {%- endif %}
     {%- if uses_cloudevents_message %}
-    private BiConsumer<io.cloudevents.CloudEvent, Void> unhandledEventHandler;
+    private TriConsumer<MessageContext, io.cloudevents.CloudEvent, Void> unhandledEventHandler;
     {%- endif %}
     
     private {{ class_name }}(AmqpConsumer endpoint) {
@@ -90,9 +89,9 @@ public class {{ class_name }} {
             credential,
             options,
             endpoints,
-            (message, log) -> {
+            (message, context, log) -> {
                 try {
-                    consumer.dispatchMessage(message, log);
+                    consumer.dispatchMessage(message, context, log);
                 } catch (Exception ex) {
                     log.error("Error in message handler: " + ex.getMessage(), ex);
                 }
@@ -118,9 +117,9 @@ public class {{ class_name }} {
             credential,
             options,
             endpoints,
-            (message, log) -> {
+            (message, context, log) -> {
                 try {
-                    consumer.dispatchMessage(message, log);
+                    consumer.dispatchMessage(message, context, log);
                 } catch (Exception ex) {
                     log.error("Error in message handler: " + ex.getMessage(), ex);
                 }
@@ -135,12 +134,12 @@ public class {{ class_name }} {
     {%- set messagename = messageid | pascal | strip_namespace %}
     {%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
     {%- if cloudEvents.isCloudEvent(message) %}
-    public {{ class_name }} on{{ messagename }}(BiConsumer<io.cloudevents.CloudEvent, {{ message_body_type }}> handler) {
+    public {{ class_name }} on{{ messagename }}(TriConsumer<MessageContext, io.cloudevents.CloudEvent, {{ message_body_type }}> handler) {
         this.{{ messagename | lower }}Handler = handler;
         return this;
     }
     {%- else %}
-    public {{ class_name }} on{{ messagename }}(BiConsumer<Message<?>, {{ message_body_type }}> handler) {
+    public {{ class_name }} on{{ messagename }}(TriConsumer<MessageContext, Message<?>, {{ message_body_type }}> handler) {
         this.{{ messagename | lower }}Handler = handler;
         return this;
     }
@@ -149,14 +148,14 @@ public class {{ class_name }} {
     {% endfor %}
     
     {%- if uses_amqp_message %}
-    public {{ class_name }} onUnhandledMessage(BiConsumer<Message<?>, Void> handler) {
+    public {{ class_name }} onUnhandledMessage(TriConsumer<MessageContext, Message<?>, Void> handler) {
         this.unhandledMessageHandler = handler;
         return this;
     }
     {%- endif %}
     
     {%- if uses_cloudevents_message %}
-    public {{ class_name }} onUnhandledEvent(BiConsumer<io.cloudevents.CloudEvent, Void> handler) {
+    public {{ class_name }} onUnhandledEvent(TriConsumer<MessageContext, io.cloudevents.CloudEvent, Void> handler) {
         this.unhandledEventHandler = handler;
         return this;
     }
@@ -179,7 +178,7 @@ public class {{ class_name }} {
     /**
      * Dispatch incoming messages to appropriate handlers
      */
-    private void dispatchMessage(Message<?> message, Logger log) {
+    private void dispatchMessage(Message<?> message, MessageContext context, Logger log) {
         try {
             log.info("Dispatching message with content-type: " + message.contentType());
             {%- if uses_cloudevents_message %}
@@ -187,7 +186,7 @@ public class {{ class_name }} {
             if (isCloudEvent(message)) {
                 log.info("Message identified as CloudEvent");
                 io.cloudevents.CloudEvent cloudEvent = extractCloudEvent(message);
-                dispatchCloudEvent(cloudEvent, log);
+                dispatchCloudEvent(cloudEvent, context, log);
                 return;
             } else {
                 log.info("Message is NOT a CloudEvent");
@@ -197,7 +196,7 @@ public class {{ class_name }} {
             {%- if uses_amqp_message %}
             // Dispatch as AMQP message
             log.info("Attempting AMQP message dispatch");
-            dispatchAmqpMessage(message, log);
+            dispatchAmqpMessage(message, context, log);
             {%- endif %}
         } catch (Exception ex) {
             log.error("Error dispatching message: " + ex.getMessage(), ex);
@@ -206,7 +205,7 @@ public class {{ class_name }} {
     }
     
     {%- if uses_cloudevents_message %}
-    private void dispatchCloudEvent(io.cloudevents.CloudEvent cloudEvent, Logger log) throws Exception {
+    private void dispatchCloudEvent(io.cloudevents.CloudEvent cloudEvent, MessageContext context, Logger log) throws Exception {
         String eventType = cloudEvent.getType();
         log.info("Dispatching CloudEvent of type: " + eventType);
         
@@ -244,7 +243,7 @@ public class {{ class_name }} {
                     // Default to JSON deserialization if no schema format is specified
                     data = new com.fasterxml.jackson.databind.ObjectMapper().readValue(dataBytes, {{ message_body_type }}.class);
                     {%- endif %}
-                    {{ messagename | lower }}Handler.accept(cloudEvent, data);
+                    {{ messagename | lower }}Handler.accept(context, cloudEvent, data);
                 } else {
                     log.warn("No handler registered for " + eventType);
                 }
@@ -254,7 +253,7 @@ public class {{ class_name }} {
             default:
                 log.warn("Unhandled CloudEvent type: " + eventType);
                 if (unhandledEventHandler != null) {
-                    unhandledEventHandler.accept(cloudEvent, null);
+                    unhandledEventHandler.accept(context, cloudEvent, null);
                 }
                 break;
         }
@@ -278,7 +277,7 @@ public class {{ class_name }} {
     {%- endif %}
     
     {%- if uses_amqp_message %}
-    private void dispatchAmqpMessage(Message<?> message, Logger log) throws Exception {
+    private void dispatchAmqpMessage(Message<?> message, MessageContext context, Logger log) throws Exception {
         // Extract subject from application properties
         Object subjectObj = message.property("subject");
         String subject = subjectObj != null ? subjectObj.toString() : null;
@@ -315,7 +314,7 @@ public class {{ class_name }} {
                         {%- else %}
                         payload = new com.fasterxml.jackson.databind.ObjectMapper().readValue(data, {{ message_body_type }}.class);
                         {%- endif %}
-                        {{ messagename | lower }}Handler.accept(message, payload);
+                        {{ messagename | lower }}Handler.accept(context, message, payload);
                     } else {
                         log.warn("No handler registered for " + subject);
                     }
@@ -325,7 +324,7 @@ public class {{ class_name }} {
                 default:
                     log.warn("Unhandled message subject: " + subject);
                     if (unhandledMessageHandler != null) {
-                        unhandledMessageHandler.accept(message, null);
+                        unhandledMessageHandler.accept(context, message, null);
                     }
                     break;
             }

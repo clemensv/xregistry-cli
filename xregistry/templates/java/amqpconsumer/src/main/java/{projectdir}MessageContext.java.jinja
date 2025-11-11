@@ -1,0 +1,109 @@
+{%- import "util.jinja.include" as util -%}
+{{ util.CommonFileHeader() }}
+
+{%- set package_name = project_name | lower | replace('-', '_') %}
+package {{ package_name }};
+
+import org.apache.qpid.protonj2.client.Delivery;
+import org.apache.logging.log4j.Logger;
+
+/**
+ * Context for AMQP message processing. Allows handlers to control message disposition
+ * (accept, release, reject, modify) after processing.
+ */
+public class MessageContext {
+    private final Delivery delivery;
+    private final Logger logger;
+    private boolean dispositionHandled;
+
+    /**
+     * Creates a new message context
+     * @param delivery The AMQP delivery object
+     * @param logger Logger for diagnostics
+     */
+    public MessageContext(Delivery delivery, Logger logger) {
+        this.delivery = delivery;
+        this.logger = logger;
+        this.dispositionHandled = false;
+    }
+
+    /**
+     * Accept the message, indicating successful processing
+     */
+    public void accept() {
+        if (dispositionHandled) {
+            logger.warn("Message disposition already handled");
+            return;
+        }
+        try {
+            delivery.accept();
+            dispositionHandled = true;
+            logger.debug("Message accepted");
+        } catch (Exception ex) {
+            logger.error("Failed to accept message: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Release the message back to the queue for redelivery
+     */
+    public void release() {
+        if (dispositionHandled) {
+            logger.warn("Message disposition already handled");
+            return;
+        }
+        try {
+            delivery.release();
+            dispositionHandled = true;
+            logger.debug("Message released");
+        } catch (Exception ex) {
+            logger.error("Failed to release message: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Reject the message, moving it to dead letter queue
+     * @param errorCondition Error condition
+     * @param errorDescription Error description
+     */
+    public void reject(String errorCondition, String errorDescription) {
+        if (dispositionHandled) {
+            logger.warn("Message disposition already handled");
+            return;
+        }
+        try {
+            delivery.reject(errorCondition, errorDescription);
+            dispositionHandled = true;
+            logger.debug("Message rejected: " + errorCondition + " - " + errorDescription);
+        } catch (Exception ex) {
+            logger.error("Failed to reject message: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Mark the message as modified
+     * @param deliveryFailed Whether delivery failed
+     * @param undeliverableHere Whether message is undeliverable at this endpoint
+     */
+    public void modify(boolean deliveryFailed, boolean undeliverableHere) {
+        if (dispositionHandled) {
+            logger.warn("Message disposition already handled");
+            return;
+        }
+        try {
+            delivery.modified(deliveryFailed, undeliverableHere);
+            dispositionHandled = true;
+            logger.debug("Message modified: deliveryFailed=" + deliveryFailed + ", undeliverableHere=" + undeliverableHere);
+        } catch (Exception ex) {
+            logger.error("Failed to modify message: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Check if the message disposition has been handled
+     * @return true if disposition has been handled
+     */
+    public boolean isDispositionHandled() {
+        return dispositionHandled;
+    }
+}

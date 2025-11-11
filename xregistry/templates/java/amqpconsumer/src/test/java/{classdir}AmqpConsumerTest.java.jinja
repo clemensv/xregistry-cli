@@ -99,14 +99,20 @@ public class {{ class_name | strip_namespace }} {
         
         CompletableFuture<Boolean> messageReceived = new CompletableFuture<>();
         
-        consumer.on{{ messagename }}((cloudEvent, data) -> {
+        consumer.on{{ messagename }}((context, cloudEvent, data) -> {
             try {
                 logger.info("{{ messagename }} message received");
                 assertNotNull(cloudEvent, "CloudEvent should not be null");
                 assertNotNull(data, "Message data should not be null");
+                context.accept(); // Accept the message
                 messageReceived.complete(true);
             } catch (AssertionError ex) {
                 logger.error("Assertion failed during message processing", ex);
+                context.reject("Assertion failed", ex.getMessage());
+                messageReceived.completeExceptionally(ex);
+            } catch (Exception ex) {
+                logger.error("Error processing message", ex);
+                context.reject("Processing error", ex.getMessage());
                 messageReceived.completeExceptionally(ex);
             }
         });

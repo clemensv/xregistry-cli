@@ -18,7 +18,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.function.BiConsumer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeUnit;
 
@@ -31,7 +30,7 @@ class AmqpConsumer {
     private final EndpointCredential credential;
     private final List<URI> endpoints;
     private final String node;
-    private final BiConsumer<Message<?>, Logger> messageHandler;
+    private final TriConsumer<Message<?>, MessageContext, Logger> messageHandler;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final Map<URI, ConnectionInfo> connectionCache = new HashMap<>();
     
@@ -49,7 +48,7 @@ class AmqpConsumer {
         EndpointCredential credential,
         Map<String, String> options,
         List<URI> endpoints,
-        BiConsumer<Message<?>, Logger> messageHandler
+        TriConsumer<Message<?>, MessageContext, Logger> messageHandler
     ) {
         this.client = Client.create();
         this.credential = credential;
@@ -75,12 +74,19 @@ class AmqpConsumer {
                                 Delivery delivery = connInfo.receiver.receive(1000, TimeUnit.MILLISECONDS);
                                 if (delivery != null) {
                                     Message<?> message = delivery.message();
-                                    try{
-                                        messageHandler.accept(message, logger);
-                                        delivery.accept();
+                                    MessageContext context = new MessageContext(delivery, logger);
+                                    try {
+                                        messageHandler.accept(message, context, logger);
+                                        // If handler didn't handle disposition, auto-reject on error
+                                        if (!context.isDispositionHandled()) {
+                                            logger.warn("Handler did not accept, release, reject, or modify the message. Auto-rejecting.");
+                                            context.reject("Handler error", "Message disposition not handled by handler");
+                                        }
                                     } catch (Exception ex) {
                                         logger.error("Error processing message: " + ex.getMessage(), ex);
-                                        delivery.reject("Processing error", "Failed to process message");
+                                        if (!context.isDispositionHandled()) {
+                                            context.reject("Processing error", "Failed to process message: " + ex.getMessage());
+                                        }
                                     }
                                 }
                             } catch (Exception ex) {
