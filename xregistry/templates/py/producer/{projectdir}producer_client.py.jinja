@@ -1,0 +1,78 @@
+{%- import "util.include.jinja" as util -%}
+
+# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
+import sys
+import requests
+from cloudevents.conversion import to_binary, to_structured
+from cloudevents.http import CloudEvent
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set messagegroup = messagegroups[messagegroupid] -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( '', root, message ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (type_name | lower) + " import " + type_name | strip_namespace | pascal %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroupid.split('.') -%}
+{%- set groupName = parts | join('_') | lower %}
+
+class {{ (groupName.split('.')[-1] + '_event_producer') | pascal }}:
+    def __init__(self, url, content_mode = 'structured'):
+        """ init """
+        self.url = url
+        self.content_mode = content_mode
+
+    {% for messageid, message in messagegroup.messages.items() -%}
+    {%- set parts = messageid.split('.') -%}
+    {%- set messageName = parts|join('_')|lower %}
+    def send_{{messageName.split('.')[-1]}}(self,
+    {%- for attrname in message.envelopemetadata -%}
+    {%- set attribute = message.envelopemetadata[attrname] -%}
+        {%- if attribute.type == "uritemplate" -%}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} : str, {% endfor -%}
+        {%- elif attribute.value is not defined -%}
+            _{{ attrname }}: str {%- if not attribute.required -%} = default {% endif %},
+        {%- endif -%}
+    {%- endfor -%} 
+    data: {{ util.DeclareDataType( project_name, root, message ) | strip_namespace }} ) -> None:
+        """ send_{{messageName.split('.')[-1]}} """
+        attributes = {
+        {%- for attrname in message.envelopemetadata -%}
+        {%- set attribute = message.envelopemetadata[attrname] %}
+            "{{ attrname }}": 
+            {%- if attribute.value -%}
+            "{{ attribute.value }}"
+            {%- if attribute.type == "uritemplate" -%}
+                {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+                {%- if phs %}
+                .format(
+                {%- for placeholder in phs -%}
+                    {{ placeholder }} = _{{ placeholder | pascal }}
+                {%- if not loop.last -%},{%- endif%}
+                {%- endfor -%}
+                )   
+                {%- endif %}        
+            {%- endif %}
+            {%- else -%}
+                _{{ attrname }}
+            {%- endif-%}
+            {%- if not loop.last -%},{%- endif%}
+        {%- endfor %}
+        }
+        event = CloudEvent(attributes, data)
+        if self.content_mode == "structured":
+            headers, body = to_structured(event)
+        else:
+            headers, body = to_binary(event)
+        requests.post(self.url, headers=headers, data=body, timeout=30)
+{% endfor %}
+{% endfor %}

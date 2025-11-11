@@ -1,0 +1,307 @@
+{%- import "util.include.jinja" as util -%}
+{%- set messagegroups = root.messagegroups %}
+# pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, missing-class-docstring
+
+"""
+Tests for {{ main_project_name }}
+"""
+import os
+import sys
+import asyncio
+import tempfile
+import pytest
+import time
+from typing import Optional
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
+from proton import Message
+from proton.reactor import Container
+from proton.handlers import MessagingHandler
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/tests')))
+
+from {{ main_project_name|dotunderscore|lower }} import *
+
+{%- set imports = [] %}
+{%- set test_imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + (type_name | pascal | strip_namespace) %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- set test_class_name = "Test_" + (type_name | pascal | strip_namespace) %}
+{%- set test_module_name = "test_" + (type_name | dotunderscore | lower) %}
+{%- set test_import_statement = "from " + test_module_name + " import " + test_class_name %}
+{%- if test_import_statement not in test_imports %}
+{%- set _ = test_imports.append(test_import_statement) %}
+{{ test_import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+ARTEMIS_BROKER_XML = """<?xml version='1.0'?>
+<configuration xmlns="urn:activemq"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="urn:activemq /schema/artemis-configuration.xsd">
+    <core xmlns="urn:activemq:core">
+        <name>0.0.0.0</name>
+        <persistence-enabled>false</persistence-enabled>
+        <security-enabled>false</security-enabled>
+        <acceptors>
+            <acceptor name="amqp">tcp://0.0.0.0:5672?protocols=AMQP;saslMechanisms=PLAIN,ANONYMOUS</acceptor>
+        </acceptors>
+        <address-settings>
+            <address-setting match="#">
+                <dead-letter-address>DLQ</dead-letter-address>
+                <expiry-address>ExpiryQueue</expiry-address>
+                <auto-create-queues>true</auto-create-queues>
+                <auto-create-addresses>true</auto-create-addresses>
+            </address-setting>
+        </address-settings>
+        <addresses>
+            <address name="test-queue">
+                <anycast>
+                    <queue name="test-queue" />
+                </anycast>
+            </address>
+        </addresses>
+    </core>
+</configuration>
+"""
+
+@pytest.fixture(scope="module")
+def artemis_container():
+    """Create and start an ActiveMQ Artemis container for testing"""
+    # Create temp file for broker configuration
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
+        f.write(ARTEMIS_BROKER_XML)
+        config_file = f.name
+    
+    try:
+        container = DockerContainer("apache/activemq-artemis:latest")
+        container.with_bind_ports(5672, 5672)
+        container.with_env("ARTEMIS_USER", "guest")
+        container.with_env("ARTEMIS_PASSWORD", "guest")
+        container.with_volume_mapping(config_file, "/var/lib/artemis-instance/etc-override/broker.xml")
+        container.with_exposed_ports(5672)
+        
+        # Wait for Artemis to be ready
+        container.start()
+        # Wait for broker to log that it's ready (AMQ241004 = "Artemis Server is now live")
+        wait_for_logs(container, "AMQ241004", timeout=60)
+        
+        yield {
+            "host": container.get_container_host_ip(),
+            "port": container.get_exposed_port(5672),
+            "username": "guest",
+            "password": "guest",
+            "address": "test-queue"
+        }
+        
+        container.stop()
+    finally:
+        if os.path.exists(config_file):
+            os.unlink(config_file)
+
+
+class SimpleSender(MessagingHandler):
+    """Simple synchronous AMQP sender for testing"""
+    
+    def __init__(self, url, address, username=None, password=None):
+        super(SimpleSender, self).__init__()
+        self.url = url
+        self.address = address
+        self.username = username
+        self.password = password
+        self.messages_to_send = []
+        self.confirmed = []
+        
+    def add_message(self, message: Message):
+        """Add a message to the queue to send"""
+        self.messages_to_send.append(message)
+        
+    def on_start(self, event):
+        """Called when container starts"""
+        conn = event.container.connect(self.url, user=self.username, password=self.password, sasl_enabled=True, allowed_mechs='PLAIN')
+        event.container.create_sender(conn, self.address)
+        
+    def on_sendable(self, event):
+        """Called when we can send messages"""
+        while self.messages_to_send and event.sender.credit:
+            msg = self.messages_to_send.pop(0)
+            event.sender.send(msg)
+            self.confirmed.append(msg)
+        
+        # Close after all messages sent
+        if not self.messages_to_send:
+            event.sender.close()
+            event.connection.close()
+
+
+def send_message_to_broker(broker_config: dict, message: Message, timeout: float = 5.0):
+    """Send a message to the broker using proton reactor
+    
+    Args:
+        broker_config: Dict with host, port, username, password, address
+        message: The proton.Message to send
+        timeout: Timeout in seconds
+    """
+    url = f"{broker_config['host']}:{broker_config['port']}"
+    sender = SimpleSender(url, broker_config['address'], 
+                         username=broker_config.get('username'),
+                         password=broker_config.get('password'))
+    sender.add_message(message)
+    
+    Container(sender).run()
+
+
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set class_name = (messagegroupid | pascal | strip_dots) + "EventConsumer" %}
+
+class Test{{ class_name }}:
+    """Test cases for {{ class_name }}"""
+    
+    def test_consumer_initialization(self):
+        """Test that consumer initializes correctly"""
+        consumer = {{ class_name }}()
+        assert consumer is not None
+        {% for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        assert consumer.{{ messagename | snake }}_handler is None
+        {%- endfor %}
+    
+    @pytest.mark.asyncio
+    async def test_handler_registration(self):
+        """Test that handlers can be registered"""
+        consumer = {{ class_name }}()
+        {% for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+        {%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+        
+        async def {{ messagename | snake }}_handler({% if isCloudEvent %}cloud_event, {% else %}message, {% endif %}data, context):
+            context.accept()
+        
+        consumer.{{ messagename | snake }}_handler = {{ messagename | snake }}_handler
+        assert consumer.{{ messagename | snake }}_handler is not None
+        {% endfor %}
+    
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | strip_dots | pascal %}
+    {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+    
+    @pytest.mark.asyncio
+    async def test_receive_{{ messagename | snake }}_message(self, artemis_container):
+        """Test receiving and dispatching {{ messagename }} message through actual broker.
+        
+        This test verifies the full message flow: send to broker -> receive from broker -> dispatch to handler -> settlement.
+        """
+        
+        consumer = {{ class_name }}()
+        
+        # Track if message was received and settled
+        received_messages = []
+        message_settled = []
+        
+        async def test_handler({% if isCloudEvent %}cloud_event, {% else %}message, {% endif %}data, context):
+            """Handler that accepts messages"""
+            received_messages.append(data)
+            context.accept()  # Properly settle the message
+            message_settled.append(True)
+        
+        consumer.{{ messagename | snake }}_handler = test_handler
+        
+        # Create and send a real message through the broker
+        {%- if type_name != "object" and type_name != "byte[]" %}
+        # Create valid test data using the test helper
+        test_data_instance = Test_{{ type_name | pascal | strip_namespace }}.create_instance()
+        msg_body = test_data_instance.to_byte_array("application/json")
+        {%- else %}
+        msg_body = b'test data'
+        {%- endif %}
+        
+        msg = Message(body=msg_body)
+        msg.content_type = "application/json"
+        
+        {%- if isCloudEvent %}
+        msg.properties = {
+            "cloudEvents:type": "{{ messageid }}",
+            "cloudEvents:specversion": "1.0",
+            "cloudEvents:source": "test",
+            "cloudEvents:id": "test-123"
+        }
+        {%- else %}
+        msg.properties = {
+            "subject": "{{ messageid }}"
+        }
+        {%- endif %}
+        
+        # Send message through broker
+        send_message_to_broker(artemis_container, msg)
+        
+        # Give message time to reach broker
+        await asyncio.sleep(0.5)
+        
+        # Receive message using proton reactor with synchronous handler
+        from proton.handlers import MessagingHandler
+        from proton.reactor import Container
+        
+        # Event to signal completion
+        receive_complete = asyncio.Event()
+        received_msg = []
+        
+        class SimpleReceiver(MessagingHandler):
+            def __init__(self, url, address, username=None, password=None):
+                super(SimpleReceiver, self).__init__()
+                self.url = url
+                self.address = address
+                self.username = username
+                self.password = password
+                
+            def on_start(self, event):
+                conn = event.container.connect(self.url, user=self.username, password=self.password, sasl_enabled=True, allowed_mechs='PLAIN')
+                event.container.create_receiver(conn, self.address)
+                
+            def on_message(self, event):
+                # Store message and delivery for processing
+                received_msg.append((event.message, event.delivery))
+                # Close immediately after receiving one message
+                event.receiver.close()
+                event.connection.close()
+        
+        connection_url = f"{artemis_container['host']}:{artemis_container['port']}"
+        receiver = SimpleReceiver(connection_url, artemis_container['address'],
+                                 username=artemis_container.get('username'),
+                                 password=artemis_container.get('password'))
+        
+        # Run receiver in thread (Container.run() is blocking)
+        import threading
+        def run_receiver():
+            Container(receiver).run()
+        
+        receiver_thread = threading.Thread(target=run_receiver, daemon=True)
+        receiver_thread.start()
+        receiver_thread.join(timeout=5.0)
+        
+        # Now process the received message through consumer dispatcher
+        assert len(received_msg) > 0, "No message received from broker"
+        
+        received_message, delivery = received_msg[0]
+        await consumer.process_message(received_message, delivery)
+        
+        # Verify message was processed and settled
+        assert len(received_messages) > 0, "Handler was not called"
+        assert len(message_settled) > 0, "Message was not settled"
+
+    
+    {%- endfor %}
+
+{% endfor %}

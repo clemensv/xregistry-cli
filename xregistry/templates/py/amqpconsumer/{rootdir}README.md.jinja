@@ -1,0 +1,246 @@
+{%- import "util.include.jinja" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{%- filter wordwrap(120) %}
+# {{ project_name | capitalize }} - AMQP 1.0 Consumer
+
+Auto-generated Python consumer for receiving messages via AMQP 1.0 protocol.
+
+## Overview
+
+This module provides a type-safe AMQP 1.0 consumer for receiving and dispatching events with optional CloudEvents envelope format. Built on the `python-qpid-proton` library for Python.
+
+## What is AMQP 1.0?
+
+**AMQP (Advanced Message Queuing Protocol) 1.0** is an open standard for business messaging that supports:
+- **Protocol-level interoperability** between different platforms and vendors
+- **Reliable message delivery** with settlement modes and flow control
+- **Multiple messaging patterns** including queues, topics, and request-reply
+- **Built-in security** with SASL authentication and TLS encryption
+
+Use cases: Enterprise integration, IoT messaging, financial services, cloud-native applications.
+
+**Note:** This library uses AMQP 1.0, which is fundamentally different from AMQP 0.9.x (used by RabbitMQ). Make sure your broker supports AMQP 1.0 (e.g., Azure Service Bus, Apache ActiveMQ, Apache Qpid).
+
+## Installation
+
+```bash
+pip install python-qpid-proton cloudevents
+```
+
+## Generated Consumers
+
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set uses_plain_amqp_message = not uses_cloudevents_message %}
+
+### {{ (messagegroupid | pascal | strip_dots) + "EventConsumer" }}
+
+`{{ (messagegroupid | pascal | strip_dots) + "EventConsumer" }}` receives and dispatches messages for the {{ messagegroupid }} message group.
+
+#### Quick Start
+
+```python
+import asyncio
+from uamqp import ReceiveClient, authentication
+from {{ main_project_name }} import {{ (messagegroupid | pascal | strip_dots) + "EventConsumer" }}
+
+async def main():
+    # Create consumer dispatcher
+    consumer = {{ (messagegroupid | pascal | strip_dots) + "EventConsumer" }}()
+    
+    # Register message handlers
+    {% for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+    async def {{ messagename | snake }}_handler({% if isCloudEvent %}cloud_event, {% else %}message, {% endif %}data):
+        print(f"Received {{ messagename }}: {data}")
+        # Process the message
+    
+    consumer.{{ messagename | snake }}_handler = {{ messagename | snake }}_handler
+    {% endfor %}
+    
+    # Setup AMQP connection
+    source_uri = "amqp://localhost:5672/my-queue"
+    auth = authentication.SASLPlain("localhost", "guest", "guest")
+    
+    # Create receive client
+    receive_client = ReceiveClient(source_uri, auth=auth, prefetch=10)
+    
+    # Start receiving messages
+    receive_client.open()
+    
+    try:
+        while True:
+            batch = receive_client.receive_message_batch(max_batch_size=10, timeout=5000)
+            for message in batch:
+                await consumer.process_message(message)
+                message.accept()  # Acknowledge message
+    finally:
+        receive_client.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+#### Message Handlers
+
+The consumer provides handlers for the following message types:
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+{%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+
+##### `{{ messagename | snake }}_handler`
+
+{%- if message.description %}
+{{ message.description }}
+{%- endif %}
+
+**Handler Signature:**
+```python
+async def handler({% if isCloudEvent %}cloud_event: CloudEvent, {% else %}message: Message, {% endif %}data: {{ type_name }}) -> None:
+    pass
+```
+
+**Parameters:**
+{%- if isCloudEvent %}
+- `cloud_event` (CloudEvent): The CloudEvent envelope
+{%- else %}
+- `message` (Message): The AMQP message
+{%- endif %}
+- `data` ({{ type_name }}): The deserialized message data
+
+{% endfor %}
+
+#### Unhandled Message Handlers
+
+Register handlers for messages that don't match any known type:
+
+```python
+{%- if uses_cloudevents_message %}
+async def unhandled_event_handler(cloud_event: CloudEvent) -> None:
+    print(f"Unhandled CloudEvent: {cloud_event['type']}")
+
+consumer.unhandled_event_handler = unhandled_event_handler
+{%- endif %}
+
+{%- if uses_plain_amqp_message %}
+async def unhandled_message_handler(message: Message) -> None:
+    print(f"Unhandled message: {message}")
+
+consumer.unhandled_message_handler = unhandled_message_handler
+{%- endif %}
+```
+
+{% endfor %}
+
+## Message Processing
+
+The consumer automatically:
+1. **Detects message format** (CloudEvent vs. plain AMQP)
+2. **Deserializes data** based on content type
+3. **Routes to handlers** based on event type or subject
+4. **Handles errors** gracefully with unhandled message handlers
+
+### CloudEvents Support
+
+The consumer supports both CloudEvents content modes:
+
+- **Structured mode**: Entire CloudEvent as JSON in message body
+- **Binary mode**: Event data in body, CloudEvents attributes in AMQP application properties
+
+Detection is automatic based on message properties.
+
+## AMQP Broker Compatibility
+
+This library has been tested with:
+- **Azure Service Bus** (AMQP 1.0 over TLS on port 5671)
+- **Apache ActiveMQ Artemis** (AMQP 1.0 on port 5672)
+- **Apache Qpid Broker-J** (AMQP 1.0 on port 5672)
+
+## Connection Management
+
+### Basic Authentication
+
+```python
+from uamqp import authentication
+
+auth = authentication.SASLPlain(
+    hostname="localhost",
+    username="guest",
+    password="guest"
+)
+
+receive_client = ReceiveClient(
+    source_uri="amqp://localhost:5672/my-queue",
+    auth=auth
+)
+```
+
+### TLS/SSL
+
+```python
+receive_client = ReceiveClient(
+    source_uri="amqps://localhost:5671/my-queue",
+    auth=auth
+)
+```
+
+### Message Settlement
+
+```python
+# Auto-accept messages
+batch = receive_client.receive_message_batch(max_batch_size=10)
+for message in batch:
+    try:
+        await consumer.process_message(message)
+        message.accept()  # Acknowledge successful processing
+    except Exception as e:
+        message.reject()  # Reject and return to queue
+        # or message.release()  # Release for redelivery
+```
+
+## Error Handling
+
+```python
+from uamqp import errors
+
+try:
+    receive_client.open()
+    batch = receive_client.receive_message_batch(max_batch_size=10, timeout=5000)
+    for message in batch:
+        await consumer.process_message(message)
+        message.accept()
+except errors.AMQPConnectionError as e:
+    print(f"Connection error: {e}")
+except errors.MessageException as e:
+    print(f"Message error: {e}")
+finally:
+    receive_client.close()
+```
+
+## Building and Testing
+
+```bash
+# Install dependencies
+poetry install
+
+# Run tests
+poetry run pytest
+
+# Build package
+poetry build
+```
+
+## Dependencies
+
+- `uamqp>=1.6.10` - AMQP 1.0 client library
+- `cloudevents>=1.10.1` - CloudEvents SDK
+- Python 3.10+
+
+## License
+
+This generated code is provided as-is for use in your projects.
+{%- endfilter %}

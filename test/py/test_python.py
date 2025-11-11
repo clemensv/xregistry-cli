@@ -6,11 +6,12 @@ import sys
 import os
 import tempfile
 import pytest
-import xregistry
 
 project_root = os.path.abspath(
     os.path.join(os.path.dirname(__file__), '../..'))
-sys.path.append(os.path.join(project_root))
+sys.path.insert(0, project_root)  # Prioritize local xregistry over installed version
+
+import xregistry
 
 
 # this test invokes the xregistry command line tool to generate a C# proxy and a consumer
@@ -157,3 +158,31 @@ def test_kafkaconsumer_lightbulb_py():
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
                         tmpdirname, "test_kafkaconsumer_lightbulb_py", "kafkaconsumer")
+
+
+def test_amqpproducer_lightbulb_py():
+    """ Test the AMQP producer for Lightbulb."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/lightbulb-amqp.xreg.json"),
+                        tmpdirname, "test_amqpproducer_lightbulb_py", "amqpproducer")
+
+
+def test_amqpproducer_contoso_erp_py():
+    """ Test the AMQP producer for Contoso ERP."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_amqpproducer_contoso_erp_py", "amqpproducer")
+
+
+def test_amqpconsumer_lightbulb_py():
+    """ Test the AMQP consumer for Lightbulb."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/lightbulb-amqp.xreg.json"),
+                        tmpdirname, "test_amqpconsumer_lightbulb_py", "amqpconsumer")
+
+
+def test_amqpconsumer_contoso_erp_py():
+    """ Test the AMQP consumer for Contoso ERP."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_amqpconsumer_contoso_erp_py", "amqpconsumer")

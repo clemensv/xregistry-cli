@@ -1,0 +1,132 @@
+{%- import "util.include.jinja" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+"""
+Sample usage of {{ main_project_name }}
+
+This example demonstrates how to receive and process messages using the AMQP 1.0 consumer.
+"""
+import sys
+from proton import Message
+from proton.handlers import MessagingHandler
+from proton.reactor import Container
+from {{ main_project_name }} import *
+
+class AmqpReceiver(MessagingHandler):
+    """AMQP receiver that processes messages through the consumer dispatcher"""
+    
+    def __init__(self, url, address, consumer, username=None, password=None):
+        super(AmqpReceiver, self).__init__()
+        self.url = url
+        self.address = address
+        self.consumer = consumer
+        self.username = username
+        self.password = password
+    
+    def on_start(self, event):
+        """Called when the event loop starts"""
+        print("Connecting to AMQP broker...")
+        conn = event.container.connect(
+            self.url,
+            user=self.username,
+            password=self.password,
+            sasl_enabled=True if self.username else False,
+            allowed_mechs='PLAIN' if self.username else 'ANONYMOUS'
+        )
+        event.container.create_receiver(conn, self.address)
+        print(f"Connected! Listening on {self.address}... (Press Ctrl+C to stop)")
+    
+    def on_message(self, event):
+        """Called when a message is received"""
+        try:
+            # Process the message through the consumer dispatcher
+            self.consumer.process_message_sync(event)
+            print("Message processed successfully")
+        except Exception as e:
+            print(f"Error processing message: {e}", file=sys.stderr)
+    
+    def on_connection_error(self, event):
+        """Called when connection error occurs"""
+        print(f"Connection error: {event.connection.remote_condition}", file=sys.stderr)
+        event.connection.close()
+    
+    def on_link_error(self, event):
+        """Called when link error occurs"""
+        print(f"Link error: {event.link.remote_condition}", file=sys.stderr)
+        event.connection.close()
+
+def main():
+    """Main function"""
+    {% for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- if loop.first %}
+    {%- set class_name = (messagegroupid | pascal | strip_dots) + "EventConsumer" %}
+    
+    # Create consumer (example uses first message group)
+    print("Creating AMQP consumer...")
+    consumer = {{ class_name }}()
+    
+    # Register message handlers
+    {% for messageid, message in messagegroup.messages.items() %}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+    
+    def {{ messagename | snake }}_handler({% if isCloudEvent %}cloud_event, {% else %}message, {% endif %}data, context):
+        """Handler for {{ messagename }} messages"""
+        print(f"\n=== Received {{ messagename }} ===")
+        {%- if isCloudEvent %}
+        print(f"CloudEvent ID: {cloud_event['id']}")
+        print(f"CloudEvent Type: {cloud_event['type']}")
+        print(f"CloudEvent Source: {cloud_event['source']}")
+        {%- endif %}
+        print(f"Data: {data}")
+        # TODO: Add your message processing logic here
+        
+        # Accept the message (acknowledge successful processing)
+        context.accept()
+        # Alternatively, you can:
+        # context.reject()  # Reject and dead-letter the message
+        # context.release()  # Release back to queue for redelivery
+    
+    consumer.{{ messagename | snake }}_handler = {{ messagename | snake }}_handler
+    {% endfor %}
+    
+    # Register unhandled message handler
+    def unhandled_message_handler(message, context):
+        """Handler for unhandled messages"""
+        print(f"\nWarning: Received unhandled message")
+        # Release unhandled messages back to queue
+        context.release()
+    
+    consumer.unhandled_message_handler = unhandled_message_handler
+    
+    # Setup AMQP connection
+    broker_url = "localhost:5672"  # Change to your broker host:port
+    queue_address = "my-queue"     # Change to your queue/topic address
+    username = "guest"             # Change to your username (or None for anonymous)
+    password = "guest"             # Change to your password (or None for anonymous)
+    
+    # Create and run the receiver
+    receiver = AmqpReceiver(
+        url=broker_url,
+        address=queue_address,
+        consumer=consumer,
+        username=username,
+        password=password
+    )
+    
+    try:
+        Container(receiver).run()
+    except KeyboardInterrupt:
+        print("\n\nStopping consumer...")
+        print("Consumer stopped")
+        return 0
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        return 1
+    {%- endif %}
+    {% endfor %}
+
+if __name__ == "__main__":
+    sys.exit(main())
+

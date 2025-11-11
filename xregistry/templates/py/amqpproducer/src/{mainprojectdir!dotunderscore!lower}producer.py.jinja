@@ -1,0 +1,249 @@
+{%- import "util.include.jinja" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+
+# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
+
+"""
+Producer module for sending messages via AMQP 1.0 protocol.
+"""
+
+import sys
+import typing
+import uuid
+import json
+from urllib.parse import quote_plus
+from proton import Message
+from proton.utils import BlockingConnection
+from cloudevents.http import CloudEvent
+from cloudevents.conversion import to_binary, to_structured
+
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set class_name = type_name | strip_namespace %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + class_name %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"Producer" %}
+
+class {{ class_name }}:
+    """
+    Producer class to send messages in the `{{ messagegroupid }}` message group via AMQP 1.0 protocol.
+    """
+    
+    def __init__(self, 
+                 host: str,
+                 address: str,
+                 port: int = 5672,
+                 username: typing.Optional[str] = None,
+                 password: typing.Optional[str] = None,
+                 content_mode: typing.Literal['structured', 'binary'] = 'structured',
+                 format_type: str = 'application/json'):
+        """
+        Initialize the AMQP producer
+        
+        Args:
+            host (str): The AMQP broker hostname
+            address (str): The AMQP address (queue or topic)
+            port (int): The AMQP broker port (default: 5672)
+            username (typing.Optional[str]): Optional username for authentication
+            password (typing.Optional[str]): Optional password for authentication
+            content_mode (typing.Literal['structured', 'binary']): CloudEvents content mode (default: 'structured')
+            format_type (str): Content type format for structured mode (default: 'application/json')
+        """
+        self.host = host
+        self.port = port
+        self.address = address
+        self.username = username
+        self.password = password
+        self.content_mode = content_mode
+        self.format_type = format_type
+
+        connection_url = self._build_connection_url()
+        self._connection = BlockingConnection(connection_url, timeout=30)
+        self._sender = self._connection.create_sender(self.address)
+    
+    def _build_connection_url(self) -> str:
+        if self.username and self.password:
+            user = quote_plus(self.username)
+            pwd = quote_plus(self.password)
+            return f"amqp://{user}:{pwd}@{self.host}:{self.port}"
+        return f"amqp://{self.host}:{self.port}"
+
+    def _serialize_payload(self, data: typing.Any, content_type: str) -> bytes:
+        if data is None:
+            return b''
+        if hasattr(data, 'to_byte_array'):
+            return data.to_byte_array(content_type)
+        if hasattr(data, 'to_dict'):
+            return json.dumps(data.to_dict()).encode('utf-8')
+        if isinstance(data, (bytes, bytearray)):
+            return bytes(data)
+        return json.dumps(data).encode('utf-8')
+
+    {% for messageid, message in messagegroup.messages.items() -%}
+    {%- set messagename = messageid | pascal | strip_namespace %}
+    {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
+    
+    def send_{{ messagename | snake }}(self,
+        data: {{ type_name }},
+        {%- if isCloudEvent %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+        _{{ placeholder | snake }}: str,
+        {%- endfor %}
+        {%- endfor %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] %}
+        {% if not attribute.required %}_{{ attrname }}: typing.Optional[str] = None,{% else %}_{{ attrname }}: str,{% endif %}
+        {%- endfor %}
+        {%- endif %}
+        content_type: str = 'application/json') -> None:
+        """
+        Send the `{{ messageid }}` message
+        {%- if message.description %}
+        {{ message.description }}
+        {%- endif %}
+        
+        Args:
+        {%- if isCloudEvent %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+            _{{ placeholder | snake }} (str): Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+        {%- endfor %}
+        {%- endfor %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] %}
+            _{{ attrname }} ({% if not attribute.required %}typing.Optional[str]{% else %}str{% endif %}): CloudEvent {{ attrname }} attribute
+        {%- endfor %}
+        {%- endif %}
+            data ({{ type_name }}): The message data object
+            content_type (str): The content type of the message data (default: 'application/json')
+        """
+        {%- if isCloudEvent %}
+        # Build CloudEvent attributes
+        attributes = {
+        {%- for attrname, attribute in message.envelopemetadata.items() %}
+            "{{ attrname }}": 
+            {%- if attrname == "id" %}
+            str(uuid.uuid4()),
+            {%- elif attrname == "time" %}
+            None,  # Will be auto-generated
+            {%- elif attrname == "datacontenttype" %}
+            content_type,
+            {%- elif attrname == "dataschema" %}
+            None,  # Optional
+            {%- elif attribute.value %}
+            {%- if attribute.type == "uritemplate" %}
+            {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+            "{{ attribute.value }}"{% if phs %}.format({% for placeholder in phs %}{{ placeholder }}=_{{ placeholder | snake }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %},
+            {%- else %}
+            "{{ attribute.value }}",
+            {%- endif %}
+            {%- else %}
+            _{{ attrname }},
+            {%- endif %}
+        {%- endfor %}
+        }
+        
+        # Remove None values
+        attributes = {k: v for k, v in attributes.items() if v is not None}
+        
+        # Serialize data
+        byte_data = self._serialize_payload(data, content_type)
+        
+        # Create CloudEvent
+        cloud_event = CloudEvent(attributes, byte_data)
+        
+        # Convert to AMQP message based on content mode
+        if self.content_mode == 'structured':
+            headers, body = to_structured(cloud_event)
+            if isinstance(body, dict):
+                msg_body = json.dumps(body).encode('utf-8')
+            elif isinstance(body, bytes):
+                msg_body = body
+            else:
+                msg_body = str(body).encode('utf-8')
+            amqp_msg = Message(body=msg_body)
+            amqp_msg.content_type = self.format_type or headers.get('content-type')
+        else:  # binary mode
+            headers, body = to_binary(cloud_event)
+            amqp_msg = Message(body=body)
+            amqp_msg.content_type = content_type
+            if headers:
+                amqp_msg.properties = headers
+        {%- else %}
+        # Plain AMQP message (non-CloudEvent)
+        byte_data = self._serialize_payload(data, content_type)
+        amqp_msg = Message(body=byte_data)
+        amqp_msg.content_type = content_type
+        amqp_msg.properties = {'subject': '{{ messageid }}'}
+        {%- endif %}
+        
+        # Send message
+        self._sender.send(amqp_msg)
+    
+    def send_{{ messagename | snake }}_batch(self,
+        data_array: typing.List[{{ type_name }}],
+        {%- if isCloudEvent %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+        _{{ placeholder | snake }}: str,
+        {%- endfor %}
+        {%- endfor %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] %}
+        {% if not attribute.required %}_{{ attrname }}: typing.Optional[str] = None,{% else %}_{{ attrname }}: str,{% endif %}
+        {%- endfor %}
+        {%- endif %}
+        content_type: str = 'application/json') -> None:
+        """
+        Send multiple `{{ messageid }}` messages
+        
+        Args:
+            data_array (typing.List[{{ type_name }}]): Array of message data objects
+        {%- if isCloudEvent %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+            _{{ placeholder | snake }} (str): Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+        {%- endfor %}
+        {%- endfor %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] %}
+            _{{ attrname }} ({% if not attribute.required %}typing.Optional[str]{% else %}str{% endif %}): CloudEvent {{ attrname }} attribute
+        {%- endfor %}
+        {%- endif %}
+            content_type (str): The content type of the message data
+        """
+        for data in data_array:
+            self.send_{{ messagename | snake }}(data, {% if isCloudEvent %}{% for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}{% for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }}, {% endfor %}{% endfor %}{% for attrname, attribute in message.envelopemetadata.items() if attribute.value is not defined and attrname not in ["time", "id", "datacontenttype", "dataschema"] %}_{{ attrname }}, {% endfor %}{% endif %}content_type)
+    {% endfor %}
+    
+    def close(self) -> None:
+        """
+        Close the producer and clean up resources
+        """
+        if hasattr(self, '_sender') and self._sender:
+            try:
+                self._sender.close()
+            except Exception:  # pragma: no cover - best-effort cleanup
+                pass
+            finally:
+                self._sender = None
+        if hasattr(self, '_connection') and self._connection:
+            try:
+                self._connection.close()
+            except Exception:  # pragma: no cover - best-effort cleanup
+                pass
+            finally:
+                self._connection = None
+
+{% endfor %}

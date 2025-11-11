@@ -1,0 +1,15 @@
+.PHONY: build install test
+
+build:
+{{'\t'}}pip install wheel poetry poetry-plugin-export
+{{'\t'}}pip wheel -w whl ./{{ data_project_name }} ./{{ main_project_name }}
+
+install: build
+{{'\t'}}cd {{ data_project_name }} && poetry install
+{{'\t'}}cd {{ main_project_name }} && poetry install
+{{'\t'}}pip install ./{{ data_project_name }} ./{{ main_project_name }}
+{{'\t'}}pip install pytest-asyncio>=0.23.7
+
+test: install
+{{'\t'}}pytest ./{{ main_project_name }}/tests ./{{ data_project_name }}/tests
+
