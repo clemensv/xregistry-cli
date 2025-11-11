@@ -43,25 +43,25 @@ namespace {{ project_name | pascal }}
         /// <summary>
         /// Event handler for {{ messagename }} messages.
         /// </summary>
-        public event Func<CloudEvent, {{ message_body_type }}?, Task>? {{ messagename }}Async;
+        public event Func<CloudEvent, {{ message_body_type }}?, MessageContext, Task>? {{ messagename }}Async;
         {%- else %}
         /// <summary>
         /// Event handler for {{ messagename }} messages.
         /// </summary>
-        public event Func<Message, {{ message_body_type }}?, Task>? {{ messagename }}Async;
+        public event Func<Message, {{ message_body_type }}?, MessageContext, Task>? {{ messagename }}Async;
         {%- endif %}
         {%- endfor %}
         {%- if uses_amqp_message%}
         /// <summary>
         /// Event handler for unhandled AMQP messages.
         /// </summary>
-        public event Func<Message, Task>? UnhandledMessageAsync;   
+        public event Func<Message, MessageContext, Task>? UnhandledMessageAsync;   
         {%- endif %}
         {%- if uses_cloudevents_message%}
         /// <summary>
         /// Event handler for unhandled CloudEvents.
         /// </summary>
-        public event Func<CloudEvent, Task>? UnhandledEventAsync;
+        public event Func<CloudEvent, MessageContext, Task>? UnhandledEventAsync;
         {%- endif %}
         /// <summary>
         /// Event handler for message processing errors.
@@ -77,10 +77,10 @@ namespace {{ project_name | pascal }}
         {
             _endpoint = endpoint;
             {% if uses_amqp_message %}
-            _endpoint.DispatchMessageAsync += async (message, log) => await DispatchMessageAsync(message);
+            _endpoint.DispatchMessageAsync += async (message, context, log) => await DispatchMessageAsync(message, context);
             {%- endif %}
             {%- if uses_cloudevents_message %}
-            _endpoint.DispatchCloudEventAsync += async (cloudEvent, log) => await DispatchCloudEventAsync(cloudEvent);
+            _endpoint.DispatchCloudEventAsync += async (cloudEvent, context, log) => await DispatchCloudEventAsync(cloudEvent, context);
             {%- endif %}
         }
 
@@ -99,8 +99,10 @@ namespace {{ project_name | pascal }}
         ///     new Uri("amqp://localhost:5672"),
         ///     loggerFactory,
         ///     new Dictionary&lt;string, string&gt; { ["node"] = "/queue" });
-        /// consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (ce, data) => {
+        /// consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (ce, data, context) => {
         ///     // Handle message
+        ///     await ProcessAsync(data);
+        ///     context.Accept();
         /// };
         /// await consumer.StartAsync();
         /// </code>
@@ -141,7 +143,7 @@ namespace {{ project_name | pascal }}
         public Task StopAsync() => _endpoint.StopAsync();
 
         {%- if uses_cloudevents_message %}
-        private async Task<bool> DispatchCloudEventAsync(CloudEvent cloudEvent)
+        private async Task<bool> DispatchCloudEventAsync(CloudEvent cloudEvent, MessageContext context)
         {
             var cloudEventType = cloudEvent.Type;
             _logger.LogInformation($"Dispatching CloudEvent of type {cloudEventType}");
@@ -166,7 +168,8 @@ namespace {{ project_name | pascal }}
                             {
                                 var t = (Task?)(handler.DynamicInvoke(
                                     cloudEvent,
-                                    {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType)));
+                                    {{ message_body_type }}.FromData(cloudEvent.Data, cloudEvent.DataContentType),
+                                    context));
                                 if (t != null)
                                 {
                                     tasks.Add(t);
@@ -181,7 +184,23 @@ namespace {{ project_name | pascal }}
                                 }
                             }
                             {%- else -%}
-                            var t = (Task?)(handler.DynamicInvoke(cloudEvent, cloudEvent.Data));
+                            byte[]? dataBytes = null;
+                            if (cloudEvent.Data != null)
+                            {
+                                if (cloudEvent.Data is byte[] bytes)
+                                {
+                                    dataBytes = bytes;
+                                }
+                                else if (cloudEvent.Data is BinaryData binaryData)
+                                {
+                                    dataBytes = binaryData.ToArray();
+                                }
+                                else if (cloudEvent.Data is System.Text.Json.JsonElement jsonElement)
+                                {
+                                    dataBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(jsonElement);
+                                }
+                            }
+                            var t = (Task?)(handler.DynamicInvoke(cloudEvent, dataBytes, context));
                             if (t != null)
                             {
                                 tasks.Add(t);
@@ -206,7 +225,7 @@ namespace {{ project_name | pascal }}
                 default:
                     if ( UnhandledEventAsync != null )
                     {
-                        await UnhandledEventAsync(cloudEvent);
+                        await UnhandledEventAsync(cloudEvent, context);
                     }
                     return false;
             }
@@ -214,7 +233,7 @@ namespace {{ project_name | pascal }}
         {%- endif %}
 
         {%- if uses_amqp_message %}
-        private async Task DispatchMessageAsync(Message amqpMessage)
+        private async Task DispatchMessageAsync(Message amqpMessage, MessageContext context)
         {
             var messageSubject = amqpMessage.ApplicationProperties["subject"]?.ToString();
             _logger.LogInformation($"Dispatching message with subject {messageSubject}");
@@ -233,13 +252,14 @@ namespace {{ project_name | pascal }}
                             {%- if message_body_type != "byte[]" -%}
                             var t = (Task?)(handler.DynamicInvoke(
                                 amqpMessage,
-                                {{ message_body_type }}.FromData(amqpMessage.Body, amqpMessage.Properties.ContentType)));
+                                {{ message_body_type }}.FromData(amqpMessage.Body, amqpMessage.Properties.ContentType),
+                                context));
                             if (t != null)
                             {
                                 tasks.Add(t);
                             }
                             {%- else -%}
-                            var t = (Task?)(handler.DynamicInvoke(amqpMessage, amqpMessage.Body));
+                            var t = (Task?)(handler.DynamicInvoke(amqpMessage, amqpMessage.Body, context));
                             if (t != null)
                             {
                                 tasks.Add(t);
@@ -253,37 +273,12 @@ namespace {{ project_name | pascal }}
                 default:
                     if (UnhandledMessageAsync != null)
                     {
-                        await UnhandledMessageAsync(amqpMessage);
+                        await UnhandledMessageAsync(amqpMessage, context);
                     }
                     break;
             }
         }
         {%- endif %}
-
-        internal override async Task<bool> ProcessMessageAsync(Message message)
-        {
-            try
-            {
-                {%- if uses_cloudevents_message %}
-                if (IsCloudEvent(message))
-                {
-                    var cloudEvent = CloudEventFromMessage(message);
-                    await DispatchCloudEventAsync(cloudEvent);
-                    return true;
-                }
-                {%- endif %}
-                {% if uses_amqp_message %}
-                await DispatchMessageAsync(message);
-                {%- endif %}
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing message");
-                await ProcessErrorAsync(ex);
-                return false;
-            }
-        }
 
         /// <summary>
         /// Disposes the consumer synchronously.

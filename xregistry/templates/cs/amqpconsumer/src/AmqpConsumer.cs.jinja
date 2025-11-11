@@ -14,11 +14,69 @@ namespace {{ project_name | pascal }}
 {
     {{ util.EndpointCredentialClasses() | indent(4) }}
 
+    /// <summary>
+    /// Context object that provides message disposition operations.
+    /// </summary>
+    public class MessageContext
+    {
+        private readonly IReceiverLink _receiver;
+        private readonly global::Amqp.Message _message;
+        private bool _disposed = false;
+
+        internal MessageContext(IReceiverLink receiver, global::Amqp.Message message)
+        {
+            _receiver = receiver;
+            _message = message;
+        }
+
+        /// <summary>
+        /// Accepts the message, indicating successful processing.
+        /// </summary>
+        public void Accept()
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(MessageContext));
+            _receiver.Accept(_message);
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Releases the message back to the sender for redelivery.
+        /// </summary>
+        public void Release()
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(MessageContext));
+            _receiver.Release(_message);
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Rejects the message, indicating permanent failure.
+        /// </summary>
+        public void Reject()
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(MessageContext));
+            _receiver.Reject(_message);
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Modifies the message delivery state.
+        /// </summary>
+        /// <param name="deliveryFailed">Indicates if delivery failed.</param>
+        /// <param name="undeliverableHere">Indicates if the message is undeliverable here.</param>
+        public void Modify(bool deliveryFailed, bool undeliverableHere = false)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(MessageContext));
+            _receiver.Modify(_message, deliveryFailed, undeliverableHere, null);
+            _disposed = true;
+        }
+    }
+
     public class AmqpConsumer : IDisposable
     {
-        public event Func<Message, ILogger, Task>? DispatchMessageAsync;
+        public event Func<Message, MessageContext, ILogger, Task>? DispatchMessageAsync;
         {%- if uses_cloudevents %}
-        public event Func<CloudEvent, ILogger, Task>? DispatchCloudEventAsync;
+        public event Func<CloudEvent, MessageContext, ILogger, Task>? DispatchCloudEventAsync;
         {%- endif %}
         
         private const string ERROR_LOG_TEMPLATE = "Error in AmqpConsumer: {0}";
@@ -154,15 +212,29 @@ namespace {{ project_name | pascal }}
             }
         }
 
-        protected void Deliver<T>(T message)
+        protected void Deliver<T>(T message, MessageContext context)
         {
             if (message is Message && DispatchMessageAsync != null)
             {
-                DispatchMessageAsync.Invoke((Message)(object)message, Logger);
+                var task = DispatchMessageAsync.Invoke((Message)(object)message, context, Logger);
+                // Fire and forget - errors logged by dispatcher
+                _ = task.ContinueWith(t => {
+                    if (t.IsFaulted)
+                    {
+                        Logger.LogError(t.Exception, "Error in DispatchMessageAsync handler");
+                    }
+                }, TaskScheduler.Default);
             }
             else if (message is CloudEvent && DispatchCloudEventAsync != null)
             {
-                DispatchCloudEventAsync.Invoke((CloudEvent)(object)message, Logger);
+                var task = DispatchCloudEventAsync.Invoke((CloudEvent)(object)message, context, Logger);
+                // Fire and forget - errors logged by dispatcher
+                _ = task.ContinueWith(t => {
+                    if (t.IsFaulted)
+                    {
+                        Logger.LogError(t.Exception, "Error in DispatchCloudEventAsync handler");
+                    }
+                }, TaskScheduler.Default);
             }
         }
 
@@ -173,6 +245,7 @@ namespace {{ project_name | pascal }}
         /// <param name="message">The message.</param>
         private void OnMessage(IReceiverLink receiver, global::Amqp.Message message)
         {
+            var context = new MessageContext(receiver, message);
             try
             {
                 {%- set extraindent = 0 %}
@@ -195,32 +268,13 @@ namespace {{ project_name | pascal }}
                         formatter = _jsonFormatter;
                     }
                     var cloudEvent = message.ToCloudEvent(formatter);
-                    try
-                    {
-
-                        Deliver(cloudEvent);
-                        receiver.Accept(message);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, "Error processing message");
-                        receiver.Release(message);
-                    }
+                    Deliver(cloudEvent, context);
                 }
                 else
                 {
                 {%- endif %}    
                 {%- filter indent(extraindent) %}
-                try
-                {
-                    Deliver(message);
-                    receiver.Accept(message);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "Error processing message");
-                    receiver.Release(message);
-                }
+                Deliver(message, context);
                 {%- endfilter %}
                 {%- if uses_cloudevents %}
                 }

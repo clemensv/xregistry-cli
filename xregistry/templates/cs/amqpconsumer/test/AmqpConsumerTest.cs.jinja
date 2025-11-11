@@ -219,18 +219,20 @@ namespace {{ project_name | pascal }}.Test
                 try
                 {
                     var messageReceived = new TaskCompletionSource<bool>();
-                    dispatcher.{{ messagename }}Async += (amqpMessage, messageObj) =>
+                    dispatcher.{{ messagename }}Async += (amqpMessage, messageObj, context) =>
                     {
                         try
                         {
                             _logger.LogInformation("{{ messagename }} message received");
                             Assert.NotNull(amqpMessage);
                             Assert.NotNull(messageObj);
+                            context.Accept();
                             messageReceived.SetResult(true);
                         }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "An error occurred during {{ messagename }} message processing");
+                            context.Release();
                             messageReceived.SetResult(false);
                         }
                         return Task.CompletedTask;

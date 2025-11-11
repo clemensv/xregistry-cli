@@ -30,11 +30,6 @@ namespace {{ project_name | pascal }}
             {
                 _logger = loggerFactory != null ? loggerFactory.CreateLogger(GetType()) : new LoggerFactory().CreateLogger(GetType());
             }
-
-            /// <summary>
-            /// Processes a message from the AMQP endpoint
-            /// </summary>
-            internal abstract Task<bool> ProcessMessageAsync(Message message);
             
             internal virtual Task ProcessErrorAsync(Exception error)
             {
@@ -47,52 +42,6 @@ namespace {{ project_name | pascal }}
             {%- if uses_cloudevents_message %}
             {{ amqp.CloudEventsMethods() | indent(12) }}
             {%- endif %}
-        }
-    
-        public static class ProcessorExtensions
-        {
-            private static readonly Dictionary<AmqpConsumer, List<DispatcherBase>> Dispatchers = new Dictionary<AmqpConsumer, List<DispatcherBase>>();
-
-            public static void Attach(this AmqpConsumer consumer, DispatcherBase dispatcher)
-            {
-                if (!Dispatchers.ContainsKey(consumer))
-                {
-                    Dispatchers[consumer] = new List<DispatcherBase>();
-                    consumer.DispatchMessageAsync += async (message, logger) => await ProcessMessageAsync(consumer, message);
-                }
-                Dispatchers[consumer].Add(dispatcher);
-            }
-
-            public static void Detach(this AmqpConsumer consumer, DispatcherBase dispatcher)
-            {
-                if (Dispatchers.ContainsKey(consumer))
-                {
-                    Dispatchers[consumer].Remove(dispatcher);
-                    if (Dispatchers[consumer].Count == 0)
-                    {
-                        Dispatchers.Remove(consumer);
-                    }
-                }
-            }
-
-            private static async Task ProcessMessageAsync(AmqpConsumer consumer, Message message)
-            {
-                foreach (var dispatcher in Dispatchers[consumer])
-                {
-                    if (await dispatcher.ProcessMessageAsync(message))
-                    {
-                        return;
-                    }
-                }
-            }
-
-            private static async Task ProcessErrorAsync(AmqpConsumer consumer, Exception error)
-            {
-                foreach (var dispatcher in Dispatchers[consumer])
-                {
-                    await dispatcher.ProcessErrorAsync(error);
-                }
-            }
         }
     }
 }

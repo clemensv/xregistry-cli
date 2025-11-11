@@ -36,10 +36,19 @@ var consumer = {{ class_name }}.CreateBuilder()
 {%- set messageid, message = first_message %}
 {%- set messagename = messageid | strip_dots | pascal %}
 {%- set message_body_type = util.body_type(data_project_name, root, message) %}
-consumer.{{ messagename }}Async += async (cloudEvent, data) =>
+consumer.{{ messagename }}Async += async (cloudEvent, data, context) =>
 {
     Console.WriteLine($"Received {{ messagename }} event");
     // Process data
+    
+    // Accept the message to acknowledge successful processing
+    context.Accept();
+    
+    // Or release the message for redelivery if processing failed
+    // context.Release();
+    
+    // Or reject the message as permanently failed
+    // context.Reject();
 };
 {%- endif %}
 
@@ -74,7 +83,10 @@ var consumer = {{ class_name }}.CreateConsumer(
     new Dictionary<string, string> { ["node"] = "/queue/events" });
 
 // Register handlers
-consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (ce, data) => { /* ... */ };
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (ce, data, context) => { 
+    // Process message
+    context.Accept(); 
+};
 
 await consumer.StartAsync();
 ```
@@ -92,12 +104,20 @@ Subscribe to handlers for specific event types:
 **Data Type:** `{{ message_body_type }}`
 
 ```csharp
-consumer.{{ messagename }}Async += async (CloudEvent cloudEvent, {{ message_body_type }}? data) =>
+consumer.{{ messagename }}Async += async (CloudEvent cloudEvent, {{ message_body_type }}? data, MessageContext context) =>
 {
     if (data != null)
     {
         // Process the event data
         Console.WriteLine($"Received {{ messagename }}");
+        
+        // Accept the message when processing is successful
+        context.Accept();
+    }
+    else
+    {
+        // Reject malformed messages
+        context.Reject();
     }
 };
 ```
@@ -109,11 +129,93 @@ consumer.{{ messagename }}Async += async (CloudEvent cloudEvent, {{ message_body
 Handle events that don't match any registered type:
 
 ```csharp
-consumer.UnhandledEventAsync += async (CloudEvent cloudEvent) =>
+consumer.UnhandledEventAsync += async (CloudEvent cloudEvent, MessageContext context) =>
 {
     Console.WriteLine($"Received unhandled event type: {cloudEvent.Type}");
+    // Reject unhandled messages or accept them to prevent redelivery
+    context.Reject();
 };
 ```
+
+## Message Disposition
+
+Every message handler receives a `MessageContext` parameter that provides control over message acknowledgment. You must call one of the disposition methods to complete message processing:
+
+### Accept
+
+Indicates the message was successfully processed and should be removed from the queue:
+
+```csharp
+consumer.MyEventAsync += async (cloudEvent, data, context) =>
+{
+    // Process successfully
+    await ProcessAsync(data);
+    
+    // Acknowledge success
+    context.Accept();
+};
+```
+
+### Release
+
+Returns the message to the queue for redelivery (e.g., temporary processing failure):
+
+```csharp
+consumer.MyEventAsync += async (cloudEvent, data, context) =>
+{
+    try
+    {
+        await ProcessAsync(data);
+        context.Accept();
+    }
+    catch (TemporaryException ex)
+    {
+        // Release for retry
+        context.Release();
+    }
+};
+```
+
+### Reject
+
+Permanently rejects the message, typically moving it to a dead-letter queue:
+
+```csharp
+consumer.MyEventAsync += async (cloudEvent, data, context) =>
+{
+    if (!IsValid(data))
+    {
+        // Reject invalid messages
+        context.Reject();
+        return;
+    }
+    
+    await ProcessAsync(data);
+    context.Accept();
+};
+```
+
+### Modify
+
+Advanced disposition that allows fine-grained control:
+
+```csharp
+consumer.MyEventAsync += async (cloudEvent, data, context) =>
+{
+    try
+    {
+        await ProcessAsync(data);
+        context.Accept();
+    }
+    catch (Exception)
+    {
+        // Mark as delivery failed, but allow redelivery here
+        context.Modify(deliveryFailed: true, undeliverableHere: false);
+    }
+};
+```
+
+**Important:** Each message must have exactly one disposition method called. Calling multiple methods or not calling any method will result in undefined behavior.
 
 ## Authentication
 
