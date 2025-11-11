@@ -1,6 +1,0 @@
-{
-    "description" : "C# CloudEvents SDK endpoint producer class",
-    "priority" : 1,
-    "main_project_name" : "{project_name|pascal}HttpProducer",
-    "data_project_name" : "{project_name|pascal}Data"
-}

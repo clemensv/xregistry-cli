@@ -1,6 +1,0 @@
-{
-    "description" : "C# Azure Function with HTTP trigger",
-    "priority" : 2,
-    "main_project_name" : "{project_name|pascal}HttpFunction",
-    "data_project_name" : "{project_name|pascal}Data"
-}
