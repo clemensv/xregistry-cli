@@ -1,4 +1,5 @@
 {%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
 {%- set messagegroups = root.messagegroups %}
 {% for messagegroupid, messagegroup in messagegroups.items() -%}
 {%- set groupname = messagegroupid | pascal -%}
@@ -53,10 +54,11 @@ String queueName = "events";
 {%- if first_message %}
 {%- set messageid, message = first_message %}
 {%- set messagename = messageid | pascal | strip_namespace %}
-{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+{%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+{%- set is_cloudevent = cloudEvents.isCloudEvent(message) %}
 
 // Register handler for {{ messagename }}
-consumer.on{{ messagename }}((data, context) -> {
+consumer.on{{ messagename }}((context, {% if is_cloudevent %}cloudEvent{% else %}message{% endif %}, data) -> {
     // Process message
     System.out.println("Received: " + data);
     
@@ -76,12 +78,13 @@ consumer.stop();
 
 {% for messageid, message in messagegroup.messages.items() -%}
 {%- set messagename = messageid | pascal | strip_namespace %}
-{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+{%- set message_body_type = util.get_data_type(data_project_name, root, message) %}
+{%- set is_cloudevent = cloudEvents.isCloudEvent(message) %}
 ### on{{ messagename }}
 
 ```java
-consumer.on{{ messagename }}(({{ message_body_type }} data, MessageContext context) -> {
-    // Process event
+consumer.on{{ messagename }}((context, {% if is_cloudevent %}cloudEvent{% else %}message{% endif %}, data) -> {
+    // Process event: data is {{ message_body_type }}
     context.accept();  // or context.reject() / context.release()
 });
 ```
@@ -93,21 +96,23 @@ consumer.on{{ messagename }}(({{ message_body_type }} data, MessageContext conte
 
 ## Message Settlement
 
-AMQP 1.0 requires explicit message settlement:
+The MessageContext parameter allows you to control message disposition:
 
 ```java
-// Accept: Message processed successfully
+// Accept: Message processed successfully (removes from queue)
 context.accept();
 
-// Reject: Permanent failure, don't redeliver
-context.reject();
+// Reject: Permanent failure, move to dead letter queue
+context.reject("error-condition", "Description of error");
 
-// Release: Temporary failure, allow redelivery
+// Release: Temporary failure, return to queue for redelivery
 context.release();
 
-// Modify: Partial failure with custom annotations
-context.modify(failed, undeliverableHere, messageAnnotations);
+// Modify: Mark message as modified with delivery failure flags
+context.modify(deliveryFailed, undeliverableHere);
 ```
+
+**Important:** Every handler MUST call one of these methods. If you don't, the message will be automatically rejected with an error.
 
 ## Authentication
 
@@ -184,9 +189,9 @@ class {{ class_name }}Test {
         
 {%- if first_message %}
         AtomicBoolean received = new AtomicBoolean(false);
-        consumer.on{{ messagename }}((data, ctx) -> {
+        consumer.on{{ messagename }}((context, {% if is_cloudevent %}cloudEvent{% else %}message{% endif %}, data) -> {
             received.set(true);
-            ctx.accept();
+            context.accept();
         });
         
         consumer.start();
