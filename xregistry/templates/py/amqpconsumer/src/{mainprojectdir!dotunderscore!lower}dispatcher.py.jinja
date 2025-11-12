@@ -1,10 +1,26 @@
 {%- import "util.include.jinja" as util -%}
 {%- import "cloudevents.jinja.include" as cloudEvents -%}
 
-# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
+# pylint: disable=line-too-long
 
 """
 Dispatcher module for processing messages from AMQP 1.0 broker.
+
+This module provides the core message dispatching functionality for AMQP 1.0 consumers.
+It handles both CloudEvents-formatted messages and plain AMQP messages, automatically
+routing them to registered handler functions based on message type or subject.
+
+The dispatcher supports:
+- CloudEvents structured and binary content modes
+- Plain AMQP messages with subject-based routing
+- Message settlement (accept, reject, release)
+- Automatic deserialization of message payloads
+- Type-safe handler registration
+
+Example:
+    >>> consumer = FabrikamInkjetEventsEventConsumer()
+    >>> consumer.printer_ready_handler = handle_printer_ready
+    >>> await consumer.process_message(message, delivery)
 """
 
 import typing
@@ -86,11 +102,48 @@ class {{ class_name }}:
     """
     Event consumer for the {{ messagegroupid }} message group.
     
-    This class receives and dispatches AMQP messages, supporting both CloudEvents and plain AMQP messages.
+    This class receives and dispatches AMQP 1.0 messages, supporting both CloudEvents
+    envelope format and plain AMQP messages. It provides type-safe message routing
+    to registered handler functions.
+    
+    The consumer automatically detects message format (CloudEvents vs. plain AMQP),
+    deserializes message payloads based on content type, and routes messages to
+    the appropriate handler based on CloudEvent type or AMQP subject.
+    
+    Attributes:
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        {{ messagename | snake }}_handler: Optional handler for {{ messageid }} messages
+        {%- endfor %}
+        {%- if uses_amqp_message %}
+        unhandled_message_handler: Optional handler for unrecognized plain AMQP messages
+        {%- endif %}
+        {%- if uses_cloudevents_message %}
+        unhandled_event_handler: Optional handler for unrecognized CloudEvents
+        {%- endif %}
+    
+    Example:
+        >>> consumer = {{ class_name }}()
+        {%- set first_message = messagegroup.messages.items() | first %}
+        {%- if first_message %}
+        {%- set messageid, message = first_message %}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+        >>> async def handler({% if isCloudEvent %}cloud_event, {% endif %}data, context):
+        ...     print(f"Received: {data}")
+        ...     context.accept()
+        >>> consumer.{{ messagename | snake }}_handler = handler
+        >>> await consumer.process_message(message, delivery)
+        {%- endif %}
     """
     
     def __init__(self):
-        """Initialize the event consumer"""
+        """
+        Initialize the event consumer.
+        
+        Creates a new consumer instance with all message handlers initialized to None.
+        Handlers must be registered before calling process_message().
+        """
         {%- for messageid, message in messagegroup.messages.items() %}
         {%- set messagename = messageid | strip_dots | pascal %}
         {%- set message_body_type = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
@@ -108,11 +161,42 @@ class {{ class_name }}:
     
     async def process_message(self, message: Message, delivery=None) -> None:
         """
-        Process an AMQP message.
+        Process an AMQP message and route it to the appropriate handler.
+        
+        This method is the main entry point for message processing. It automatically
+        detects the message format (CloudEvents vs. plain AMQP), creates a MessageContext
+        for settlement, and dispatches to the appropriate handler based on message type.
+        
+        The method performs the following steps:
+        1. Creates a MessageContext wrapping the delivery for settlement operations
+        2. Checks if the message is a CloudEvent (structured or binary mode)
+        3. Converts the message to the appropriate format (CloudEvent or Message)
+        4. Dispatches to the registered handler for the message type/subject
+        5. Calls unhandled_*_handler if no specific handler is registered
         
         Args:
-            message (Message): The AMQP message to process
-            delivery: The proton delivery object for message settlement (optional for testing)
+            message: The AMQP Proton Message object to process
+            delivery: The Proton Delivery object for message settlement. Optional for
+                testing scenarios where settlement is not required. If provided, handlers
+                can use context.accept(), context.reject(), or context.release() to
+                settle the message.
+        
+        Raises:
+            Exception: Any exception raised by the handler is propagated to the caller.
+                The caller is responsible for catching exceptions and settling the
+                message appropriately (e.g., reject on error, release for retry).
+        
+        Example:
+            >>> async def handle_message(cloud_event, data, context):
+            ...     try:
+            ...         await process_data(data)
+            ...         context.accept()
+            ...     except TransientError:
+            ...         context.release()  # Allow retry
+            ...     except PermanentError:
+            ...         context.reject()   # Don't retry
+            >>> consumer.message_handler = handle_message
+            >>> await consumer.process_message(proton_message, delivery)
         """
         context = MessageContext(delivery)
         
@@ -153,13 +237,30 @@ class {{ class_name }}:
     
     def _cloud_event_from_message(self, message: Message) -> CloudEvent:
         """
-        Convert an AMQP message to a CloudEvent.
+        Convert an AMQP message to a CloudEvent object.
+        
+        Handles both CloudEvents content modes:
+        - Structured mode: Entire CloudEvent as JSON in message body, identified by
+          content type 'application/cloudevents+json'
+        - Binary mode: CloudEvents attributes in AMQP application properties with
+          'cloudEvents:', 'ce_', or 'ce-' prefixes, event data in message body
         
         Args:
-            message (Message): The AMQP message to convert
+            message: The AMQP Proton Message object to convert
             
         Returns:
-            CloudEvent: The converted CloudEvent
+            A CloudEvent object containing the event attributes and data
+            
+        Raises:
+            ValueError: If the message cannot be parsed as a valid CloudEvent
+            json.JSONDecodeError: If structured mode JSON is malformed
+        
+        Example:
+            Structured mode message will have content type 'application/cloudevents+json'
+            and body containing: {"specversion": "1.0", "type": "...", ...}
+            
+            Binary mode message will have application properties like:
+            {'ce_specversion': '1.0', 'ce_type': '...', 'ce_source': '...'}
         """
         content_type = message.content_type
         
@@ -210,11 +311,27 @@ class {{ class_name }}:
     
     async def _dispatch_cloud_event(self, cloud_event: CloudEvent, context: MessageContext) -> None:
         """
-        Dispatch a CloudEvent message to the appropriate handler.
+        Dispatch a CloudEvent to the appropriate registered handler.
+        
+        Routes the CloudEvent to the handler registered for its 'type' attribute.
+        If no specific handler is registered, calls unhandled_event_handler if available.
+        Automatically deserializes the event data using the generated from_data() method
+        of the message data class.
         
         Args:
-            cloud_event (CloudEvent): The CloudEvent to dispatch
-            context (MessageContext): The message context for settlement
+            cloud_event: The CloudEvent object to dispatch
+            context: The MessageContext for message settlement operations
+            
+        Note:
+            The handler signature is:
+            async def handler(cloud_event: CloudEvent, data: DataType, context: MessageContext)
+            
+            The handler receives:
+            - The complete CloudEvent for accessing metadata (id, source, time, etc.)
+            - The deserialized data object with strong typing
+            - The MessageContext for settlement (accept/reject/release)
+            
+            If the handler does not settle the message, it remains unacknowledged.
         """
         cloud_event_type = cloud_event['type']
         
@@ -255,11 +372,28 @@ class {{ class_name }}:
     
     async def _dispatch_message(self, message: Message, context: MessageContext) -> None:
         """
-        Dispatch a plain AMQP message to the appropriate handler.
+        Dispatch a plain AMQP message to the appropriate registered handler.
+        
+        Routes the message to the handler registered for its 'subject' application property.
+        The subject is extracted from application properties using either 'subject' or
+        'Subject' keys. If no specific handler is registered, calls unhandled_message_handler
+        if available. Automatically deserializes the message body using the generated
+        from_data() method of the message data class.
         
         Args:
-            message (Message): The AMQP message to dispatch
-            context (MessageContext): The message context for settlement
+            message: The AMQP Proton Message object to dispatch
+            context: The MessageContext for message settlement operations
+            
+        Note:
+            The handler signature is:
+            async def handler(message: Message, data: DataType, context: MessageContext)
+            
+            The handler receives:
+            - The complete AMQP Message for accessing properties and metadata
+            - The deserialized data object with strong typing
+            - The MessageContext for settlement (accept/reject/release)
+            
+            If the handler does not settle the message, it remains unacknowledged.
         """
         # Get subject from application properties
         message_subject = None

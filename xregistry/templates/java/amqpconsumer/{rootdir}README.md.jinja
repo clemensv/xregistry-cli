@@ -114,52 +114,367 @@ context.modify(deliveryFailed, undeliverableHere);
 
 **Important:** Every handler MUST call one of these methods. If you don't, the message will be automatically rejected with an error.
 
+## Connection Management
+
+### Using try-with-resources (Recommended)
+
+The consumer implements `AutoCloseable` for automatic resource cleanup:
+
+```java
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+
+try ({{ class_name }} consumer = {{ class_name }}.createConsumer(
+    credentials,
+    options,
+    List.of(URI.create("amqp://localhost:5672/queue"))
+)) {
+    // Register handlers
+{%- if first_message %}
+    consumer.on{{ messagename }}((context, {% if is_cloudevent %}cloudEvent{% else %}message{% endif %}, data) -> {
+        System.out.println("Received: " + data);
+        context.accept();
+    });
+{%- endif %}
+    
+    // Start consuming
+    consumer.start();
+    
+    // Process messages for specified duration
+    Thread.sleep(60000); // 60 seconds
+    
+} // Consumer automatically stopped and resources released
+```
+
+### Graceful Shutdown
+
+Handle shutdown signals for clean resource cleanup:
+
+```java
+import java.util.concurrent.CountDownLatch;
+
+public class GracefulConsumer {
+    private static final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private static {{ class_name }} consumer;
+    
+    public static void main(String[] args) {
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            logger.info("Shutdown signal received. Stopping consumer...");
+            try {
+                if (consumer != null) {
+                    consumer.stop();
+                    logger.info("Consumer stopped successfully");
+                }
+            } catch (Exception e) {
+                logger.error("Error during shutdown: " + e.getMessage(), e);
+            }
+            shutdownLatch.countDown();
+        }));
+        
+        try {
+            // Create and start consumer
+            consumer = {{ class_name }}.createConsumer(
+                credentials,
+                options,
+                endpoints
+            );
+            
+            // Register handlers
+            registerHandlers(consumer);
+            
+            // Start consuming
+            consumer.start();
+            logger.info("Consumer started. Press Ctrl+C to stop.");
+            
+            // Wait for shutdown signal
+            shutdownLatch.await();
+            
+        } catch (Exception e) {
+            logger.error("Fatal error: " + e.getMessage(), e);
+            System.exit(1);
+        }
+    }
+}
+```
+
+### Connection Pool Management
+
+For high-throughput scenarios, manage multiple consumer instances:
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class ConsumerPool {
+    private final List<{{ class_name }}> consumers = new ArrayList<>();
+    private final ExecutorService executor;
+    private final int poolSize;
+    
+    public ConsumerPool(int poolSize) {
+        this.poolSize = poolSize;
+        this.executor = Executors.newFixedThreadPool(poolSize);
+    }
+    
+    public void start() throws Exception {
+        for (int i = 0; i < poolSize; i++) {
+            {{ class_name }} consumer = {{ class_name }}.createConsumer(
+                credentials,
+                options,
+                endpoints
+            );
+            
+            // Register handlers
+            registerHandlers(consumer);
+            
+            // Start in thread pool
+            executor.submit(() -> {
+                try {
+                    consumer.start();
+                } catch (Exception e) {
+                    logger.error("Consumer " + i + " failed: " + e.getMessage(), e);
+                }
+            });
+            
+            consumers.add(consumer);
+        }
+        
+        logger.info("Started " + poolSize + " consumer instances");
+    }
+    
+    public void stop() throws Exception {
+        logger.info("Stopping consumer pool...");
+        
+        for ({{ class_name }} consumer : consumers) {
+            try {
+                consumer.stop();
+            } catch (Exception e) {
+                logger.error("Error stopping consumer: " + e.getMessage(), e);
+            }
+        }
+        
+        executor.shutdown();
+        logger.info("Consumer pool stopped");
+    }
+}
+```
+
 ## Authentication
 
 ### SASL PLAIN (Username/Password)
 
 ```java
-{{ class_name }} consumer = {{ class_name }}.builder()
-    .connectionString("amqp://host:5672")
-    .queueName("events")
-    .username("user")
-    .password("pass")
-    .build();
+EndpointCredential credential = EndpointCredential.createPlain("username", "password");
+
+{{ class_name }} consumer = {{ class_name }}.createConsumer(
+    credential,
+    options,
+    List.of(URI.create("amqp://host:5672/queue"))
+);
 ```
 
 ### SASL ANONYMOUS
 
 ```java
-{{ class_name }} consumer = {{ class_name }}.builder()
-    .connectionString("amqp://host:5672")
-    .queueName("events")
-    .saslMechanism("ANONYMOUS")
-    .build();
+EndpointCredential credential = EndpointCredential.createAnonymous();
+
+{{ class_name }} consumer = {{ class_name }}.createConsumer(
+    credential,
+    options,
+    List.of(URI.create("amqp://host:5672/queue"))
+);
 ```
 
-### TLS/SSL
+### TLS/SSL Connection
 
 ```java
-{{ class_name }} consumer = {{ class_name }}.builder()
-    .connectionString("amqps://host:5671")  // Note: amqps
-    .queueName("events")
-    .sslEnabled(true)
-    .trustStorePath("/path/to/truststore.jks")
-    .trustStorePassword("password")
-    .build();
+import java.util.Map;
+
+Map<String, String> options = Map.of(
+    "sasl-mechanism", "PLAIN",
+    "transport-secure", "true"
+);
+
+EndpointCredential credential = EndpointCredential.createPlain("username", "password");
+
+{{ class_name }} consumer = {{ class_name }}.createConsumer(
+    credential,
+    options,
+    List.of(URI.create("amqps://host:5671/queue"))  // Note: amqps scheme
+);
 ```
 
 ## Error Handling
 
+### Message Processing Errors
+
+Handle errors within message handlers using try-catch blocks:
+
 ```java
-consumer.onError((exception, context) -> {
-    System.err.println("Error: " + exception.getMessage());
-    
-    // Reject message on error
-    if (context != null) {
-        context.reject();
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+{%- if first_message %}
+private static final Logger logger = LogManager.getLogger();
+
+consumer.on{{ messagename }}((context, {% if is_cloudevent %}cloudEvent{% else %}message{% endif %}, data) -> {
+    try {
+        // Validate message data
+        if (data == null) {
+            logger.warn("Empty data in message");
+            context.reject("validation-error", "Data is null");
+            return;
+        }
+        
+        // Process message
+        processBusinessLogic(data);
+        
+        // Acknowledge success
+        context.accept();
+        logger.info("Successfully processed message");
+        
+    } catch (ValidationException e) {
+        // Data validation error - reject (don't retry)
+        logger.error("Invalid data: " + e.getMessage());
+        context.reject("validation-error", e.getMessage());
+        
+    } catch (TransientException e) {
+        // Transient error - release for retry
+        logger.warn("Transient error: " + e.getMessage());
+        context.release();
+        
+    } catch (Exception e) {
+        // Unknown error - log and reject
+        logger.error("Unexpected error: " + e.getMessage(), e);
+        context.reject("processing-error", e.getMessage());
     }
 });
+{%- endif %}
+```
+
+### Connection Retry Logic
+
+Implement automatic reconnection with exponential backoff:
+
+```java
+import java.util.concurrent.TimeUnit;
+
+public class ResilientConsumer {
+    private static final int MAX_RETRIES = 5;
+    private static final long INITIAL_BACKOFF_MS = 1000;
+    
+    private {{ class_name }} consumer;
+    private int retryCount = 0;
+    
+    public void start() {
+        while (retryCount < MAX_RETRIES) {
+            try {
+                consumer = {{ class_name }}.createConsumer(
+                    credentials,
+                    options,
+                    endpoints
+                );
+                
+                // Register handlers
+                registerHandlers();
+                
+                // Start consuming
+                consumer.start();
+                
+                // Reset retry count on success
+                retryCount = 0;
+                logger.info("Consumer started successfully");
+                return;
+                
+            } catch (Exception e) {
+                retryCount++;
+                long backoff = INITIAL_BACKOFF_MS * (1L << (retryCount - 1));
+                backoff = Math.min(backoff, 60000); // Max 60 seconds
+                
+                logger.error("Connection failed (attempt " + retryCount + "/" + MAX_RETRIES + "): " + e.getMessage());
+                
+                if (retryCount < MAX_RETRIES) {
+                    logger.info("Retrying in " + backoff + "ms...");
+                    try {
+                        TimeUnit.MILLISECONDS.sleep(backoff);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                } else {
+                    logger.error("Max retries reached. Giving up.");
+                    throw new RuntimeException("Failed to start consumer after " + MAX_RETRIES + " attempts", e);
+                }
+            }
+        }
+    }
+    
+    public void stop() throws Exception {
+        if (consumer != null) {
+            consumer.stop();
+        }
+    }
+}
+```
+
+### Dead Letter Queue Pattern
+
+Move failed messages to a dead letter queue:
+
+```java
+import java.util.HashMap;
+import java.util.Map;
+
+public class ConsumerWithDLQ {
+    private {{ class_name }} mainConsumer;
+    private {{ class_name }} dlqProducer;
+    
+    public void setupConsumer() throws Exception {
+        mainConsumer = {{ class_name }}.createConsumer(
+            credentials,
+            options,
+            List.of(URI.create("amqp://localhost:5672/main-queue"))
+        );
+        
+{%- if first_message %}
+        mainConsumer.on{{ messagename }}((context, {% if is_cloudevent %}cloudEvent{% else %}message{% endif %}, data) -> {
+            try {
+                // Process message
+                processMessage(data);
+                context.accept();
+                
+            } catch (Exception e) {
+                logger.error("Processing failed, sending to DLQ: " + e.getMessage());
+                
+                try {
+                    // Send to dead letter queue with error metadata
+                    sendToDLQ({% if is_cloudevent %}cloudEvent{% else %}message{% endif %}, e.getMessage());
+                    
+                    // Reject original message
+                    context.reject("processing-failed", e.getMessage());
+                } catch (Exception dlqError) {
+                    logger.error("Failed to send to DLQ: " + dlqError.getMessage());
+                    // Release for retry if DLQ send fails
+                    context.release();
+                }
+            }
+        });
+{%- endif %}
+        
+        mainConsumer.start();
+    }
+    
+    private void sendToDLQ({% if is_cloudevent %}io.cloudevents.CloudEvent{% else %}org.apache.qpid.protonj2.client.Message<?>{% endif %} originalMessage, String errorMessage) throws Exception {
+        // Implementation to send message to DLQ with error metadata
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("error", errorMessage);
+        metadata.put("timestamp", System.currentTimeMillis());
+        // ... send to DLQ
+    }
+}
 ```
 
 ## Configuration Options

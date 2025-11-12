@@ -23,8 +23,18 @@ Use cases: Enterprise integration, IoT messaging, financial services, cloud-nati
 
 ## Installation
 
+Install using pip or Poetry:
+
 ```bash
 pip install python-qpid-proton cloudevents
+```
+
+Or add to your `pyproject.toml`:
+
+```toml
+[tool.poetry.dependencies]
+python-qpid-proton = "^0.39.0"
+cloudevents = "^1.10.1"
 ```
 
 ## Generated Consumers
@@ -41,8 +51,33 @@ pip install python-qpid-proton cloudevents
 
 ```python
 import asyncio
-from uamqp import ReceiveClient, authentication
+import logging
+from proton import Message
+from proton.handlers import MessagingHandler
+from proton.reactor import Container
 from {{ main_project_name }} import {{ (messagegroupid | pascal | strip_dots) + "EventConsumer" }}
+
+logging.basicConfig(level=logging.INFO)
+
+class MessageReceiver(MessagingHandler):
+    """AMQP message receiver using Proton event-driven API."""
+    
+    def __init__(self, url: str, consumer: {{ (messagegroupid | pascal | strip_dots) + "EventConsumer" }}):
+        super().__init__()
+        self.url = url
+        self.consumer = consumer
+    
+    def on_start(self, event):
+        """Called when the container starts."""
+        event.container.create_receiver(self.url)
+    
+    def on_message(self, event):
+        """Called when a message is received."""
+        message = event.message
+        delivery = event.delivery
+        
+        # Process message asynchronously
+        asyncio.create_task(self.consumer.process_message(message, delivery))
 
 async def main():
     # Create consumer dispatcher
@@ -53,31 +88,21 @@ async def main():
     {%- set messagename = messageid | pascal | strip_namespace %}
     {%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
     {%- set type_name = util.DeclareDataType( data_project_name, root, message ) | strip_namespace %}
-    async def {{ messagename | snake }}_handler({% if isCloudEvent %}cloud_event, {% else %}message, {% endif %}data):
+    async def {{ messagename | snake }}_handler({% if isCloudEvent %}cloud_event, {% else %}message, {% endif %}data, context):
         print(f"Received {{ messagename }}: {data}")
         # Process the message
+        context.accept()  # Acknowledge successful processing
     
     consumer.{{ messagename | snake }}_handler = {{ messagename | snake }}_handler
     {% endfor %}
     
     # Setup AMQP connection
-    source_uri = "amqp://localhost:5672/my-queue"
-    auth = authentication.SASLPlain("localhost", "guest", "guest")
+    url = "amqp://guest:guest@localhost:5672/my-queue"
     
-    # Create receive client
-    receive_client = ReceiveClient(source_uri, auth=auth, prefetch=10)
-    
-    # Start receiving messages
-    receive_client.open()
-    
-    try:
-        while True:
-            batch = receive_client.receive_message_batch(max_batch_size=10, timeout=5000)
-            for message in batch:
-                await consumer.process_message(message)
-                message.accept()  # Acknowledge message
-    finally:
-        receive_client.close()
+    # Create and run receiver
+    handler = MessageReceiver(url, consumer)
+    container = Container(handler)
+    container.run()
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -100,7 +125,7 @@ The consumer provides handlers for the following message types:
 
 **Handler Signature:**
 ```python
-async def handler({% if isCloudEvent %}cloud_event: CloudEvent, {% else %}message: Message, {% endif %}data: {{ type_name }}) -> None:
+async def handler({% if isCloudEvent %}cloud_event: CloudEvent, {% else %}message: Message, {% endif %}data: {{ type_name }}, context: MessageContext) -> None:
     pass
 ```
 
@@ -111,6 +136,7 @@ async def handler({% if isCloudEvent %}cloud_event: CloudEvent, {% else %}messag
 - `message` (Message): The AMQP message
 {%- endif %}
 - `data` ({{ type_name }}): The deserialized message data
+- `context` (MessageContext): Message settlement context (accept/reject/release)
 
 {% endfor %}
 
@@ -120,15 +146,17 @@ Register handlers for messages that don't match any known type:
 
 ```python
 {%- if uses_cloudevents_message %}
-async def unhandled_event_handler(cloud_event: CloudEvent) -> None:
+async def unhandled_event_handler(cloud_event: CloudEvent, context: MessageContext) -> None:
     print(f"Unhandled CloudEvent: {cloud_event['type']}")
+    context.reject()  # Reject unknown event types
 
 consumer.unhandled_event_handler = unhandled_event_handler
 {%- endif %}
 
 {%- if uses_plain_amqp_message %}
-async def unhandled_message_handler(message: Message) -> None:
+async def unhandled_message_handler(message: Message, context: MessageContext) -> None:
     print(f"Unhandled message: {message}")
+    context.reject()  # Reject unknown message types
 
 consumer.unhandled_message_handler = unhandled_message_handler
 {%- endif %}
@@ -162,63 +190,242 @@ This library has been tested with:
 
 ## Connection Management
 
+### Using Async Context Manager
+
+Recommended pattern for automatic connection cleanup:
+
+```python
+from proton.handlers import MessagingHandler
+from proton.reactor import Container
+
+class MessageReceiver(MessagingHandler):
+    """Context-managed AMQP receiver."""
+    
+    def __init__(self, url: str, consumer):
+        super().__init__()
+        self.url = url
+        self.consumer = consumer
+        self.container = None
+    
+    async def __aenter__(self):
+        """Start the connection."""
+        self.container = Container(self)
+        # Run container in background
+        import threading
+        self.thread = threading.Thread(target=self.container.run)
+        self.thread.start()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Close the connection."""
+        if self.container:
+            self.container.stop()
+            self.thread.join()
+    
+    def on_start(self, event):
+        event.container.create_receiver(self.url)
+    
+    def on_message(self, event):
+        asyncio.create_task(self.consumer.process_message(event.message, event.delivery))
+
+# Usage
+async with MessageReceiver("amqp://guest:guest@localhost:5672/queue", consumer) as receiver:
+    # Receiver is active
+    await asyncio.sleep(60)  # Process messages for 60 seconds
+# Connection automatically closed
+```
+
 ### Basic Authentication
 
 ```python
-from uamqp import authentication
+from proton import Message
+from proton.handlers import MessagingHandler
+from proton.reactor import Container
 
-auth = authentication.SASLPlain(
-    hostname="localhost",
-    username="guest",
-    password="guest"
-)
+# URL format includes credentials
+url = "amqp://username:password@hostname:5672/queue-name"
 
-receive_client = ReceiveClient(
-    source_uri="amqp://localhost:5672/my-queue",
-    auth=auth
-)
+handler = MessageReceiver(url, consumer)
+container = Container(handler)
+container.run()
 ```
 
-### TLS/SSL
+### TLS/SSL Connection
 
 ```python
-receive_client = ReceiveClient(
-    source_uri="amqps://localhost:5671/my-queue",
-    auth=auth
-)
+# Use amqps:// scheme for TLS
+url = "amqps://username:password@hostname:5671/queue-name"
+
+handler = MessageReceiver(url, consumer)
+container = Container(handler)
+container.run()
 ```
 
 ### Message Settlement
 
+The `MessageContext` provides three settlement methods:
+
 ```python
-# Auto-accept messages
-batch = receive_client.receive_message_batch(max_batch_size=10)
-for message in batch:
+async def my_handler(cloud_event, data, context):
     try:
-        await consumer.process_message(message)
-        message.accept()  # Acknowledge successful processing
-    except Exception as e:
-        message.reject()  # Reject and return to queue
-        # or message.release()  # Release for redelivery
+        # Process message
+        await process_data(data)
+        context.accept()  # Success - remove from queue
+    except TransientError as e:
+        # Temporary failure - allow redelivery
+        context.release()
+    except PermanentError as e:
+        # Permanent failure - don't retry
+        context.reject()
 ```
 
 ## Error Handling
 
-```python
-from uamqp import errors
+### Connection Errors
 
-try:
-    receive_client.open()
-    batch = receive_client.receive_message_batch(max_batch_size=10, timeout=5000)
-    for message in batch:
-        await consumer.process_message(message)
-        message.accept()
-except errors.AMQPConnectionError as e:
-    print(f"Connection error: {e}")
-except errors.MessageException as e:
-    print(f"Message error: {e}")
-finally:
-    receive_client.close()
+Handle connection failures with retry logic:
+
+```python
+import asyncio
+from proton import ConnectionException
+from proton.handlers import MessagingHandler
+from proton.reactor import Container
+
+class ResilientReceiver(MessagingHandler):
+    """Receiver with connection retry logic."""
+    
+    def __init__(self, url: str, consumer, max_retries: int = 5):
+        super().__init__()
+        self.url = url
+        self.consumer = consumer
+        self.max_retries = max_retries
+        self.retry_count = 0
+    
+    def on_start(self, event):
+        try:
+            event.container.create_receiver(self.url)
+            self.retry_count = 0  # Reset on success
+        except ConnectionException as e:
+            print(f"Connection failed: {e}")
+            self._retry_connection(event)
+    
+    def on_connection_error(self, event):
+        print(f"Connection error: {event.connection.remote_condition}")
+        self._retry_connection(event)
+    
+    def on_message(self, event):
+        asyncio.create_task(self.consumer.process_message(event.message, event.delivery))
+    
+    def _retry_connection(self, event):
+        if self.retry_count < self.max_retries:
+            self.retry_count += 1
+            delay = min(2 ** self.retry_count, 60)  # Exponential backoff, max 60s
+            print(f"Retrying connection in {delay}s (attempt {self.retry_count}/{self.max_retries})")
+            event.container.schedule(delay, self)
+        else:
+            print("Max retries reached. Stopping container.")
+            event.container.stop()
+    
+    def on_timer_task(self, event):
+        """Called after scheduled retry delay."""
+        event.container.create_receiver(self.url)
+
+# Usage
+handler = ResilientReceiver("amqp://guest:guest@localhost:5672/queue", consumer)
+container = Container(handler)
+container.run()
+```
+
+### Message Processing Errors
+
+Handle errors within message handlers:
+
+```python
+import logging
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+async def robust_message_handler(cloud_event, data, context):
+    """Handler with comprehensive error handling."""
+    try:
+        # Validate message data
+        if not data:
+            logger.warning(f"Empty data in message {cloud_event['id']}")
+            context.reject()
+            return
+        
+        # Process message
+        result = await process_business_logic(data)
+        
+        # Acknowledge success
+        context.accept()
+        logger.info(f"Successfully processed message {cloud_event['id']}")
+        
+    except ValueError as e:
+        # Data validation error - reject (don't retry)
+        logger.error(f"Invalid data in message {cloud_event['id']}: {e}")
+        context.reject()
+        
+    except ConnectionError as e:
+        # Transient error - release for retry
+        logger.warning(f"Connection error processing {cloud_event['id']}: {e}")
+        context.release()
+        
+    except Exception as e:
+        # Unknown error - log and reject
+        logger.exception(f"Unexpected error processing {cloud_event['id']}: {e}")
+        context.reject()
+
+consumer.message_handler = robust_message_handler
+```
+
+### Dead Letter Queue Pattern
+
+Move failed messages to a dead letter queue:
+
+```python
+from proton import Message
+from proton.handlers import MessagingHandler
+
+class MessageProcessor(MessagingHandler):
+    """Processor with dead letter queue support."""
+    
+    def __init__(self, source_url: str, dlq_url: str, consumer):
+        super().__init__()
+        self.source_url = source_url
+        self.dlq_url = dlq_url
+        self.consumer = consumer
+        self.dlq_sender = None
+    
+    def on_start(self, event):
+        event.container.create_receiver(self.source_url)
+        self.dlq_sender = event.container.create_sender(self.dlq_url)
+    
+    def on_message(self, event):
+        message = event.message
+        delivery = event.delivery
+        
+        async def process_with_dlq():
+            context = MessageContext(delivery)
+            try:
+                await self.consumer.process_message(message, delivery)
+            except Exception as e:
+                # Send to DLQ and reject original
+                dlq_message = Message(body=message.body)
+                dlq_message.properties = message.properties or {}
+                dlq_message.properties['x-error'] = str(e)
+                self.dlq_sender.send(dlq_message)
+                context.reject()
+        
+        asyncio.create_task(process_with_dlq())
+
+# Usage
+handler = MessageProcessor(
+    source_url="amqp://guest:guest@localhost:5672/main-queue",
+    dlq_url="amqp://guest:guest@localhost:5672/dead-letter-queue",
+    consumer=consumer
+)
 ```
 
 ## Building and Testing
@@ -236,9 +443,12 @@ poetry build
 
 ## Dependencies
 
-- `uamqp>=1.6.10` - AMQP 1.0 client library
-- `cloudevents>=1.10.1` - CloudEvents SDK
-- Python 3.10+
+- `python-qpid-proton>=0.39.0` - Apache Qpid Proton AMQP 1.0 client library
+- `cloudevents>=1.10.1` - CloudEvents SDK for Python
+- Python 3.12+
+
+**Note:** This library uses `python-qpid-proton` (Apache Qpid Proton), not `uamqp` (Azure's legacy library). 
+Proton is the standard AMQP 1.0 implementation with broader compatibility and active maintenance.
 
 ## License
 

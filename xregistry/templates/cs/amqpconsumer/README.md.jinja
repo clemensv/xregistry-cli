@@ -9,6 +9,22 @@
 
 Auto-generated AMQP consumer for {{ groupname }} message group.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Available Event Handlers](#available-event-handlers)
+- [Message Disposition](#message-disposition)
+- [Authentication](#authentication)
+- [Error Handling](#error-handling)
+- [Connection Management](#connection-management)
+- [Lifecycle Management](#lifecycle-management)
+- [Configuration Options](#configuration-options)
+- [Advanced Topics](#advanced-topics)
+- [Testing](#testing)
+- [Logging](#logging)
+- [Dependencies](#dependencies)
+
 ## Overview
 
 This consumer provides event handlers for incoming AMQP messages using the CloudEvents specification.
@@ -219,6 +235,8 @@ consumer.MyEventAsync += async (cloudEvent, data, context) =>
 
 ## Authentication
 
+Configure authentication credentials to connect to the AMQP broker.
+
 ### Plain Credentials
 
 ```csharp
@@ -265,6 +283,236 @@ consumer.DeserializationErrorAsync += async (CloudEvent cloudEvent, Exception ex
 };
 ```
 
+### Complete Error Handling Example
+
+```csharp
+var consumer = {{ class_name }}.CreateBuilder()
+    .WithEndpoint("amqp://localhost:5672")
+    .WithCredential(credential)
+    .Build();
+
+// Handle processing errors with retry logic
+consumer.MessageProcessingErrorAsync += async (cloudEvent, exception) =>
+{
+    logger.LogError(exception, 
+        "Failed to process event {EventType} with ID {EventId}", 
+        cloudEvent.Type, cloudEvent.Id);
+    
+    // Implement retry strategy
+    if (exception is TransientException)
+    {
+        await RetryAsync(cloudEvent);
+    }
+    else
+    {
+        await SendToDeadLetterAsync(cloudEvent);
+    }
+};
+
+// Handle deserialization errors
+consumer.DeserializationErrorAsync += async (cloudEvent, exception) =>
+{
+    logger.LogError(exception, 
+        "Failed to deserialize event {EventType}", 
+        cloudEvent.Type);
+    
+    // Save raw data for investigation
+    await SaveRawEventAsync(cloudEvent);
+};
+```
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+
+```csharp
+// Handle business logic errors in individual handlers
+consumer.{{ messagename }}Async += async (cloudEvent, data, context) =>
+{
+    try
+    {
+        await ProcessBusinessLogicAsync(data);
+        context.Accept();
+    }
+    catch (ValidationException ex)
+    {
+        logger.LogWarning(ex, "Validation failed for event {EventId}", cloudEvent.Id);
+        context.Reject(); // Don't retry invalid messages
+    }
+    catch (TransientException ex)
+    {
+        logger.LogWarning(ex, "Temporary failure for event {EventId}", cloudEvent.Id);
+        context.Release(); // Retry later
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Unexpected error for event {EventId}", cloudEvent.Id);
+        context.Reject(); // Move to DLQ
+    }
+};
+```
+{%- endif %}
+
+## Connection Management
+
+### Connection Retry Logic
+
+Implement automatic reconnection when connection is lost:
+
+```csharp
+public async Task<{{ class_name }}> CreateConsumerWithRetryAsync(
+    ILoggerFactory loggerFactory,
+    CancellationToken cancellationToken = default)
+{
+    var maxRetries = 5;
+    var retryDelay = TimeSpan.FromSeconds(5);
+    
+    for (int attempt = 1; attempt <= maxRetries; attempt++)
+    {
+        try
+        {
+            var consumer = {{ class_name }}.CreateBuilder()
+                .WithEndpoint("amqp://localhost:5672")
+                .WithCredential(new PlainEndpointCredential("username", "password"))
+                .WithNode("/queue/events")
+                .WithLogger(loggerFactory)
+                .Build();
+            
+            await consumer.StartAsync();
+            logger.LogInformation("Successfully connected to AMQP broker");
+            return consumer;
+        }
+        catch (Exception ex) when (attempt < maxRetries)
+        {
+            logger.LogWarning(ex, 
+                "Failed to connect (attempt {Attempt}/{MaxRetries}). Retrying in {Delay}s...", 
+                attempt, maxRetries, retryDelay.TotalSeconds);
+            
+            await Task.Delay(retryDelay, cancellationToken);
+            retryDelay = TimeSpan.FromSeconds(retryDelay.TotalSeconds * 2); // Exponential backoff
+        }
+    }
+    
+    throw new InvalidOperationException("Failed to connect after maximum retries");
+}
+```
+
+### Handling Connection Drops
+
+Monitor and recover from connection failures:
+
+```csharp
+var consumer = {{ class_name }}.CreateBuilder()
+    .WithEndpoint("amqp://localhost:5672")
+    .WithCredential(credential)
+    .Build();
+
+// Monitor connection health
+var connectionLost = false;
+
+consumer.MessageProcessingErrorAsync += async (cloudEvent, exception) =>
+{
+    if (exception is Amqp.AmqpException)
+    {
+        connectionLost = true;
+        logger.LogError("Connection to AMQP broker lost");
+        
+        // Trigger reconnection
+        await ReconnectAsync(consumer);
+    }
+};
+
+async Task ReconnectAsync({{ class_name }} consumer)
+{
+    await consumer.DisposeAsync();
+    
+    // Wait before reconnecting
+    await Task.Delay(TimeSpan.FromSeconds(5));
+    
+    // Create new consumer instance
+    consumer = await CreateConsumerWithRetryAsync(loggerFactory);
+    
+    // Re-register handlers
+    RegisterHandlers(consumer);
+    
+    connectionLost = false;
+}
+```
+
+### Graceful Shutdown with CancellationToken
+
+Properly handle application shutdown:
+
+```csharp
+public async Task RunConsumerAsync(CancellationToken cancellationToken)
+{
+    var consumer = {{ class_name }}.CreateBuilder()
+        .WithEndpoint("amqp://localhost:5672")
+        .WithCredential(new PlainEndpointCredential("username", "password"))
+        .WithNode("/queue/events")
+        .WithLogger(loggerFactory)
+        .Build();
+```
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+
+```csharp    
+    // Register handlers
+    consumer.{{ messagename }}Async += async (cloudEvent, data, context) =>
+    {
+        // Check cancellation before processing
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        await ProcessEventAsync(data, cancellationToken);
+        context.Accept();
+    };
+```
+{%- endif %}
+
+```csharp    
+    try
+    {
+        await consumer.StartAsync();
+        logger.LogInformation("Consumer started successfully");
+        
+        // Wait for shutdown signal
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+    }
+    catch (OperationCanceledException)
+    {
+        logger.LogInformation("Shutdown requested, stopping consumer gracefully...");
+    }
+    finally
+    {
+        // Graceful cleanup
+        try
+        {
+            await consumer.DisposeAsync();
+            logger.LogInformation("Consumer stopped successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during consumer shutdown");
+        }
+    }
+}
+
+// Usage in Program.cs
+var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (s, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+    logger.LogInformation("Shutdown initiated...");
+};
+
+await RunConsumerAsync(cts.Token);
+```
+
 ## Lifecycle Management
 
 ### Start and Stop
@@ -308,7 +556,108 @@ consumer = {{ class_name }}.CreateBuilder()
     .Build();
 ```
 
-## Multiple Handlers
+## Logging
+
+The consumer uses `Microsoft.Extensions.Logging` for diagnostic output. Configure logging to monitor consumer health and troubleshoot issues.
+
+### Log Levels
+
+The consumer logs at different levels:
+
+| Level | Events |
+|-------|--------|
+| **Information** | Connection established, consumer started/stopped, message received |
+| **Warning** | Connection retry attempts, transient errors, invalid message format |
+| **Error** | Connection failures after max retries, handler exceptions, deserialization failures |
+| **Debug** | Message disposition (Accept/Release/Reject), handler invocation details |
+
+### Configuring Logging
+
+```csharp
+using Microsoft.Extensions.Logging;
+
+var loggerFactory = LoggerFactory.Create(builder =>
+{
+    builder
+        .AddConsole()
+        .SetMinimumLevel(LogLevel.Information)
+        // Add filters for specific namespaces
+        .AddFilter("{{ project_name | pascal }}", LogLevel.Debug);
+});
+
+var consumer = {{ class_name }}.CreateBuilder()
+    .WithEndpoint("amqp://localhost:5672")
+    .WithCredential(credential)
+    .WithLogger(loggerFactory)
+    .Build();
+```
+
+### What Gets Logged
+
+**Connection Events:**
+```
+[Information] Connecting to AMQP broker at amqp://localhost:5672
+[Information] Successfully connected to AMQP broker
+[Warning] Connection lost, attempting reconnection (attempt 1/5)
+[Error] Failed to connect after 5 attempts
+```
+
+**Message Processing:**
+```
+[Debug] Received message with type: com.example.OrderCreated
+[Debug] Invoking handler for OrderCreated
+[Debug] Message disposition: Accept
+[Warning] Handler threw TransientException, releasing message for retry
+```
+
+**Errors:**
+```
+[Error] Failed to deserialize message: Invalid JSON format
+[Error] Handler exception for event 12345: NullReferenceException
+```
+
+### Logging Best Practices
+
+1. **Production Environments:** Use `LogLevel.Information` or `LogLevel.Warning` to reduce log volume
+2. **Development/Staging:** Use `LogLevel.Debug` for detailed diagnostics
+3. **Structured Logging:** Include event IDs and correlation IDs for tracing
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+
+```csharp
+consumer.{{ messagename }}Async += async (cloudEvent, data, context) =>
+{
+    using (logger.BeginScope(new Dictionary<string, object>
+    {
+        ["EventId"] = cloudEvent.Id,
+        ["EventType"] = cloudEvent.Type,
+        ["Source"] = cloudEvent.Source
+    }))
+    {
+        logger.LogInformation("Processing event {EventType}", cloudEvent.Type);
+        
+        try
+        {
+            await ProcessAsync(data);
+            context.Accept();
+            logger.LogInformation("Successfully processed event");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to process event");
+            context.Reject();
+        }
+    }
+};
+```
+{%- endif %}
+
+## Advanced Topics
+
+### Multiple Handlers
 
 Register multiple handlers for the same event type:
 
@@ -335,7 +684,7 @@ consumer.{{ first_msg_name }}Async += async (ce, data) =>
 // All handlers execute in parallel
 ```
 
-## Testing with Testcontainers
+## Testing
 
 The generated test project includes examples using Apache Artemis:
 

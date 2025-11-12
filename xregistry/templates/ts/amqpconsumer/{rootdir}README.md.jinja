@@ -120,26 +120,446 @@ new AmqpConsumer(
 )
 ```
 
-## Error Handling
+## Message Settlement
+
+AMQP 1.0 supports explicit message settlement (acknowledgment). The `MessageContext` class provides three settlement methods that handlers should use:
+
+- **`accept()`**: Successful processing - message removed from queue
+- **`reject()`**: Permanent failure - message sent to dead-letter queue (if configured)
+- **`release()`**: Temporary failure - message requeued for retry
+
+### Basic Settlement Pattern
 
 ```typescript
-dispatcher.{{ messagename }}Handler = async (message, data) => {
+import * as rhea from 'rhea';
+
+const connection = rhea.connect({
+    host: 'localhost',
+    port: 5672,
+    username: 'guest',
+    password: 'guest'
+});
+
+const receiver = connection.open_receiver('test-queue');
+
+receiver.on('message', async (context: rhea.EventContext) => {
     try {
-        // Process message
-        await processEvent(data);
+        // Message settlement is handled by the handler via MessageContext
+        await dispatcher.processMessage(context);
     } catch (error) {
-        console.error('Failed to process {{ messagename }}:', error);
-        // Message will be rejected and may be requeued depending on broker settings
-        throw error;
+        console.error('Message processing failed:', error);
+        
+        // Fallback: reject the message if handler didn't settle it
+        if (!context.delivery?.settled) {
+            context.delivery?.reject();
+        }
     }
-};
+});
 ```
 
-## Best Practices
+### Handler Settlement
 
-1. **Always close the consumer** when shutting down to ensure clean disconnection
-2. **Handle errors in event handlers** to prevent message loss
-3. **Use typed data models** from the generated types for type safety
-4. **Configure reconnection** for production environments
-5. **Monitor message processing** for failures and retries
+Handlers receive a `MessageContext` parameter for explicit settlement:
+
+```typescript
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+
+dispatcher.{{ messagename }}Handler = async (cloudEvent, data, context) => {
+    try {
+        // Validate and process
+        await processData(data);
+        
+        // Accept on success
+        context.accept();
+    } catch (error) {
+        if (isValidationError(error)) {
+            // Permanent failure - don't retry
+            context.reject();
+        } else {
+            // Temporary failure - allow retry
+            context.release();
+        }
+    }
+};
+{%- endif %}
+```
+
+## Error Handling
+
+### Message Processing Errors
+
+Distinguish between transient and permanent errors using message settlement:
+
+```typescript
+class ValidationError extends Error {}
+class TransientError extends Error {}
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+
+dispatcher.{{ messagename }}Handler = async (cloudEvent, data, context) => {
+    try {
+        // Validate message data
+        if (!data) {
+            throw new ValidationError('Data is null');
+        }
+        
+        // Process message
+        await processBusinessLogic(data);
+        
+        // Accept on success
+        context.accept();
+        console.log('Successfully processed message');
+        
+    } catch (error) {
+        if (error instanceof ValidationError) {
+            // Permanent error - log and reject (don't retry)
+            console.error('Invalid data:', error.message);
+            context.reject();
+        } else if (error instanceof TransientError) {
+            // Transient error - log and release for retry
+            console.warn('Transient error:', error.message);
+            context.release();
+        } else {
+            // Unknown error - log and reject
+            console.error('Unexpected error:', error);
+            context.reject();
+        }
+    }
+};
+{%- endif %}
+```
+
+### Connection Retry Logic
+
+Implement automatic reconnection with exponential backoff:
+
+```typescript
+interface RetryOptions {
+    maxRetries: number;
+    initialDelay: number;
+    maxDelay: number;
+}
+
+class ResilientConsumer {
+    private retryCount = 0;
+    private options: RetryOptions = {
+        maxRetries: 5,
+        initialDelay: 1000,
+        maxDelay: 60000
+    };
+    
+    async connect(): Promise<void> {
+        while (this.retryCount < this.options.maxRetries) {
+            try {
+                const connection = rhea.connect({
+                    host: 'localhost',
+                    port: 5672,
+                    username: 'guest',
+                    password: 'guest'
+                });
+                
+                connection.on('connection_open', () => {
+                    console.log('Connected successfully');
+                    this.retryCount = 0; // Reset on success
+                });
+                
+                connection.on('connection_close', () => {
+                    console.log('Connection closed, attempting reconnect...');
+                    this.reconnect();
+                });
+                
+                return;
+                
+            } catch (error) {
+                this.retryCount++;
+                const backoff = Math.min(
+                    this.options.initialDelay * Math.pow(2, this.retryCount - 1),
+                    this.options.maxDelay
+                );
+                
+                console.error(`Connection failed (attempt ${this.retryCount}/${this.options.maxRetries}):`, error);
+                
+                if (this.retryCount < this.options.maxRetries) {
+                    console.log(`Retrying in ${backoff}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, backoff));
+                } else {
+                    throw new Error(`Failed to connect after ${this.options.maxRetries} attempts`);
+                }
+            }
+        }
+    }
+    
+    private async reconnect(): Promise<void> {
+        await this.connect();
+    }
+}
+```
+
+### Dead Letter Queue Pattern
+
+Move failed messages to a dead letter queue:
+
+```typescript
+class ConsumerWithDLQ {
+    private dlqSender: rhea.Sender;
+    
+    constructor(connection: rhea.Connection) {
+        this.dlqSender = connection.open_sender('dead-letter-queue');
+    }
+    
+    async setupConsumer(): Promise<void> {
+        const receiver = connection.open_receiver('main-queue');
+        
+        receiver.on('message', async (context: rhea.EventContext) => {
+            try {
+                await dispatcher.processMessage(context.message);
+                context.delivery?.accept();
+                
+            } catch (error) {
+                console.error('Processing failed, sending to DLQ:', error);
+                
+                try {
+                    // Send to dead letter queue with error metadata
+                    await this.sendToDLQ(context.message, error.message);
+                    
+                    // Accept original message (it's now in DLQ)
+                    context.delivery?.accept();
+                } catch (dlqError) {
+                    console.error('Failed to send to DLQ:', dlqError);
+                    // Release for retry if DLQ send fails
+                    context.delivery?.release();
+                }
+            }
+        });
+    }
+    
+    private async sendToDLQ(originalMessage: rhea.Message, errorMessage: string): Promise<void> {
+        const dlqMessage = {
+            ...originalMessage,
+            application_properties: {
+                ...originalMessage.application_properties,
+                'x-original-error': errorMessage,
+                'x-failed-at': new Date().toISOString()
+            }
+        };
+        
+        return new Promise((resolve, reject) => {
+            this.dlqSender.send(dlqMessage, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+    }
+}
+```
+
+## Connection Management
+
+### Graceful Shutdown
+
+Properly close connections when shutting down:
+
+```typescript
+class ManagedConsumer {
+    private connection?: rhea.Connection;
+    private receiver?: rhea.Receiver;
+    
+    async start(): Promise<void> {
+        this.connection = rhea.connect({
+            host: 'localhost',
+            port: 5672
+        });
+        
+        this.receiver = this.connection.open_receiver('test-queue');
+        
+        // Handle shutdown signals
+        process.on('SIGINT', () => this.shutdown());
+        process.on('SIGTERM', () => this.shutdown());
+    }
+    
+    private async shutdown(): Promise<void> {
+        console.log('Shutting down gracefully...');
+        
+        if (this.receiver) {
+            this.receiver.close();
+        }
+        
+        if (this.connection) {
+            this.connection.close();
+        }
+        
+        // Wait for pending operations
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('Shutdown complete');
+        process.exit(0);
+    }
+}
+```
+
+### Connection Pool Management
+
+For high-throughput scenarios, manage multiple connections:
+
+```typescript
+class ConsumerPool {
+    private consumers: ManagedConsumer[] = [];
+    private poolSize: number;
+    
+    constructor(poolSize: number = 4) {
+        this.poolSize = poolSize;
+    }
+    
+    async start(): Promise<void> {
+        for (let i = 0; i < this.poolSize; i++) {
+            const consumer = new ManagedConsumer();
+            await consumer.start();
+            this.consumers.push(consumer);
+        }
+        
+        console.log(`Started ${this.poolSize} consumer instances`);
+    }
+    
+    async stop(): Promise<void> {
+        console.log('Stopping consumer pool...');
+        
+        await Promise.all(
+            this.consumers.map(consumer => consumer.shutdown())
+        );
+        
+        console.log('Consumer pool stopped');
+    }
+}
+```
+
+## Authentication
+
+### SASL PLAIN (Username/Password)
+
+```typescript
+const connection = rhea.connect({
+    host: 'localhost',
+    port: 5672,
+    username: 'guest',
+    password: 'guest',
+    sasl_mech: 'PLAIN'
+});
+```
+
+### SASL ANONYMOUS
+
+```typescript
+const connection = rhea.connect({
+    host: 'localhost',
+    port: 5672,
+    sasl_mech: 'ANONYMOUS'
+});
+```
+
+### TLS/SSL Connection
+
+```typescript
+import * as fs from 'fs';
+
+const connection = rhea.connect({
+    host: 'localhost',
+    port: 5671,
+    username: 'guest',
+    password: 'guest',
+    transport: 'tls',
+    servername: 'localhost', // For SNI
+    ca: [fs.readFileSync('/path/to/ca-cert.pem')],
+    key: fs.readFileSync('/path/to/client-key.pem'),
+    cert: fs.readFileSync('/path/to/client-cert.pem'),
+    rejectUnauthorized: true
+});
+```
+
+## Configuration Options
+
+```typescript
+const connection = rhea.connect({
+    host: string,              // Broker hostname
+    port: number,              // Broker port (5672 for TCP, 5671 for TLS)
+    username?: string,         // Authentication username
+    password?: string,         // Authentication password
+    transport?: 'tcp' | 'tls', // Transport protocol
+    reconnect?: boolean,       // Auto-reconnect on disconnect
+    reconnect_limit?: number,  // Max reconnection attempts
+    initial_reconnect_delay?: number, // Initial delay (ms)
+    max_reconnect_delay?: number,     // Max delay (ms)
+    idle_time_out?: number,    // Idle timeout (ms)
+});
+```
+
+## Testing
+
+```typescript
+import { {{ class_name }} } from './src';
+
+describe('{{ class_name }}', () => {
+    it('should process message', async () => {
+        const dispatcher = new {{ class_name }}();
+        let received = false;
+        
+        {%- set first_message = messagegroup.messages.items() | first %}
+        {%- if first_message %}
+        {%- set messageid, message = first_message %}
+        {%- set messagename = messageid | pascal | strip_namespace %}
+        dispatcher.{{ messagename }}Handler = async (cloudEvent, data) => {
+            received = true;
+            expect(data).toBeDefined();
+        };
+        
+        // Create test message
+        const testMessage = {
+            content_type: 'application/cloudevents+json',
+            body: JSON.stringify({
+                specversion: '1.0',
+                type: '{{ messageid }}',
+                source: 'test',
+                id: '123',
+                data: { /* test data */ }
+            })
+        };
+        
+        await dispatcher.processMessage(testMessage as any);
+        expect(received).toBe(true);
+        {%- endif %}
+    });
+});
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Connection refused | Verify broker is running and connection details are correct |
+| Authentication failed | Check username/password and SASL mechanism |
+| Messages not received | Verify queue/address name and message routing |
+| Memory leaks | Always close connections properly in shutdown handlers |
+| Slow processing | Consider using connection pool for parallel processing |
+
+## Dependencies
+
+- `rhea` - AMQP 1.0 client for Node.js
+- `cloudevents` - CloudEvents SDK
+- TypeScript 4.5+
+
+## Learn More
+
+- [AMQP 1.0 Specification](http://www.amqp.org/specification/1.0/amqp-org-download)
+- [Rhea Documentation](https://github.com/amqp/rhea)
+- [CloudEvents Specification](https://cloudevents.io/)
+- [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
 {% endfor %}

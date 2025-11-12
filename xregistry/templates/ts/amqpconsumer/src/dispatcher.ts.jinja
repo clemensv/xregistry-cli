@@ -10,19 +10,61 @@ import * as rhea from 'rhea';
 {%- if uses_cloudevents_message %}
 import { CloudEvent, HTTP } from 'cloudevents';
 {%- endif %}
+import { MessageContext } from './messageContext.js';
 
 // Import data types (need to compile data project first: cd ../{{ data_project_name }} && npm install && npm run build)
 // NOTE: In real usage, the data project should be a proper npm package dependency
 import * as {{ data_module_name }} from '../../{{ data_project_name }}/dist/index.js';
 
 {% for messagegroupid, messagegroup in messagegroups.items() -%}
-{%- set uses_cloudevents_message = cloudEvents.usesCloudEvents(messagegroup) %}
-{%- set uses_amqp_message = true %}
 {%- set groupname = messagegroupid | pascal -%}
 {%- set class_name = (groupname | strip_namespace) + "EventConsumer" %}
+{%- set has_cloudevents_messages = namespace(value=false) %}
+{%- set has_amqp_messages = namespace(value=false) %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- if message | exists("envelope","CloudEvents/1.0") %}
+{%- set has_cloudevents_messages.value = true %}
+{%- else %}
+{%- set has_amqp_messages.value = true %}
+{%- endif %}
+{%- endfor %}
 
 /**
- * Event consumer for the {{ messagegroupid }} message group
+ * Event consumer for the {{ messagegroupid }} message group.
+ * 
+ * This class receives and dispatches AMQP 1.0 messages, supporting both CloudEvents
+ * envelope format and plain AMQP messages. It provides type-safe message routing to
+ * registered handler functions.
+ * 
+ * ## Features
+ * - CloudEvents structured and binary content modes
+ * - Plain AMQP messages with subject-based routing
+ * - Message settlement (accept, reject, release)
+ * - Automatic deserialization of message payloads
+ * - Type-safe handler registration
+ * 
+ * @example
+ * ```typescript
+ * const consumer = new {{ class_name }}();
+ * {%- set first_message = messagegroup.messages.items() | first %}
+ * {%- if first_message %}
+ * {%- set messageid, message = first_message %}
+ * {%- set messagename = messageid | strip_dots | pascal %}
+ * {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+ * 
+ * // Register handler with MessageContext for settlement
+ * consumer.{{ messagename }}Handler = async ({% if isCloudEvent %}cloudEvent, {% else %}message, {% endif %}data, context) => {
+ *     console.log('Received:', data);
+ *     // Process message
+ *     context.accept(); // Successful processing
+ * };
+ * {%- endif %}
+ * 
+ * // Process message from AMQP broker (called from receiver.on('message'))
+ * receiver.on('message', async (eventContext: rhea.EventContext) => {
+ *     await consumer.processMessage(eventContext);
+ * });
+ * ```
  */
 export class {{ class_name }} {
     {%- for messageid, message in messagegroup.messages.items() %}
@@ -31,48 +73,117 @@ export class {{ class_name }} {
     {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
     
     /**
-     * Handler for {{ messagename }} messages
+     * Handler for {{ messagename }} messages.
      {%- if message.description %}
+     * 
      * {{ message.description }}
      {%- endif %}
+     * 
+     * @param {% if isCloudEvent %}cloudEvent - The CloudEvent envelope
+     * @param {% endif %}data - The deserialized message payload
+     * @param context - Message context for settlement (accept/reject/release)
+     * @returns Promise that resolves when handling is complete
+     * 
+     * @example
+     * ```typescript
+     * consumer.{{ messagename }}Handler = async ({% if isCloudEvent %}cloudEvent, {% endif %}data, context) => {
+     *     try {
+     *         // Process the message
+     *         await processData(data);
+     *         context.accept(); // Successful processing
+     *     } catch (error) {
+     *         if (isValidationError(error)) {
+     *             context.reject(); // Permanent failure
+     *         } else {
+     *             context.release(); // Temporary failure, allow retry
+     *         }
+     *     }
+     * };
+     * ```
      */
-    public {{ messagename }}Handler?: ({% if isCloudEvent %}cloudEvent: CloudEvent, {% else %}message: rhea.Message, {% endif %}data: {{ message_body_type }}) => Promise<void>;
+    public {{ messagename }}Handler?: ({% if isCloudEvent %}cloudEvent: CloudEvent, {% else %}message: rhea.Message, {% endif %}data: {{ message_body_type }}, context: MessageContext) => Promise<void>;
     {%- endfor %}
     
-    {%- if uses_amqp_message %}
+    {%- if has_amqp_messages.value %}
     /**
-     * Handler for unhandled AMQP messages
+     * Handler for unhandled AMQP messages.
+     * 
+     * Called when a message is received that does not match any registered handler.
+     * 
+     * @param message - The unrecognized AMQP message
+     * @param context - Message context for settlement
      */
-    public unhandledMessageHandler?: (message: rhea.Message) => Promise<void>;
+    public unhandledMessageHandler?: (message: rhea.Message, context: MessageContext) => Promise<void>;
     {%- endif %}
     
-    {%- if uses_cloudevents_message %}
+    {%- if has_cloudevents_messages.value %}
     /**
-     * Handler for unhandled CloudEvents
+     * Handler for unhandled CloudEvents.
+     * 
+     * Called when a CloudEvent is received that does not match any registered handler.
+     * 
+     * @param cloudEvent - The unrecognized CloudEvent
+     * @param context - Message context for settlement
      */
-    public unhandledEventHandler?: (cloudEvent: CloudEvent) => Promise<void>;
+    public unhandledEventHandler?: (cloudEvent: CloudEvent, context: MessageContext) => Promise<void>;
     {%- endif %}
     
     /**
-     * Process an AMQP message
-     * @param message The AMQP message
+     * Process an incoming AMQP message.
+     * 
+     * This method is the main entry point for message processing. It automatically detects
+     * whether the message is a CloudEvent (structured or binary mode) or a plain AMQP message,
+     * then routes it to the appropriate registered handler. A MessageContext is created and
+     * passed to handlers for explicit message settlement.
+     * 
+     * @param eventContext - The rhea EventContext containing the message and delivery information
+     * @returns Promise that resolves when the message has been dispatched to a handler
+     * 
+     * @throws Error if message processing fails or no handler is registered
+     * 
+     * @example
+     * ```typescript
+     * receiver.on('message', async (context: EventContext) => {
+     *     try {
+     *         await consumer.processMessage(context);
+     *         // Message settlement is handled by the handler via MessageContext
+     *     } catch (error) {
+     *         console.error('Message processing failed:', error);
+     *         // Fallback: reject the message if handler didn't settle it
+     *         if (!context.delivery?.settled) {
+     *             context.delivery?.reject();
+     *         }
+     *     }
+     * });
+     * ```
      */
-    async processMessage(message: rhea.Message): Promise<void> {
-        {%- if uses_cloudevents_message %}
+    async processMessage(eventContext: rhea.EventContext): Promise<void> {
+        const message = eventContext.message;
+        const context = new MessageContext(eventContext);
+        
+        {%- if has_cloudevents_messages.value %}
         if (this.isCloudEvent(message)) {
             const cloudEvent = this.cloudEventFromMessage(message);
-            await this.dispatchCloudEvent(cloudEvent);
+            await this.dispatchCloudEvent(cloudEvent, context);
             return;
         }
         {%- endif %}
         
-        await this.dispatchMessage(message);
+        {%- if has_amqp_messages.value %}
+        await this.dispatchMessage(message, context);
+        {%- endif %}
     }
     
-    {%- if uses_cloudevents_message %}
+    {%- if has_cloudevents_messages.value %}
     
     /**
-     * Check if an AMQP message is a CloudEvent
+     * Check if an AMQP message is a CloudEvent.
+     * 
+     * Detects both structured mode (via content-type) and binary mode (via application properties).
+     * 
+     * @param message - The AMQP message to check
+     * @returns True if the message is a CloudEvent, false otherwise
+     * @private
      */
     private isCloudEvent(message: rhea.Message): boolean {
         const contentType = message.content_type;
@@ -91,7 +202,15 @@ export class {{ class_name }} {
     }
     
     /**
-     * Convert an AMQP message to a CloudEvent
+     * Convert an AMQP message to a CloudEvent object.
+     * 
+     * Handles both structured mode (JSON body with CloudEvent properties) and binary mode
+     * (CloudEvent properties in AMQP application properties).
+     * 
+     * @param message - The AMQP message to convert
+     * @returns CloudEvent object
+     * @throws Error if the message cannot be parsed as a CloudEvent
+     * @private
      */
     private cloudEventFromMessage(message: rhea.Message): CloudEvent {
         const contentType = message.content_type;
@@ -122,9 +241,18 @@ export class {{ class_name }} {
     }
     
     /**
-     * Dispatch a CloudEvent message
+     * Dispatch a CloudEvent to the appropriate registered handler.
+     * 
+     * Routes the CloudEvent based on its `type` property to the corresponding handler.
+     * If no specific handler is registered, calls the unhandledEventHandler if available.
+     * 
+     * @param cloudEvent - The CloudEvent to dispatch
+     * @param context - Message context for settlement
+     * @returns Promise that resolves when the handler completes
+     * @throws Error if handler execution fails
+     * @private
      */
-    private async dispatchCloudEvent(cloudEvent: CloudEvent): Promise<void> {
+    private async dispatchCloudEvent(cloudEvent: CloudEvent, context: MessageContext): Promise<void> {
         const cloudEventType = cloudEvent.type;
         
         switch (cloudEventType) {
@@ -136,7 +264,7 @@ export class {{ class_name }} {
             case '{{ messageid }}':
                 if (this.{{ messagename }}Handler) {
                     const data = cloudEvent.data as unknown as {{ message_body_type }};
-                    await this.{{ messagename }}Handler(cloudEvent, data);
+                    await this.{{ messagename }}Handler(cloudEvent, data, context);
                     return;
                 }
                 break;
@@ -144,18 +272,27 @@ export class {{ class_name }} {
             {% endfor %}
             default:
                 if (this.unhandledEventHandler) {
-                    await this.unhandledEventHandler(cloudEvent);
+                    await this.unhandledEventHandler(cloudEvent, context);
                 }
                 break;
         }
     }
     {%- endif %}
     
-    {%- if uses_amqp_message %}
+    {%- if has_amqp_messages.value %}
     /**
-     * Dispatch a plain AMQP message
+     * Dispatch a plain AMQP message to the appropriate registered handler.
+     * 
+     * Routes the message based on the 'subject' application property to the corresponding handler.
+     * If no specific handler is registered, calls the unhandledMessageHandler if available.
+     * 
+     * @param message - The AMQP message to dispatch
+     * @param context - Message context for settlement
+     * @returns Promise that resolves when the handler completes
+     * @throws Error if handler execution fails
+     * @private
      */
-    private async dispatchMessage(message: rhea.Message): Promise<void> {
+    private async dispatchMessage(message: rhea.Message, context: MessageContext): Promise<void> {
         const messageSubject = message.application_properties?.['subject'];
         
         switch (messageSubject) {
@@ -165,14 +302,14 @@ export class {{ class_name }} {
             case '{{ messageid }}':
                 if (this.{{ messagename }}Handler) {
                     const data = message.body as {{ message_body_type }};
-                    await this.{{ messagename }}Handler(message, data);
+                    await this.{{ messagename }}Handler(message, data, context);
                     return;
                 }
                 break;
             {% endfor %}
             default:
                 if (this.unhandledMessageHandler) {
-                    await this.unhandledMessageHandler(message);
+                    await this.unhandledMessageHandler(message, context);
                 }
                 break;
         }
