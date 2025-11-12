@@ -1,0 +1,394 @@
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = cloudEvents.usesCloudEvents(root) %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "EventConsumer" %}
+# {{ project_name | pascal }} - AMQP Consumer
+
+Auto-generated AMQP consumer for {{ groupname }} message group.
+
+## Overview
+
+This consumer provides event handlers for incoming AMQP messages using the CloudEvents specification.
+
+## Quick Start
+
+### Using Builder Pattern (Recommended)
+
+```csharp
+using {{ project_name | pascal }};
+using CloudNative.CloudEvents;
+using Microsoft.Extensions.Logging;
+
+// Create consumer using fluent builder
+var consumer = {{ class_name }}.CreateBuilder()
+    .WithEndpoint("amqp://localhost:5672")
+    .WithCredential(new PlainEndpointCredential("username", "password"))
+    .WithNode("/queue/events")
+    .WithLogger(loggerFactory)
+    .Build();
+
+// Register event handlers
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+consumer.{{ messagename }}Async += async (cloudEvent, data, context) =>
+{
+    Console.WriteLine($"Received {{ messagename }} event");
+    // Process data
+    
+    // Accept the message to acknowledge successful processing
+    context.Accept();
+    
+    // Or release the message for redelivery if processing failed
+    // context.Release();
+    
+    // Or reject the message as permanently failed
+    // context.Reject();
+};
+{%- endif %}
+
+// Register error handlers
+consumer.MessageProcessingErrorAsync += async (cloudEvent, exception) =>
+{
+    Console.WriteLine($"Error processing message: {exception.Message}");
+};
+
+consumer.DeserializationErrorAsync += async (cloudEvent, exception) =>
+{
+    Console.WriteLine($"Error deserializing message: {exception.Message}");
+};
+
+// Start consuming
+await consumer.StartAsync();
+
+// Keep running until cancellation
+await Task.Delay(-1, cancellationToken);
+
+// Stop and cleanup
+await consumer.DisposeAsync();
+```
+
+### Using Factory Method
+
+```csharp
+var consumer = {{ class_name }}.CreateConsumer(
+    new PlainEndpointCredential("username", "password"),
+    new Uri("amqp://localhost:5672"),
+    loggerFactory,
+    new Dictionary<string, string> { ["node"] = "/queue/events" });
+
+// Register handlers
+consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += async (ce, data, context) => { 
+    // Process message
+    context.Accept(); 
+};
+
+await consumer.StartAsync();
+```
+
+## Available Event Handlers
+
+Subscribe to handlers for specific event types:
+
+{% for messageid, message in messagegroup.messages.items() -%}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+### {{ messagename }}
+
+**Event Type:** `{{ messageid }}`  
+**Data Type:** `{{ message_body_type }}`
+
+```csharp
+consumer.{{ messagename }}Async += async (CloudEvent cloudEvent, {{ message_body_type }}? data, MessageContext context) =>
+{
+    if (data != null)
+    {
+        // Process the event data
+        Console.WriteLine($"Received {{ messagename }}");
+        
+        // Accept the message when processing is successful
+        context.Accept();
+    }
+    else
+    {
+        // Reject malformed messages
+        context.Reject();
+    }
+};
+```
+
+{% endfor %}
+
+### Unhandled Events
+
+Handle events that don't match any registered type:
+
+```csharp
+consumer.UnhandledEventAsync += async (CloudEvent cloudEvent, MessageContext context) =>
+{
+    Console.WriteLine($"Received unhandled event type: {cloudEvent.Type}");
+    // Reject unhandled messages or accept them to prevent redelivery
+    context.Reject();
+};
+```
+
+## Message Disposition
+
+Every message handler receives a `MessageContext` parameter that provides control over message acknowledgment. You must call one of the disposition methods to complete message processing:
+
+### Accept
+
+Indicates the message was successfully processed and should be removed from the queue:
+
+```csharp
+consumer.MyEventAsync += async (cloudEvent, data, context) =>
+{
+    // Process successfully
+    await ProcessAsync(data);
+    
+    // Acknowledge success
+    context.Accept();
+};
+```
+
+### Release
+
+Returns the message to the queue for redelivery (e.g., temporary processing failure):
+
+```csharp
+consumer.MyEventAsync += async (cloudEvent, data, context) =>
+{
+    try
+    {
+        await ProcessAsync(data);
+        context.Accept();
+    }
+    catch (TemporaryException ex)
+    {
+        // Release for retry
+        context.Release();
+    }
+};
+```
+
+### Reject
+
+Permanently rejects the message, typically moving it to a dead-letter queue:
+
+```csharp
+consumer.MyEventAsync += async (cloudEvent, data, context) =>
+{
+    if (!IsValid(data))
+    {
+        // Reject invalid messages
+        context.Reject();
+        return;
+    }
+    
+    await ProcessAsync(data);
+    context.Accept();
+};
+```
+
+### Modify
+
+Advanced disposition that allows fine-grained control:
+
+```csharp
+consumer.MyEventAsync += async (cloudEvent, data, context) =>
+{
+    try
+    {
+        await ProcessAsync(data);
+        context.Accept();
+    }
+    catch (Exception)
+    {
+        // Mark as delivery failed, but allow redelivery here
+        context.Modify(deliveryFailed: true, undeliverableHere: false);
+    }
+};
+```
+
+**Important:** Each message must have exactly one disposition method called. Calling multiple methods or not calling any method will result in undefined behavior.
+
+## Authentication
+
+### Plain Credentials
+
+```csharp
+var credential = new PlainEndpointCredential("username", "password");
+```
+
+### Token-Based Authentication
+
+```csharp
+var credential = new TokenEndpointCredential(async () => 
+{
+    // Fetch and return access token
+    return await GetAccessTokenAsync();
+});
+```
+
+## Error Handling
+
+### Message Processing Errors
+
+Handle errors that occur while processing messages:
+
+```csharp
+consumer.MessageProcessingErrorAsync += async (CloudEvent cloudEvent, Exception exception) =>
+{
+    logger.LogError(exception, "Error processing event {EventType}", cloudEvent.Type);
+    
+    // Optionally send to dead letter queue
+    await SendToDeadLetterQueueAsync(cloudEvent);
+};
+```
+
+### Deserialization Errors
+
+Handle errors when deserializing event data:
+
+```csharp
+consumer.DeserializationErrorAsync += async (CloudEvent cloudEvent, Exception exception) =>
+{
+    logger.LogError(exception, "Error deserializing event {EventType}", cloudEvent.Type);
+    
+    // Log raw event for investigation
+    logger.LogWarning("Raw CloudEvent: {CloudEvent}", cloudEvent);
+};
+```
+
+## Lifecycle Management
+
+### Start and Stop
+
+```csharp
+// Start consuming messages
+await consumer.StartAsync();
+
+// Stop consuming (graceful shutdown)
+await consumer.StopAsync();
+```
+
+### Async Disposal
+
+The consumer implements `IAsyncDisposable` for proper cleanup:
+
+```csharp
+await using var consumer = {{ class_name }}.CreateBuilder()
+    .WithEndpoint("amqp://localhost:5672")
+    .WithCredential(credential)
+    .Build();
+
+await consumer.StartAsync();
+
+// Use consumer...
+
+// Disposed automatically (calls StopAsync internally)
+```
+
+## Configuration Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `node` | AMQP queue or topic name | `/queue/events` |
+| `filter` | Message filter expression | `priority = 'high'` |
+
+```csharp
+consumer = {{ class_name }}.CreateBuilder()
+    .WithNode("/queue/events")
+    .WithOption("filter", "priority = 'high'")
+    .Build();
+```
+
+## Multiple Handlers
+
+Register multiple handlers for the same event type:
+
+```csharp
+{%- set first_msg_name = messagegroup.messages.keys() | first | strip_dots | pascal %}
+// Handler 1: Log event
+consumer.{{ first_msg_name }}Async += async (ce, data) =>
+{
+    logger.LogInformation("Event received: {EventId}", ce.Id);
+};
+
+// Handler 2: Process business logic
+consumer.{{ first_msg_name }}Async += async (ce, data) =>
+{
+    await ProcessEventAsync(data);
+};
+
+// Handler 3: Send metrics
+consumer.{{ first_msg_name }}Async += async (ce, data) =>
+{
+    await metrics.RecordEventAsync(ce.Type);
+};
+
+// All handlers execute in parallel
+```
+
+## Testing with Testcontainers
+
+The generated test project includes examples using Apache Artemis:
+
+```csharp
+[Fact]
+public async Task TestConsumeMessage()
+{
+    // Arrange
+    using var artemis = new ArtemisContainer();
+    await artemis.StartAsync();
+    
+    var consumer = {{ class_name }}.CreateBuilder()
+        .WithEndpoint(artemis.GetBrokerAddress())
+        .WithCredential(new PlainEndpointCredential("guest", "guest"))
+        .WithNode("/queue/test")
+        .Build();
+    
+    var receivedEvent = new TaskCompletionSource<bool>();
+    consumer.{{ first_msg_name }}Async += async (ce, data) =>
+    {
+        receivedEvent.SetResult(true);
+    };
+    
+    await consumer.StartAsync();
+    
+    // Act: Send test message
+    await SendTestMessageAsync(artemis);
+    
+    // Assert
+    Assert.True(await receivedEvent.Task);
+    
+    await consumer.DisposeAsync();
+}
+```
+
+## Dependencies
+
+- `CloudNative.CloudEvents` >= 2.8.0
+- `CloudNative.CloudEvents.Amqp` >= 2.8.0
+- `AMQPNetLite` >= 2.4.11
+- `Microsoft.Extensions.Logging` >= 9.0.0
+
+## Generated Code
+
+This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
+
+**Message Group:** {{ groupname }}  
+**Protocol:** AMQP 1.0  
+**Envelope:** CloudEvents 1.0
+
+## See Also
+
+- [CloudEvents Specification](https://cloudevents.io/)
+- [AMQP 1.0 Protocol](https://www.amqp.org/)
+- [xRegistry Documentation](https://github.com/clemensv/xregistry-cli/blob/main/README.md)
+{% endfor %}
