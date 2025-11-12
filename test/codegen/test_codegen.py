@@ -126,10 +126,12 @@ def test_codegen_java(template_name):
     
     assert main_dir is not None, f"Could not find main project directory in {output_dir}"
     
-    # Build data project first if it exists
+    # Build data project first if it exists (with timeout to prevent hanging)
     if data_dir and os.path.exists(os.path.join(data_dir, 'pom.xml')):
-        assert subprocess.check_call("mvn install -B", cwd=data_dir, shell=True) == 0, "Data project build failed"
+        result = subprocess.run("mvn install -B", cwd=data_dir, shell=True, timeout=300)
+        assert result.returncode == 0, "Data project build failed"
     
-    # Build main project
+    # Build main project (with timeout to prevent hanging)
     assert os.path.exists(os.path.join(main_dir, 'pom.xml')), f"No pom.xml found in {main_dir}"
-    assert subprocess.check_call("mvn package -B", cwd=main_dir, shell=True) == 0, "Main project build failed"
+    result = subprocess.run("mvn package -B", cwd=main_dir, shell=True, timeout=300)
+    assert result.returncode == 0, "Main project build failed"

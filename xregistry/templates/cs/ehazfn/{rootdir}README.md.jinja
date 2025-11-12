@@ -35,7 +35,7 @@ The function includes:
 ### 2. Add Your Business Logic
 
 ```csharp
-{% for messageid, message in messagegroup.messages.items() | list | slice(0, 1) -%}
+{% for messageid, message in messagegroup.messages.items() | list | slice(1) | first -%}
 {%- set messagename = messageid | pascal | strip_namespace %}
 {%- set message_body_type = util.body_type(data_project_name, root, message) %}
 // Called automatically for each {{ messagename }} event

@@ -31,7 +31,7 @@ The generated function includes:
 Open `{{ class_name }}.cs` and find your event handlers:
 
 ```csharp
-{% for messageid, message in messagegroup.messages.items() | list | slice(0, 1) -%}
+{% for messageid, message in messagegroup.messages.items() | list | slice(1) | first -%}
 {%- set messagename = messageid | pascal | strip_namespace %}
 {%- set message_body_type = util.body_type(data_project_name, root, message) %}
 // This method is called automatically when a {{ messagename }} event arrives

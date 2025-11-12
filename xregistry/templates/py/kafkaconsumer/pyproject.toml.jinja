@@ -2,7 +2,6 @@
 name = "{{main_project_name|replace("_","-")}}"
 description = "{{main_project_name}} Apache Kafka consumer library"
 authors = ["Your Name <your.email@example.com>"]
-readme = "README.md"
 version = "{{ "0.1.0" if not package_version else package_version }}"  # Placeholder version, dynamic versioning can be handled with plugins
 packages = [{include = "{{main_project_name}}", from = "src"}]
 
