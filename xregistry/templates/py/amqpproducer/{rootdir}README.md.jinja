@@ -149,7 +149,167 @@ This library has been tested with:
 - Use SASL authentication mechanisms appropriate for your broker
 - Consider using token-based authentication (OAuth, JWT) where supported
 
+## Advanced Usage
+
+### Batch Sending with Concurrency Control
+
+Send multiple messages efficiently with rate limiting:
+
+```python
+import asyncio
+from typing import List
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set producer_class = (messagegroupid | pascal | strip_dots) + "Producer" %}
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, first_message[1] ) | strip_namespace %}
+
+class BatchProducer:
+    def __init__(self, producer: {{ producer_class }}, max_concurrency: int = 10):
+        self.producer = producer
+        self.semaphore = asyncio.Semaphore(max_concurrency)
+    
+    async def send_batch_async(self, data_array: List[{{ type_name }}]):
+        """Send multiple messages with concurrency control."""
+        async def send_one(data):
+            async with self.semaphore:
+                await asyncio.to_thread(
+                    self.producer.send_{{ first_message[0] | pascal | strip_namespace | snake }},
+                    data
+                )
+        
+        tasks = [send_one(data) for data in data_array]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+# Usage
+producer = {{ producer_class }}(host="localhost", address="my-queue")
+batch_producer = BatchProducer(producer, max_concurrency=20)
+
+data_list = [{{ type_name }}(...) for _ in range(100)]
+asyncio.run(batch_producer.send_batch_async(data_list))
+```
+{% endfor %}
+
+### Connection Pooling
+
+Reuse producer connections across your application:
+
+```python
+from threading import Lock
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set producer_class = (messagegroupid | pascal | strip_dots) + "Producer" %}
+
+class ProducerPool:
+    _instance = None
+    _lock = Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance.producer = {{ producer_class }}(
+                        host="localhost",
+                        address="my-queue",
+                        username="guest",
+                        password="guest"
+                    )
+        return cls._instance
+    
+    def get_producer(self) -> {{ producer_class }}:
+        return self.producer
+    
+    def close(self):
+        if self.producer:
+            self.producer.close()
+
+# Use from anywhere
+pool = ProducerPool()
+producer = pool.get_producer()
+{% endfor %}
+```
+
+### Connection Resilience
+
+Automatically reconnect on connection failures:
+
+```python
+import time
+from typing import Optional
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set producer_class = (messagegroupid | pascal | strip_dots) + "Producer" %}
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, first_message[1] ) | strip_namespace %}
+
+class ResilientProducer:
+    def __init__(self, host: str, address: str, **kwargs):
+        self.host = host
+        self.address = address
+        self.kwargs = kwargs
+        self.producer: Optional[{{ producer_class }}] = None
+        self._connect()
+    
+    def _connect(self):
+        """Establish connection to AMQP broker."""
+        if self.producer:
+            try:
+                self.producer.close()
+            except:
+                pass
+        
+        self.producer = {{ producer_class }}(
+            host=self.host,
+            address=self.address,
+            **self.kwargs
+        )
+    
+    def send_with_retry(self, data: {{ type_name }}, max_retries: int = 3):
+        """Send message with automatic retry on connection failure."""
+        for attempt in range(max_retries):
+            try:
+                self.producer.send_{{ first_message[0] | pascal | strip_namespace | snake }}(data)
+                return
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    self._connect()  # Reconnect
+                else:
+                    raise Exception(f"Failed after {max_retries} attempts") from e
+    
+    def close(self):
+        if self.producer:
+            self.producer.close()
+{% endfor %}
+```
+
+### Custom CloudEvents Attributes
+
+Add extension attributes to CloudEvents:
+
+```python
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- if (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set producer_class = (messagegroupid | pascal | strip_dots) + "Producer" %}
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set messagename = first_message[0] | pascal | strip_namespace %}
+
+producer = {{ producer_class }}(host="localhost", address="my-queue")
+
+# CloudEvents extension attributes can be added via metadata
+producer.send_{{ messagename | snake }}(
+    data=data,
+    _tenant="contoso",           # Custom extension attribute
+    _deviceid="device-001",      # Custom extension attribute
+    _region="us-west-2",         # Custom extension attribute
+    _priority="high",            # Custom extension attribute
+    content_type="application/json"
+)
+{%- endif %}
+{% endfor %}
+```
+
 ## Error Handling
+
+### Basic Error Handling
 
 ```python
 from uamqp import errors
@@ -162,6 +322,95 @@ except errors.MessageException as e:
     print(f"Message error: {e}")
 finally:
     producer.close()
+```
+
+### Retry with Exponential Backoff
+
+```python
+import time
+from typing import Any
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set producer_class = (messagegroupid | pascal | strip_dots) + "Producer" %}
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set messagename = first_message[0] | pascal | strip_namespace %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, first_message[1] ) | strip_namespace %}
+
+def send_with_retry(
+    producer: {{ producer_class }},
+    data: {{ type_name }},
+    max_retries: int = 5,
+    initial_delay: float = 1.0,
+    max_delay: float = 60.0
+) -> None:
+    """
+    Send message with exponential backoff retry.
+    
+    Args:
+        producer: The producer instance
+        data: Message data to send
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds
+        max_delay: Maximum delay between retries
+    
+    Raises:
+        Exception: If all retries are exhausted
+    """
+    for attempt in range(max_retries):
+        try:
+            producer.send_{{ messagename | snake }}(data)
+            return  # Success
+        except errors.AMQPConnectionError as e:
+            if attempt < max_retries - 1:
+                delay = min(initial_delay * (2 ** attempt), max_delay)
+                print(f"Attempt {attempt + 1}/{max_retries} failed. Retrying in {delay}s...")
+                time.sleep(delay)
+            else:
+                raise Exception(f"Failed after {max_retries} attempts") from e
+{% endfor %}
+```
+
+### Circuit Breaker Pattern
+
+```python
+from datetime import datetime, timedelta
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set producer_class = (messagegroupid | pascal | strip_dots) + "Producer" %}
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, first_message[1] ) | strip_namespace %}
+
+class CircuitBreakerProducer:
+    """Producer with circuit breaker to prevent cascading failures."""
+    
+    def __init__(self, producer: {{ producer_class }}, threshold: int = 5, timeout: int = 60):
+        self.producer = producer
+        self.threshold = threshold
+        self.timeout = timedelta(seconds=timeout)
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.is_open = False
+    
+    def send(self, data: {{ type_name }}):
+        """Send message with circuit breaker protection."""
+        # Check if circuit breaker is open
+        if self.is_open:
+            if datetime.now() - self.last_failure_time < self.timeout:
+                raise Exception("Circuit breaker is open. Too many consecutive failures.")
+            else:
+                # Try to close the circuit
+                self.is_open = False
+                self.failure_count = 0
+        
+        try:
+            self.producer.send_{{ first_message[0] | pascal | strip_namespace | snake }}(data)
+            self.failure_count = 0  # Reset on success
+        except Exception as e:
+            self.failure_count += 1
+            self.last_failure_time = datetime.now()
+            
+            if self.failure_count >= self.threshold:
+                self.is_open = True
+            raise
+{% endfor %}
 ```
 
 ## Building and Testing

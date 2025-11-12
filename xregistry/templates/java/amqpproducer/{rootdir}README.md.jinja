@@ -100,14 +100,304 @@ producer.sendEventName(data, options -> {
     .build();
 ```
 
+## Advanced Usage
+
+### Batch Sending with CompletableFuture
+
+Send multiple messages concurrently:
+
+```java
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set messagename = first_message[0] | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, first_message[1]) %}
+
+{{ class_name }} producer = new {{ class_name }}(connectionString, queueName);
+List<{{ message_body_type }}> events = List.of(
+    new {{ message_body_type }}(),
+    new {{ message_body_type }}(),
+    new {{ message_body_type }}()
+);
+
+// Send all messages asynchronously
+List<CompletableFuture<Void>> futures = events.stream()
+    .map(producer::send{{ messagename }}Async)
+    .collect(Collectors.toList());
+
+// Wait for all to complete
+CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+```
+
+### Batch Sending with Rate Limiting
+
+Control concurrency with a semaphore:
+
+```java
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class BatchProducer {
+    private final {{ class_name }} producer;
+    private final Semaphore semaphore;
+    private final ExecutorService executor;
+    
+    public BatchProducer({{ class_name }} producer, int maxConcurrency) {
+        this.producer = producer;
+        this.semaphore = new Semaphore(maxConcurrency);
+        this.executor = Executors.newFixedThreadPool(maxConcurrency);
+    }
+    
+    public void sendBatch(List<{{ message_body_type }}> events) {
+        List<CompletableFuture<Void>> futures = events.stream()
+            .map(event -> CompletableFuture.runAsync(() -> {
+                try {
+                    semaphore.acquire();
+                    producer.send{{ messagename }}(event);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                } finally {
+                    semaphore.release();
+                }
+            }, executor))
+            .collect(Collectors.toList());
+        
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+    }
+    
+    public void close() {
+        executor.shutdown();
+        producer.close();
+    }
+}
+```
+
+### Connection Pooling
+
+Implement singleton producer for connection reuse:
+
+```java
+public class ProducerPool {
+    private static volatile {{ class_name }} instance;
+    private static final Object lock = new Object();
+    
+    private ProducerPool() {}
+    
+    public static {{ class_name }} getInstance(String connectionString, String queueName) {
+        if (instance == null) {
+            synchronized (lock) {
+                if (instance == null) {
+                    instance = new {{ class_name }}(connectionString, queueName);
+                }
+            }
+        }
+        return instance;
+    }
+    
+    public static void close() {
+        if (instance != null) {
+            synchronized (lock) {
+                if (instance != null) {
+                    instance.close();
+                    instance = null;
+                }
+            }
+        }
+    }
+}
+
+// Usage
+{{ class_name }} producer = ProducerPool.getInstance("amqp://localhost:5672", "events");
+```
+
+### Connection Resilience
+
+Automatically reconnect on connection failures:
+
+```java
+import java.time.Duration;
+
+public class ResilientProducer implements AutoCloseable {
+    private {{ class_name }} producer;
+    private final String connectionString;
+    private final String queueName;
+    private final int maxRetries;
+    
+    public ResilientProducer(String connectionString, String queueName, int maxRetries) {
+        this.connectionString = connectionString;
+        this.queueName = queueName;
+        this.maxRetries = maxRetries;
+        this.producer = new {{ class_name }}(connectionString, queueName);
+    }
+    
+    public void send{{ messagename }}WithRetry({{ message_body_type }} data) throws Exception {
+        int attempt = 0;
+        Exception lastException = null;
+        
+        while (attempt < maxRetries) {
+            try {
+                producer.send{{ messagename }}(data);
+                return; // Success
+            } catch (Exception e) {
+                lastException = e;
+                attempt++;
+                
+                if (attempt < maxRetries) {
+                    // Exponential backoff
+                    long delayMillis = (long) (1000 * Math.pow(2, attempt - 1));
+                    Thread.sleep(Math.min(delayMillis, 60000));
+                    
+                    // Reconnect
+                    try {
+                        producer.close();
+                    } catch (Exception ignored) {}
+                    producer = new {{ class_name }}(connectionString, queueName);
+                }
+            }
+        }
+        
+        throw new Exception("Failed after " + maxRetries + " attempts", lastException);
+    }
+    
+    @Override
+    public void close() {
+        if (producer != null) {
+            producer.close();
+        }
+    }
+}
+```
+
+### Custom CloudEvents Attributes
+
+Add extension attributes to CloudEvents:
+
+```java
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
+
+// Use CloudEvent builder to add custom attributes
+CloudEventBuilder builder = CloudEventBuilder.v1()
+    .withType("{{ first_message[0] }}")
+    .withSource(URI.create("/source"))
+    .withId(UUID.randomUUID().toString())
+    .withData("application/json", data);
+
+// Add extension attributes
+builder.withExtension("tenant", "contoso");
+builder.withExtension("deviceid", "device-001");
+builder.withExtension("region", "us-west-2");
+builder.withExtension("priority", "high");
+
+CloudEvent cloudEvent = builder.build();
+```
+
 ## Error Handling
+
+### Basic Error Handling
 
 ```java
 try {
     producer.sendEventName(data);
 } catch (AmqpException e) {
     // Handle connection/sending errors
+    System.err.println("Failed to send message: " + e.getMessage());
 }
+```
+
+### Retry with Exponential Backoff
+
+```java
+public class RetryHelper {
+    public static void sendWithRetry(
+        {{ class_name }} producer,
+        {{ message_body_type }} data,
+        int maxRetries,
+        long initialDelayMs
+    ) throws Exception {
+        Exception lastException = null;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                producer.send{{ messagename }}(data);
+                return; // Success
+            } catch (Exception e) {
+                lastException = e;
+                
+                if (attempt < maxRetries - 1) {
+                    long delayMs = initialDelayMs * (long) Math.pow(2, attempt);
+                    long cappedDelay = Math.min(delayMs, 60000);
+                    System.out.println("Attempt " + (attempt + 1) + "/" + maxRetries + 
+                        " failed. Retrying in " + cappedDelay + "ms...");
+                    Thread.sleep(cappedDelay);
+                }
+            }
+        }
+        
+        throw new Exception("Failed after " + maxRetries + " attempts", lastException);
+    }
+}
+```
+
+### Circuit Breaker Pattern
+
+```java
+import java.time.Instant;
+import java.time.Duration;
+
+public class CircuitBreakerProducer {
+    private final {{ class_name }} producer;
+    private int failureCount = 0;
+    private Instant lastFailureTime = null;
+    private final int threshold;
+    private final Duration timeout;
+    private boolean isOpen = false;
+    
+    public CircuitBreakerProducer({{ class_name }} producer, int threshold, Duration timeout) {
+        this.producer = producer;
+        this.threshold = threshold;
+        this.timeout = timeout;
+    }
+    
+    public void send{{ messagename }}({{ message_body_type }} data) throws Exception {
+        // Check if circuit breaker is open
+        if (isOpen) {
+            if (Duration.between(lastFailureTime, Instant.now()).compareTo(timeout) < 0) {
+                throw new Exception("Circuit breaker is open. Too many consecutive failures.");
+            } else {
+                // Try to close the circuit
+                isOpen = false;
+                failureCount = 0;
+            }
+        }
+        
+        try {
+            producer.send{{ messagename }}(data);
+            failureCount = 0; // Reset on success
+        } catch (Exception e) {
+            failureCount++;
+            lastFailureTime = Instant.now();
+            
+            if (failureCount >= threshold) {
+                isOpen = true;
+            }
+            throw e;
+        }
+    }
+}
+```
+
+### Try-with-Resources
+
+Use try-with-resources for automatic cleanup:
+
+```java
+try ({{ class_name }} producer = new {{ class_name }}(connectionString, queueName)) {
+    producer.send{{ messagename }}(data);
+} // Producer automatically closed
 ```
 
 ## Learn More

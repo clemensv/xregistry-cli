@@ -120,6 +120,59 @@ producer.BeforeSendAsync += async (cloudEvent, cancellationToken) =>
 };
 ```
 
+### Before Send Hook for Observability
+
+Use the hook to add distributed tracing, logging, and custom metadata:
+
+```csharp
+using System.Diagnostics;
+
+producer.BeforeSendAsync += async (cloudEvent, cancellationToken) =>
+{
+    // Add distributed tracing context
+    var activity = Activity.Current;
+    if (activity != null)
+    {
+        cloudEvent["traceparent"] = activity.Id;
+        cloudEvent["tracestate"] = activity.TraceStateString ?? "";
+    }
+    
+    // Add correlation ID for log correlation
+    var correlationId = Guid.NewGuid().ToString();
+    cloudEvent["correlationid"] = correlationId;
+    
+    // Add custom metadata for monitoring
+    cloudEvent["producerversion"] = "1.0.0";
+    cloudEvent["environment"] = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "unknown";
+    cloudEvent["machinename"] = Environment.MachineName;
+    
+    // Log outgoing event
+    logger.LogInformation("Sending event {EventType} with correlation-id {CorrelationId}", 
+        cloudEvent.Type,
+        correlationId);
+    
+    return cloudEvent;
+};
+```
+
+### CloudEvents Extension Attributes
+
+Add custom CloudEvents extension attributes:
+
+```csharp
+producer.BeforeSendAsync += async (cloudEvent, cancellationToken) =>
+{
+    // Add custom extension attributes
+    cloudEvent["tenant"] = tenantId;
+    cloudEvent["deviceid"] = deviceId;
+    cloudEvent["region"] = "us-west-2";
+    cloudEvent["priority"] = "high";
+    cloudEvent["batchid"] = batchId;
+    
+    return cloudEvent;
+};
+```
+
 ### Content Formats
 
 The producer supports multiple CloudEvents formats:
@@ -145,6 +198,293 @@ The producer supports multiple CloudEvents formats:
 .WithContentMode(ContentMode.Binary)
 ```
 
+## Batch Sending
+
+### Send Multiple Events Efficiently
+
+Group related events into a batch for better throughput:
+
+```csharp
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set messagename = first_message[0] | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, first_message[1]) %}
+var events = new List<{{ message_body_type }}>
+{
+    new {{ message_body_type }} { /* ... */ },
+    new {{ message_body_type }} { /* ... */ },
+    new {{ message_body_type }} { /* ... */ }
+};
+
+// Send all events in parallel
+var tasks = events.Select(eventData => 
+    producer.Send{{ messagename }}Async(eventData, tenantId, deviceId));
+await Task.WhenAll(tasks);
+```
+
+### Batch with Rate Limiting
+
+Control the rate of concurrent sends to prevent overwhelming the broker:
+
+```csharp
+using System.Threading;
+
+public class BatchProducer
+{
+    private readonly {{ class_name }} _producer;
+    private readonly SemaphoreSlim _throttle;
+    
+    public BatchProducer({{ class_name }} producer, int maxConcurrency = 10)
+    {
+        _producer = producer;
+        _throttle = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+    }
+    
+    {%- set first_message = messagegroup.messages.items() | list | first %}
+    {%- set messagename = first_message[0] | pascal | strip_namespace %}
+    {%- set message_body_type = util.body_type(data_project_name, root, first_message[1]) %}
+    public async Task SendBatchAsync(IEnumerable<{{ message_body_type }}> events, string tenantId, string deviceId)
+    {
+        var tasks = events.Select(async eventData =>
+        {
+            await _throttle.WaitAsync();
+            try
+            {
+                await _producer.Send{{ messagename }}Async(eventData, tenantId, deviceId);
+            }
+            finally
+            {
+                _throttle.Release();
+            }
+        });
+        
+        await Task.WhenAll(tasks);
+    }
+}
+```
+
+### Batch with Backpressure Handling
+
+Monitor queue depth and apply backpressure when necessary:
+
+```csharp
+public class BackpressureProducer
+{
+    private readonly {{ class_name }} _producer;
+    private int _pendingCount = 0;
+    private readonly int _maxPending = 1000;
+    private readonly SemaphoreSlim _backpressure = new SemaphoreSlim(1, 1);
+    
+    {%- set first_message = messagegroup.messages.items() | list | first %}
+    {%- set messagename = first_message[0] | pascal | strip_namespace %}
+    {%- set message_body_type = util.body_type(data_project_name, root, first_message[1]) %}
+    public async Task Send{{ messagename }}WithBackpressureAsync({{ message_body_type }} data, string tenantId, string deviceId)
+    {
+        // Wait if too many pending sends
+        while (Interlocked.CompareExchange(ref _pendingCount, 0, 0) >= _maxPending)
+        {
+            await Task.Delay(100);
+        }
+        
+        Interlocked.Increment(ref _pendingCount);
+        try
+        {
+            await _producer.Send{{ messagename }}Async(data, tenantId, deviceId);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _pendingCount);
+        }
+    }
+}
+```
+
+## Connection Management
+
+### Connection Pooling
+
+Reuse producer instances across your application:
+
+```csharp
+public class ProducerPool
+{
+    private static readonly Lazy<{{ class_name }}> _instance = new Lazy<{{ class_name }}>(() =>
+    {
+        var credential = new TokenEndpointCredential(
+            async (resource, claims) => await GetTokenAsync(resource, claims));
+        
+        return {{ class_name }}Builder
+            .Create("amqps://example.servicebus.windows.net/inkjet")
+            .WithTokenCredential(credential)
+            .Build();
+    });
+    
+    public static {{ class_name }} Instance => _instance.Value;
+}
+
+// Use from anywhere in your application
+await ProducerPool.Instance.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data, tenantId, deviceId);
+```
+
+### Connection Lifecycle Management
+
+Properly manage connection lifecycle in long-running applications:
+
+```csharp
+public class ManagedProducer : IDisposable
+{
+    private {{ class_name }}? _producer;
+    private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
+    private bool _disposed = false;
+    
+    public async Task<{{ class_name }}> GetProducerAsync()
+    {
+        if (_producer != null)
+            return _producer;
+        
+        await _lock.WaitAsync();
+        try
+        {
+            if (_producer == null)
+            {
+                var credential = new TokenEndpointCredential(
+                    async (resource, claims) => await GetTokenAsync(resource, claims));
+                
+                _producer = {{ class_name }}Builder
+                    .Create("amqps://example.servicebus.windows.net/inkjet")
+                    .WithTokenCredential(credential)
+                    .Build();
+            }
+            return _producer;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+    
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _producer?.Dispose();
+            _lock?.Dispose();
+            _disposed = true;
+        }
+    }
+}
+```
+
+### Reconnection Strategy
+
+Automatically reconnect on connection failures:
+
+```csharp
+public class ResilientProducer : IDisposable
+{
+    private {{ class_name }}? _producer;
+    private readonly string _address;
+    private readonly IEndpointCredential _credential;
+    private bool _disposed = false;
+    
+    public ResilientProducer(string address, IEndpointCredential credential)
+    {
+        _address = address;
+        _credential = credential;
+    }
+    
+    private async Task<{{ class_name }}> GetOrRecreateProducerAsync()
+    {
+        if (_producer != null)
+        {
+            try
+            {
+                // Test connection with a no-op
+                return _producer;
+            }
+            catch (AmqpException)
+            {
+                _producer?.Dispose();
+                _producer = null;
+            }
+        }
+        
+        // Recreate producer
+        _producer = {{ class_name }}Builder
+            .Create(_address)
+            .WithTokenCredential((TokenEndpointCredential)_credential)
+            .Build();
+        
+        return _producer;
+    }
+    
+    {%- set first_message = messagegroup.messages.items() | list | first %}
+    {%- set messagename = first_message[0] | pascal | strip_namespace %}
+    {%- set message_body_type = util.body_type(data_project_name, root, first_message[1]) %}
+    public async Task Send{{ messagename }}Async({{ message_body_type }} data, string tenantId, string deviceId)
+    {
+        var producer = await GetOrRecreateProducerAsync();
+        await producer.Send{{ messagename }}Async(data, tenantId, deviceId);
+    }
+    
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _producer?.Dispose();
+            _disposed = true;
+        }
+    }
+}
+```
+
+## URI Template Parameters
+
+The producer extracts parameters from the source URI template for routing.
+
+### Extracting Parameters
+
+```csharp
+// Parameters are extracted from the source URI template
+// Example: /tenant/{tenantid}/device/{deviceid}
+
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set messagename = first_message[0] | pascal | strip_namespace %}
+// When sending, provide values for each template parameter:
+await producer.Send{{ messagename }}Async(
+    data,
+    tenantId: "contoso",     // Replaces {tenantid}
+    deviceId: "device-001"   // Replaces {deviceid}
+);
+
+// This produces the routing key: /tenant/contoso/device/device-001
+```
+
+### Dynamic Parameter Routing
+
+Use parameters for multi-tenant message routing:
+
+```csharp
+public class TenantAwareProducer
+{
+    private readonly {{ class_name }} _producer;
+    
+    {%- set first_message = messagegroup.messages.items() | list | first %}
+    {%- set messagename = first_message[0] | pascal | strip_namespace %}
+    {%- set message_body_type = util.body_type(data_project_name, root, first_message[1]) %}
+    public async Task Send{{ messagename }}ForTenantAsync(
+        {{ message_body_type }} data,
+        string tenantId,
+        string deviceId)
+    {
+        // Parameters route to tenant-specific queues/topics
+        await _producer.Send{{ messagename }}Async(data, tenantId, deviceId);
+        
+        logger.LogInformation("Sent event for tenant {TenantId}, device {DeviceId}", 
+            tenantId, deviceId);
+    }
+}
+```
+
 ## Configuration Options
 
 | Option | Description | Example |
@@ -160,6 +500,8 @@ producer = {{ class_name }}.CreateBuilder()
 ```
 
 ## Error Handling
+
+### Basic Error Handling
 
 All send methods throw exceptions on failure:
 
@@ -177,6 +519,88 @@ catch (Exception ex)
 {
     // Handle general errors
     logger.LogError(ex, "Unexpected error");
+}
+```
+
+### Retry Logic with Exponential Backoff
+
+Implement automatic retry for transient failures:
+
+```csharp
+public class ResilientProducer
+{
+    private readonly {{ class_name }} _producer;
+    private readonly ILogger _logger;
+    private readonly int _maxRetries = 5;
+    private readonly TimeSpan _initialDelay = TimeSpan.FromSeconds(1);
+    private readonly TimeSpan _maxDelay = TimeSpan.FromSeconds(60);
+
+    public async Task Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}WithRetryAsync({{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }} data, string tenantId, string deviceId)
+    {
+        int retryCount = 0;
+        while (true)
+        {
+            try
+            {
+                await _producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data, tenantId, deviceId);
+                return; // Success
+            }
+            catch (AmqpException ex) when (retryCount < _maxRetries)
+            {
+                retryCount++;
+                var delay = TimeSpan.FromSeconds(
+                    Math.Min(_initialDelay.TotalSeconds * Math.Pow(2, retryCount - 1), _maxDelay.TotalSeconds)
+                );
+                
+                _logger.LogWarning(ex, "Failed to send event, attempt {Attempt}/{MaxRetries}. Retrying in {Delay}s", 
+                    retryCount, _maxRetries, delay.TotalSeconds);
+                
+                await Task.Delay(delay);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send event after {Attempts} attempts", retryCount);
+                throw;
+            }
+        }
+    }
+}
+```
+
+### Circuit Breaker Pattern
+
+Prevent cascading failures with a circuit breaker:
+
+```csharp
+public class CircuitBreakerProducer
+{
+    private readonly {{ class_name }} _producer;
+    private int _failureCount = 0;
+    private DateTime _lastFailureTime = DateTime.MinValue;
+    private readonly int _failureThreshold = 5;
+    private readonly TimeSpan _breakDuration = TimeSpan.FromMinutes(1);
+
+    public async Task Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async({{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }} data, string tenantId, string deviceId)
+    {
+        // Check if circuit is open
+        if (_failureCount >= _failureThreshold && 
+            (DateTime.UtcNow - _lastFailureTime) < _breakDuration)
+        {
+            throw new InvalidOperationException("Circuit breaker is open. Too many consecutive failures.");
+        }
+
+        try
+        {
+            await _producer.Send{{ messagegroup.messages.keys() | first | pascal | strip_namespace }}Async(data, tenantId, deviceId);
+            _failureCount = 0; // Reset on success
+        }
+        catch (Exception)
+        {
+            _failureCount++;
+            _lastFailureTime = DateTime.UtcNow;
+            throw;
+        }
+    }
 }
 ```
 

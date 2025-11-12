@@ -110,7 +110,244 @@ new {{ class_name }}(
 )
 ```
 
+## Advanced Usage
+
+### Batch Sending with Concurrency Control
+
+Send multiple messages efficiently with Promise.all:
+
+```typescript
+{%- set first_message = messagegroup.messages.items() | list | first %}
+{%- set messagename = first_message[0] | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, first_message[1]) %}
+
+const events: {{ message_body_type | strip_namespace }}[] = [
+    { /* event 1 */ },
+    { /* event 2 */ },
+    { /* event 3 */ }
+];
+
+// Send all messages concurrently
+await Promise.all(events.map(event => producer.send{{ messagename }}(event)));
+```
+
+### Batch Sending with Rate Limiting
+
+Control concurrency to prevent overwhelming the broker:
+
+```typescript
+class BatchProducer {
+    private producer: {{ class_name }};
+    private semaphore: number = 0;
+    private readonly maxConcurrency: number;
+
+    constructor(producer: {{ class_name }}, maxConcurrency: number = 10) {
+        this.producer = producer;
+        this.maxConcurrency = maxConcurrency;
+    }
+
+    async sendBatch(events: {{ message_body_type | strip_namespace }}[]): Promise<void> {
+        const sendOne = async (event: {{ message_body_type | strip_namespace }}) => {
+            while (this.semaphore >= this.maxConcurrency) {
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            
+            this.semaphore++;
+            try {
+                await this.producer.send{{ messagename }}(event);
+            } finally {
+                this.semaphore--;
+            }
+        };
+
+        await Promise.all(events.map(sendOne));
+    }
+}
+
+// Usage
+const batchProducer = new BatchProducer(producer, 20);
+await batchProducer.sendBatch(events);
+```
+
+### Connection Pooling
+
+Implement singleton pattern for producer reuse:
+
+```typescript
+class ProducerPool {
+    private static instance: {{ class_name }} | null = null;
+    private static readonly lock = Promise.resolve();
+
+    static async getInstance(
+        host: string,
+        port: number,
+        address: string,
+        options?: any
+    ): Promise<{{ class_name }}> {
+        await this.lock;
+        
+        if (!this.instance) {
+            this.instance = new {{ class_name }}(host, port, address, options);
+        }
+        
+        return this.instance;
+    }
+
+    static async close(): Promise<void> {
+        if (this.instance) {
+            await this.instance.close();
+            this.instance = null;
+        }
+    }
+}
+
+// Usage from anywhere
+const producer = await ProducerPool.getInstance('localhost', 5672, 'test-queue');
+```
+
+### Connection Resilience
+
+Automatically reconnect on connection failures:
+
+```typescript
+class ResilientProducer {
+    private producer: {{ class_name }} | null = null;
+    private readonly config: {
+        host: string;
+        port: number;
+        address: string;
+        options?: any;
+    };
+
+    constructor(host: string, port: number, address: string, options?: any) {
+        this.config = { host, port, address, options };
+    }
+
+    private async connect(): Promise<void> {
+        if (this.producer) {
+            try {
+                await this.producer.close();
+            } catch (error) {
+                // Ignore close errors
+            }
+        }
+        
+        this.producer = new {{ class_name }}(
+            this.config.host,
+            this.config.port,
+            this.config.address,
+            this.config.options
+        );
+    }
+
+    async send{{ messagename }}WithRetry(
+        data: {{ message_body_type | strip_namespace }},
+        maxRetries: number = 3
+    ): Promise<void> {
+        if (!this.producer) {
+            await this.connect();
+        }
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                await this.producer!.send{{ messagename }}(data);
+                return; // Success
+            } catch (error) {
+                if (attempt < maxRetries - 1) {
+                    const delay = Math.min(1000 * Math.pow(2, attempt), 60000);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    await this.connect(); // Reconnect
+                } else {
+                    throw new Error(`Failed after ${maxRetries} attempts: ${error}`);
+                }
+            }
+        }
+    }
+
+    async close(): Promise<void> {
+        if (this.producer) {
+            await this.producer.close();
+            this.producer = null;
+        }
+    }
+}
+```
+
+### Custom CloudEvents Attributes
+
+Add extension attributes to CloudEvents:
+
+```typescript
+import { CloudEvent } from 'cloudevents';
+
+// CloudEvents extension attributes can be added via the extensions property
+const cloudEvent = new CloudEvent({
+    type: '{{ first_message[0] }}',
+    source: '/source',
+    data: eventData,
+    extensions: {
+        tenant: 'contoso',
+        deviceid: 'device-001',
+        region: 'us-west-2',
+        priority: 'high',
+        correlationid: crypto.randomUUID()
+    }
+});
+```
+
+### Observability with Hooks
+
+Add distributed tracing and logging:
+
+```typescript
+class ObservableProducer {
+    private producer: {{ class_name }};
+
+    constructor(producer: {{ class_name }}) {
+        this.producer = producer;
+    }
+
+    async send{{ messagename }}WithTracing(
+        data: {{ message_body_type | strip_namespace }},
+        context?: { traceId?: string; spanId?: string }
+    ): Promise<void> {
+        const startTime = Date.now();
+        const correlationId = crypto.randomUUID();
+        
+        console.log('Sending message', {
+            type: '{{ first_message[0] }}',
+            correlationId,
+            traceId: context?.traceId,
+            spanId: context?.spanId
+        });
+
+        try {
+            // Add tracing metadata to message
+            const enrichedData = {
+                ...data,
+                _metadata: {
+                    correlationId,
+                    traceId: context?.traceId,
+                    spanId: context?.spanId,
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+            await this.producer.send{{ messagename }}(enrichedData as any);
+            
+            const duration = Date.now() - startTime;
+            console.log('Message sent successfully', { correlationId, duration });
+        } catch (error) {
+            console.error('Failed to send message', { correlationId, error });
+            throw error;
+        }
+    }
+}
+```
+
 ## Error Handling
+
+### Basic Error Handling
 
 ```typescript
 try {
@@ -121,11 +358,107 @@ try {
 }
 ```
 
+### Retry with Exponential Backoff
+
+```typescript
+async function sendWithRetry(
+    producer: {{ class_name }},
+    data: {{ message_body_type | strip_namespace }},
+    maxRetries: number = 5,
+    initialDelay: number = 1000,
+    maxDelay: number = 60000
+): Promise<void> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            await producer.send{{ messagename }}(data);
+            return; // Success
+        } catch (error) {
+            if (attempt < maxRetries - 1) {
+                const delay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
+                console.log(`Attempt ${attempt + 1}/${maxRetries} failed. Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                throw new Error(`Failed after ${maxRetries} attempts: ${error}`);
+            }
+        }
+    }
+}
+```
+
+### Circuit Breaker Pattern
+
+```typescript
+class CircuitBreakerProducer {
+    private producer: {{ class_name }};
+    private failureCount: number = 0;
+    private lastFailureTime: Date | null = null;
+    private isOpen: boolean = false;
+    
+    constructor(
+        producer: {{ class_name }},
+        private threshold: number = 5,
+        private timeoutMs: number = 60000
+    ) {
+        this.producer = producer;
+    }
+
+    async send{{ messagename }}(data: {{ message_body_type | strip_namespace }}): Promise<void> {
+        // Check if circuit breaker is open
+        if (this.isOpen) {
+            const timeSinceLastFailure = Date.now() - (this.lastFailureTime?.getTime() || 0);
+            if (timeSinceLastFailure < this.timeoutMs) {
+                throw new Error('Circuit breaker is open. Too many consecutive failures.');
+            } else {
+                // Try to close the circuit
+                this.isOpen = false;
+                this.failureCount = 0;
+            }
+        }
+
+        try {
+            await this.producer.send{{ messagename }}(data);
+            this.failureCount = 0; // Reset on success
+        } catch (error) {
+            this.failureCount++;
+            this.lastFailureTime = new Date();
+            
+            if (this.failureCount >= this.threshold) {
+                this.isOpen = true;
+            }
+            throw error;
+        }
+    }
+}
+```
+
+### Promise Error Handling Best Practices
+
+```typescript
+// Always handle rejections
+producer.send{{ messagename }}(data)
+    .then(() => console.log('Sent successfully'))
+    .catch(error => console.error('Send failed:', error));
+
+// Or use async/await with try-catch
+async function safeSend() {
+    try {
+        await producer.send{{ messagename }}(data);
+    } catch (error) {
+        if (error instanceof Error) {
+            console.error('Send error:', error.message);
+        }
+    }
+}
+```
+
 ## Best Practices
 
 1. **Reuse producer instances** - create once, use multiple times
-2. **Always close connections** when shutting down
-3. **Handle send errors** with appropriate retry logic
+2. **Always close connections** when shutting down with `await producer.close()`
+3. **Handle send errors** with appropriate retry logic and exponential backoff
 4. **Use connection pooling** for high-throughput scenarios
 5. **Enable TLS** for production environments
+6. **Add observability** with distributed tracing and correlation IDs
+7. **Implement circuit breakers** to prevent cascading failures
+8. **Use TypeScript strict mode** for type safety
 {% endfor %}
