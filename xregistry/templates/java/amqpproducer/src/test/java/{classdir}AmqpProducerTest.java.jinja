@@ -114,6 +114,10 @@ public class {{ class_name | strip_namespace }} {
                         messagesReceived.add(message);
                         receiveLatch.countDown();
                         delivery.accept();
+                        // Stop immediately after receiving 5 messages
+                        if (messagesReceived.size() >= 5) {
+                            break;
+                        }
                     }
                     attempts++;
                 }
