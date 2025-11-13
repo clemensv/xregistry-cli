@@ -152,6 +152,1160 @@ try {
 - [Azure Service Bus Documentation](https://learn.microsoft.com/azure/service-bus-messaging/)
 - [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
 
+## Production-Ready Patterns
+
+This section provides production-grade patterns for building reliable Service Bus producers in Java.
+
+### 1. Connection Pooling and Lifecycle Management
+
+Efficiently manage Service Bus connections with singleton pattern and proper resource lifecycle.
+
+```java
+import com.azure.messaging.servicebus.*;
+import com.azure.identity.DefaultAzureCredential;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class ServiceBusSenderPool {
+    private static final ConcurrentHashMap<String, ServiceBusSenderClient> senders = 
+        new ConcurrentHashMap<>();
+    
+    /**
+     * Get or create sender (singleton per queue/topic).
+     */
+    public static ServiceBusSenderClient getSender(
+        String fullyQualifiedNamespace,
+        String queueOrTopicName
+    ) {
+        String key = fullyQualifiedNamespace + "/" + queueOrTopicName;
+        
+        return senders.computeIfAbsent(key, k -> 
+            new ServiceBusClientBuilder()
+                .fullyQualifiedNamespace(fullyQualifiedNamespace)
+                .credential(new DefaultAzureCredential())
+                .sender()
+                .queueName(queueOrTopicName)
+                .buildClient()
+        );
+    }
+    
+    /**
+     * Close specific sender.
+     */
+    public static void closeSender(String fullyQualifiedNamespace, String queueOrTopicName) {
+        String key = fullyQualifiedNamespace + "/" + queueOrTopicName;
+        ServiceBusSenderClient sender = senders.remove(key);
+        
+        if (sender != null) {
+            sender.close();
+            System.out.println("Closed sender: " + key);
+        }
+    }
+    
+    /**
+     * Close all senders.
+     */
+    public static void closeAll() {
+        senders.forEach((key, sender) -> {
+            try {
+                sender.close();
+                System.out.println("Closed sender: " + key);
+            } catch (Exception e) {
+                System.err.println("Error closing sender " + key + ": " + e.getMessage());
+            }
+        });
+        senders.clear();
+    }
+    
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(ServiceBusSenderPool::closeAll));
+    }
+}
+```
+
+### 2. Batch Sending with Automatic Splitting
+
+Optimize throughput with intelligent batch management and size-aware splitting.
+
+```java
+import java.util.List;
+import java.util.concurrent.*;
+
+public class BatchServiceBusProducer {
+    private final ServiceBusSenderClient sender;
+    private final int maxBatchSize;
+    
+    public BatchServiceBusProducer(
+        String connectionString,
+        String queueName,
+        int maxBatchSize
+    ) {
+        this.sender = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .sender()
+            .queueName(queueName)
+            .buildClient();
+        
+        this.maxBatchSize = maxBatchSize;
+    }
+    
+    /**
+     * Send messages with automatic batch splitting.
+     */
+    public CompletableFuture<Integer> sendBatchAsync(List<ServiceBusMessage> messages) {
+        return CompletableFuture.supplyAsync(() -> {
+            int totalSent = 0;
+            ServiceBusMessageBatch currentBatch = null;
+            
+            try {
+                currentBatch = sender.createMessageBatch();
+                
+                for (ServiceBusMessage message : messages) {
+                    // Try to add to current batch
+                    if (!currentBatch.tryAddMessage(message)) {
+                        // Batch full, send it
+                        if (currentBatch.getCount() > 0) {
+                            sender.sendMessages(currentBatch);
+                            totalSent += currentBatch.getCount();
+                            System.out.println("Sent batch of " + currentBatch.getCount() + " messages");
+                        }
+                        
+                        // Create new batch and add message
+                        currentBatch = sender.createMessageBatch();
+                        
+                        if (!currentBatch.tryAddMessage(message)) {
+                            System.err.println("Message too large for batch, sending individually");
+                            sender.sendMessage(message);
+                            totalSent++;
+                        }
+                    }
+                }
+                
+                // Send remaining messages
+                if (currentBatch != null && currentBatch.getCount() > 0) {
+                    sender.sendMessages(currentBatch);
+                    totalSent += currentBatch.getCount();
+                    System.out.println("Sent final batch of " + currentBatch.getCount() + " messages");
+                }
+                
+                return totalSent;
+                
+            } catch (Exception e) {
+                System.err.println("Batch send failed: " + e.getMessage());
+                throw new CompletionException(e);
+            }
+        });
+    }
+    
+    /**
+     * Send messages with session grouping.
+     */
+    public CompletableFuture<Integer> sendSessionBatchAsync(
+        Map<String, List<ServiceBusMessage>> sessionMessages
+    ) {
+        return CompletableFuture.supplyAsync(() -> {
+            int totalSent = 0;
+            
+            for (Map.Entry<String, List<ServiceBusMessage>> entry : sessionMessages.entrySet()) {
+                String sessionId = entry.getKey();
+                List<ServiceBusMessage> messages = entry.getValue();
+                
+                // Set session ID on all messages
+                messages.forEach(msg -> msg.setSessionId(sessionId));
+                
+                try {
+                    int sent = sendBatchAsync(messages).join();
+                    totalSent += sent;
+                    System.out.println("Session " + sessionId + ": sent " + sent + " messages");
+                    
+                } catch (Exception e) {
+                    System.err.println("Session " + sessionId + " failed: " + e.getMessage());
+                }
+            }
+            
+            return totalSent;
+        });
+    }
+    
+    public void close() {
+        sender.close();
+    }
+}
+```
+
+### 3. Retry Logic with Exponential Backoff
+
+Handle transient failures with intelligent retry policies.
+
+```java
+import io.github.resilience4j.retry.*;
+import com.azure.core.exception.AzureException;
+
+public class RetryableServiceBusProducer {
+    private final ServiceBusSenderClient sender;
+    private final Retry retry;
+    
+    public RetryableServiceBusProducer(
+        String connectionString,
+        String queueName
+    ) {
+        this.sender = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .sender()
+            .queueName(queueName)
+            .buildClient();
+        
+        RetryConfig config = RetryConfig.custom()
+            .maxAttempts(5)
+            .waitDuration(Duration.ofMillis(500))
+            .exponentialBackoffMultiplier(2.0)
+            .retryExceptions(
+                AzureException.class,
+                java.net.SocketException.class,
+                java.util.concurrent.TimeoutException.class
+            )
+            .ignoreExceptions(
+                IllegalArgumentException.class,
+                com.azure.core.exception.ResourceNotFoundException.class
+            )
+            .build();
+        
+        this.retry = Retry.of("servicebus-producer", config);
+        
+        // Event logging
+        retry.getEventPublisher()
+            .onRetry(event -> 
+                System.err.println("Retry attempt " + event.getNumberOfRetryAttempts() +
+                    " for message send")
+            )
+            .onError(event ->
+                System.err.println("All retries exhausted: " + event.getLastThrowable().getMessage())
+            );
+    }
+    
+    /**
+     * Send message with automatic retry.
+     */
+    public void sendWithRetry(ServiceBusMessage message) {
+        retry.executeRunnable(() -> {
+            sender.sendMessage(message);
+        });
+    }
+    
+    /**
+     * Send message async with retry.
+     */
+    public CompletableFuture<Void> sendWithRetryAsync(ServiceBusMessage message) {
+        return CompletableFuture.runAsync(() -> {
+            sendWithRetry(message);
+        });
+    }
+    
+    /**
+     * Send batch with retry for entire batch.
+     */
+    public void sendBatchWithRetry(List<ServiceBusMessage> messages) {
+        retry.executeRunnable(() -> {
+            ServiceBusMessageBatch batch = sender.createMessageBatch();
+            
+            for (ServiceBusMessage message : messages) {
+                if (!batch.tryAddMessage(message)) {
+                    // Send current batch
+                    sender.sendMessages(batch);
+                    
+                    // Create new batch
+                    batch = sender.createMessageBatch();
+                    batch.tryAddMessage(message);
+                }
+            }
+            
+            if (batch.getCount() > 0) {
+                sender.sendMessages(batch);
+            }
+        });
+    }
+    
+    public void close() {
+        sender.close();
+    }
+}
+```
+
+### 4. Circuit Breaker with Fallback Queue
+
+Protect Service Bus from being overwhelmed with circuit breaker pattern.
+
+```java
+import io.github.resilience4j.circuitbreaker.*;
+
+public class CircuitBreakerServiceBusProducer {
+    private final ServiceBusSenderClient primarySender;
+    private final ServiceBusSenderClient fallbackSender;
+    private final CircuitBreaker circuitBreaker;
+    
+    public CircuitBreakerServiceBusProducer(
+        String primaryConnectionString,
+        String primaryQueue,
+        String fallbackConnectionString,
+        String fallbackQueue
+    ) {
+        this.primarySender = new ServiceBusClientBuilder()
+            .connectionString(primaryConnectionString)
+            .sender()
+            .queueName(primaryQueue)
+            .buildClient();
+        
+        this.fallbackSender = new ServiceBusClientBuilder()
+            .connectionString(fallbackConnectionString)
+            .sender()
+            .queueName(fallbackQueue)
+            .buildClient();
+        
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+            .failureRateThreshold(50.0f)
+            .waitDurationInOpenState(Duration.ofSeconds(60))
+            .slidingWindowSize(20)
+            .minimumNumberOfCalls(10)
+            .permittedNumberOfCallsInHalfOpenState(5)
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+        
+        this.circuitBreaker = CircuitBreaker.of("servicebus-producer", config);
+        
+        // Event logging
+        circuitBreaker.getEventPublisher()
+            .onStateTransition(event -> 
+                System.err.println("Circuit breaker: " + event.getStateTransition())
+            )
+            .onCallNotPermitted(event ->
+                System.err.println("Circuit OPEN, using fallback queue")
+            );
+    }
+    
+    /**
+     * Send message with circuit breaker protection.
+     */
+    public void send(ServiceBusMessage message) {
+        try {
+            circuitBreaker.executeRunnable(() -> {
+                primarySender.sendMessage(message);
+            });
+            
+        } catch (CallNotPermittedException e) {
+            // Circuit open, use fallback
+            System.err.println("Using fallback queue");
+            
+            ServiceBusMessage fallbackMessage = new ServiceBusMessage(message.getBody())
+                .setMessageId(message.getMessageId())
+                .setCorrelationId(message.getCorrelationId())
+                .setSessionId(message.getSessionId());
+            
+            fallbackMessage.getApplicationProperties().put("fallback", "true");
+            fallbackMessage.getApplicationProperties().put("original-queue", "primary");
+            
+            fallbackSender.sendMessage(fallbackMessage);
+        }
+    }
+    
+    /**
+     * Send with circuit breaker and return status.
+     */
+    public CompletableFuture<String> sendAsync(ServiceBusMessage message) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                circuitBreaker.executeRunnable(() -> {
+                    primarySender.sendMessage(message);
+                });
+                return "primary";
+                
+            } catch (CallNotPermittedException e) {
+                ServiceBusMessage fallbackMessage = new ServiceBusMessage(message.getBody())
+                    .setMessageId(message.getMessageId());
+                
+                fallbackMessage.getApplicationProperties().put("fallback", "true");
+                fallbackSender.sendMessage(fallbackMessage);
+                
+                return "fallback";
+            }
+        });
+    }
+    
+    /**
+     * Get circuit breaker state.
+     */
+    public CircuitBreaker.State getState() {
+        return circuitBreaker.getState();
+    }
+    
+    public void close() {
+        primarySender.close();
+        fallbackSender.close();
+    }
+}
+```
+
+### 5. Rate Limiting
+
+Control message send rate to prevent quota exhaustion.
+
+```java
+import com.google.common.util.concurrent.RateLimiter;
+
+public class RateLimitedServiceBusProducer {
+    private final ServiceBusSenderClient sender;
+    private final RateLimiter rateLimiter;
+    
+    public RateLimitedServiceBusProducer(
+        String connectionString,
+        String queueName,
+        double messagesPerSecond
+    ) {
+        this.sender = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .sender()
+            .queueName(queueName)
+            .buildClient();
+        
+        // Create rate limiter with warmup period
+        this.rateLimiter = RateLimiter.create(messagesPerSecond, 
+            Duration.ofSeconds(10));  // 10s warmup
+    }
+    
+    /**
+     * Send message with rate limiting (blocking).
+     */
+    public void send(ServiceBusMessage message) {
+        rateLimiter.acquire();  // Block until permit available
+        sender.sendMessage(message);
+    }
+    
+    /**
+     * Try to send message with timeout.
+     */
+    public boolean trySend(ServiceBusMessage message, Duration timeout) {
+        if (rateLimiter.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            sender.sendMessage(message);
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Send batch with rate limiting.
+     */
+    public CompletableFuture<Integer> sendBatchAsync(List<ServiceBusMessage> messages) {
+        return CompletableFuture.supplyAsync(() -> {
+            int sent = 0;
+            
+            for (ServiceBusMessage message : messages) {
+                rateLimiter.acquire();
+                sender.sendMessage(message);
+                sent++;
+            }
+            
+            return sent;
+        });
+    }
+    
+    /**
+     * Send with batch permits (acquire permits for entire batch).
+     */
+    public void sendBatchWithBatchPermits(List<ServiceBusMessage> messages) {
+        rateLimiter.acquire(messages.size());  // Acquire all permits at once
+        
+        ServiceBusMessageBatch batch = sender.createMessageBatch();
+        
+        for (ServiceBusMessage message : messages) {
+            if (!batch.tryAddMessage(message)) {
+                sender.sendMessages(batch);
+                batch = sender.createMessageBatch();
+                batch.tryAddMessage(message);
+            }
+        }
+        
+        if (batch.getCount() > 0) {
+            sender.sendMessages(batch);
+        }
+    }
+    
+    public void close() {
+        sender.close();
+    }
+}
+```
+
+### 6. Transactional Producer
+
+Ensure exactly-once delivery with Service Bus transactions.
+
+```java
+import com.azure.messaging.servicebus.ServiceBusTransactionContext;
+
+public class TransactionalServiceBusProducer {
+    private final ServiceBusSenderClient sender;
+    
+    public TransactionalServiceBusProducer(
+        String connectionString,
+        String queueName
+    ) {
+        this.sender = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .sender()
+            .queueName(queueName)
+            .buildClient();
+    }
+    
+    /**
+     * Send messages in a transaction (all-or-nothing).
+     */
+    public void sendTransactional(List<ServiceBusMessage> messages) {
+        ServiceBusTransactionContext transaction = sender.createTransaction();
+        
+        try {
+            // Send all messages in transaction
+            for (ServiceBusMessage message : messages) {
+                sender.sendMessage(message, transaction);
+            }
+            
+            // Commit transaction
+            sender.commitTransaction(transaction);
+            System.out.println("Transaction committed: " + messages.size() + " messages sent");
+            
+        } catch (Exception e) {
+            // Rollback on error
+            System.err.println("Transaction failed, rolling back: " + e.getMessage());
+            sender.rollbackTransaction(transaction);
+            throw e;
+        }
+    }
+    
+    /**
+     * Send messages to multiple queues in a single transaction.
+     */
+    public void sendCrossEntityTransactional(
+        ServiceBusSenderClient queue1Sender,
+        List<ServiceBusMessage> queue1Messages,
+        ServiceBusSenderClient queue2Sender,
+        List<ServiceBusMessage> queue2Messages
+    ) {
+        ServiceBusTransactionContext transaction = sender.createTransaction();
+        
+        try {
+            // Send to queue 1
+            for (ServiceBusMessage message : queue1Messages) {
+                queue1Sender.sendMessage(message, transaction);
+            }
+            
+            // Send to queue 2
+            for (ServiceBusMessage message : queue2Messages) {
+                queue2Sender.sendMessage(message, transaction);
+            }
+            
+            // Commit both sends atomically
+            sender.commitTransaction(transaction);
+            System.out.println("Cross-entity transaction committed");
+            
+        } catch (Exception e) {
+            System.err.println("Cross-entity transaction failed: " + e.getMessage());
+            sender.rollbackTransaction(transaction);
+            throw e;
+        }
+    }
+    
+    /**
+     * Send with custom rollback logic.
+     */
+    public boolean trySendTransactional(
+        List<ServiceBusMessage> messages,
+        java.util.function.Predicate<Integer> commitCondition
+    ) {
+        ServiceBusTransactionContext transaction = sender.createTransaction();
+        
+        try {
+            int sent = 0;
+            
+            for (ServiceBusMessage message : messages) {
+                sender.sendMessage(message, transaction);
+                sent++;
+            }
+            
+            // Check commit condition
+            if (commitCondition.test(sent)) {
+                sender.commitTransaction(transaction);
+                System.out.println("Conditional transaction committed");
+                return true;
+            } else {
+                sender.rollbackTransaction(transaction);
+                System.out.println("Condition not met, transaction rolled back");
+                return false;
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Transaction error: " + e.getMessage());
+            sender.rollbackTransaction(transaction);
+            return false;
+        }
+    }
+    
+    public void close() {
+        sender.close();
+    }
+}
+```
+
+### 7. Scheduled Message Producer
+
+Send messages for future delivery with scheduling support.
+
+```java
+import java.time.OffsetDateTime;
+import java.util.concurrent.*;
+
+public class ScheduledServiceBusProducer {
+    private final ServiceBusSenderClient sender;
+    private final ConcurrentHashMap<Long, OffsetDateTime> scheduledMessages = 
+        new ConcurrentHashMap<>();
+    
+    public ScheduledServiceBusProducer(
+        String connectionString,
+        String queueName
+    ) {
+        this.sender = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .sender()
+            .queueName(queueName)
+            .buildClient();
+    }
+    
+    /**
+     * Schedule message for future delivery.
+     */
+    public long scheduleMessage(ServiceBusMessage message, OffsetDateTime scheduledTime) {
+        long sequenceNumber = sender.scheduleMessage(message, scheduledTime);
+        
+        scheduledMessages.put(sequenceNumber, scheduledTime);
+        System.out.println("Scheduled message " + sequenceNumber + " for " + scheduledTime);
+        
+        return sequenceNumber;
+    }
+    
+    /**
+     * Schedule message with delay.
+     */
+    public long scheduleMessageWithDelay(ServiceBusMessage message, Duration delay) {
+        OffsetDateTime scheduledTime = OffsetDateTime.now().plus(delay);
+        return scheduleMessage(message, scheduledTime);
+    }
+    
+    /**
+     * Cancel scheduled message.
+     */
+    public void cancelScheduledMessage(long sequenceNumber) {
+        sender.cancelScheduledMessage(sequenceNumber);
+        scheduledMessages.remove(sequenceNumber);
+        System.out.println("Cancelled scheduled message: " + sequenceNumber);
+    }
+    
+    /**
+     * Schedule batch of messages.
+     */
+    public CompletableFuture<List<Long>> scheduleMessagesAsync(
+        List<ServiceBusMessage> messages,
+        OffsetDateTime scheduledTime
+    ) {
+        return CompletableFuture.supplyAsync(() -> {
+            List<Long> sequenceNumbers = new ArrayList<>();
+            
+            for (ServiceBusMessage message : messages) {
+                long seqNum = scheduleMessage(message, scheduledTime);
+                sequenceNumbers.add(seqNum);
+            }
+            
+            return sequenceNumbers;
+        });
+    }
+    
+    /**
+     * Schedule messages at different times.
+     */
+    public Map<Long, OffsetDateTime> scheduleStaggered(
+        List<ServiceBusMessage> messages,
+        Duration interval
+    ) {
+        Map<Long, OffsetDateTime> scheduled = new HashMap<>();
+        OffsetDateTime currentTime = OffsetDateTime.now();
+        
+        for (int i = 0; i < messages.size(); i++) {
+            OffsetDateTime scheduleTime = currentTime.plus(interval.multipliedBy(i));
+            long seqNum = scheduleMessage(messages.get(i), scheduleTime);
+            scheduled.put(seqNum, scheduleTime);
+        }
+        
+        return scheduled;
+    }
+    
+    /**
+     * Get all scheduled messages.
+     */
+    public Map<Long, OffsetDateTime> getScheduledMessages() {
+        return new HashMap<>(scheduledMessages);
+    }
+    
+    public void close() {
+        sender.close();
+    }
+}
+```
+
+### 8. OpenTelemetry Observability
+
+Instrument Service Bus producer with distributed tracing and metrics.
+
+```java
+import io.opentelemetry.api.*;
+import io.opentelemetry.api.trace.*;
+import io.opentelemetry.api.metrics.*;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapSetter;
+
+public class ObservableServiceBusProducer {
+    private final ServiceBusSenderClient sender;
+    private final Tracer tracer;
+    private final LongCounter messagesSent;
+    private final LongHistogram sendDuration;
+    private final OpenTelemetry openTelemetry;
+    
+    public ObservableServiceBusProducer(
+        String connectionString,
+        String queueName,
+        OpenTelemetry openTelemetry
+    ) {
+        this.openTelemetry = openTelemetry;
+        this.sender = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .sender()
+            .queueName(queueName)
+            .buildClient();
+        
+        this.tracer = openTelemetry.getTracer("servicebus-producer");
+        
+        Meter meter = openTelemetry.getMeter("servicebus-producer");
+        this.messagesSent = meter
+            .counterBuilder("servicebus.messages.sent")
+            .setDescription("Total messages sent")
+            .build();
+        
+        this.sendDuration = meter
+            .histogramBuilder("servicebus.send.duration")
+            .setDescription("Message send duration")
+            .setUnit("ms")
+            .ofLongs()
+            .build();
+    }
+    
+    /**
+     * Send message with distributed tracing.
+     */
+    public void send(ServiceBusMessage message) {
+        Span span = tracer.spanBuilder("servicebus.send")
+            .setSpanKind(SpanKind.PRODUCER)
+            .setAttribute("messaging.system", "servicebus")
+            .setAttribute("messaging.destination", sender.getEntityPath())
+            .setAttribute("messaging.message_id", message.getMessageId())
+            .startSpan();
+        
+        long startTime = System.currentTimeMillis();
+        
+        try (Scope scope = span.makeCurrent()) {
+            // Inject trace context into message properties
+            openTelemetry.getPropagators()
+                .getTextMapPropagator()
+                .inject(Context.current(), message.getApplicationProperties(),
+                    new ServiceBusPropertiesSetter());
+            
+            sender.sendMessage(message);
+            
+            long duration = System.currentTimeMillis() - startTime;
+            
+            span.setStatus(StatusCode.OK);
+            span.setAttribute("messaging.operation", "send");
+            
+            messagesSent.add(1,
+                Attributes.of(
+                    AttributeKey.stringKey("queue"), sender.getEntityPath(),
+                    AttributeKey.stringKey("status"), "success"
+                ));
+            
+            sendDuration.record(duration,
+                Attributes.of(
+                    AttributeKey.stringKey("queue"), sender.getEntityPath()
+                ));
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            
+            messagesSent.add(1,
+                Attributes.of(
+                    AttributeKey.stringKey("queue"), sender.getEntityPath(),
+                    AttributeKey.stringKey("status"), "error"
+                ));
+            
+            throw e;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    /**
+     * Send batch with tracing.
+     */
+    public CompletableFuture<Void> sendBatchAsync(List<ServiceBusMessage> messages) {
+        Span span = tracer.spanBuilder("servicebus.send_batch")
+            .setSpanKind(SpanKind.PRODUCER)
+            .setAttribute("messaging.system", "servicebus")
+            .setAttribute("messaging.destination", sender.getEntityPath())
+            .setAttribute("messaging.batch.message_count", messages.size())
+            .startSpan();
+        
+        return CompletableFuture.runAsync(() -> {
+            try (Scope scope = span.makeCurrent()) {
+                ServiceBusMessageBatch batch = sender.createMessageBatch();
+                
+                for (ServiceBusMessage message : messages) {
+                    // Inject trace context
+                    openTelemetry.getPropagators()
+                        .getTextMapPropagator()
+                        .inject(Context.current(), message.getApplicationProperties(),
+                            new ServiceBusPropertiesSetter());
+                    
+                    if (!batch.tryAddMessage(message)) {
+                        sender.sendMessages(batch);
+                        batch = sender.createMessageBatch();
+                        batch.tryAddMessage(message);
+                    }
+                }
+                
+                if (batch.getCount() > 0) {
+                    sender.sendMessages(batch);
+                }
+                
+                span.setStatus(StatusCode.OK);
+                
+                messagesSent.add(messages.size(),
+                    Attributes.of(
+                        AttributeKey.stringKey("queue"), sender.getEntityPath(),
+                        AttributeKey.stringKey("type"), "batch"
+                    ));
+                
+            } catch (Exception e) {
+                span.recordException(e);
+                span.setStatus(StatusCode.ERROR, e.getMessage());
+                throw e;
+                
+            } finally {
+                span.end();
+            }
+        });
+    }
+    
+    // TextMapSetter for injecting trace context into Service Bus properties
+    private static class ServiceBusPropertiesSetter 
+        implements TextMapSetter<Map<String, Object>> {
+        
+        @Override
+        public void set(Map<String, Object> carrier, String key, String value) {
+            if (carrier != null && key != null && value != null) {
+                carrier.put(key, value);
+            }
+        }
+    }
+    
+    public void close() {
+        sender.close();
+    }
+}
+```
+
+### 9. Graceful Shutdown
+
+Ensure all pending messages are sent before shutdown.
+
+```java
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class GracefulServiceBusProducer {
+    private final ServiceBusSenderClient sender;
+    private final AtomicInteger pendingMessages = new AtomicInteger(0);
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private volatile boolean shuttingDown = false;
+    
+    public GracefulServiceBusProducer(
+        String connectionString,
+        String queueName
+    ) {
+        this.sender = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .sender()
+            .queueName(queueName)
+            .buildClient();
+        
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+    }
+    
+    /**
+     * Send message with pending tracking.
+     */
+    public CompletableFuture<Void> sendAsync(ServiceBusMessage message) {
+        if (shuttingDown) {
+            return CompletableFuture.failedFuture(
+                new IllegalStateException("Producer is shutting down")
+            );
+        }
+        
+        pendingMessages.incrementAndGet();
+        
+        return CompletableFuture.runAsync(() -> {
+            try {
+                sender.sendMessage(message);
+                System.out.println("Sent message: " + message.getMessageId());
+                
+            } catch (Exception e) {
+                System.err.println("Send failed: " + e.getMessage());
+                throw e;
+                
+            } finally {
+                pendingMessages.decrementAndGet();
+            }
+        });
+    }
+    
+    /**
+     * Send batch with tracking.
+     */
+    public CompletableFuture<Void> sendBatchAsync(List<ServiceBusMessage> messages) {
+        if (shuttingDown) {
+            return CompletableFuture.failedFuture(
+                new IllegalStateException("Producer is shutting down")
+            );
+        }
+        
+        pendingMessages.addAndGet(messages.size());
+        
+        return CompletableFuture.runAsync(() -> {
+            try {
+                ServiceBusMessageBatch batch = sender.createMessageBatch();
+                
+                for (ServiceBusMessage message : messages) {
+                    if (!batch.tryAddMessage(message)) {
+                        sender.sendMessages(batch);
+                        batch = sender.createMessageBatch();
+                        batch.tryAddMessage(message);
+                    }
+                }
+                
+                if (batch.getCount() > 0) {
+                    sender.sendMessages(batch);
+                }
+                
+                System.out.println("Batch sent: " + messages.size() + " messages");
+                
+            } catch (Exception e) {
+                System.err.println("Batch send failed: " + e.getMessage());
+                throw e;
+                
+            } finally {
+                pendingMessages.addAndGet(-messages.size());
+            }
+        });
+    }
+    
+    /**
+     * Graceful shutdown: wait for pending messages, then close.
+     */
+    public void shutdown() {
+        if (shuttingDown) {
+            return;
+        }
+        
+        shuttingDown = true;
+        System.out.println("Initiating graceful shutdown...");
+        
+        try {
+            // Wait for pending messages (up to 30 seconds)
+            long timeout = 30000;
+            long start = System.currentTimeMillis();
+            
+            while (pendingMessages.get() > 0 && 
+                   System.currentTimeMillis() - start < timeout) {
+                System.out.println("Waiting for " + pendingMessages.get() + 
+                    " pending messages...");
+                TimeUnit.SECONDS.sleep(1);
+            }
+            
+            if (pendingMessages.get() > 0) {
+                System.err.println("Timeout: " + pendingMessages.get() + 
+                    " messages not sent");
+            } else {
+                System.out.println("All messages sent");
+            }
+            
+            // Close sender
+            sender.close();
+            System.out.println("Service Bus sender closed");
+            
+        } catch (Exception e) {
+            System.err.println("Error during shutdown: " + e.getMessage());
+        } finally {
+            shutdownLatch.countDown();
+        }
+    }
+    
+    /**
+     * Wait for shutdown to complete.
+     */
+    public void awaitShutdown() throws InterruptedException {
+        shutdownLatch.await();
+    }
+    
+    public int getPendingCount() {
+        return pendingMessages.get();
+    }
+}
+```
+
+### Configuration Best Practices
+
+```java
+public class ServiceBusProducerConfig {
+    public static ServiceBusSenderClient createProductionSender(
+        String fullyQualifiedNamespace,
+        String queueName
+    ) {
+        return new ServiceBusClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .credential(new DefaultAzureCredential())
+            .sender()
+            .queueName(queueName)
+            
+            // Retry configuration
+            .retryOptions(new AmqpRetryOptions()
+                .setMaxRetries(3)
+                .setDelay(Duration.ofSeconds(1))
+                .setMaxDelay(Duration.ofSeconds(30))
+                .setTryTimeout(Duration.ofSeconds(60)))
+            
+            .buildClient();
+    }
+    
+    /**
+     * Create sender for topic with subscription.
+     */
+    public static ServiceBusSenderClient createTopicSender(
+        String fullyQualifiedNamespace,
+        String topicName
+    ) {
+        return new ServiceBusClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .credential(new DefaultAzureCredential())
+            .sender()
+            .topicName(topicName)
+            .retryOptions(new AmqpRetryOptions()
+                .setMaxRetries(3)
+                .setDelay(Duration.ofSeconds(1)))
+            .buildClient();
+    }
+}
+```
+
+### Integration Example
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+
+public class ProductionServiceBusProducer {
+    public static void main(String[] args) throws Exception {
+        String fullyQualifiedNamespace = "mybus.servicebus.windows.net";
+        String queueName = "orders";
+        
+        // Connection pooling
+        ServiceBusSenderClient sender = ServiceBusSenderPool.getSender(
+            fullyQualifiedNamespace, queueName
+        );
+        
+        // Batch producer
+        BatchServiceBusProducer batchProducer = new BatchServiceBusProducer(
+            connectionString, queueName, 100
+        );
+        
+        // Retryable producer
+        RetryableServiceBusProducer retryProducer = new RetryableServiceBusProducer(
+            connectionString, queueName
+        );
+        
+        // Circuit breaker
+        CircuitBreakerServiceBusProducer cbProducer = 
+            new CircuitBreakerServiceBusProducer(
+                primaryConnectionString, queueName,
+                fallbackConnectionString, "orders-fallback"
+            );
+        
+        // Rate limited
+        RateLimitedServiceBusProducer rateLimitedProducer = 
+            new RateLimitedServiceBusProducer(
+                connectionString, queueName, 100.0  // 100 msg/sec
+            );
+        
+        // Transactional
+        TransactionalServiceBusProducer txProducer = 
+            new TransactionalServiceBusProducer(connectionString, queueName);
+        
+        // Scheduled messages
+        ScheduledServiceBusProducer scheduledProducer = 
+            new ScheduledServiceBusProducer(connectionString, queueName);
+        
+        // OpenTelemetry
+        OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .setMeterProvider(meterProvider)
+            .buildAndRegisterGlobal();
+        
+        ObservableServiceBusProducer observableProducer = 
+            new ObservableServiceBusProducer(connectionString, queueName, openTelemetry);
+        
+        // Graceful shutdown
+        GracefulServiceBusProducer gracefulProducer = 
+            new GracefulServiceBusProducer(connectionString, queueName);
+        
+        // Send messages
+        ServiceBusMessage message = new ServiceBusMessage("Order data");
+        
+        retryProducer.sendWithRetry(message);
+        cbProducer.send(message);
+        rateLimitedProducer.send(message);
+        observableProducer.send(message);
+        gracefulProducer.sendAsync(message).join();
+        
+        // Schedule message
+        scheduledProducer.scheduleMessageWithDelay(message, Duration.ofHours(1));
+        
+        // Transaction
+        List<ServiceBusMessage> messages = Arrays.asList(message);
+        txProducer.sendTransactional(messages);
+        
+        // Batch
+        batchProducer.sendBatchAsync(messages).join();
+        
+        // Graceful shutdown
+        gracefulProducer.shutdown();
+        gracefulProducer.awaitShutdown();
+        
+        ServiceBusSenderPool.closeAll();
+    }
+}
+```
+
 ## Generated Code
 
 Auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).

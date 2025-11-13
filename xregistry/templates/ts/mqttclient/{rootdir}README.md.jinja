@@ -214,4 +214,831 @@ client.on('reconnect', () => {
 4. **Use appropriate QoS levels** - higher levels consume more bandwidth
 5. **Use TLS/SSL** for production deployments
 6. **Implement Last Will** for client availability monitoring
+
+## Production-Ready Patterns
+
+This section provides enterprise-grade patterns for building reliable MQTT clients in TypeScript/Node.js.
+
+### 1. Managed MQTT Client with Auto-Reconnect
+
+Maintain reliable MQTT connections with exponential backoff and state management.
+
+```typescript
+import * as mqtt from 'mqtt';
+import { EventEmitter } from 'events';
+
+export class ManagedMqttClient extends EventEmitter {
+    private client: mqtt.MqttClient | null = null;
+    private isConnected: boolean = false;
+    private reconnectAttempts: number = 0;
+    private maxReconnectAttempts: number = 10;
+    private reconnectDelayMs: number = 1000;
+    
+    constructor(
+        private brokerUrl: string,
+        private options: mqtt.IClientOptions
+    ) {
+        super();
+    }
+    
+    async connect(): Promise<void> {
+        if (this.client && this.isConnected) {
+            console.warn('Already connected');
+            return;
+        }
+        
+        this.client = mqtt.connect(this.brokerUrl, {
+            ...this.options,
+            reconnectPeriod: 0, // We'll handle reconnection manually
+        });
+        
+        this.setupEventHandlers();
+        
+        return new Promise((resolve, reject) => {
+            this.client!.once('connect', () => {
+                this.isConnected = true;
+                this.reconnectAttempts = 0;
+                console.log('MQTT connected');
+                this.emit('connected');
+                resolve();
+            });
+            
+            this.client!.once('error', (error) => {
+                reject(error);
+            });
+        });
+    }
+    
+    private setupEventHandlers(): void {
+        if (!this.client) return;
+        
+        this.client.on('close', () => {
+            this.isConnected = false;
+            console.warn('MQTT connection closed');
+            this.emit('disconnected');
+            this.attemptReconnect();
+        });
+        
+        this.client.on('offline', () => {
+            console.warn('MQTT client offline');
+            this.emit('offline');
+        });
+        
+        this.client.on('error', (error) => {
+            console.error('MQTT error:', error);
+            this.emit('error', error);
+        });
+        
+        this.client.on('reconnect', () => {
+            console.log('MQTT reconnecting...');
+            this.emit('reconnecting');
+        });
+    }
+    
+    private async attemptReconnect(): Promise<void> {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.error('Max reconnection attempts reached');
+            this.emit('max_reconnect_attempts');
+            return;
+        }
+        
+        this.reconnectAttempts++;
+        const delay = Math.min(
+            this.reconnectDelayMs * Math.pow(2, this.reconnectAttempts - 1),
+            30000
+        );
+        
+        console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        try {
+            await this.connect();
+        } catch (error) {
+            console.error('Reconnection failed:', error);
+            this.attemptReconnect();
+        }
+    }
+    
+    async subscribe(topic: string, qos: mqtt.QoS = 1): Promise<void> {
+        if (!this.client || !this.isConnected) {
+            throw new Error('Not connected');
+        }
+        
+        return new Promise((resolve, reject) => {
+            this.client!.subscribe(topic, { qos }, (error) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    console.log(`Subscribed to ${topic}`);
+                    resolve();
+                }
+            });
+        });
+    }
+    
+    async publish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions = {}
+    ): Promise<void> {
+        if (!this.client || !this.isConnected) {
+            throw new Error('Not connected');
+        }
+        
+        return new Promise((resolve, reject) => {
+            this.client!.publish(topic, message, options, (error) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+    
+    onMessage(callback: (topic: string, payload: Buffer) => void): void {
+        if (!this.client) {
+            throw new Error('Client not initialized');
+        }
+        
+        this.client.on('message', callback);
+    }
+    
+    async disconnect(): Promise<void> {
+        if (!this.client) return;
+        
+        return new Promise((resolve) => {
+            this.client!.end(false, {}, () => {
+                this.isConnected = false;
+                console.log('MQTT disconnected');
+                resolve();
+            });
+        });
+    }
+    
+    getConnectionState(): { connected: boolean; reconnectAttempts: number } {
+        return {
+            connected: this.isConnected,
+            reconnectAttempts: this.reconnectAttempts
+        };
+    }
+}
+```
+
+### 2. Retry Logic with DLQ
+
+Handle failed message processing with retry and dead-letter queue.
+
+```typescript
+interface RetryConfig {
+    maxAttempts: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+}
+
+export class RetryableMqttPublisher {
+    private retryConfig: RetryConfig;
+    
+    constructor(
+        private client: mqtt.MqttClient,
+        private dlqTopic: string,
+        config?: Partial<RetryConfig>
+    ) {
+        this.retryConfig = {
+            maxAttempts: 5,
+            initialDelayMs: 500,
+            maxDelayMs: 30000,
+            backoffMultiplier: 2,
+            ...config
+        };
+    }
+    
+    async publishWithRetry(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions = { qos: 1 }
+    ): Promise<void> {
+        let attempt = 0;
+        
+        while (attempt < this.retryConfig.maxAttempts) {
+            try {
+                await this.publish(topic, message, options);
+                return; // Success
+                
+            } catch (error) {
+                attempt++;
+                
+                if (attempt < this.retryConfig.maxAttempts) {
+                    const delay = Math.min(
+                        this.retryConfig.initialDelayMs * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+                        this.retryConfig.maxDelayMs
+                    );
+                    
+                    console.warn(`Retry attempt ${attempt}/${this.retryConfig.maxAttempts} after ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('Max retries exceeded, sending to DLQ');
+                    await this.sendToDLQ(topic, message, error);
+                }
+            }
+        }
+    }
+    
+    private publish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions
+    ): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.client.publish(topic, message, options, (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    }
+    
+    private async sendToDLQ(topic: string, message: string | Buffer, error: any): Promise<void> {
+        const dlqMessage = JSON.stringify({
+            originalTopic: topic,
+            message: message.toString(),
+            errorMessage: error.message,
+            timestamp: new Date().toISOString(),
+            attempts: this.retryConfig.maxAttempts
+        });
+        
+        await this.publish(this.dlqTopic, dlqMessage, { qos: 1, retain: true });
+        console.log(`Message sent to DLQ: ${this.dlqTopic}`);
+    }
+}
+```
+
+### 3. Circuit Breaker Pattern
+
+Protect MQTT broker and downstream services from being overwhelmed.
+
+```typescript
+enum CircuitState {
+    CLOSED = 'CLOSED',
+    OPEN = 'OPEN',
+    HALF_OPEN = 'HALF_OPEN'
+}
+
+interface CircuitBreakerConfig {
+    failureThreshold: number;
+    successThreshold: number;
+    timeout: number;
+}
+
+export class CircuitBreakerMqttClient {
+    private state: CircuitState = CircuitState.CLOSED;
+    private failures: number = 0;
+    private successes: number = 0;
+    private lastFailureTime: number = 0;
+    private config: CircuitBreakerConfig;
+    
+    constructor(
+        private client: mqtt.MqttClient,
+        private fallbackBrokerUrl?: string,
+        config?: Partial<CircuitBreakerConfig>
+    ) {
+        this.config = {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 60000,
+            ...config
+        };
+    }
+    
+    async publish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions = {}
+    ): Promise<void> {
+        if (this.state === CircuitState.OPEN) {
+            const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+            
+            if (timeSinceLastFailure > this.config.timeout) {
+                console.log('Circuit breaker transitioning to HALF_OPEN');
+                this.state = CircuitState.HALF_OPEN;
+                this.successes = 0;
+            } else {
+                throw new Error('Circuit breaker is OPEN');
+            }
+        }
+        
+        try {
+            await this.executePublish(topic, message, options);
+            this.onSuccess();
+            
+        } catch (error) {
+            this.onFailure();
+            throw error;
+        }
+    }
+    
+    private executePublish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions
+    ): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.client.publish(topic, message, options, (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    }
+    
+    private onSuccess(): void {
+        this.failures = 0;
+        
+        if (this.state === CircuitState.HALF_OPEN) {
+            this.successes++;
+            
+            if (this.successes >= this.config.successThreshold) {
+                console.log('Circuit breaker transitioning to CLOSED');
+                this.state = CircuitState.CLOSED;
+                this.successes = 0;
+            }
+        }
+    }
+    
+    private onFailure(): void {
+        this.failures++;
+        this.lastFailureTime = Date.now();
+        
+        if (this.failures >= this.config.failureThreshold) {
+            console.error('Circuit breaker transitioning to OPEN');
+            this.state = CircuitState.OPEN;
+            this.failures = 0;
+        }
+    }
+    
+    getState(): CircuitState {
+        return this.state;
+    }
+}
+```
+
+### 4. Rate Limiting
+
+Control message publishing rate to prevent broker overload.
+
+```typescript
+export class RateLimitedMqttPublisher {
+    private tokensPerSecond: number;
+    private availableTokens: number;
+    private lastRefill: number = Date.now();
+    
+    constructor(
+        private client: mqtt.MqttClient,
+        messagesPerSecond: number
+    ) {
+        this.tokensPerSecond = messagesPerSecond;
+        this.availableTokens = messagesPerSecond;
+        
+        // Refill tokens periodically
+        setInterval(() => this.refillTokens(), 100);
+    }
+    
+    private refillTokens(): void {
+        const now = Date.now();
+        const elapsed = (now - this.lastRefill) / 1000;
+        const tokensToAdd = elapsed * this.tokensPerSecond;
+        
+        this.availableTokens = Math.min(
+            this.availableTokens + tokensToAdd,
+            this.tokensPerSecond
+        );
+        
+        this.lastRefill = now;
+    }
+    
+    private async acquireToken(): Promise<void> {
+        while (this.availableTokens < 1) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        this.availableTokens--;
+    }
+    
+    async publish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions = {}
+    ): Promise<void> {
+        await this.acquireToken();
+        
+        return new Promise((resolve, reject) => {
+            this.client.publish(topic, message, options, (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    }
+    
+    getAvailableTokens(): number {
+        return this.availableTokens;
+    }
+}
+```
+
+### 5. Message Buffering for Offline Support
+
+Buffer messages when offline and send when connection is restored.
+
+```typescript
+interface BufferedMessage {
+    topic: string;
+    message: string | Buffer;
+    options: mqtt.IClientPublishOptions;
+    timestamp: number;
+}
+
+export class BufferedMqttPublisher {
+    private buffer: BufferedMessage[] = [];
+    private maxBufferSize: number;
+    private isConnected: boolean = false;
+    
+    constructor(
+        private client: mqtt.MqttClient,
+        maxBufferSize: number = 1000
+    ) {
+        this.maxBufferSize = maxBufferSize;
+        this.setupEventHandlers();
+    }
+    
+    private setupEventHandlers(): void {
+        this.client.on('connect', () => {
+            this.isConnected = true;
+            console.log('Connected, flushing buffer...');
+            this.flushBuffer();
+        });
+        
+        this.client.on('offline', () => {
+            this.isConnected = false;
+            console.log('Offline, buffering messages');
+        });
+    }
+    
+    async publish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions = {}
+    ): Promise<void> {
+        if (this.isConnected) {
+            try {
+                await this.executePublish(topic, message, options);
+            } catch (error) {
+                console.warn('Publish failed, buffering message');
+                this.bufferMessage(topic, message, options);
+            }
+        } else {
+            this.bufferMessage(topic, message, options);
+        }
+    }
+    
+    private bufferMessage(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions
+    ): void {
+        if (this.buffer.length >= this.maxBufferSize) {
+            console.warn('Buffer full, dropping oldest message');
+            this.buffer.shift();
+        }
+        
+        this.buffer.push({
+            topic,
+            message,
+            options,
+            timestamp: Date.now()
+        });
+        
+        console.log(`Message buffered (${this.buffer.length}/${this.maxBufferSize})`);
+    }
+    
+    private async flushBuffer(): Promise<void> {
+        if (this.buffer.length === 0) {
+            return;
+        }
+        
+        console.log(`Flushing ${this.buffer.length} buffered messages...`);
+        
+        const messages = [...this.buffer];
+        this.buffer = [];
+        
+        for (const msg of messages) {
+            try {
+                await this.executePublish(msg.topic, msg.message, msg.options);
+            } catch (error) {
+                console.error('Failed to flush message:', error);
+                this.buffer.push(msg); // Re-buffer failed messages
+            }
+        }
+        
+        console.log('Buffer flush complete');
+    }
+    
+    private executePublish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions
+    ): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.client.publish(topic, message, options, (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    }
+    
+    getBufferSize(): number {
+        return this.buffer.length;
+    }
+}
+```
+
+### 6. OpenTelemetry Observability
+
+Instrument MQTT client with distributed tracing and metrics.
+
+```typescript
+import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { metrics } from '@opentelemetry/api-metrics';
+
+export class ObservableMqttClient {
+    private tracer = trace.getTracer('mqtt-client');
+    private meter = metrics.getMeter('mqtt-client');
+    private messagesPublished = this.meter.createCounter('mqtt.messages.published');
+    private messagesReceived = this.meter.createCounter('mqtt.messages.received');
+    private publishDuration = this.meter.createHistogram('mqtt.publish.duration');
+    
+    constructor(private client: mqtt.MqttClient) {
+        this.setupMessageTracing();
+    }
+    
+    private setupMessageTracing(): void {
+        this.client.on('message', (topic, payload) => {
+            const span = this.tracer.startSpan('mqtt.receive', {
+                kind: 1, // CONSUMER
+                attributes: {
+                    'messaging.system': 'mqtt',
+                    'messaging.destination': topic,
+                    'messaging.message_payload_size_bytes': payload.length
+                }
+            });
+            
+            try {
+                // Process message
+                span.setStatus({ code: SpanStatusCode.OK });
+                
+                this.messagesReceived.add(1, { topic });
+                
+            } catch (error: any) {
+                span.recordException(error);
+                span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+                
+            } finally {
+                span.end();
+            }
+        });
+    }
+    
+    async publish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions = {}
+    ): Promise<void> {
+        const span = this.tracer.startSpan('mqtt.publish', {
+            kind: 2, // PRODUCER
+            attributes: {
+                'messaging.system': 'mqtt',
+                'messaging.destination': topic,
+                'messaging.protocol': 'mqtt',
+                'messaging.message_payload_size_bytes': Buffer.byteLength(message)
+            }
+        });
+        
+        const startTime = Date.now();
+        
+        try {
+            await this.executePublish(topic, message, options);
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            const duration = Date.now() - startTime;
+            
+            this.messagesPublished.add(1, { topic, status: 'success' });
+            this.publishDuration.record(duration, { topic });
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            
+            this.messagesPublished.add(1, { topic, status: 'error' });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    private executePublish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions
+    ): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.client.publish(topic, message, options, (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    }
+}
+```
+
+### 7. Graceful Shutdown
+
+Ensure all messages are published before shutdown.
+
+```typescript
+export class GracefulMqttClient {
+    private pendingPublishes: number = 0;
+    private isShuttingDown: boolean = false;
+    
+    constructor(private client: mqtt.MqttClient) {
+        this.setupShutdownHandlers();
+    }
+    
+    private setupShutdownHandlers(): void {
+        process.on('SIGTERM', () => this.shutdown());
+        process.on('SIGINT', () => this.shutdown());
+    }
+    
+    async publish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions = {}
+    ): Promise<void> {
+        if (this.isShuttingDown) {
+            throw new Error('Client is shutting down');
+        }
+        
+        this.pendingPublishes++;
+        
+        try {
+            await this.executePublish(topic, message, options);
+        } finally {
+            this.pendingPublishes--;
+        }
+    }
+    
+    private executePublish(
+        topic: string,
+        message: string | Buffer,
+        options: mqtt.IClientPublishOptions
+    ): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.client.publish(topic, message, options, (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    }
+    
+    private async shutdown(): Promise<void> {
+        if (this.isShuttingDown) {
+            return;
+        }
+        
+        console.log('Initiating graceful shutdown...');
+        this.isShuttingDown = true;
+        
+        // Wait for pending publishes (up to 30 seconds)
+        const timeout = 30000;
+        const start = Date.now();
+        
+        while (this.pendingPublishes > 0 && Date.now() - start < timeout) {
+            console.log(`Waiting for ${this.pendingPublishes} pending messages...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (this.pendingPublishes > 0) {
+            console.warn(`Timeout: ${this.pendingPublishes} messages not sent`);
+        } else {
+            console.log('All messages published');
+        }
+        
+        await new Promise<void>((resolve) => {
+            this.client.end(false, {}, () => {
+                console.log('MQTT client disconnected');
+                resolve();
+            });
+        });
+        
+        process.exit(0);
+    }
+    
+    getPendingCount(): number {
+        return this.pendingPublishes;
+    }
+}
+```
+
+### Integration Example
+
+```typescript
+import * as mqtt from 'mqtt';
+import {
+    ManagedMqttClient,
+    RetryableMqttPublisher,
+    CircuitBreakerMqttClient,
+    RateLimitedMqttPublisher,
+    BufferedMqttPublisher,
+    ObservableMqttClient,
+    GracefulMqttClient
+} from './patterns';
+
+async function main() {
+    const brokerUrl = 'mqtt://localhost:1883';
+    
+    // 1. Managed client with auto-reconnect
+    const managedClient = new ManagedMqttClient(brokerUrl, {
+        clientId: 'my-client',
+        clean: true,
+        keepalive: 60
+    });
+    
+    managedClient.on('connected', () => console.log('Connected!'));
+    managedClient.on('error', (error) => console.error('Error:', error));
+    
+    await managedClient.connect();
+    await managedClient.subscribe('my/topic', 1);
+    
+    managedClient.onMessage((topic, payload) => {
+        console.log(`Received on ${topic}:`, payload.toString());
+    });
+    
+    // 2. Retry with DLQ
+    const client = mqtt.connect(brokerUrl);
+    const retryPublisher = new RetryableMqttPublisher(client, 'dlq/topic', {
+        maxAttempts: 5,
+        initialDelayMs: 500
+    });
+    
+    await retryPublisher.publishWithRetry('my/topic', 'Hello MQTT', { qos: 1 });
+    
+    // 3. Circuit breaker
+    const cbClient = new CircuitBreakerMqttClient(client, 'mqtt://fallback:1883', {
+        failureThreshold: 5,
+        timeout: 60000
+    });
+    
+    await cbClient.publish('my/topic', 'Hello', { qos: 1 });
+    
+    // 4. Rate limited
+    const rateLimitedPublisher = new RateLimitedMqttPublisher(client, 100);
+    await rateLimitedPublisher.publish('my/topic', 'Hello', { qos: 1 });
+    
+    // 5. Buffered (offline support)
+    const bufferedPublisher = new BufferedMqttPublisher(client, 1000);
+    await bufferedPublisher.publish('my/topic', 'Hello', { qos: 1 });
+    
+    // 6. Observable
+    const observableClient = new ObservableMqttClient(client);
+    await observableClient.publish('my/topic', 'Hello', { qos: 1 });
+    
+    // 7. Graceful shutdown
+    const gracefulClient = new GracefulMqttClient(client);
+    await gracefulClient.publish('my/topic', 'Hello', { qos: 1 });
+    
+    // Client will handle SIGTERM/SIGINT gracefully
+}
+
+main().catch(console.error);
+```
+
+### Dependencies
+
+Add these packages to your `package.json`:
+
+```json
+{
+  "dependencies": {
+    "mqtt": "^5.3.0",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/api-metrics": "^0.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+```
+
 {% endfor %}

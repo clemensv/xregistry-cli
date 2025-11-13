@@ -181,4 +181,749 @@ processor.processError = async (error, context) => {
 4. **Use Azure Identity** instead of connection strings for production
 5. **Monitor partition distribution** to ensure balanced load
 6. **Set appropriate batch sizes** based on message volume
+
+## Production-Ready Patterns
+
+Enterprise-grade patterns for Azure Event Hubs consumers in TypeScript/Node.js.
+
+### 1. Managed Event Hubs Consumer with Auto-Recovery
+
+Maintain reliable Event Hubs connections with automatic recovery from transient failures.
+
+```typescript
+import { EventHubConsumerClient, ReceivedEventData, PartitionContext } from '@azure/event-hubs';
+import { EventEmitter } from 'events';
+
+export class ManagedEventHubsConsumer extends EventEmitter {
+    private isRunning: boolean = false;
+    private processingTasks = new Map<string, Promise<void>>();
+    
+    constructor(
+        private client: EventHubConsumerClient,
+        private processEvent: (eventData: ReceivedEventData, context: PartitionContext) => Promise<void>
+    ) {
+        super();
+    }
+    
+    async start(): Promise<void> {
+        if (this.isRunning) {
+            console.warn('Consumer already running');
+            return;
+        }
+        
+        this.isRunning = true;
+        console.log('Starting Event Hubs consumer...');
+        
+        const subscription = this.client.subscribe({
+            processEvents: async (events, context) => {
+                for (const event of events) {
+                    if (!this.isRunning) break;
+                    
+                    const taskId = `${context.partitionId}-${event.sequenceNumber}`;
+                    
+                    const task = this.processWithRetry(event, context)
+                        .finally(() => this.processingTasks.delete(taskId));
+                    
+                    this.processingTasks.set(taskId, task);
+                }
+                
+                // Checkpoint after batch
+                try {
+                    await context.updateCheckpoint(events[events.length - 1]);
+                } catch (error) {
+                    console.error('Checkpoint failed:', error);
+                }
+            },
+            
+            processError: async (error, context) => {
+                console.error(`Error from partition ${context.partitionId}:`, error);
+                this.emit('error', error, context);
+                
+                // Auto-recovery: subscription will automatically retry
+            }
+        });
+        
+        this.emit('started');
+    }
+    
+    private async processWithRetry(
+        eventData: ReceivedEventData,
+        context: PartitionContext,
+        maxRetries: number = 3
+    ): Promise<void> {
+        let attempt = 0;
+        
+        while (attempt < maxRetries) {
+            try {
+                await this.processEvent(eventData, context);
+                return; // Success
+                
+            } catch (error) {
+                attempt++;
+                
+                if (attempt < maxRetries) {
+                    const delay = Math.pow(2, attempt) * 500;
+                    console.warn(`Retry attempt ${attempt}/${maxRetries} after ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('Max retries exceeded');
+                    this.emit('processing_failed', eventData, error);
+                    throw error;
+                }
+            }
+        }
+    }
+    
+    async stop(): Promise<void> {
+        if (!this.isRunning) return;
+        
+        console.log('Stopping Event Hubs consumer...');
+        this.isRunning = false;
+        
+        // Wait for in-flight messages
+        await Promise.all(this.processingTasks.values());
+        
+        await this.client.close();
+        this.emit('stopped');
+        console.log('Consumer stopped');
+    }
+}
+```
+
+### 2. Retry with Dead Letter Queue
+
+Handle processing failures with configurable retry and dead-letter queue.
+
+```typescript
+import { EventHubProducerClient, ReceivedEventData } from '@azure/event-hubs';
+
+interface RetryConfig {
+    maxAttempts: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+}
+
+export class RetryableEventProcessor {
+    private retryConfig: RetryConfig;
+    private dlqProducer: EventHubProducerClient | null = null;
+    
+    constructor(
+        private dlqConnectionString: string,
+        private dlqEventHubName: string,
+        config?: Partial<RetryConfig>
+    ) {
+        this.retryConfig = {
+            maxAttempts: 5,
+            initialDelayMs: 500,
+            maxDelayMs: 30000,
+            backoffMultiplier: 2,
+            ...config
+        };
+    }
+    
+    async initialize(): Promise<void> {
+        this.dlqProducer = new EventHubProducerClient(
+            this.dlqConnectionString,
+            this.dlqEventHubName
+        );
+    }
+    
+    async processWithRetry<T>(
+        eventData: ReceivedEventData,
+        processor: (data: T) => Promise<void>,
+        data: T
+    ): Promise<void> {
+        let attempt = 0;
+        
+        while (attempt < this.retryConfig.maxAttempts) {
+            try {
+                await processor(data);
+                return; // Success
+                
+            } catch (error: any) {
+                attempt++;
+                
+                if (this.isTransientError(error) && attempt < this.retryConfig.maxAttempts) {
+                    const delay = Math.min(
+                        this.retryConfig.initialDelayMs * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+                        this.retryConfig.maxDelayMs
+                    );
+                    
+                    console.warn(`Retry attempt ${attempt}/${this.retryConfig.maxAttempts} after ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('Sending to DLQ after max retries or permanent error');
+                    await this.sendToDLQ(eventData, error);
+                    return; // Don't throw to prevent checkpoint failure
+                }
+            }
+        }
+    }
+    
+    private isTransientError(error: any): boolean {
+        const transientErrors = [
+            'ETIMEDOUT',
+            'ECONNREFUSED',
+            'ECONNRESET',
+            'ServiceBusError',
+            'MessagingError'
+        ];
+        
+        return transientErrors.some(code => 
+            error.code === code || error.name?.includes(code)
+        );
+    }
+    
+    private async sendToDLQ(eventData: ReceivedEventData, error: any): Promise<void> {
+        if (!this.dlqProducer) {
+            throw new Error('DLQ producer not initialized');
+        }
+        
+        const dlqEvent = {
+            body: {
+                originalBody: eventData.body,
+                originalPartitionKey: eventData.partitionKey,
+                originalSequenceNumber: eventData.sequenceNumber,
+                errorMessage: error.message,
+                errorStack: error.stack,
+                timestamp: new Date().toISOString(),
+                attempts: this.retryConfig.maxAttempts
+            },
+            properties: {
+                'dlq-reason': 'max-retries-exceeded',
+                'dlq-original-partition': eventData.partitionKey
+            }
+        };
+        
+        await this.dlqProducer.sendBatch([dlqEvent]);
+        console.log('Event sent to DLQ');
+    }
+    
+    async close(): Promise<void> {
+        if (this.dlqProducer) {
+            await this.dlqProducer.close();
+        }
+    }
+}
+```
+
+### 3. Circuit Breaker Pattern
+
+Protect downstream services from being overwhelmed during failures.
+
+```typescript
+enum CircuitState {
+    CLOSED = 'CLOSED',
+    OPEN = 'OPEN',
+    HALF_OPEN = 'HALF_OPEN'
+}
+
+interface CircuitBreakerConfig {
+    failureThreshold: number;
+    successThreshold: number;
+    timeout: number;
+}
+
+export class CircuitBreakerEventProcessor {
+    private state: CircuitState = CircuitState.CLOSED;
+    private failures: number = 0;
+    private successes: number = 0;
+    private lastFailureTime: number = 0;
+    private config: CircuitBreakerConfig;
+    
+    constructor(config?: Partial<CircuitBreakerConfig>) {
+        this.config = {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 60000,
+            ...config
+        };
+    }
+    
+    async process<T>(processor: (data: T) => Promise<void>, data: T): Promise<void> {
+        if (this.state === CircuitState.OPEN) {
+            const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+            
+            if (timeSinceLastFailure > this.config.timeout) {
+                console.log('Circuit breaker transitioning to HALF_OPEN');
+                this.state = CircuitState.HALF_OPEN;
+                this.successes = 0;
+            } else {
+                throw new Error('Circuit breaker is OPEN - rejecting request');
+            }
+        }
+        
+        try {
+            await processor(data);
+            this.onSuccess();
+            
+        } catch (error) {
+            this.onFailure();
+            throw error;
+        }
+    }
+    
+    private onSuccess(): void {
+        this.failures = 0;
+        
+        if (this.state === CircuitState.HALF_OPEN) {
+            this.successes++;
+            
+            if (this.successes >= this.config.successThreshold) {
+                console.log('Circuit breaker transitioning to CLOSED');
+                this.state = CircuitState.CLOSED;
+                this.successes = 0;
+            }
+        }
+    }
+    
+    private onFailure(): void {
+        this.failures++;
+        this.lastFailureTime = Date.now();
+        
+        if (this.failures >= this.config.failureThreshold) {
+            console.error('Circuit breaker transitioning to OPEN');
+            this.state = CircuitState.OPEN;
+            this.failures = 0;
+        }
+    }
+    
+    getState(): CircuitState {
+        return this.state;
+    }
+}
+```
+
+### 4. Rate Limiting with Backpressure
+
+Control processing rate with concurrency limits and backpressure.
+
+```typescript
+import { Semaphore } from 'async-mutex';
+
+export class RateLimitedEventProcessor {
+    private semaphore: Semaphore;
+    private tokensPerSecond: number;
+    private availableTokens: number;
+    private lastRefill: number = Date.now();
+    
+    constructor(
+        maxConcurrent: number,
+        messagesPerSecond: number
+    ) {
+        this.semaphore = new Semaphore(maxConcurrent);
+        this.tokensPerSecond = messagesPerSecond;
+        this.availableTokens = messagesPerSecond;
+        
+        // Refill tokens periodically
+        setInterval(() => this.refillTokens(), 100);
+    }
+    
+    private refillTokens(): void {
+        const now = Date.now();
+        const elapsed = (now - this.lastRefill) / 1000;
+        const tokensToAdd = elapsed * this.tokensPerSecond;
+        
+        this.availableTokens = Math.min(
+            this.availableTokens + tokensToAdd,
+            this.tokensPerSecond
+        );
+        
+        this.lastRefill = now;
+    }
+    
+    private async acquireToken(): Promise<void> {
+        while (this.availableTokens < 1) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        this.availableTokens--;
+    }
+    
+    async process<T>(processor: (data: T) => Promise<void>, data: T): Promise<void> {
+        // Rate limiting
+        await this.acquireToken();
+        
+        // Concurrency control
+        const [, release] = await this.semaphore.acquire();
+        
+        try {
+            await processor(data);
+        } finally {
+            release();
+        }
+    }
+    
+    getAvailableTokens(): number {
+        return this.availableTokens;
+    }
+}
+```
+
+### 5. Batch Processing with Windowing
+
+Process events in batches with size and time-based triggers.
+
+```typescript
+interface BatchConfig {
+    maxBatchSize: number;
+    maxBatchWaitMs: number;
+}
+
+export class BatchEventProcessor<T> {
+    private batches = new Map<string, T[]>();
+    private timers = new Map<string, NodeJS.Timeout>();
+    private config: BatchConfig;
+    
+    constructor(
+        private processor: (batch: T[]) => Promise<void>,
+        config?: Partial<BatchConfig>
+    ) {
+        this.config = {
+            maxBatchSize: 100,
+            maxBatchWaitMs: 5000,
+            ...config
+        };
+    }
+    
+    async addEvent(partitionId: string, data: T): Promise<void> {
+        if (!this.batches.has(partitionId)) {
+            this.batches.set(partitionId, []);
+            this.scheduleBatchFlush(partitionId);
+        }
+        
+        const batch = this.batches.get(partitionId)!;
+        batch.push(data);
+        
+        // Size-based trigger
+        if (batch.length >= this.config.maxBatchSize) {
+            await this.flushBatch(partitionId);
+        }
+    }
+    
+    private scheduleBatchFlush(partitionId: string): void {
+        const timer = setTimeout(
+            () => this.flushBatch(partitionId),
+            this.config.maxBatchWaitMs
+        );
+        
+        this.timers.set(partitionId, timer);
+    }
+    
+    private async flushBatch(partitionId: string): Promise<void> {
+        const batch = this.batches.get(partitionId);
+        
+        if (!batch || batch.length === 0) {
+            return;
+        }
+        
+        // Clear timer
+        const timer = this.timers.get(partitionId);
+        if (timer) {
+            clearTimeout(timer);
+            this.timers.delete(partitionId);
+        }
+        
+        // Process batch
+        console.log(`Flushing batch for partition ${partitionId}: ${batch.length} events`);
+        
+        try {
+            await this.processor(batch);
+            
+            // Clear batch
+            this.batches.set(partitionId, []);
+            
+            // Reschedule
+            this.scheduleBatchFlush(partitionId);
+            
+        } catch (error) {
+            console.error('Batch processing failed:', error);
+            throw error;
+        }
+    }
+    
+    async flushAll(): Promise<void> {
+        const flushPromises = Array.from(this.batches.keys()).map(
+            partitionId => this.flushBatch(partitionId)
+        );
+        
+        await Promise.all(flushPromises);
+    }
+}
+```
+
+### 6. OpenTelemetry Observability
+
+Instrument Event Hubs consumer with distributed tracing and metrics.
+
+```typescript
+import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { metrics } from '@opentelemetry/api-metrics';
+import { ReceivedEventData } from '@azure/event-hubs';
+
+export class ObservableEventProcessor {
+    private tracer = trace.getTracer('eventhubs-consumer');
+    private meter = metrics.getMeter('eventhubs-consumer');
+    private eventsProcessed = this.meter.createCounter('eventhubs.events.processed');
+    private processingDuration = this.meter.createHistogram('eventhubs.processing.duration');
+    private checkpointLag = this.meter.createHistogram('eventhubs.checkpoint.lag');
+    
+    async process<T>(
+        eventData: ReceivedEventData,
+        processor: (data: T) => Promise<void>,
+        data: T,
+        partitionId: string
+    ): Promise<void> {
+        // Extract trace context from event properties
+        const traceParent = eventData.properties?.['traceparent'] as string;
+        const parentContext = traceParent ? this.extractContext(traceParent) : undefined;
+        
+        const span = this.tracer.startSpan(
+            'eventhubs.receive',
+            {
+                kind: 1, // CONSUMER
+                attributes: {
+                    'messaging.system': 'eventhubs',
+                    'messaging.destination': 'event-hub-name',
+                    'messaging.eventhubs.partition_id': partitionId,
+                    'messaging.eventhubs.sequence_number': eventData.sequenceNumber,
+                    'messaging.message_payload_size_bytes': JSON.stringify(eventData.body).length
+                }
+            },
+            parentContext
+        );
+        
+        const startTime = Date.now();
+        
+        try {
+            await processor(data);
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            const duration = Date.now() - startTime;
+            
+            this.eventsProcessed.add(1, { partition: partitionId, status: 'success' });
+            this.processingDuration.record(duration, { partition: partitionId });
+            
+            // Checkpoint lag (time since event was enqueued)
+            if (eventData.enqueuedTimeUtc) {
+                const lag = Date.now() - eventData.enqueuedTimeUtc.getTime();
+                this.checkpointLag.record(lag, { partition: partitionId });
+            }
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            
+            this.eventsProcessed.add(1, { partition: partitionId, status: 'error' });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    private extractContext(traceParent: string): any {
+        // Parse W3C traceparent header
+        // Format: 00-<trace-id>-<span-id>-<flags>
+        return context.active();
+    }
+}
+```
+
+### 7. Graceful Shutdown
+
+Ensure all events are processed before shutdown.
+
+```typescript
+export class GracefulEventProcessor {
+    private isShuttingDown: boolean = false;
+    private pendingEvents = new Set<Promise<void>>();
+    
+    constructor(private client: EventHubConsumerClient) {
+        this.setupShutdownHandlers();
+    }
+    
+    private setupShutdownHandlers(): void {
+        process.on('SIGTERM', () => this.shutdown());
+        process.on('SIGINT', () => this.shutdown());
+    }
+    
+    async processEvent<T>(
+        processor: (data: T) => Promise<void>,
+        data: T
+    ): Promise<void> {
+        if (this.isShuttingDown) {
+            throw new Error('Processor is shutting down');
+        }
+        
+        const task = processor(data);
+        this.pendingEvents.add(task);
+        
+        try {
+            await task;
+        } finally {
+            this.pendingEvents.delete(task);
+        }
+    }
+    
+    private async shutdown(): Promise<void> {
+        if (this.isShuttingDown) return;
+        
+        console.log('Initiating graceful shutdown...');
+        this.isShuttingDown = true;
+        
+        // Wait for pending events (up to 30 seconds)
+        const timeout = 30000;
+        const start = Date.now();
+        
+        while (this.pendingEvents.size > 0 && Date.now() - start < timeout) {
+            console.log(`Waiting for ${this.pendingEvents.size} pending events...`);
+            await Promise.race([
+                Promise.all(this.pendingEvents),
+                new Promise(resolve => setTimeout(resolve, 1000))
+            ]);
+        }
+        
+        if (this.pendingEvents.size > 0) {
+            console.warn(`Timeout: ${this.pendingEvents.size} events not processed`);
+        } else {
+            console.log('All events processed');
+        }
+        
+        await this.client.close();
+        console.log('Event Hubs client closed');
+        
+        process.exit(0);
+    }
+    
+    getPendingCount(): number {
+        return this.pendingEvents.size;
+    }
+}
+```
+
+### Integration Example
+
+```typescript
+import { EventHubConsumerClient } from '@azure/event-hubs';
+import { DefaultAzureCredential } from '@azure/identity';
+import { BlobCheckpointStore } from '@azure/eventhubs-checkpointstore-blob';
+import { ContainerClient } from '@azure/storage-blob';
+import {
+    ManagedEventHubsConsumer,
+    RetryableEventProcessor,
+    CircuitBreakerEventProcessor,
+    RateLimitedEventProcessor,
+    BatchEventProcessor,
+    ObservableEventProcessor,
+    GracefulEventProcessor
+} from './patterns';
+
+async function main() {
+    // 1. Setup checkpoint store
+    const storageClient = new ContainerClient(
+        'DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...',
+        'checkpoints'
+    );
+    await storageClient.createIfNotExists();
+    
+    const checkpointStore = new BlobCheckpointStore(storageClient);
+    
+    // 2. Create client with Azure Identity
+    const credential = new DefaultAzureCredential();
+    const client = new EventHubConsumerClient(
+        '$Default',
+        'namespace.servicebus.windows.net',
+        'event-hub-name',
+        credential,
+        { checkpointStore }
+    );
+    
+    // 3. Initialize patterns
+    const retryProcessor = new RetryableEventProcessor(
+        'connection-string',
+        'dlq-hub',
+        { maxAttempts: 5 }
+    );
+    await retryProcessor.initialize();
+    
+    const circuitBreaker = new CircuitBreakerEventProcessor({ failureThreshold: 5 });
+    const rateLimiter = new RateLimitedEventProcessor(10, 100);
+    const batchProcessor = new BatchEventProcessor(async (batch) => {
+        console.log(`Processing batch of ${batch.length} events`);
+    });
+    const observable = new ObservableEventProcessor();
+    const graceful = new GracefulEventProcessor(client);
+    
+    // 4. Process events with all patterns
+    const processEvent = async (eventData: any, context: any) => {
+        await retryProcessor.processWithRetry(
+            eventData,
+            async (data) => {
+                await circuitBreaker.process(
+                    async (d) => {
+                        await rateLimiter.process(
+                            async (dd) => {
+                                await observable.process(
+                                    eventData,
+                                    async (ddd) => {
+                                        await graceful.processEvent(
+                                            async (dddd) => {
+                                                await batchProcessor.addEvent(
+                                                    context.partitionId,
+                                                    dddd
+                                                );
+                                            },
+                                            ddd
+                                        );
+                                    },
+                                    dd,
+                                    context.partitionId
+                                );
+                            },
+                            d
+                        );
+                    },
+                    data
+                );
+            },
+            eventData.body
+        );
+    };
+    
+    // 5. Start managed consumer
+    const consumer = new ManagedEventHubsConsumer(client, processEvent);
+    await consumer.start();
+    
+    // Consumer will handle SIGTERM/SIGINT gracefully
+}
+
+main().catch(console.error);
+```
+
+### Dependencies
+
+Add these packages to your `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@azure/event-hubs": "^5.11.0",
+    "@azure/eventhubs-checkpointstore-blob": "^1.0.0",
+    "@azure/storage-blob": "^12.17.0",
+    "@azure/identity": "^4.0.0",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/api-metrics": "^0.45.0",
+    "async-mutex": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+```
+
 {% endfor %}

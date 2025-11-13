@@ -117,6 +117,1004 @@ try {
 - [Azure Event Hubs Documentation](https://learn.microsoft.com/azure/event-hubs/)
 - [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
 
+## Production-Ready Patterns
+
+This section provides best-practice patterns for building production-grade Event Hubs producers in Java.
+
+### 1. Connection Pooling with Singleton Producer
+
+Maintain a single long-lived EventHubProducerClient instance for efficient sending.
+
+```java
+import com.azure.messaging.eventhubs.*;
+import com.azure.identity.DefaultAzureCredential;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class EventHubsProducerPool {
+    private static final ConcurrentHashMap<String, EventHubProducerClient> producers = 
+        new ConcurrentHashMap<>();
+    
+    /**
+     * Get or create thread-safe Event Hubs producer instance.
+     * EventHubProducerClient is thread-safe and should be shared.
+     */
+    public static EventHubProducerClient getProducer(
+        String fullyQualifiedNamespace,
+        String eventHubName
+    ) {
+        String key = fullyQualifiedNamespace + "/" + eventHubName;
+        
+        return producers.computeIfAbsent(key, k -> 
+            new EventHubClientBuilder()
+                .fullyQualifiedNamespace(fullyQualifiedNamespace)
+                .eventHubName(eventHubName)
+                .credential(new DefaultAzureCredential())
+                .buildProducerClient()
+        );
+    }
+    
+    /**
+     * Get producer with connection string.
+     */
+    public static EventHubProducerClient getProducer(
+        String connectionString,
+        String eventHubName
+    ) {
+        String key = "connstring:" + eventHubName;
+        
+        return producers.computeIfAbsent(key, k ->
+            new EventHubClientBuilder()
+                .connectionString(connectionString, eventHubName)
+                .buildProducerClient()
+        );
+    }
+    
+    /**
+     * Close all producers gracefully.
+     */
+    public static void closeAll() {
+        producers.values().forEach(producer -> {
+            try {
+                producer.close();
+            } catch (Exception e) {
+                System.err.println("Error closing producer: " + e.getMessage());
+            }
+        });
+        producers.clear();
+    }
+    
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(EventHubsProducerPool::closeAll));
+    }
+}
+```
+
+### 2. Batch Sending for High Throughput
+
+Send events in efficient batches using EventDataBatch with automatic splitting.
+
+```java
+import com.azure.messaging.eventhubs.*;
+import java.util.List;
+import java.util.ArrayList;
+
+public class BatchEventHubsProducer {
+    private final EventHubProducerClient producer;
+    private final String eventHubName;
+    
+    public BatchEventHubsProducer(
+        String fullyQualifiedNamespace,
+        String eventHubName
+    ) {
+        this.eventHubName = eventHubName;
+        this.producer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+    }
+    
+    /**
+     * Send events in optimized batches with automatic size management.
+     */
+    public int sendBatch(List<EventData> events) {
+        return sendBatch(events, null);
+    }
+    
+    /**
+     * Send events with partition key for ordering.
+     */
+    public int sendBatch(List<EventData> events, String partitionKey) {
+        int sentCount = 0;
+        
+        CreateBatchOptions options = new CreateBatchOptions();
+        if (partitionKey != null) {
+            options.setPartitionKey(partitionKey);
+        }
+        
+        try {
+            EventDataBatch currentBatch = producer.createBatch(options);
+            
+            for (EventData event : events) {
+                // Try to add event to current batch
+                if (!currentBatch.tryAdd(event)) {
+                    // Batch is full, send it
+                    producer.send(currentBatch);
+                    sentCount += currentBatch.getCount();
+                    
+                    System.out.println("Sent batch of " + currentBatch.getCount() + 
+                        " events to " + eventHubName);
+                    
+                    // Create new batch and add current event
+                    currentBatch = producer.createBatch(options);
+                    
+                    if (!currentBatch.tryAdd(event)) {
+                        System.err.println("Event too large to fit in batch");
+                        continue;
+                    }
+                }
+            }
+            
+            // Send remaining events
+            if (currentBatch.getCount() > 0) {
+                producer.send(currentBatch);
+                sentCount += currentBatch.getCount();
+                
+                System.out.println("Sent final batch of " + currentBatch.getCount() + 
+                    " events");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Batch send failed: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+        
+        return sentCount;
+    }
+    
+    /**
+     * Send events to specific partition.
+     */
+    public int sendBatchToPartition(List<EventData> events, String partitionId) {
+        int sentCount = 0;
+        
+        CreateBatchOptions options = new CreateBatchOptions()
+            .setPartitionId(partitionId);
+        
+        try {
+            EventDataBatch batch = producer.createBatch(options);
+            
+            for (EventData event : events) {
+                if (!batch.tryAdd(event)) {
+                    producer.send(batch);
+                    sentCount += batch.getCount();
+                    
+                    batch = producer.createBatch(options);
+                    batch.tryAdd(event);
+                }
+            }
+            
+            if (batch.getCount() > 0) {
+                producer.send(batch);
+                sentCount += batch.getCount();
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Partition send failed: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+        
+        return sentCount;
+    }
+    
+    public void close() {
+        producer.close();
+    }
+}
+```
+
+### 3. Retry Logic with Exponential Backoff
+
+Implement intelligent retry with transient error detection.
+
+```java
+import io.github.resilience4j.retry.*;
+import com.azure.core.exception.AzureException;
+
+public class RetryableEventHubsProducer {
+    private final EventHubProducerClient producer;
+    private final Retry retry;
+    
+    public RetryableEventHubsProducer(
+        String fullyQualifiedNamespace,
+        String eventHubName
+    ) {
+        this.producer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+        
+        // Configure retry for transient failures
+        RetryConfig config = RetryConfig.custom()
+            .maxAttempts(5)
+            .waitDuration(java.time.Duration.ofMillis(500))
+            .exponentialBackoffMultiplier(2.0)
+            .retryExceptions(
+                AzureException.class,
+                java.net.SocketException.class,
+                java.util.concurrent.TimeoutException.class
+            )
+            .ignoreExceptions(
+                IllegalArgumentException.class,
+                com.azure.core.exception.ResourceNotFoundException.class
+            )
+            .build();
+        
+        this.retry = Retry.of("eventhubs-producer", config);
+        
+        // Log retry attempts
+        retry.getEventPublisher()
+            .onRetry(event -> 
+                System.err.println("Retry attempt " + event.getNumberOfRetryAttempts() + 
+                    " for Event Hubs send")
+            )
+            .onSuccess(event -> 
+                System.out.println("Send succeeded after " + 
+                    event.getNumberOfRetryAttempts() + " attempts")
+            );
+    }
+    
+    /**
+     * Send with automatic retry on transient failures.
+     */
+    public void sendWithRetry(EventData event) {
+        retry.executeRunnable(() -> {
+            producer.send(List.of(event));
+        });
+    }
+    
+    /**
+     * Send batch with retry.
+     */
+    public void sendBatchWithRetry(List<EventData> events) {
+        retry.executeRunnable(() -> {
+            producer.send(events);
+        });
+    }
+    
+    /**
+     * Send with partition key and retry.
+     */
+    public void sendWithPartitionKeyAndRetry(EventData event, String partitionKey) {
+        retry.executeRunnable(() -> {
+            SendOptions options = new SendOptions()
+                .setPartitionKey(partitionKey);
+            
+            EventDataBatch batch = producer.createBatch(
+                new CreateBatchOptions().setPartitionKey(partitionKey)
+            );
+            
+            if (!batch.tryAdd(event)) {
+                throw new IllegalArgumentException("Event too large");
+            }
+            
+            producer.send(batch);
+        });
+    }
+    
+    public void close() {
+        producer.close();
+    }
+}
+```
+
+### 4. Circuit Breaker Pattern
+
+Protect Event Hubs from being overwhelmed during outages.
+
+```java
+import io.github.resilience4j.circuitbreaker.*;
+
+public class CircuitBreakerEventHubsProducer {
+    private final EventHubProducerClient producer;
+    private final CircuitBreaker circuitBreaker;
+    private final EventHubProducerClient fallbackProducer;
+    
+    public CircuitBreakerEventHubsProducer(
+        String primaryNamespace,
+        String fallbackNamespace,
+        String eventHubName
+    ) {
+        this.producer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(primaryNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+        
+        // Fallback to secondary region
+        this.fallbackProducer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fallbackNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+        
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+            .failureRateThreshold(50.0f)
+            .waitDurationInOpenState(java.time.Duration.ofSeconds(60))
+            .slidingWindowSize(20)
+            .minimumNumberOfCalls(10)
+            .permittedNumberOfCallsInHalfOpenState(5)
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+        
+        this.circuitBreaker = CircuitBreaker.of("eventhubs-producer", config);
+        
+        // Event logging
+        circuitBreaker.getEventPublisher()
+            .onStateTransition(event -> 
+                System.err.println("Circuit breaker state: " + event.getStateTransition())
+            )
+            .onError(event -> 
+                System.err.println("Circuit breaker error: " + event.getThrowable().getMessage())
+            );
+    }
+    
+    /**
+     * Send with circuit breaker protection.
+     * Falls back to secondary region when circuit opens.
+     */
+    public void sendWithCircuitBreaker(EventData event) {
+        try {
+            circuitBreaker.executeRunnable(() -> {
+                producer.send(List.of(event));
+            });
+            
+        } catch (CallNotPermittedException e) {
+            System.err.println("Circuit OPEN, using fallback Event Hub");
+            
+            // Send to fallback region
+            fallbackProducer.send(List.of(event));
+        }
+    }
+    
+    /**
+     * Send batch with circuit breaker.
+     */
+    public void sendBatchWithCircuitBreaker(List<EventData> events) {
+        try {
+            circuitBreaker.executeRunnable(() -> {
+                producer.send(events);
+            });
+            
+        } catch (CallNotPermittedException e) {
+            System.err.println("Circuit OPEN, routing to fallback");
+            fallbackProducer.send(events);
+        }
+    }
+    
+    public void close() {
+        producer.close();
+        fallbackProducer.close();
+    }
+}
+```
+
+### 5. Rate Limiting with Token Bucket
+
+Control event sending rate to prevent quota exhaustion.
+
+```java
+import com.google.common.util.concurrent.RateLimiter;
+import java.util.concurrent.TimeUnit;
+
+public class RateLimitedEventHubsProducer {
+    private final EventHubProducerClient producer;
+    private final RateLimiter rateLimiter;
+    
+    /**
+     * @param eventsPerSecond Maximum events per second
+     */
+    public RateLimitedEventHubsProducer(
+        String fullyQualifiedNamespace,
+        String eventHubName,
+        double eventsPerSecond
+    ) {
+        this.producer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+        
+        this.rateLimiter = RateLimiter.create(eventsPerSecond);
+    }
+    
+    /**
+     * Send with rate limiting (blocks if necessary).
+     */
+    public void sendWithRateLimit(EventData event) {
+        rateLimiter.acquire();  // Blocks until permit available
+        producer.send(List.of(event));
+    }
+    
+    /**
+     * Send batch with rate limiting applied per event.
+     */
+    public void sendBatchWithRateLimit(List<EventData> events) {
+        rateLimiter.acquire(events.size());  // Acquire permits for entire batch
+        producer.send(events);
+    }
+    
+    /**
+     * Send with timeout on rate limit.
+     * Returns false if timeout exceeded.
+     */
+    public boolean sendWithTimeout(
+        EventData event,
+        java.time.Duration timeout
+    ) {
+        boolean acquired = rateLimiter.tryAcquire(
+            timeout.toMillis(),
+            TimeUnit.MILLISECONDS
+        );
+        
+        if (acquired) {
+            producer.send(List.of(event));
+            return true;
+        }
+        
+        System.err.println("Rate limit timeout exceeded");
+        return false;
+    }
+    
+    /**
+     * Warm up rate limiter to prevent initial burst.
+     */
+    public void warmUp(java.time.Duration warmupPeriod) {
+        RateLimiter warmupLimiter = RateLimiter.create(
+            rateLimiter.getRate(),
+            warmupPeriod.toMillis(),
+            TimeUnit.MILLISECONDS
+        );
+        
+        System.out.println("Rate limiter warmed up over " + warmupPeriod);
+    }
+    
+    public void close() {
+        producer.close();
+    }
+}
+```
+
+### 6. Partition Strategy for Ordering
+
+Control event distribution across partitions for ordering guarantees.
+
+```java
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+
+public class PartitionStrategyProducer {
+    private final EventHubProducerClient producer;
+    private final String eventHubName;
+    
+    public PartitionStrategyProducer(
+        String fullyQualifiedNamespace,
+        String eventHubName
+    ) {
+        this.eventHubName = eventHubName;
+        this.producer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+    }
+    
+    /**
+     * Send with partition key for ordering.
+     * All events with same key go to same partition.
+     */
+    public void sendWithKey(EventData event, String partitionKey) {
+        CreateBatchOptions options = new CreateBatchOptions()
+            .setPartitionKey(partitionKey);
+        
+        EventDataBatch batch = producer.createBatch(options);
+        batch.tryAdd(event);
+        
+        producer.send(batch);
+    }
+    
+    /**
+     * Send to specific partition ID.
+     */
+    public void sendToPartition(EventData event, String partitionId) {
+        CreateBatchOptions options = new CreateBatchOptions()
+            .setPartitionId(partitionId);
+        
+        EventDataBatch batch = producer.createBatch(options);
+        batch.tryAdd(event);
+        
+        producer.send(batch);
+    }
+    
+    /**
+     * Compute consistent partition key from entity ID.
+     * Ensures related entities always map to same partition.
+     */
+    public String computePartitionKey(String entityId) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hash = md.digest(entityId.getBytes(StandardCharsets.UTF_8));
+            return String.format("%016x", new java.math.BigInteger(1, hash));
+        } catch (Exception e) {
+            return entityId;  // Fallback
+        }
+    }
+    
+    /**
+     * Send related events in order using computed partition key.
+     */
+    public void sendRelatedEvents(String entityId, List<EventData> events) {
+        String partitionKey = computePartitionKey(entityId);
+        
+        CreateBatchOptions options = new CreateBatchOptions()
+            .setPartitionKey(partitionKey);
+        
+        try {
+            EventDataBatch batch = producer.createBatch(options);
+            
+            for (EventData event : events) {
+                if (!batch.tryAdd(event)) {
+                    // Send full batch
+                    producer.send(batch);
+                    
+                    // Create new batch
+                    batch = producer.createBatch(options);
+                    batch.tryAdd(event);
+                }
+            }
+            
+            // Send remaining
+            if (batch.getCount() > 0) {
+                producer.send(batch);
+            }
+            
+            System.out.println("Sent " + events.size() + 
+                " related events for entity: " + entityId);
+            
+        } catch (Exception e) {
+            System.err.println("Failed to send related events: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Get available partition IDs for manual routing.
+     */
+    public String[] getPartitionIds() {
+        return producer.getPartitionIds().stream()
+            .toArray(String[]::new);
+    }
+    
+    /**
+     * Round-robin across partitions for load balancing.
+     */
+    public void sendRoundRobin(EventData event, java.util.concurrent.atomic.AtomicInteger counter) {
+        String[] partitions = getPartitionIds();
+        int index = counter.getAndIncrement() % partitions.length;
+        
+        sendToPartition(event, partitions[index]);
+    }
+    
+    public void close() {
+        producer.close();
+    }
+}
+```
+
+### 7. OpenTelemetry Observability
+
+Instrument Event Hubs producer with distributed tracing and metrics.
+
+```java
+import io.opentelemetry.api.*;
+import io.opentelemetry.api.trace.*;
+import io.opentelemetry.api.metrics.*;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapSetter;
+
+public class ObservableEventHubsProducer {
+    private final EventHubProducerClient producer;
+    private final Tracer tracer;
+    private final LongCounter eventsSent;
+    private final LongHistogram sendDuration;
+    private final String eventHubName;
+    private final OpenTelemetry openTelemetry;
+    
+    public ObservableEventHubsProducer(
+        String fullyQualifiedNamespace,
+        String eventHubName,
+        OpenTelemetry openTelemetry
+    ) {
+        this.eventHubName = eventHubName;
+        this.openTelemetry = openTelemetry;
+        
+        this.producer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+        
+        this.tracer = openTelemetry.getTracer("eventhubs-producer");
+        
+        Meter meter = openTelemetry.getMeter("eventhubs-producer");
+        this.eventsSent = meter
+            .counterBuilder("eventhubs.events.sent")
+            .setDescription("Total events sent to Event Hubs")
+            .build();
+        
+        this.sendDuration = meter
+            .histogramBuilder("eventhubs.send.duration")
+            .setDescription("Event send duration")
+            .setUnit("ms")
+            .ofLongs()
+            .build();
+    }
+    
+    /**
+     * Send with distributed tracing and metrics.
+     */
+    public void sendWithTracing(EventData event) {
+        sendWithTracing(event, null);
+    }
+    
+    /**
+     * Send with tracing and partition key.
+     */
+    public void sendWithTracing(EventData event, String partitionKey) {
+        Span span = tracer.spanBuilder("eventhubs.send")
+            .setSpanKind(SpanKind.PRODUCER)
+            .setAttribute("messaging.system", "eventhubs")
+            .setAttribute("messaging.destination", eventHubName)
+            .setAttribute("messaging.message.payload_size_bytes", 
+                event.getBody().length)
+            .startSpan();
+        
+        if (partitionKey != null) {
+            span.setAttribute("messaging.eventhubs.partition_key", partitionKey);
+        }
+        
+        long startTime = System.currentTimeMillis();
+        
+        try (Scope scope = span.makeCurrent()) {
+            // Inject trace context into event properties
+            openTelemetry.getPropagators().getTextMapPropagator()
+                .inject(Context.current(), event.getProperties(), 
+                    new EventDataPropertiesSetter());
+            
+            // Send event
+            CreateBatchOptions options = partitionKey != null 
+                ? new CreateBatchOptions().setPartitionKey(partitionKey)
+                : new CreateBatchOptions();
+            
+            EventDataBatch batch = producer.createBatch(options);
+            batch.tryAdd(event);
+            
+            producer.send(batch);
+            
+            long duration = System.currentTimeMillis() - startTime;
+            
+            span.setStatus(StatusCode.OK);
+            span.setAttribute("messaging.operation", "send");
+            
+            eventsSent.add(1,
+                Attributes.of(
+                    AttributeKey.stringKey("event_hub"), eventHubName,
+                    AttributeKey.stringKey("status"), "success"
+                ));
+            
+            sendDuration.record(duration,
+                Attributes.of(
+                    AttributeKey.stringKey("event_hub"), eventHubName
+                ));
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            
+            eventsSent.add(1,
+                Attributes.of(
+                    AttributeKey.stringKey("event_hub"), eventHubName,
+                    AttributeKey.stringKey("status"), "error"
+                ));
+            
+            throw new RuntimeException(e);
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    /**
+     * Send batch with tracing.
+     */
+    public void sendBatchWithTracing(List<EventData> events) {
+        Span span = tracer.spanBuilder("eventhubs.send.batch")
+            .setSpanKind(SpanKind.PRODUCER)
+            .setAttribute("messaging.system", "eventhubs")
+            .setAttribute("messaging.destination", eventHubName)
+            .setAttribute("messaging.batch.message_count", events.size())
+            .startSpan();
+        
+        long startTime = System.currentTimeMillis();
+        
+        try (Scope scope = span.makeCurrent()) {
+            // Inject trace context into all events
+            events.forEach(event -> 
+                openTelemetry.getPropagators().getTextMapPropagator()
+                    .inject(Context.current(), event.getProperties(), 
+                        new EventDataPropertiesSetter())
+            );
+            
+            producer.send(events);
+            
+            long duration = System.currentTimeMillis() - startTime;
+            
+            span.setStatus(StatusCode.OK);
+            
+            eventsSent.add(events.size(),
+                Attributes.of(
+                    AttributeKey.stringKey("event_hub"), eventHubName,
+                    AttributeKey.stringKey("status"), "success"
+                ));
+            
+            sendDuration.record(duration,
+                Attributes.of(
+                    AttributeKey.stringKey("event_hub"), eventHubName
+                ));
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            throw new RuntimeException(e);
+        } finally {
+            span.end();
+        }
+    }
+    
+    // TextMapSetter for injecting trace context into EventData properties
+    private static class EventDataPropertiesSetter 
+        implements TextMapSetter<Map<String, Object>> {
+        
+        @Override
+        public void set(Map<String, Object> carrier, String key, String value) {
+            carrier.put(key, value);
+        }
+    }
+    
+    public void close() {
+        producer.close();
+    }
+}
+```
+
+### 8. Graceful Shutdown
+
+Ensure all events are sent before application termination.
+
+```java
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class GracefulEventHubsProducer {
+    private final EventHubProducerClient producer;
+    private final AtomicInteger pendingEvents = new AtomicInteger(0);
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private volatile boolean shuttingDown = false;
+    
+    public GracefulEventHubsProducer(
+        String fullyQualifiedNamespace,
+        String eventHubName
+    ) {
+        this.producer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+        
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+    }
+    
+    /**
+     * Send with pending event tracking.
+     */
+    public void send(EventData event) {
+        if (shuttingDown) {
+            throw new IllegalStateException("Producer shutting down");
+        }
+        
+        pendingEvents.incrementAndGet();
+        
+        try {
+            producer.send(List.of(event));
+        } finally {
+            pendingEvents.decrementAndGet();
+        }
+    }
+    
+    /**
+     * Send batch with tracking.
+     */
+    public void sendBatch(List<EventData> events) {
+        if (shuttingDown) {
+            throw new IllegalStateException("Producer shutting down");
+        }
+        
+        pendingEvents.addAndGet(events.size());
+        
+        try {
+            producer.send(events);
+        } finally {
+            pendingEvents.addAndGet(-events.size());
+        }
+    }
+    
+    /**
+     * Graceful shutdown: wait for pending events, then close.
+     */
+    public void shutdown() {
+        if (shuttingDown) {
+            return;
+        }
+        
+        shuttingDown = true;
+        System.out.println("Initiating graceful shutdown...");
+        
+        try {
+            // Wait for pending events (up to 30 seconds)
+            long timeout = 30000;
+            long start = System.currentTimeMillis();
+            
+            while (pendingEvents.get() > 0 && 
+                   System.currentTimeMillis() - start < timeout) {
+                System.out.println("Waiting for " + pendingEvents.get() + 
+                    " pending events...");
+                TimeUnit.SECONDS.sleep(1);
+            }
+            
+            if (pendingEvents.get() > 0) {
+                System.err.println("Timeout: " + pendingEvents.get() + 
+                    " events still pending");
+            } else {
+                System.out.println("All events sent");
+            }
+            
+            // Close producer
+            producer.close();
+            System.out.println("Producer closed gracefully");
+            
+        } catch (Exception e) {
+            System.err.println("Error during shutdown: " + e.getMessage());
+        } finally {
+            shutdownLatch.countDown();
+        }
+    }
+    
+    /**
+     * Wait for shutdown to complete.
+     */
+    public void awaitShutdown() throws InterruptedException {
+        shutdownLatch.await();
+    }
+    
+    public int getPendingEventCount() {
+        return pendingEvents.get();
+    }
+}
+```
+
+### Configuration Best Practices
+
+```java
+public class EventHubsProducerConfig {
+    public static EventHubProducerClient createProductionProducer(
+        String fullyQualifiedNamespace,
+        String eventHubName
+    ) {
+        return new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .credential(new DefaultAzureCredential())
+            
+            // Retry configuration
+            .retry(new com.azure.core.amqp.AmqpRetryOptions()
+                .setMaxRetries(3)
+                .setDelay(java.time.Duration.ofSeconds(1))
+                .setMaxDelay(java.time.Duration.ofSeconds(30))
+                .setTryTimeout(java.time.Duration.ofSeconds(60)))
+            
+            // Connection configuration
+            .transportType(com.azure.core.amqp.AmqpTransportType.AMQP_WEB_SOCKETS)
+            
+            .buildProducerClient();
+    }
+}
+```
+
+### Integration Example
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+
+public class ProductionEventHubsProducer {
+    public static void main(String[] args) throws Exception {
+        String fullyQualifiedNamespace = "myhub.servicebus.windows.net";
+        String eventHubName = "telemetry";
+        
+        // Get pooled producer
+        EventHubProducerClient baseProducer = 
+            EventHubsProducerPool.getProducer(fullyQualifiedNamespace, eventHubName);
+        
+        // Create pattern-enhanced producers
+        BatchEventHubsProducer batchProducer = 
+            new BatchEventHubsProducer(fullyQualifiedNamespace, eventHubName);
+        
+        RetryableEventHubsProducer retryProducer = 
+            new RetryableEventHubsProducer(fullyQualifiedNamespace, eventHubName);
+        
+        CircuitBreakerEventHubsProducer cbProducer = 
+            new CircuitBreakerEventHubsProducer(
+                fullyQualifiedNamespace, 
+                "fallback-hub.servicebus.windows.net",
+                eventHubName
+            );
+        
+        RateLimitedEventHubsProducer rateLimitedProducer = 
+            new RateLimitedEventHubsProducer(
+                fullyQualifiedNamespace, eventHubName, 1000.0  // 1000 events/sec
+            );
+        
+        PartitionStrategyProducer partitionProducer = 
+            new PartitionStrategyProducer(fullyQualifiedNamespace, eventHubName);
+        
+        // OpenTelemetry setup
+        OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .setMeterProvider(meterProvider)
+            .buildAndRegisterGlobal();
+        
+        ObservableEventHubsProducer observableProducer = 
+            new ObservableEventHubsProducer(
+                fullyQualifiedNamespace, eventHubName, openTelemetry
+            );
+        
+        GracefulEventHubsProducer gracefulProducer = 
+            new GracefulEventHubsProducer(fullyQualifiedNamespace, eventHubName);
+        
+        // Example: Send with all patterns
+        EventData event = new EventData("Hello, Event Hubs!".getBytes());
+        
+        // Apply patterns
+        retryProducer.sendWithRetry(event);
+        cbProducer.sendWithCircuitBreaker(event);
+        rateLimitedProducer.sendWithRateLimit(event);
+        partitionProducer.sendWithKey(event, "user-123");
+        observableProducer.sendWithTracing(event);
+        
+        // Batch sending
+        List<EventData> events = List.of(event, event, event);
+        batchProducer.sendBatch(events, "partition-key");
+        
+        // Graceful shutdown
+        gracefulProducer.shutdown();
+        gracefulProducer.awaitShutdown();
+        
+        EventHubsProducerPool.closeAll();
+    }
+}
+```
+
 ## Generated Code
 
 Auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).

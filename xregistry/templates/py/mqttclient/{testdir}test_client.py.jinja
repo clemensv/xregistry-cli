@@ -1,0 +1,195 @@
+{%- import "util.include.jinja" as util -%}
+# pylint: disable=line-too-long, trailing-whitespace, missing-module-docstring, missing-function-docstring, missing-class-docstring, redefined-outer-name, unused-argument, broad-exception-caught, broad-exception-raised, invalid-name, trailing-newlines
+
+import pytest
+import pytest_asyncio
+import asyncio
+import time
+import paho.mqtt.client as mqtt
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
+import {{ data_project_name | dotunderscore | lower }}
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set class_name = type_name | strip_namespace %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + class_name %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroupid.split('.') -%}
+{%- set groupName = parts | join('_') | lower %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"MqttClient" %}
+from {{main_project_name}} import {{ class_name }}
+{%- endfor %}
+
+@pytest_asyncio.fixture
+async def mosquitto_broker():
+    """Start Mosquitto MQTT broker in container."""
+    container = DockerContainer("eclipse-mosquitto:2.0")
+    container.with_exposed_ports(1883)
+    container.with_command("mosquitto -c /mosquitto-no-auth.conf")
+    
+    container.start()
+    
+    try:
+        # Wait for Mosquitto to start
+        wait_for_logs(container, "mosquitto version .* running", timeout=10)
+        await asyncio.sleep(2)  # Additional stabilization time
+        
+        # Get mapped port
+        broker_port = container.get_exposed_port(1883)
+        broker_host = "localhost"
+        
+        yield broker_host, broker_port
+    finally:
+        container.stop()
+
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroupid.split('.') -%}
+{%- set groupName = parts | join('_') | lower %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"MqttClient" %}
+
+{% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
+{%- set messagename = messageid | dotunderscore | snake %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+
+@pytest.mark.asyncio
+async def test_{{groupName}}_{{messagename.split('.')[-1]}}_py(mosquitto_broker):
+    """Test publishing and receiving {{ messageid }} message via MQTT."""
+    broker_host, broker_port = mosquitto_broker
+    
+    # Create minimal test data instance to satisfy schema requirements
+    try:
+        import inspect
+        import typing
+        import enum
+        data_class = {{type_name | pascal | strip_namespace}}
+        sig = inspect.signature(data_class.__init__)
+        kwargs = {}
+        for param_name, param in sig.parameters.items():
+            if param_name == 'self':
+                continue
+            if param.default == inspect.Parameter.empty or param.kind == inspect.Parameter.KEYWORD_ONLY:
+                # Get the actual type, unwrapping Optional/Union if needed
+                ann = param.annotation
+                origin = typing.get_origin(ann)
+                
+                # Handle Optional[X] which is Union[X, None]
+                if origin is typing.Union:
+                    args = typing.get_args(ann)
+                    # Use the first non-None type
+                    ann = next((a for a in args if a is not type(None)), args[0])
+                    origin = typing.get_origin(ann)
+                
+                # Now match based on the actual type
+                ann_str = str(ann).lower()
+                if ann is str or ann == 'str' or 'str' in ann_str:
+                    kwargs[param_name] = ""
+                elif ann is int or ann == 'int' or 'int' in ann_str:
+                    kwargs[param_name] = 0
+                elif ann is float or ann == 'float' or 'float' in ann_str:
+                    kwargs[param_name] = 0.0
+                elif ann is bool or ann == 'bool' or 'bool' in ann_str:
+                    kwargs[param_name] = False
+                elif origin is list or ann is list or 'list' in ann_str:
+                    kwargs[param_name] = []
+                elif origin is dict or ann is dict or 'dict' in ann_str:
+                    kwargs[param_name] = {}
+                elif isinstance(ann, type) and issubclass(ann, enum.Enum):
+                    # For enums, use the first value
+                    kwargs[param_name] = list(ann)[0] if list(ann) else None
+                elif 'enum' in ann_str:
+                    # Fallback for enum detection via string
+                    try:
+                        kwargs[param_name] = list(ann)[0] if hasattr(ann, '__iter__') else None
+                    except:
+                        kwargs[param_name] = None
+                else:
+                    kwargs[param_name] = None
+        test_data = data_class(**kwargs)
+    except Exception:
+        test_data = None
+    
+    # Create subscriber client
+    subscriber_mqtt = mqtt.Client(client_id="test_subscriber")
+    loop = asyncio.get_running_loop()
+    subscriber_client = {{ class_name }}(subscriber_mqtt, content_mode='structured', loop=loop)
+    
+    # Create publisher client
+    publisher_mqtt = mqtt.Client(client_id="test_publisher")
+    publisher_client = {{ class_name }}(publisher_mqtt, content_mode='structured', loop=loop)
+    
+    # Track received message
+    received_data = []
+    received_event = asyncio.Event()
+    
+    async def on_{{messagename.split('.')[-1]}}(mqtt_msg, cloud_event, data: {{type_name}}):
+        """Handler for {{ messageid }} messages."""
+        received_data.append(data)
+        {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+        assert cloud_event['type'] == "{{ message.envelopemetadata["type"]["value"] }}"
+        {%- else %}
+        assert cloud_event['type'] == "{{ messageid }}"
+        {%- endif %}
+        received_event.set()
+    
+    # Register handler
+    subscriber_client.{{messagename.split('.')[-1]}}_async = on_{{messagename.split('.')[-1]}}
+    
+    # Connect both clients
+    await subscriber_client.connect(broker_host, broker_port)
+    await publisher_client.connect(broker_host, broker_port)
+    
+    # Subscribe to topic
+    test_topic = "test/{{groupName}}/{{messagename.split('.')[-1]}}"
+    await subscriber_client.subscribe([test_topic])
+    
+    # Wait for subscription to be active
+    await asyncio.sleep(1)
+    
+    # Publish message
+    await publisher_client.publish_{{messagename.split('.')[-1]}}(
+        topic=test_topic,
+        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.value %}
+        {%- if attribute.type == "uritemplate" %}
+        {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+        {%- if phs %}
+        {%- for placeholder in phs %}
+        _{{ placeholder | snake }}="test_{{placeholder}}",
+        {%- endfor %}
+        {%- endif %}
+        {%- else %}
+        _{{ attrname | snake }}="test_{{attrname}}",
+        {%- endif %}
+        {%- endfor %}
+        data=test_data,
+        content_type="application/json"
+    )
+    
+    # Wait for message reception (with timeout)
+    try:
+        await asyncio.wait_for(received_event.wait(), timeout=5.0)
+    except asyncio.TimeoutError:
+        pytest.fail("Message not received within timeout")
+    
+    # Verify received data
+    assert len(received_data) == 1
+    
+    # Cleanup
+    await subscriber_client.disconnect()
+    await publisher_client.disconnect()
+
+{% endfor %}
+{% endfor %}

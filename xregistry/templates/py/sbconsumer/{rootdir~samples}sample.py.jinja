@@ -1,0 +1,136 @@
+{%- set messagegroups = root.messagegroups %}
+"""
+
+{%- filter wordwrap(80) %}
+This is sample code to consume messages from Azure Service Bus with the
+dispatcher client{%- if messagegroups|length > 1 -%}s{% endif %} contained in this project.
+
+There is a handler for each defined message type. The handler is an async function that takes the following parameters:
+- message: The ServiceBusReceivedMessage object (message context).
+- cloud_event: The CloudEvent data (if using CloudEvents).
+- message_data: The deserialized message data.
+
+Handlers are registered with the dispatcher client{%- if messagegroups|length > 1 -%} associated with their respective message group{% endif %}. A "dispatcher" is a class that inspects incoming messages and routes them to the appropriate handler based on the message type.
+
+{%- if messagegroups|length == 1 -%}
+The main function creates a dispatcher client and registers the handlers for the messages in the message group. Then it creates a Service Bus receiver and processes messages.
+
+The dispatcher will call the appropriate handler for each message received.
+{%- else -%}
+The main function creates a dispatcher client for each message group and registers the handlers for the messages in the message group. Then it creates Service Bus receivers and processes messages.
+
+The dispatcher will call the appropriate handler for each message received.
+{%- endif %}
+
+This sample uses "passwordless" mode for authentication via the DefaultAzureCredential class, which means that the credential is automatically selected based on the environment. For more information, see https://aka.ms/azsdk/python/identity/defaultazurecredential.
+
+The script either reads the configuration from the command line or uses the environment variables. The following environment variables are recognized:
+
+- FULLY_QUALIFIED_NAMESPACE: The fully qualified Service Bus namespace.
+- QUEUE_NAME: The Service Bus queue name.
+
+Alternatively, you can pass the configuration as command-line arguments.
+
+python sample.py --fully-qualified-namespace <fully_qualified_namespace> --queue-name <queue_name>
+
+The main function waits for a signal (Press Ctrl+C) to stop processing messages.
+{%- endfilter %}
+"""
+
+import argparse
+import asyncio
+import os
+import signal
+from azure.identity.aio import DefaultAzureCredential
+
+{%- for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "MessageDispatcher" %}
+from {{main_project_name}}.dispatcher import {{class_name}}
+{%- for messageid, message in messagegroup.messages.items() %}
+
+async def handle_{{ messageid | dotunderscore | snake }}(sb_message, {%- if message | exists("envelope","CloudEvents/1.0") -%}cloud_event, {% endif %}{{ messageid | dotunderscore | snake }}_data):
+    """ Handles the {{ messageid }} message """
+    print(f"Received {{ messageid }} from {sb_message.message_id}")
+    {%- if message | exists("envelope","CloudEvents/1.0") %}
+    if cloud_event:
+        print(f"  CloudEvent ID: {cloud_event.id}, Source: {cloud_event.source}")
+    {%- endif %}
+    print(f"  Data: { {{- messageid | dotunderscore | snake -}}_data}")
+{%- endfor %}
+{%- endfor %}
+
+async def main(fully_qualified_namespace, queue_name):
+    """ Main function to consume messages from Azure Service Bus """
+    {%- if messagegroups|length == 1 -%}
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal %}
+    {%- set class_name = ( groupname | strip_dots ) + "MessageDispatcher" %}
+    dispatcher = {{ class_name }}()
+    {%- for messageid, message in messagegroup.messages.items() %}
+    dispatcher.{{ messageid | dotunderscore | snake }}_async = handle_{{ messageid | dotunderscore | snake }}
+    {%- endfor %}
+    {%- endfor %}
+    
+    async with dispatcher.create_processor(
+            fully_qualified_namespace,
+            queue_name,
+            DefaultAzureCredential()
+        ) as processor:
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+            loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+            print(f"Listening for messages on {fully_qualified_namespace}/{queue_name}...")
+            print("Press Ctrl+C to stop")
+            await stop_event.wait()
+    {%- else -%}
+    # Multiple message groups - create dispatcher for each
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal %}
+    {%- set class_name = ( groupname | strip_dots ) + "MessageDispatcher" %}
+    {{messagegroupid | dotunderscore | snake}}_dispatcher = {{ class_name }}()
+    {%- for messageid, message in messagegroup.messages.items() %}
+    {{messagegroupid | dotunderscore | snake}}_dispatcher.{{ messageid | dotunderscore | snake }}_async = handle_{{ messageid | dotunderscore | snake }}
+    {%- endfor %}
+    {%- endfor %}
+    
+    # Create processors for each dispatcher
+    processors = []
+    {%- for messagegroupid, messagegroup in messagegroups.items() %}
+    {%- set groupname = messagegroupid | pascal %}
+    processors.append({{messagegroupid | dotunderscore | snake}}_dispatcher.create_processor(
+        fully_qualified_namespace,
+        queue_name,
+        DefaultAzureCredential()
+    ))
+    {%- endfor %}
+    
+    async with asyncio.TaskGroup() as tg:
+        for processor in processors:
+            tg.create_task(processor.__aenter__())
+        
+        stop_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGTERM, lambda: stop_event.set())
+        loop.add_signal_handler(signal.SIGINT, lambda: stop_event.set())
+        print(f"Listening for messages on {fully_qualified_namespace}/{queue_name}...")
+        print("Press Ctrl+C to stop")
+        await stop_event.wait()
+        
+        for processor in processors:
+            tg.create_task(processor.__aexit__(None, None, None))
+    {%- endif %}
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Azure Service Bus Consumer")
+    parser.add_argument('--fully-qualified-namespace', default=os.getenv('FULLY_QUALIFIED_NAMESPACE', 'your_namespace.servicebus.windows.net'), help='The fully qualified Service Bus namespace', required=True)
+    parser.add_argument('--queue-name', default=os.getenv('QUEUE_NAME', 'myqueue'), help='The Service Bus queue name', required=True)
+
+    args = parser.parse_args()
+
+    asyncio.run(main(
+        args.fully_qualified_namespace,
+        args.queue_name
+    ))

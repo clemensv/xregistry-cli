@@ -1,0 +1,7 @@
+{
+  "description": "Python Azure Service Bus Producer",
+  "priority": 1,
+  "main_project_name": "{project_name|dotunderscore|lower}_servicebus_producer",
+  "data_project_name": "{project_name|dotunderscore|lower}_data",
+  "src_layout": false
+}

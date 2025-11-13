@@ -1,0 +1,255 @@
+{%- import "util.include.jinja" as util -%}
+# pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, redefined-outer-name, missing-class-docstring
+
+import asyncio
+import logging
+import os
+import sys
+import json
+import tempfile
+import pytest
+import pytest_asyncio
+from azure.servicebus.aio import ServiceBusClient
+from azure.servicebus import ServiceBusReceivedMessage
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.network import Network
+from testcontainers.core.waiting_utils import wait_for_logs
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/tests')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}/src')))
+
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
+from {{main_project_name}}.producer import {{class_name}}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + (type_name | pascal | strip_namespace) %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+@pytest_asyncio.fixture(scope="module")
+async def service_bus_emulator():
+    """Set up Service Bus emulator with SQL Edge"""
+    network = Network()
+    network.create()
+    
+    # Service Bus emulator configuration
+    config_content = {
+        "UserConfig": {
+            "Namespaces": [
+                {
+                    "Name": "sbemulatorns",
+                    "Queues": [
+                        {
+                            "Name": "myqueue",
+                            "Properties": {
+                                "DeadLetteringOnMessageExpiration": False,
+                                "DefaultMessageTimeToLive": "PT1H",
+                                "LockDuration": "PT1M",
+                                "MaxDeliveryCount": 10,
+                                "RequiresDuplicateDetection": False,
+                                "RequiresSession": False
+                            }
+                        }
+                    ]
+                }
+            ],
+            "Logging": {
+                "Type": "File"
+            }
+        }
+    }
+    
+    config_file = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json')
+    json.dump(config_content, config_file)
+    config_file.flush()
+    config_file.close()
+    config_file_path = config_file.name
+    os.chmod(config_file_path, 0o666)
+    
+    try:
+        # Start SQL Edge container
+        sql_edge_container = DockerContainer("mcr.microsoft.com/azure-sql-edge:latest") \
+            .with_env("ACCEPT_EULA", "Y") \
+            .with_env("MSSQL_SA_PASSWORD", "StrongPassword!1") \
+            .with_network(network) \
+            .with_network_aliases("sqledge")
+        
+        sql_edge_container.start()
+        logging.info("SQL Edge container started")
+        await asyncio.sleep(10)  # Wait for SQL Edge to initialize
+        
+        # Start Service Bus emulator container
+        sb_emulator_container = DockerContainer("mcr.microsoft.com/azure-messaging/servicebus-emulator:latest") \
+            .with_volume_mapping(config_file_path, "/ServiceBus_Emulator/ConfigFiles/Config.json") \
+            .with_bind_ports(5672, 5672) \
+            .with_network(network) \
+            .with_network_aliases("sb-emulator") \
+            .with_env("SQL_SERVER", "sqledge") \
+            .with_env("MSSQL_SA_PASSWORD", "StrongPassword!1") \
+            .with_env("ACCEPT_EULA", "Y")
+        
+        sb_emulator_container.start()
+        logging.info("Service Bus emulator container started")
+        
+        try:
+            wait_for_logs(sb_emulator_container, ".*Emulator Service is Successfully Up!", timeout=60)
+        except TimeoutError as e:
+            stdoutlog, stderrlog = sb_emulator_container.get_logs()
+            logging.error("stdout: %s", stdoutlog)
+            logging.error("stderr: %s", stderrlog)
+            raise e
+        
+        # Extended wait for Service Bus emulator to fully initialize
+        await asyncio.sleep(45)
+        
+        connection_string = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+        
+        yield {
+            "connection_string": connection_string,
+            "queue_name": "myqueue",
+            "network": network,
+            "sql_edge_container": sql_edge_container,
+            "sb_emulator_container": sb_emulator_container
+        }
+        
+        # Cleanup
+        sb_emulator_container.stop()
+        sql_edge_container.stop()
+        network.remove()
+    finally:
+        os.unlink(config_file_path)
+
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
+{%- for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) %}
+{%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
+{%- set message_snake = messageid | dotunderscore | snake %}
+{%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+
+@pytest.mark.asyncio
+async def {{ test_function_name | dotunderscore }}(service_bus_emulator):
+    """Test the {{ messagename }} event from the {{ groupname }} message group"""
+    
+    connection_string = service_bus_emulator["connection_string"]
+    queue_name = service_bus_emulator["queue_name"]
+    
+    # Create producer
+    producer = {{class_name}}.from_connection_string(connection_string, queue_name)
+    
+    # Create minimal test data instance to satisfy schema requirements
+    {%- if type_name != "object" %}
+    try:
+        import inspect
+        import typing
+        import enum
+        data_class = {{ type_name | pascal | strip_namespace }}
+        sig = inspect.signature(data_class.__init__)
+        kwargs = {}
+        for param_name, param in sig.parameters.items():
+            if param_name == 'self':
+                continue
+            if param.default == inspect.Parameter.empty or param.kind == inspect.Parameter.KEYWORD_ONLY:
+                # Get the actual type, unwrapping Optional/Union if needed
+                ann = param.annotation
+                origin = typing.get_origin(ann)
+                
+                # Handle Optional[X] which is Union[X, None]
+                if origin is typing.Union:
+                    args = typing.get_args(ann)
+                    # Use the first non-None type
+                    ann = next((a for a in args if a is not type(None)), args[0])
+                    origin = typing.get_origin(ann)
+                
+                # Now match based on the actual type
+                ann_str = str(ann).lower()
+                if ann is str or ann == 'str' or 'str' in ann_str:
+                    kwargs[param_name] = ""
+                elif ann is int or ann == 'int' or 'int' in ann_str:
+                    kwargs[param_name] = 0
+                elif ann is float or ann == 'float' or 'float' in ann_str:
+                    kwargs[param_name] = 0.0
+                elif ann is bool or ann == 'bool' or 'bool' in ann_str:
+                    kwargs[param_name] = False
+                elif origin is list or ann is list or 'list' in ann_str:
+                    kwargs[param_name] = []
+                elif origin is dict or ann is dict or 'dict' in ann_str:
+                    kwargs[param_name] = {}
+                elif isinstance(ann, type) and issubclass(ann, enum.Enum):
+                    # For enums, use the first value
+                    kwargs[param_name] = list(ann)[0] if list(ann) else None
+                elif 'enum' in ann_str:
+                    # Fallback for enum detection via string
+                    try:
+                        kwargs[param_name] = list(ann)[0] if hasattr(ann, '__iter__') else None
+                    except:
+                        kwargs[param_name] = None
+                else:
+                    kwargs[param_name] = None
+        test_data = data_class(**kwargs)
+    except Exception:
+        test_data = None
+    {%- else %}
+    test_data = None
+    {%- endif %}
+    
+    # Send message
+    await producer.send_{{ message_snake.split('.')[-1] }}(
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
+        _{{ attrname }}="test_{{ attrname }}",
+        {%- endfor %}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+        _{{ placeholder | snake }}="test_{{ placeholder }}",
+        {%- endfor %}
+        {%- endfor %}
+        data=test_data
+    )
+    
+    # Verify message was sent by receiving it
+    servicebus_client = ServiceBusClient.from_connection_string(conn_str=connection_string, logging_enable=True)
+    async with servicebus_client:
+        receiver = servicebus_client.get_queue_receiver(queue_name=queue_name)
+        async with receiver:
+            received_msgs = await receiver.receive_messages(max_wait_time=10, max_message_count=1)
+            assert len(received_msgs) == 1, "Should receive exactly one message"
+            
+            msg = received_msgs[0]
+            # Check CloudEvent properties
+            # For structured mode, CloudEvents are in the JSON body
+            # For binary mode, CloudEvents are in application_properties
+            import json
+            # Try structured mode first (body contains CloudEvents)
+            try:
+                body_data = json.loads(str(msg))
+                if "type" in body_data:
+                    # Structured mode
+                    assert body_data["type"] == "{{ messageid }}"
+                else:
+                    # Binary mode - check application_properties
+                    app_props = msg.application_properties or {}
+                    assert "cloudEvents:type" in app_props or "cloudEvents_type" in app_props, f"CloudEvents type not found in application_properties: {app_props}"
+                    ce_type = app_props.get("cloudEvents:type") or app_props.get("cloudEvents_type")
+                    assert ce_type == "{{ messageid }}"
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # Binary mode - check application_properties
+                app_props = msg.application_properties or {}
+                assert "cloudEvents:type" in app_props or "cloudEvents_type" in app_props, f"CloudEvents type not found in application_properties: {app_props}"
+                ce_type = app_props.get("cloudEvents:type") or app_props.get("cloudEvents_type")
+                assert ce_type == "{{ messageid }}"
+            
+            await receiver.complete_message(msg)
+
+{% endfor %}
+{% endfor %}

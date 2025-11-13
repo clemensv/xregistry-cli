@@ -175,4 +175,729 @@ processor.processError = async (error, context) => {
 4. **Use sessions** when message ordering is required
 5. **Monitor queue depth** and adjust concurrent processing accordingly
 6. **Handle duplicate messages** with idempotent processing logic
+
+## Production-Ready Patterns
+
+Enterprise-grade patterns for Azure Service Bus consumers in TypeScript/Node.js.
+
+### 1. Managed Service Bus Consumer with Auto-Recovery
+
+Maintain reliable Service Bus connections with automatic recovery and lock renewal.
+
+```typescript
+import { ServiceBusClient, ServiceBusReceiver, ServiceBusReceivedMessage } from '@azure/service-bus';
+import { EventEmitter } from 'events';
+
+export class ManagedServiceBusConsumer extends EventEmitter {
+    private receiver: ServiceBusReceiver | null = null;
+    private isRunning: boolean = false;
+    private processingTasks = new Set<Promise<void>>();
+    
+    constructor(
+        private client: ServiceBusClient,
+        private entityPath: string,
+        private isQueue: boolean,
+        private subscriptionName?: string,
+        private processMessage: (message: ServiceBusReceivedMessage) => Promise<void> = async () => {}
+    ) {
+        super();
+    }
+    
+    async start(): Promise<void> {
+        if (this.isRunning) {
+            console.warn('Consumer already running');
+            return;
+        }
+        
+        this.isRunning = true;
+        console.log(`Starting Service Bus consumer for ${this.entityPath}...`);
+        
+        try {
+            this.receiver = this.isQueue
+                ? this.client.createReceiver(this.entityPath, {
+                    receiveMode: 'peekLock',
+                    maxAutoLockRenewalDurationMs: 300000 // 5 minutes
+                  })
+                : this.client.createReceiver(this.entityPath, this.subscriptionName!, {
+                    receiveMode: 'peekLock',
+                    maxAutoLockRenewalDurationMs: 300000
+                  });
+            
+            this.emit('started');
+            
+            // Process messages continuously
+            await this.processMessages();
+            
+        } catch (error) {
+            console.error('Failed to start consumer:', error);
+            this.emit('error', error);
+            throw error;
+        }
+    }
+    
+    private async processMessages(): Promise<void> {
+        while (this.isRunning && this.receiver) {
+            try {
+                const messages = await this.receiver.receiveMessages(10, {
+                    maxWaitTimeInMs: 60000
+                });
+                
+                for (const message of messages) {
+                    if (!this.isRunning) break;
+                    
+                    const task = this.processWithRetry(message)
+                        .finally(() => this.processingTasks.delete(task));
+                    
+                    this.processingTasks.add(task);
+                }
+                
+            } catch (error: any) {
+                if (error.code === 'ServiceCommunicationError') {
+                    console.warn('Connection lost, attempting recovery...');
+                    await this.reconnect();
+                } else {
+                    console.error('Error receiving messages:', error);
+                    this.emit('error', error);
+                }
+            }
+        }
+    }
+    
+    private async processWithRetry(
+        message: ServiceBusReceivedMessage,
+        maxRetries: number = 3
+    ): Promise<void> {
+        let attempt = 0;
+        
+        while (attempt < maxRetries) {
+            try {
+                await this.processMessage(message);
+                await this.receiver!.completeMessage(message);
+                return; // Success
+                
+            } catch (error) {
+                attempt++;
+                
+                if (attempt < maxRetries) {
+                    const delay = Math.pow(2, attempt) * 500;
+                    console.warn(`Retry attempt ${attempt}/${maxRetries} after ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('Max retries exceeded, dead-lettering message');
+                    await this.receiver!.deadLetterMessage(message, {
+                        deadLetterReason: 'MaxRetriesExceeded',
+                        deadLetterErrorDescription: (error as Error).message
+                    });
+                    this.emit('dead_letter', message, error);
+                }
+            }
+        }
+    }
+    
+    private async reconnect(): Promise<void> {
+        if (this.receiver) {
+            await this.receiver.close();
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        this.receiver = this.isQueue
+            ? this.client.createReceiver(this.entityPath)
+            : this.client.createReceiver(this.entityPath, this.subscriptionName!);
+        
+        console.log('Reconnected to Service Bus');
+        this.emit('reconnected');
+    }
+    
+    async stop(): Promise<void> {
+        if (!this.isRunning) return;
+        
+        console.log('Stopping Service Bus consumer...');
+        this.isRunning = false;
+        
+        // Wait for in-flight messages
+        await Promise.all(this.processingTasks);
+        
+        if (this.receiver) {
+            await this.receiver.close();
+        }
+        
+        this.emit('stopped');
+        console.log('Consumer stopped');
+    }
+}
+```
+
+### 2. Session-Aware Consumer
+
+Handle session-enabled queues/topics for ordered message processing.
+
+```typescript
+import { ServiceBusClient, ServiceBusSessionReceiver } from '@azure/service-bus';
+
+export class SessionAwareConsumer {
+    private receivers = new Map<string, ServiceBusSessionReceiver>();
+    private isRunning: boolean = false;
+    
+    constructor(
+        private client: ServiceBusClient,
+        private entityPath: string,
+        private isQueue: boolean,
+        private subscriptionName?: string
+    ) {}
+    
+    async start(
+        processMessage: (message: ServiceBusReceivedMessage, sessionId: string) => Promise<void>
+    ): Promise<void> {
+        this.isRunning = true;
+        console.log('Starting session-aware consumer...');
+        
+        // Accept multiple sessions concurrently
+        const concurrentSessions = 5;
+        
+        const sessionTasks = Array.from({ length: concurrentSessions }, () =>
+            this.processSession(processMessage)
+        );
+        
+        await Promise.all(sessionTasks);
+    }
+    
+    private async processSession(
+        processMessage: (message: ServiceBusReceivedMessage, sessionId: string) => Promise<void>
+    ): Promise<void> {
+        while (this.isRunning) {
+            let receiver: ServiceBusSessionReceiver | null = null;
+            
+            try {
+                // Accept next available session
+                receiver = this.isQueue
+                    ? await this.client.acceptNextSession(this.entityPath, {
+                        maxAutoLockRenewalDurationMs: 300000
+                      })
+                    : await this.client.acceptNextSession(this.entityPath, this.subscriptionName!, {
+                        maxAutoLockRenewalDurationMs: 300000
+                      });
+                
+                const sessionId = receiver.sessionId;
+                console.log(`Accepted session: ${sessionId}`);
+                
+                this.receivers.set(sessionId, receiver);
+                
+                // Process messages from this session
+                while (this.isRunning) {
+                    const messages = await receiver.receiveMessages(10, {
+                        maxWaitTimeInMs: 30000
+                    });
+                    
+                    if (messages.length === 0) {
+                        break; // No more messages in session
+                    }
+                    
+                    for (const message of messages) {
+                        try {
+                            await processMessage(message, sessionId);
+                            await receiver.completeMessage(message);
+                            
+                        } catch (error) {
+                            console.error(`Error processing message in session ${sessionId}:`, error);
+                            await receiver.deadLetterMessage(message, {
+                                deadLetterReason: 'ProcessingFailed'
+                            });
+                        }
+                    }
+                }
+                
+                await receiver.close();
+                this.receivers.delete(sessionId);
+                console.log(`Closed session: ${sessionId}`);
+                
+            } catch (error: any) {
+                if (error.code === 'SessionCannotBeLockedError') {
+                    // No sessions available, wait before retrying
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                } else {
+                    console.error('Session processing error:', error);
+                }
+                
+                if (receiver) {
+                    await receiver.close();
+                }
+            }
+        }
+    }
+    
+    async stop(): Promise<void> {
+        console.log('Stopping session-aware consumer...');
+        this.isRunning = false;
+        
+        const closePromises = Array.from(this.receivers.values()).map(
+            receiver => receiver.close()
+        );
+        
+        await Promise.all(closePromises);
+        this.receivers.clear();
+        
+        console.log('All sessions closed');
+    }
+}
+```
+
+### 3. Circuit Breaker Pattern
+
+Protect downstream services during failures.
+
+```typescript
+enum CircuitState {
+    CLOSED = 'CLOSED',
+    OPEN = 'OPEN',
+    HALF_OPEN = 'HALF_OPEN'
+}
+
+interface CircuitBreakerConfig {
+    failureThreshold: number;
+    successThreshold: number;
+    timeout: number;
+}
+
+export class CircuitBreakerMessageProcessor {
+    private state: CircuitState = CircuitState.CLOSED;
+    private failures: number = 0;
+    private successes: number = 0;
+    private lastFailureTime: number = 0;
+    private config: CircuitBreakerConfig;
+    
+    constructor(config?: Partial<CircuitBreakerConfig>) {
+        this.config = {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 60000,
+            ...config
+        };
+    }
+    
+    async process<T>(
+        message: ServiceBusReceivedMessage,
+        processor: (data: T) => Promise<void>,
+        data: T,
+        receiver: ServiceBusReceiver
+    ): Promise<void> {
+        if (this.state === CircuitState.OPEN) {
+            const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+            
+            if (timeSinceLastFailure > this.config.timeout) {
+                console.log('Circuit breaker transitioning to HALF_OPEN');
+                this.state = CircuitState.HALF_OPEN;
+                this.successes = 0;
+            } else {
+                // Circuit is open, defer message
+                await receiver.deferMessage(message);
+                throw new Error('Circuit breaker is OPEN - message deferred');
+            }
+        }
+        
+        try {
+            await processor(data);
+            await receiver.completeMessage(message);
+            this.onSuccess();
+            
+        } catch (error) {
+            this.onFailure();
+            await receiver.abandonMessage(message);
+            throw error;
+        }
+    }
+    
+    private onSuccess(): void {
+        this.failures = 0;
+        
+        if (this.state === CircuitState.HALF_OPEN) {
+            this.successes++;
+            
+            if (this.successes >= this.config.successThreshold) {
+                console.log('Circuit breaker transitioning to CLOSED');
+                this.state = CircuitState.CLOSED;
+                this.successes = 0;
+            }
+        }
+    }
+    
+    private onFailure(): void {
+        this.failures++;
+        this.lastFailureTime = Date.now();
+        
+        if (this.failures >= this.config.failureThreshold) {
+            console.error('Circuit breaker transitioning to OPEN');
+            this.state = CircuitState.OPEN;
+            this.failures = 0;
+        }
+    }
+    
+    getState(): CircuitState {
+        return this.state;
+    }
+}
+```
+
+### 4. Rate Limiting with Backpressure
+
+Control processing rate with concurrency limits.
+
+```typescript
+import { Semaphore } from 'async-mutex';
+
+export class RateLimitedMessageProcessor {
+    private semaphore: Semaphore;
+    private tokensPerSecond: number;
+    private availableTokens: number;
+    private lastRefill: number = Date.now();
+    
+    constructor(
+        maxConcurrent: number,
+        messagesPerSecond: number
+    ) {
+        this.semaphore = new Semaphore(maxConcurrent);
+        this.tokensPerSecond = messagesPerSecond;
+        this.availableTokens = messagesPerSecond;
+        
+        setInterval(() => this.refillTokens(), 100);
+    }
+    
+    private refillTokens(): void {
+        const now = Date.now();
+        const elapsed = (now - this.lastRefill) / 1000;
+        const tokensToAdd = elapsed * this.tokensPerSecond;
+        
+        this.availableTokens = Math.min(
+            this.availableTokens + tokensToAdd,
+            this.tokensPerSecond
+        );
+        
+        this.lastRefill = now;
+    }
+    
+    private async acquireToken(): Promise<void> {
+        while (this.availableTokens < 1) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        this.availableTokens--;
+    }
+    
+    async process<T>(
+        processor: (data: T) => Promise<void>,
+        data: T
+    ): Promise<void> {
+        await this.acquireToken();
+        
+        const [, release] = await this.semaphore.acquire();
+        
+        try {
+            await processor(data);
+        } finally {
+            release();
+        }
+    }
+}
+```
+
+### 5. Batch Processing
+
+Process messages in batches for improved throughput.
+
+```typescript
+interface BatchConfig {
+    maxBatchSize: number;
+    maxBatchWaitMs: number;
+}
+
+export class BatchMessageProcessor<T> {
+    private batch: T[] = [];
+    private timer: NodeJS.Timeout | null = null;
+    private config: BatchConfig;
+    
+    constructor(
+        private processor: (batch: T[]) => Promise<void>,
+        config?: Partial<BatchConfig>
+    ) {
+        this.config = {
+            maxBatchSize: 50,
+            maxBatchWaitMs: 5000,
+            ...config
+        };
+    }
+    
+    async addMessage(data: T): Promise<void> {
+        this.batch.push(data);
+        
+        if (this.batch.length >= this.config.maxBatchSize) {
+            await this.flush();
+        } else if (!this.timer) {
+            this.timer = setTimeout(
+                () => this.flush(),
+                this.config.maxBatchWaitMs
+            );
+        }
+    }
+    
+    async flush(): Promise<void> {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+        
+        if (this.batch.length === 0) return;
+        
+        const currentBatch = [...this.batch];
+        this.batch = [];
+        
+        console.log(`Processing batch of ${currentBatch.length} messages`);
+        
+        try {
+            await this.processor(currentBatch);
+        } catch (error) {
+            console.error('Batch processing failed:', error);
+            throw error;
+        }
+    }
+}
+```
+
+### 6. OpenTelemetry Observability
+
+Instrument Service Bus consumer with distributed tracing.
+
+```typescript
+import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { metrics } from '@opentelemetry/api-metrics';
+
+export class ObservableMessageProcessor {
+    private tracer = trace.getTracer('servicebus-consumer');
+    private meter = metrics.getMeter('servicebus-consumer');
+    private messagesProcessed = this.meter.createCounter('servicebus.messages.processed');
+    private processingDuration = this.meter.createHistogram('servicebus.processing.duration');
+    private lockRenewalCount = this.meter.createCounter('servicebus.lock.renewals');
+    
+    async process<T>(
+        message: ServiceBusReceivedMessage,
+        processor: (data: T) => Promise<void>,
+        data: T,
+        receiver: ServiceBusReceiver
+    ): Promise<void> {
+        const traceParent = message.applicationProperties?.['traceparent'] as string;
+        const parentContext = traceParent ? this.extractContext(traceParent) : undefined;
+        
+        const span = this.tracer.startSpan(
+            'servicebus.receive',
+            {
+                kind: 1, // CONSUMER
+                attributes: {
+                    'messaging.system': 'servicebus',
+                    'messaging.destination': receiver.entityPath,
+                    'messaging.servicebus.message_id': message.messageId,
+                    'messaging.servicebus.delivery_count': message.deliveryCount,
+                    'messaging.servicebus.enqueued_time': message.enqueuedTimeUtc?.toISOString()
+                }
+            },
+            parentContext
+        );
+        
+        const startTime = Date.now();
+        
+        try {
+            await processor(data);
+            await receiver.completeMessage(message);
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            const duration = Date.now() - startTime;
+            
+            this.messagesProcessed.add(1, { status: 'success' });
+            this.processingDuration.record(duration);
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            
+            this.messagesProcessed.add(1, { status: 'error' });
+            
+            await receiver.deadLetterMessage(message, {
+                deadLetterReason: 'ProcessingFailed'
+            });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    private extractContext(traceParent: string): any {
+        return context.active();
+    }
+}
+```
+
+### 7. Graceful Shutdown
+
+Ensure all messages are processed before shutdown.
+
+```typescript
+export class GracefulMessageProcessor {
+    private isShuttingDown: boolean = false;
+    private pendingMessages = new Set<Promise<void>>();
+    
+    constructor(
+        private client: ServiceBusClient,
+        private receiver: ServiceBusReceiver
+    ) {
+        this.setupShutdownHandlers();
+    }
+    
+    private setupShutdownHandlers(): void {
+        process.on('SIGTERM', () => this.shutdown());
+        process.on('SIGINT', () => this.shutdown());
+    }
+    
+    async processMessage<T>(
+        processor: (data: T) => Promise<void>,
+        data: T
+    ): Promise<void> {
+        if (this.isShuttingDown) {
+            throw new Error('Processor is shutting down');
+        }
+        
+        const task = processor(data);
+        this.pendingMessages.add(task);
+        
+        try {
+            await task;
+        } finally {
+            this.pendingMessages.delete(task);
+        }
+    }
+    
+    private async shutdown(): Promise<void> {
+        if (this.isShuttingDown) return;
+        
+        console.log('Initiating graceful shutdown...');
+        this.isShuttingDown = true;
+        
+        const timeout = 30000;
+        const start = Date.now();
+        
+        while (this.pendingMessages.size > 0 && Date.now() - start < timeout) {
+            console.log(`Waiting for ${this.pendingMessages.size} pending messages...`);
+            await Promise.race([
+                Promise.all(this.pendingMessages),
+                new Promise(resolve => setTimeout(resolve, 1000))
+            ]);
+        }
+        
+        if (this.pendingMessages.size > 0) {
+            console.warn(`Timeout: ${this.pendingMessages.size} messages not processed`);
+        } else {
+            console.log('All messages processed');
+        }
+        
+        await this.receiver.close();
+        await this.client.close();
+        console.log('Service Bus client closed');
+        
+        process.exit(0);
+    }
+    
+    getPendingCount(): number {
+        return this.pendingMessages.size;
+    }
+}
+```
+
+### Integration Example
+
+```typescript
+import { ServiceBusClient } from '@azure/service-bus';
+import { DefaultAzureCredential } from '@azure/identity';
+import {
+    ManagedServiceBusConsumer,
+    SessionAwareConsumer,
+    CircuitBreakerMessageProcessor,
+    RateLimitedMessageProcessor,
+    BatchMessageProcessor,
+    ObservableMessageProcessor,
+    GracefulMessageProcessor
+} from './patterns';
+
+async function main() {
+    // 1. Create client with Azure Identity
+    const credential = new DefaultAzureCredential();
+    const client = new ServiceBusClient(
+        'namespace.servicebus.windows.net',
+        credential
+    );
+    
+    // 2. Initialize patterns
+    const circuitBreaker = new CircuitBreakerMessageProcessor({ failureThreshold: 5 });
+    const rateLimiter = new RateLimitedMessageProcessor(10, 100);
+    const batchProcessor = new BatchMessageProcessor(async (batch) => {
+        console.log(`Processing batch of ${batch.length} messages`);
+    });
+    const observable = new ObservableMessageProcessor();
+    
+    // 3. Standard consumer
+    const consumer = new ManagedServiceBusConsumer(
+        client,
+        'queue-name',
+        true,
+        undefined,
+        async (message) => {
+            const data = message.body;
+            
+            await rateLimiter.process(
+                async (d) => {
+                    await batchProcessor.addMessage(d);
+                },
+                data
+            );
+        }
+    );
+    
+    await consumer.start();
+    
+    // 4. Session-aware consumer
+    const sessionConsumer = new SessionAwareConsumer(
+        client,
+        'session-queue',
+        true
+    );
+    
+    await sessionConsumer.start(async (message, sessionId) => {
+        console.log(`Processing message from session ${sessionId}`);
+    });
+    
+    // Consumer will handle SIGTERM/SIGINT gracefully
+}
+
+main().catch(console.error);
+```
+
+### Dependencies
+
+Add these packages to your `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@azure/service-bus": "^7.9.0",
+    "@azure/identity": "^4.0.0",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/api-metrics": "^0.45.0",
+    "async-mutex": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+```
+
 {% endfor %}

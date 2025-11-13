@@ -145,6 +145,816 @@ try {
 - [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
 - [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
 
+## Production-Ready Patterns
+
+This section provides best-practice patterns for building production-grade Kafka producers in Java.
+
+### 1. Connection Pooling with Singleton Producer
+
+Maintain a single long-lived KafkaProducer instance for thread-safe, efficient message sending.
+
+```java
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class KafkaProducerPool {
+    private static final ConcurrentHashMap<String, KafkaProducer<String, byte[]>> producers = 
+        new ConcurrentHashMap<>();
+    private static final Object lock = new Object();
+    
+    /**
+     * Get or create a thread-safe Kafka producer instance.
+     * KafkaProducer is thread-safe and should be shared across threads.
+     */
+    public static KafkaProducer<String, byte[]> getProducer(
+        Properties properties,
+        String poolKey
+    ) {
+        return producers.computeIfAbsent(poolKey, k -> {
+            // Configure for production reliability
+            properties.putIfAbsent("acks", "all");  // Wait for all replicas
+            properties.putIfAbsent("retries", Integer.MAX_VALUE);
+            properties.putIfAbsent("max.in.flight.requests.per.connection", "5");
+            properties.putIfAbsent("enable.idempotence", "true");  // Exactly-once semantics
+            properties.putIfAbsent("compression.type", "snappy");
+            
+            return new KafkaProducer<>(properties);
+        });
+    }
+    
+    /**
+     * Close all producers gracefully.
+     * Call during application shutdown.
+     */
+    public static void closeAll() {
+        producers.values().forEach(producer -> {
+            try {
+                producer.flush();  // Ensure all messages sent
+                producer.close(java.time.Duration.ofSeconds(10));
+            } catch (Exception e) {
+                System.err.println("Error closing producer: " + e.getMessage());
+            }
+        });
+        producers.clear();
+    }
+    
+    static {
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(KafkaProducerPool::closeAll));
+    }
+}
+```
+
+### 2. Batch Sending for High Throughput
+
+Send messages in batches using CompletableFuture for parallel processing.
+
+```java
+import org.apache.kafka.clients.producer.*;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
+
+public class BatchKafkaProducer {
+    private final KafkaProducer<String, byte[]> producer;
+    private final String topic;
+    
+    public BatchKafkaProducer(Properties properties, String topic) {
+        this.producer = new KafkaProducer<>(properties);
+        this.topic = topic;
+    }
+    
+    /**
+     * Send messages in batch with parallel async sends.
+     * Returns when all messages are acknowledged.
+     */
+    public List<RecordMetadata> sendBatch(List<ProducerRecord<String, byte[]>> records) 
+        throws InterruptedException, ExecutionException {
+        
+        // Send all messages asynchronously
+        List<CompletableFuture<RecordMetadata>> futures = records.stream()
+            .map(record -> {
+                CompletableFuture<RecordMetadata> future = new CompletableFuture<>();
+                producer.send(record, (metadata, exception) -> {
+                    if (exception == null) {
+                        future.complete(metadata);
+                    } else {
+                        future.completeExceptionally(exception);
+                    }
+                });
+                return future;
+            })
+            .collect(Collectors.toList());
+        
+        // Wait for all to complete
+        CompletableFuture<Void> allOf = CompletableFuture.allOf(
+            futures.toArray(new CompletableFuture[0])
+        );
+        
+        allOf.get();  // Blocks until all complete
+        
+        return futures.stream()
+            .map(CompletableFuture::join)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Send batch with size limit and automatic splitting.
+     */
+    public void sendLargeBatch(List<byte[]> messages, int batchSize) {
+        for (int i = 0; i < messages.size(); i += batchSize) {
+            List<byte[]> batch = messages.subList(
+                i, 
+                Math.min(i + batchSize, messages.size())
+            );
+            
+            batch.forEach(msg -> {
+                ProducerRecord<String, byte[]> record = 
+                    new ProducerRecord<>(topic, msg);
+                producer.send(record);
+            });
+            
+            // Flush after each batch
+            producer.flush();
+        }
+    }
+}
+```
+
+### 3. Retry Logic with Resilience4j
+
+Implement intelligent retry with exponential backoff and transient error detection.
+
+```java
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.errors.*;
+
+public class RetryableKafkaProducer {
+    private final KafkaProducer<String, byte[]> producer;
+    private final Retry retry;
+    
+    public RetryableKafkaProducer(Properties properties, String topic) {
+        this.producer = new KafkaProducer<>(properties);
+        
+        // Configure retry for transient errors
+        RetryConfig config = RetryConfig.custom()
+            .maxAttempts(5)
+            .waitDuration(java.time.Duration.ofMillis(500))
+            .exponentialBackoffMultiplier(2.0)
+            .retryExceptions(
+                TimeoutException.class,
+                NetworkException.class,
+                NotLeaderOrFollowerException.class,
+                LeaderNotAvailableException.class
+            )
+            .ignoreExceptions(
+                RecordTooLargeException.class,
+                InvalidTopicException.class,
+                org.apache.kafka.common.errors.AuthorizationException.class
+            )
+            .build();
+        
+        this.retry = Retry.of("kafka-producer", config);
+        
+        // Log retry attempts
+        retry.getEventPublisher()
+            .onRetry(event -> 
+                System.err.println("Retry attempt " + event.getNumberOfRetryAttempts() + 
+                    " for: " + event.getLastThrowable().getMessage())
+            );
+    }
+    
+    /**
+     * Send with automatic retry on transient failures.
+     */
+    public RecordMetadata sendWithRetry(ProducerRecord<String, byte[]> record) 
+        throws Exception {
+        
+        return retry.executeCallable(() -> {
+            try {
+                return producer.send(record).get();  // Synchronous send with retry
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof Exception) {
+                    throw (Exception) cause;
+                }
+                throw e;
+            }
+        });
+    }
+}
+```
+
+### 4. Circuit Breaker Pattern
+
+Protect Kafka cluster from being overwhelmed during outages.
+
+```java
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import java.time.Duration;
+
+public class CircuitBreakerKafkaProducer {
+    private final KafkaProducer<String, byte[]> producer;
+    private final CircuitBreaker circuitBreaker;
+    private final String fallbackTopic;
+    
+    public CircuitBreakerKafkaProducer(
+        Properties properties, 
+        String topic,
+        String fallbackTopic
+    ) {
+        this.producer = new KafkaProducer<>(properties);
+        this.fallbackTopic = fallbackTopic;
+        
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+            .failureRateThreshold(50.0f)  // Open if 50% fail
+            .waitDurationInOpenState(Duration.ofSeconds(60))
+            .slidingWindowSize(20)
+            .minimumNumberOfCalls(10)
+            .permittedNumberOfCallsInHalfOpenState(5)
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+        
+        this.circuitBreaker = CircuitBreaker.of("kafka-producer", config);
+        
+        // Event logging
+        circuitBreaker.getEventPublisher()
+            .onStateTransition(event -> 
+                System.err.println("Circuit breaker state transition: " + 
+                    event.getStateTransition())
+            )
+            .onError(event -> 
+                System.err.println("Circuit breaker error: " + 
+                    event.getThrowable().getMessage())
+            );
+    }
+    
+    /**
+     * Send with circuit breaker protection.
+     * Falls back to alternative topic when circuit is open.
+     */
+    public void sendWithCircuitBreaker(ProducerRecord<String, byte[]> record) {
+        try {
+            circuitBreaker.executeRunnable(() -> {
+                producer.send(record, (metadata, exception) -> {
+                    if (exception != null) {
+                        throw new RuntimeException("Send failed", exception);
+                    }
+                });
+            });
+        } catch (io.github.resilience4j.circuitbreaker.CallNotPermittedException e) {
+            // Circuit is open, use fallback
+            System.err.println("Circuit OPEN, routing to fallback topic");
+            ProducerRecord<String, byte[]> fallbackRecord = 
+                new ProducerRecord<>(fallbackTopic, record.key(), record.value());
+            producer.send(fallbackRecord);
+        }
+    }
+}
+```
+
+### 5. Rate Limiting with Guava
+
+Control message sending rate to prevent overwhelming downstream systems.
+
+```java
+import com.google.common.util.concurrent.RateLimiter;
+import org.apache.kafka.clients.producer.ProducerRecord;
+
+public class RateLimitedKafkaProducer {
+    private final KafkaProducer<String, byte[]> producer;
+    private final RateLimiter rateLimiter;
+    
+    /**
+     * @param properties Kafka producer properties
+     * @param messagesPerSecond Maximum messages to send per second
+     */
+    public RateLimitedKafkaProducer(Properties properties, double messagesPerSecond) {
+        this.producer = new KafkaProducer<>(properties);
+        this.rateLimiter = RateLimiter.create(messagesPerSecond);
+    }
+    
+    /**
+     * Send message with rate limiting.
+     * Blocks if necessary to honor rate limit.
+     */
+    public void sendWithRateLimit(ProducerRecord<String, byte[]> record) {
+        rateLimiter.acquire();  // Blocks until permit available
+        producer.send(record);
+    }
+    
+    /**
+     * Send with timeout on rate limit acquisition.
+     * Returns false if timeout exceeded.
+     */
+    public boolean sendWithTimeout(
+        ProducerRecord<String, byte[]> record,
+        Duration timeout
+    ) {
+        boolean acquired = rateLimiter.tryAcquire(
+            timeout.toMillis(), 
+            java.util.concurrent.TimeUnit.MILLISECONDS
+        );
+        
+        if (acquired) {
+            producer.send(record);
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Send batch with rate limiting applied to entire batch.
+     */
+    public void sendBatchWithRateLimit(List<ProducerRecord<String, byte[]>> records) {
+        rateLimiter.acquire(records.size());  // Acquire permits for entire batch
+        
+        records.forEach(producer::send);
+        producer.flush();
+    }
+}
+```
+
+### 6. Transaction Support for Exactly-Once Semantics
+
+Use Kafka transactions for exactly-once message delivery.
+
+```java
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import java.util.List;
+import java.util.UUID;
+
+public class TransactionalKafkaProducer {
+    private final KafkaProducer<String, byte[]> producer;
+    
+    public TransactionalKafkaProducer(Properties properties) {
+        // Must set transactional.id for exactly-once semantics
+        properties.put("transactional.id", "producer-" + UUID.randomUUID());
+        properties.put("enable.idempotence", "true");
+        properties.put("acks", "all");
+        
+        this.producer = new KafkaProducer<>(properties);
+        this.producer.initTransactions();
+    }
+    
+    /**
+     * Send messages in a transaction.
+     * All messages are committed atomically or none are.
+     */
+    public void sendInTransaction(List<ProducerRecord<String, byte[]>> records) {
+        producer.beginTransaction();
+        
+        try {
+            records.forEach(producer::send);
+            producer.commitTransaction();
+            
+            System.out.println("Transaction committed: " + records.size() + " messages");
+            
+        } catch (Exception e) {
+            producer.abortTransaction();
+            System.err.println("Transaction aborted: " + e.getMessage());
+            throw e;
+        }
+    }
+    
+    /**
+     * Send with automatic transaction management.
+     */
+    public <T> T executeInTransaction(
+        java.util.function.Supplier<T> operation
+    ) {
+        producer.beginTransaction();
+        try {
+            T result = operation.get();
+            producer.commitTransaction();
+            return result;
+        } catch (Exception e) {
+            producer.abortTransaction();
+            throw e;
+        }
+    }
+    
+    public void close() {
+        producer.close();
+    }
+}
+```
+
+### 7. OpenTelemetry Observability
+
+Instrument Kafka producer with distributed tracing and metrics.
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.*;
+import io.opentelemetry.api.metrics.*;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapSetter;
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import java.nio.charset.StandardCharsets;
+
+public class ObservableKafkaProducer {
+    private final KafkaProducer<String, byte[]> producer;
+    private final Tracer tracer;
+    private final LongCounter messagesSent;
+    private final LongHistogram sendDuration;
+    private final String topic;
+    
+    public ObservableKafkaProducer(
+        Properties properties, 
+        String topic,
+        OpenTelemetry openTelemetry
+    ) {
+        this.producer = new KafkaProducer<>(properties);
+        this.topic = topic;
+        this.tracer = openTelemetry.getTracer("kafka-producer");
+        
+        Meter meter = openTelemetry.getMeter("kafka-producer");
+        this.messagesSent = meter
+            .counterBuilder("kafka.messages.sent")
+            .setDescription("Total messages sent")
+            .build();
+        
+        this.sendDuration = meter
+            .histogramBuilder("kafka.send.duration")
+            .setDescription("Message send duration")
+            .setUnit("ms")
+            .ofLongs()
+            .build();
+    }
+    
+    /**
+     * Send message with distributed tracing.
+     */
+    public void sendWithTracing(ProducerRecord<String, byte[]> record) {
+        Span span = tracer.spanBuilder("kafka.send")
+            .setSpanKind(SpanKind.PRODUCER)
+            .setAttribute("messaging.system", "kafka")
+            .setAttribute("messaging.destination", topic)
+            .setAttribute("messaging.kafka.message_key", 
+                record.key() != null ? record.key() : "")
+            .startSpan();
+        
+        long startTime = System.currentTimeMillis();
+        
+        try (Scope scope = span.makeCurrent()) {
+            // Inject trace context into headers
+            openTelemetry.getPropagators().getTextMapPropagator()
+                .inject(Context.current(), record.headers(), new KafkaHeaderSetter());
+            
+            producer.send(record, (metadata, exception) -> {
+                long duration = System.currentTimeMillis() - startTime;
+                
+                if (exception == null) {
+                    span.setAttribute("messaging.kafka.partition", metadata.partition());
+                    span.setAttribute("messaging.kafka.offset", metadata.offset());
+                    span.setStatus(StatusCode.OK);
+                    
+                    messagesSent.add(1, 
+                        Attributes.of(
+                            AttributeKey.stringKey("topic"), topic,
+                            AttributeKey.stringKey("status"), "success"
+                        ));
+                    
+                    sendDuration.record(duration,
+                        Attributes.of(
+                            AttributeKey.stringKey("topic"), topic,
+                            AttributeKey.stringKey("status"), "success"
+                        ));
+                } else {
+                    span.recordException(exception);
+                    span.setStatus(StatusCode.ERROR, exception.getMessage());
+                    
+                    messagesSent.add(1,
+                        Attributes.of(
+                            AttributeKey.stringKey("topic"), topic,
+                            AttributeKey.stringKey("status"), "error"
+                        ));
+                }
+                
+                span.end();
+            });
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            span.end();
+            throw e;
+        }
+    }
+    
+    // TextMapSetter for injecting trace context into Kafka headers
+    private static class KafkaHeaderSetter 
+        implements TextMapSetter<org.apache.kafka.common.header.Headers> {
+        
+        @Override
+        public void set(
+            org.apache.kafka.common.header.Headers headers, 
+            String key, 
+            String value
+        ) {
+            headers.add(new RecordHeader(key, value.getBytes(StandardCharsets.UTF_8)));
+        }
+    }
+}
+```
+
+### 8. Partition Strategy for Ordering
+
+Control message distribution across partitions for ordering guarantees.
+
+```java
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.Partitioner;
+import org.apache.kafka.common.Cluster;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Map;
+
+public class PartitionStrategyProducer {
+    private final KafkaProducer<String, byte[]> producer;
+    private final String topic;
+    
+    public PartitionStrategyProducer(Properties properties, String topic) {
+        this.producer = new KafkaProducer<>(properties);
+        this.topic = topic;
+    }
+    
+    /**
+     * Send with partition key for ordering.
+     * All messages with same key go to same partition.
+     */
+    public void sendWithKey(String key, byte[] message) {
+        ProducerRecord<String, byte[]> record = 
+            new ProducerRecord<>(topic, key, message);
+        producer.send(record);
+    }
+    
+    /**
+     * Send to specific partition for strict ordering.
+     */
+    public void sendToPartition(int partition, byte[] message) {
+        ProducerRecord<String, byte[]> record = 
+            new ProducerRecord<>(topic, partition, null, message);
+        producer.send(record);
+    }
+    
+    /**
+     * Compute consistent partition key from entity ID.
+     * Ensures related entities always map to same partition.
+     */
+    public String computePartitionKey(String entityId) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hash = md.digest(entityId.getBytes(StandardCharsets.UTF_8));
+            return String.format("%016x", new java.math.BigInteger(1, hash));
+        } catch (Exception e) {
+            return entityId;  // Fallback
+        }
+    }
+    
+    /**
+     * Send related messages in order.
+     */
+    public void sendRelatedMessages(
+        String entityId, 
+        List<byte[]> messages
+    ) {
+        String partitionKey = computePartitionKey(entityId);
+        
+        messages.forEach(msg -> {
+            ProducerRecord<String, byte[]> record = 
+                new ProducerRecord<>(topic, partitionKey, msg);
+            producer.send(record);
+        });
+        
+        producer.flush();  // Ensure all sent in order
+    }
+}
+
+/**
+ * Custom partitioner for advanced partition selection strategies.
+ */
+public class CustomPartitioner implements Partitioner {
+    @Override
+    public int partition(
+        String topic, 
+        Object key, 
+        byte[] keyBytes,
+        Object value, 
+        byte[] valueBytes, 
+        Cluster cluster
+    ) {
+        int numPartitions = cluster.partitionCountForTopic(topic);
+        
+        if (key == null) {
+            // Round-robin for null keys
+            return (int) (System.currentTimeMillis() % numPartitions);
+        }
+        
+        // Hash-based partitioning
+        return Math.abs(key.hashCode()) % numPartitions;
+    }
+    
+    @Override
+    public void close() {}
+    
+    @Override
+    public void configure(Map<String, ?> configs) {}
+}
+```
+
+### 9. Graceful Shutdown
+
+Ensure all messages are sent before application termination.
+
+```java
+import org.apache.kafka.clients.producer.KafkaProducer;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CountDownLatch;
+import java.time.Duration;
+
+public class GracefulKafkaProducer {
+    private final KafkaProducer<String, byte[]> producer;
+    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    
+    public GracefulKafkaProducer(Properties properties) {
+        this.producer = new KafkaProducer<>(properties);
+        
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+    }
+    
+    /**
+     * Send message with tracking for graceful shutdown.
+     */
+    public void send(ProducerRecord<String, byte[]> record) {
+        if (shuttingDown.get()) {
+            System.err.println("Producer shutting down, message not sent");
+            return;
+        }
+        
+        producer.send(record, (metadata, exception) -> {
+            if (exception != null) {
+                System.err.println("Send failed: " + exception.getMessage());
+            } else {
+                System.out.println("Sent: partition=" + metadata.partition() + 
+                    ", offset=" + metadata.offset());
+            }
+        });
+    }
+    
+    /**
+     * Graceful shutdown: flush all pending messages and close.
+     */
+    public void shutdown() {
+        if (shuttingDown.compareAndSet(false, true)) {
+            System.out.println("Initiating graceful shutdown...");
+            
+            try {
+                // Flush all pending messages (blocks until complete)
+                producer.flush();
+                System.out.println("All messages flushed");
+                
+                // Close producer with timeout
+                producer.close(Duration.ofSeconds(30));
+                System.out.println("Producer closed gracefully");
+                
+            } catch (Exception e) {
+                System.err.println("Error during shutdown: " + e.getMessage());
+            } finally {
+                shutdownLatch.countDown();
+            }
+        }
+    }
+    
+    /**
+     * Wait for graceful shutdown to complete.
+     */
+    public void awaitShutdown() throws InterruptedException {
+        shutdownLatch.await();
+    }
+}
+```
+
+### Configuration Best Practices
+
+```java
+public class KafkaProducerConfig {
+    public static Properties createProductionConfig(String bootstrapServers) {
+        Properties props = new Properties();
+        
+        // Connection
+        props.put("bootstrap.servers", bootstrapServers);
+        props.put("client.id", "producer-" + java.util.UUID.randomUUID());
+        
+        // Serialization
+        props.put("key.serializer", 
+            "org.apache.kafka.common.serialization.StringSerializer");
+        props.put("value.serializer", 
+            "org.apache.kafka.common.serialization.ByteArraySerializer");
+        
+        // Reliability (Exactly-Once)
+        props.put("acks", "all");  // Wait for all replicas
+        props.put("retries", Integer.MAX_VALUE);
+        props.put("max.in.flight.requests.per.connection", "5");
+        props.put("enable.idempotence", "true");
+        
+        // Performance
+        props.put("compression.type", "snappy");  // Or lz4, zstd
+        props.put("batch.size", "32768");  // 32KB batches
+        props.put("linger.ms", "10");  // Wait 10ms for batching
+        props.put("buffer.memory", "67108864");  // 64MB buffer
+        
+        // Timeouts
+        props.put("request.timeout.ms", "30000");  // 30s
+        props.put("delivery.timeout.ms", "120000");  // 2 minutes total
+        
+        // Security (for production)
+        props.put("security.protocol", "SASL_SSL");
+        props.put("sasl.mechanism", "PLAIN");
+        props.put("sasl.jaas.config",
+            "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+            "username=\"${KAFKA_USERNAME}\" password=\"${KAFKA_PASSWORD}\";");
+        
+        return props;
+    }
+}
+```
+
+### Integration Example
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+import com.google.common.util.concurrent.RateLimiter;
+
+public class ProductionKafkaProducer {
+    public static void main(String[] args) throws Exception {
+        // Configuration
+        Properties props = KafkaProducerConfig.createProductionConfig(
+            "broker1:9092,broker2:9092,broker3:9092"
+        );
+        
+        // Initialize components
+        KafkaProducer<String, byte[]> baseProducer = 
+            KafkaProducerPool.getProducer(props, "main-pool");
+        
+        GracefulKafkaProducer gracefulProducer = 
+            new GracefulKafkaProducer(props);
+        
+        TransactionalKafkaProducer transactionalProducer = 
+            new TransactionalKafkaProducer(props);
+        
+        RetryableKafkaProducer retryProducer = 
+            new RetryableKafkaProducer(props, "my-topic");
+        
+        CircuitBreakerKafkaProducer cbProducer = 
+            new CircuitBreakerKafkaProducer(props, "my-topic", "fallback-topic");
+        
+        RateLimitedKafkaProducer rateLimitedProducer = 
+            new RateLimitedKafkaProducer(props, 1000.0);  // 1000 msg/sec
+        
+        // OpenTelemetry setup
+        OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .setMeterProvider(meterProvider)
+            .buildAndRegisterGlobal();
+        
+        ObservableKafkaProducer observableProducer = 
+            new ObservableKafkaProducer(props, "my-topic", openTelemetry);
+        
+        // Example: Send with all patterns
+        byte[] message = "Hello, Kafka!".getBytes();
+        ProducerRecord<String, byte[]> record = 
+            new ProducerRecord<>("my-topic", "key1", message);
+        
+        // Apply patterns
+        rateLimitedProducer.sendWithRateLimit(record);
+        observableProducer.sendWithTracing(record);
+        RecordMetadata metadata = retryProducer.sendWithRetry(record);
+        cbProducer.sendWithCircuitBreaker(record);
+        
+        // Transactional send
+        transactionalProducer.sendInTransaction(List.of(record));
+        
+        // Graceful shutdown
+        gracefulProducer.shutdown();
+        gracefulProducer.awaitShutdown();
+        
+        KafkaProducerPool.closeAll();
+    }
+}
+```
+
 ## Generated Code
 
 Auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).

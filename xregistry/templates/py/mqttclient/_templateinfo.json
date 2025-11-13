@@ -1,0 +1,7 @@
+{
+  "description": "Python MQTT Client",
+  "priority": 1,
+  "main_project_name": "{project_name|dotunderscore|lower}_mqtt_client",
+  "data_project_name": "{project_name|dotunderscore|lower}_data",
+  "src_layout": false
+}

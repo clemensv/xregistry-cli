@@ -187,4 +187,890 @@ const processor = new KafkaProcessor(consumer, 'my-topic', {
 4. **Monitor consumer lag** to ensure timely processing
 5. **Use SSL/SASL** for production deployments
 6. **Implement idempotent handlers** to handle duplicate messages
+
+## Production-Ready Patterns
+
+This section provides enterprise-grade patterns for building reliable Kafka consumers in TypeScript/Node.js.
+
+### 1. Connection Management with Auto-Reconnect
+
+Maintain reliable Kafka connections with automatic reconnection and health monitoring.
+
+```typescript
+import { Kafka, Consumer, EachMessagePayload } from 'kafkajs';
+import { EventEmitter } from 'events';
+
+export class ManagedKafkaConsumer extends EventEmitter {
+    private kafka: Kafka;
+    private consumer: Consumer;
+    private isRunning: boolean = false;
+    private reconnectAttempts: number = 0;
+    private maxReconnectAttempts: number = 10;
+    
+    constructor(
+        brokers: string[],
+        groupId: string,
+        private topics: string[]
+    ) {
+        super();
+        
+        this.kafka = new Kafka({
+            clientId: `${groupId}-client`,
+            brokers,
+            retry: {
+                initialRetryTime: 300,
+                retries: 8,
+                maxRetryTime: 30000,
+                multiplier: 2,
+                factor: 0.2
+            }
+        });
+        
+        this.consumer = this.kafka.consumer({
+            groupId,
+            sessionTimeout: 30000,
+            heartbeatInterval: 3000,
+            maxWaitTimeInMs: 100,
+            retry: {
+                initialRetryTime: 300,
+                retries: 5
+            }
+        });
+        
+        this.setupEventHandlers();
+    }
+    
+    private setupEventHandlers(): void {
+        this.consumer.on('consumer.connect', () => {
+            console.log('Kafka consumer connected');
+            this.reconnectAttempts = 0;
+            this.emit('connected');
+        });
+        
+        this.consumer.on('consumer.disconnect', () => {
+            console.warn('Kafka consumer disconnected');
+            this.emit('disconnected');
+            
+            if (this.isRunning) {
+                this.reconnect();
+            }
+        });
+        
+        this.consumer.on('consumer.crash', ({ error, groupId }) => {
+            console.error(`Consumer crashed (group: ${groupId}):`, error);
+            this.emit('error', error);
+            
+            if (this.isRunning) {
+                this.reconnect();
+            }
+        });
+        
+        this.consumer.on('consumer.group_join', ({ groupId, memberId }) => {
+            console.log(`Joined group ${groupId} as ${memberId}`);
+            this.emit('group_joined', { groupId, memberId });
+        });
+    }
+    
+    private async reconnect(): Promise<void> {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.error('Max reconnection attempts reached');
+            this.emit('max_reconnect_attempts');
+            return;
+        }
+        
+        this.reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+        
+        console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        try {
+            await this.start();
+        } catch (error) {
+            console.error('Reconnection failed:', error);
+            this.reconnect();
+        }
+    }
+    
+    async start(messageHandler: (payload: EachMessagePayload) => Promise<void>): Promise<void> {
+        if (this.isRunning) {
+            console.warn('Consumer already running');
+            return;
+        }
+        
+        this.isRunning = true;
+        
+        await this.consumer.connect();
+        await this.consumer.subscribe({
+            topics: this.topics,
+            fromBeginning: false
+        });
+        
+        await this.consumer.run({
+            eachMessage: async (payload) => {
+                try {
+                    await messageHandler(payload);
+                } catch (error) {
+                    console.error('Message processing failed:', error);
+                    this.emit('processing_error', error);
+                }
+            }
+        });
+    }
+    
+    async stop(): Promise<void> {
+        this.isRunning = false;
+        await this.consumer.disconnect();
+        console.log('Kafka consumer stopped');
+    }
+    
+    getConnectionState(): { running: boolean; reconnectAttempts: number } {
+        return {
+            running: this.isRunning,
+            reconnectAttempts: this.reconnectAttempts
+        };
+    }
+}
+```
+
+### 2. Retry Logic with Exponential Backoff and DLQ
+
+Handle transient failures with intelligent retry and dead-letter queue routing.
+
+```typescript
+import { EachMessagePayload, Producer } from 'kafkajs';
+
+interface RetryConfig {
+    maxAttempts: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+}
+
+export class RetryableKafkaConsumer {
+    private retryConfig: RetryConfig;
+    private dlqProducer: Producer;
+    
+    constructor(
+        private consumer: Consumer,
+        private dlqTopic: string,
+        retryConfig?: Partial<RetryConfig>
+    ) {
+        this.retryConfig = {
+            maxAttempts: 5,
+            initialDelayMs: 500,
+            maxDelayMs: 30000,
+            backoffMultiplier: 2,
+            ...retryConfig
+        };
+        
+        this.dlqProducer = consumer.kafka().producer();
+    }
+    
+    async start(
+        topics: string[],
+        messageHandler: (message: EachMessagePayload) => Promise<void>
+    ): Promise<void> {
+        await this.dlqProducer.connect();
+        await this.consumer.connect();
+        await this.consumer.subscribe({ topics, fromBeginning: false });
+        
+        await this.consumer.run({
+            eachMessage: async (payload) => {
+                await this.processWithRetry(payload, messageHandler);
+            }
+        });
+    }
+    
+    private async processWithRetry(
+        payload: EachMessagePayload,
+        handler: (payload: EachMessagePayload) => Promise<void>
+    ): Promise<void> {
+        let attempt = 0;
+        
+        while (attempt < this.retryConfig.maxAttempts) {
+            try {
+                await handler(payload);
+                return; // Success
+                
+            } catch (error) {
+                attempt++;
+                
+                if (this.isTransientError(error)) {
+                    if (attempt < this.retryConfig.maxAttempts) {
+                        const delay = Math.min(
+                            this.retryConfig.initialDelayMs * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+                            this.retryConfig.maxDelayMs
+                        );
+                        
+                        console.warn(`Retry attempt ${attempt}/${this.retryConfig.maxAttempts} after ${delay}ms`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        console.error('Max retries exceeded, sending to DLQ');
+                        await this.sendToDLQ(payload, error);
+                    }
+                } else {
+                    // Non-transient error, send directly to DLQ
+                    console.error('Non-transient error, sending to DLQ:', error);
+                    await this.sendToDLQ(payload, error);
+                    return;
+                }
+            }
+        }
+    }
+    
+    private isTransientError(error: any): boolean {
+        const transientErrors = [
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            'NetworkError',
+            'TimeoutError'
+        ];
+        
+        return transientErrors.some(err => 
+            error.message?.includes(err) || error.code === err
+        );
+    }
+    
+    private async sendToDLQ(payload: EachMessagePayload, error: any): Promise<void> {
+        const dlqMessage = {
+            key: payload.message.key,
+            value: payload.message.value,
+            headers: {
+                ...payload.message.headers,
+                'dlq-original-topic': payload.topic,
+                'dlq-original-partition': payload.partition.toString(),
+                'dlq-original-offset': payload.message.offset,
+                'dlq-error-message': error.message || 'Unknown error',
+                'dlq-timestamp': new Date().toISOString()
+            }
+        };
+        
+        await this.dlqProducer.send({
+            topic: this.dlqTopic,
+            messages: [dlqMessage]
+        });
+        
+        console.log(`Message sent to DLQ: ${this.dlqTopic}`);
+    }
+    
+    async stop(): Promise<void> {
+        await this.consumer.disconnect();
+        await this.dlqProducer.disconnect();
+    }
+}
+```
+
+### 3. Circuit Breaker Pattern
+
+Protect downstream services from being overwhelmed during message processing.
+
+```typescript
+enum CircuitState {
+    CLOSED = 'CLOSED',
+    OPEN = 'OPEN',
+    HALF_OPEN = 'HALF_OPEN'
+}
+
+interface CircuitBreakerConfig {
+    failureThreshold: number;
+    successThreshold: number;
+    timeout: number;
+    windowSize: number;
+}
+
+export class CircuitBreakerKafkaConsumer {
+    private state: CircuitState = CircuitState.CLOSED;
+    private failures: number = 0;
+    private successes: number = 0;
+    private lastFailureTime: number = 0;
+    private config: CircuitBreakerConfig;
+    
+    constructor(
+        private consumer: Consumer,
+        config?: Partial<CircuitBreakerConfig>
+    ) {
+        this.config = {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 60000,
+            windowSize: 100,
+            ...config
+        };
+    }
+    
+    async start(
+        topics: string[],
+        messageHandler: (payload: EachMessagePayload) => Promise<void>
+    ): Promise<void> {
+        await this.consumer.connect();
+        await this.consumer.subscribe({ topics, fromBeginning: false });
+        
+        await this.consumer.run({
+            eachMessage: async (payload) => {
+                await this.processWithCircuitBreaker(payload, messageHandler);
+            }
+        });
+    }
+    
+    private async processWithCircuitBreaker(
+        payload: EachMessagePayload,
+        handler: (payload: EachMessagePayload) => Promise<void>
+    ): Promise<void> {
+        if (this.state === CircuitState.OPEN) {
+            const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+            
+            if (timeSinceLastFailure > this.config.timeout) {
+                console.log('Circuit breaker transitioning to HALF_OPEN');
+                this.state = CircuitState.HALF_OPEN;
+                this.successes = 0;
+            } else {
+                console.warn('Circuit breaker OPEN, skipping message');
+                throw new Error('Circuit breaker is OPEN');
+            }
+        }
+        
+        try {
+            await handler(payload);
+            this.onSuccess();
+            
+        } catch (error) {
+            this.onFailure();
+            throw error;
+        }
+    }
+    
+    private onSuccess(): void {
+        this.failures = 0;
+        
+        if (this.state === CircuitState.HALF_OPEN) {
+            this.successes++;
+            
+            if (this.successes >= this.config.successThreshold) {
+                console.log('Circuit breaker transitioning to CLOSED');
+                this.state = CircuitState.CLOSED;
+                this.successes = 0;
+            }
+        }
+    }
+    
+    private onFailure(): void {
+        this.failures++;
+        this.lastFailureTime = Date.now();
+        
+        if (this.failures >= this.config.failureThreshold) {
+            console.error('Circuit breaker transitioning to OPEN');
+            this.state = CircuitState.OPEN;
+            this.failures = 0;
+        }
+    }
+    
+    getState(): CircuitState {
+        return this.state;
+    }
+    
+    async stop(): Promise<void> {
+        await this.consumer.disconnect();
+    }
+}
+```
+
+### 4. Rate Limiting with Backpressure Control
+
+Control message processing rate to prevent system overload.
+
+```typescript
+import { Semaphore } from 'async-mutex';
+
+export class RateLimitedKafkaConsumer {
+    private semaphore: Semaphore;
+    private tokensPerSecond: number;
+    private lastRefill: number = Date.now();
+    private availableTokens: number;
+    
+    constructor(
+        private consumer: Consumer,
+        messagesPerSecond: number,
+        maxConcurrent: number = 10
+    ) {
+        this.tokensPerSecond = messagesPerSecond;
+        this.availableTokens = messagesPerSecond;
+        this.semaphore = new Semaphore(maxConcurrent);
+        
+        // Refill tokens periodically
+        setInterval(() => this.refillTokens(), 100);
+    }
+    
+    private refillTokens(): void {
+        const now = Date.now();
+        const elapsed = (now - this.lastRefill) / 1000;
+        const tokensToAdd = elapsed * this.tokensPerSecond;
+        
+        this.availableTokens = Math.min(
+            this.availableTokens + tokensToAdd,
+            this.tokensPerSecond
+        );
+        
+        this.lastRefill = now;
+    }
+    
+    private async acquireToken(): Promise<void> {
+        while (this.availableTokens < 1) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        this.availableTokens--;
+    }
+    
+    async start(
+        topics: string[],
+        messageHandler: (payload: EachMessagePayload) => Promise<void>
+    ): Promise<void> {
+        await this.consumer.connect();
+        await this.consumer.subscribe({ topics, fromBeginning: false });
+        
+        await this.consumer.run({
+            eachMessage: async (payload) => {
+                // Apply rate limit
+                await this.acquireToken();
+                
+                // Apply backpressure (concurrency limit)
+                const release = await this.semaphore.acquire();
+                
+                try {
+                    await messageHandler(payload);
+                } finally {
+                    release();
+                }
+            }
+        });
+    }
+    
+    getAvailableTokens(): number {
+        return this.availableTokens;
+    }
+    
+    async stop(): Promise<void> {
+        await this.consumer.disconnect();
+    }
+}
+```
+
+### 5. Batch Processing with Checkpointing
+
+Process messages in batches for improved throughput.
+
+```typescript
+interface BatchConfig {
+    maxBatchSize: number;
+    maxBatchWaitMs: number;
+}
+
+export class BatchKafkaConsumer {
+    private batches: Map<number, EachMessagePayload[]> = new Map();
+    private batchTimers: Map<number, NodeJS.Timeout> = new Map();
+    private config: BatchConfig;
+    
+    constructor(
+        private consumer: Consumer,
+        config?: Partial<BatchConfig>
+    ) {
+        this.config = {
+            maxBatchSize: 100,
+            maxBatchWaitMs: 5000,
+            ...config
+        };
+    }
+    
+    async start(
+        topics: string[],
+        batchHandler: (messages: EachMessagePayload[]) => Promise<void>
+    ): Promise<void> {
+        await this.consumer.connect();
+        await this.consumer.subscribe({ topics, fromBeginning: false });
+        
+        await this.consumer.run({
+            autoCommit: false,
+            eachMessage: async (payload) => {
+                await this.addToBatch(payload, batchHandler);
+            }
+        });
+    }
+    
+    private async addToBatch(
+        payload: EachMessagePayload,
+        handler: (messages: EachMessagePayload[]) => Promise<void>
+    ): Promise<void> {
+        const partition = payload.partition;
+        
+        if (!this.batches.has(partition)) {
+            this.batches.set(partition, []);
+            this.scheduleBatchFlush(partition, handler);
+        }
+        
+        const batch = this.batches.get(partition)!;
+        batch.push(payload);
+        
+        // Flush if batch is full
+        if (batch.length >= this.config.maxBatchSize) {
+            await this.flushBatch(partition, handler);
+        }
+    }
+    
+    private scheduleBatchFlush(
+        partition: number,
+        handler: (messages: EachMessagePayload[]) => Promise<void>
+    ): void {
+        const timer = setTimeout(() => {
+            this.flushBatch(partition, handler);
+        }, this.config.maxBatchWaitMs);
+        
+        this.batchTimers.set(partition, timer);
+    }
+    
+    private async flushBatch(
+        partition: number,
+        handler: (messages: EachMessagePayload[]) => Promise<void>
+    ): Promise<void> {
+        const batch = this.batches.get(partition);
+        
+        if (!batch || batch.length === 0) {
+            return;
+        }
+        
+        // Clear timer
+        const timer = this.batchTimers.get(partition);
+        if (timer) {
+            clearTimeout(timer);
+            this.batchTimers.delete(partition);
+        }
+        
+        try {
+            console.log(`Processing batch of ${batch.length} messages from partition ${partition}`);
+            await handler(batch);
+            
+            // Commit offsets after successful batch processing
+            const lastMessage = batch[batch.length - 1];
+            await this.consumer.commitOffsets([{
+                topic: lastMessage.topic,
+                partition: lastMessage.partition,
+                offset: (parseInt(lastMessage.message.offset) + 1).toString()
+            }]);
+            
+            console.log(`Committed offset for partition ${partition}`);
+            
+        } catch (error) {
+            console.error(`Batch processing failed for partition ${partition}:`, error);
+            throw error;
+            
+        } finally {
+            // Clear batch and reschedule
+            this.batches.set(partition, []);
+            this.scheduleBatchFlush(partition, handler);
+        }
+    }
+    
+    async stop(): Promise<void> {
+        // Flush all pending batches
+        for (const [partition, timer] of this.batchTimers.entries()) {
+            clearTimeout(timer);
+        }
+        
+        await this.consumer.disconnect();
+    }
+}
+```
+
+### 6. OpenTelemetry Observability
+
+Instrument Kafka consumer with distributed tracing and metrics.
+
+```typescript
+import { trace, context, SpanStatusCode, Span } from '@opentelemetry/api';
+import { metrics } from '@opentelemetry/api-metrics';
+
+export class ObservableKafkaConsumer {
+    private tracer = trace.getTracer('kafka-consumer');
+    private meter = metrics.getMeter('kafka-consumer');
+    private messagesProcessed = this.meter.createCounter('kafka.messages.processed');
+    private processingDuration = this.meter.createHistogram('kafka.processing.duration');
+    
+    constructor(private consumer: Consumer) {}
+    
+    async start(
+        topics: string[],
+        messageHandler: (payload: EachMessagePayload) => Promise<void>
+    ): Promise<void> {
+        await this.consumer.connect();
+        await this.consumer.subscribe({ topics, fromBeginning: false });
+        
+        await this.consumer.run({
+            eachMessage: async (payload) => {
+                await this.processWithTracing(payload, messageHandler);
+            }
+        });
+    }
+    
+    private async processWithTracing(
+        payload: EachMessagePayload,
+        handler: (payload: EachMessagePayload) => Promise<void>
+    ): Promise<void> {
+        // Extract trace context from message headers
+        const headers = payload.message.headers || {};
+        const traceparent = headers['traceparent']?.toString();
+        
+        const span = this.tracer.startSpan('kafka.consume', {
+            kind: 1, // CONSUMER
+            attributes: {
+                'messaging.system': 'kafka',
+                'messaging.destination': payload.topic,
+                'messaging.operation': 'receive',
+                'messaging.kafka.partition': payload.partition,
+                'messaging.kafka.offset': payload.message.offset,
+                'messaging.kafka.message_key': payload.message.key?.toString()
+            }
+        });
+        
+        const startTime = Date.now();
+        
+        try {
+            await context.with(trace.setSpan(context.active(), span), async () => {
+                await handler(payload);
+            });
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            // Record metrics
+            this.messagesProcessed.add(1, {
+                topic: payload.topic,
+                status: 'success'
+            });
+            
+            const duration = Date.now() - startTime;
+            this.processingDuration.record(duration, {
+                topic: payload.topic
+            });
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: error.message
+            });
+            
+            this.messagesProcessed.add(1, {
+                topic: payload.topic,
+                status: 'error'
+            });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    async stop(): Promise<void> {
+        await this.consumer.disconnect();
+    }
+}
+```
+
+### 7. Graceful Shutdown
+
+Ensure all messages are processed before shutdown.
+
+```typescript
+export class GracefulKafkaConsumer {
+    private isShuttingDown: boolean = false;
+    private inFlightMessages: number = 0;
+    
+    constructor(private consumer: Consumer) {
+        this.setupShutdownHandlers();
+    }
+    
+    private setupShutdownHandlers(): void {
+        process.on('SIGTERM', () => this.shutdown());
+        process.on('SIGINT', () => this.shutdown());
+    }
+    
+    async start(
+        topics: string[],
+        messageHandler: (payload: EachMessagePayload) => Promise<void>
+    ): Promise<void> {
+        await this.consumer.connect();
+        await this.consumer.subscribe({ topics, fromBeginning: false });
+        
+        await this.consumer.run({
+            eachMessage: async (payload) => {
+                if (this.isShuttingDown) {
+                    console.log('Shutdown in progress, skipping message');
+                    return;
+                }
+                
+                this.inFlightMessages++;
+                
+                try {
+                    await messageHandler(payload);
+                } finally {
+                    this.inFlightMessages--;
+                }
+            }
+        });
+    }
+    
+    private async shutdown(): Promise<void> {
+        if (this.isShuttingDown) {
+            return;
+        }
+        
+        console.log('Initiating graceful shutdown...');
+        this.isShuttingDown = true;
+        
+        // Wait for in-flight messages (up to 30 seconds)
+        const timeout = 30000;
+        const start = Date.now();
+        
+        while (this.inFlightMessages > 0 && Date.now() - start < timeout) {
+            console.log(`Waiting for ${this.inFlightMessages} in-flight messages...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (this.inFlightMessages > 0) {
+            console.warn(`Timeout: ${this.inFlightMessages} messages still in-flight`);
+        } else {
+            console.log('All messages processed');
+        }
+        
+        await this.consumer.disconnect();
+        console.log('Kafka consumer disconnected');
+        process.exit(0);
+    }
+    
+    getInFlightCount(): number {
+        return this.inFlightMessages;
+    }
+}
+```
+
+### Integration Example
+
+```typescript
+import { Kafka } from 'kafkajs';
+import { 
+    ManagedKafkaConsumer,
+    RetryableKafkaConsumer,
+    CircuitBreakerKafkaConsumer,
+    RateLimitedKafkaConsumer,
+    BatchKafkaConsumer,
+    ObservableKafkaConsumer,
+    GracefulKafkaConsumer
+} from './patterns';
+
+async function main() {
+    const kafka = new Kafka({
+        clientId: 'my-app',
+        brokers: ['localhost:9092']
+    });
+    
+    const consumer = kafka.consumer({ groupId: 'my-group' });
+    
+    // 1. Managed consumer with auto-reconnect
+    const managedConsumer = new ManagedKafkaConsumer(
+        ['localhost:9092'],
+        'my-group',
+        ['my-topic']
+    );
+    
+    managedConsumer.on('connected', () => console.log('Connected!'));
+    managedConsumer.on('error', (error) => console.error('Error:', error));
+    
+    await managedConsumer.start(async (payload) => {
+        console.log('Message:', payload.message.value?.toString());
+    });
+    
+    // 2. Retry with DLQ
+    const retryConsumer = new RetryableKafkaConsumer(
+        consumer,
+        'my-topic-dlq',
+        { maxAttempts: 5, initialDelayMs: 500 }
+    );
+    
+    await retryConsumer.start(['my-topic'], async (payload) => {
+        // Process message
+    });
+    
+    // 3. Circuit breaker
+    const cbConsumer = new CircuitBreakerKafkaConsumer(consumer, {
+        failureThreshold: 5,
+        timeout: 60000
+    });
+    
+    await cbConsumer.start(['my-topic'], async (payload) => {
+        // Process message
+    });
+    
+    // 4. Rate limiting
+    const rateLimitedConsumer = new RateLimitedKafkaConsumer(
+        consumer,
+        100, // 100 messages per second
+        10   // 10 concurrent
+    );
+    
+    await rateLimitedConsumer.start(['my-topic'], async (payload) => {
+        // Process message
+    });
+    
+    // 5. Batch processing
+    const batchConsumer = new BatchKafkaConsumer(consumer, {
+        maxBatchSize: 100,
+        maxBatchWaitMs: 5000
+    });
+    
+    await batchConsumer.start(['my-topic'], async (messages) => {
+        console.log(`Processing batch of ${messages.length} messages`);
+        // Process batch
+    });
+    
+    // 6. Observable with OpenTelemetry
+    const observableConsumer = new ObservableKafkaConsumer(consumer);
+    
+    await observableConsumer.start(['my-topic'], async (payload) => {
+        // Process message with tracing
+    });
+    
+    // 7. Graceful shutdown
+    const gracefulConsumer = new GracefulKafkaConsumer(consumer);
+    
+    await gracefulConsumer.start(['my-topic'], async (payload) => {
+        // Process message
+    });
+    
+    // Consumer will handle SIGTERM/SIGINT gracefully
+}
+
+main().catch(console.error);
+```
+
+### Dependencies
+
+Add these packages to your `package.json`:
+
+```json
+{
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/api-metrics": "^0.45.0",
+    "async-mutex": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+```
+
 {% endfor %}

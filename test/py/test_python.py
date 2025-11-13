@@ -186,3 +186,87 @@ def test_amqpconsumer_contoso_erp_py():
     tmpdirname = tempfile.mkdtemp()
     run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
             '/', os.sep)), tmpdirname, "test_amqpconsumer_contoso_erp_py", "amqpconsumer")
+
+
+def test_mqttclient_lightbulb_py():
+    """ Test the MQTT client for Lightbulb."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
+                        tmpdirname, "test_mqttclient_lightbulb_py", "mqttclient")
+
+
+def test_mqttclient_contoso_erp_py():
+    """ Test the MQTT client for Contoso ERP."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_mqttclient_contoso_erp_py", "mqttclient")
+
+
+def test_mqttclient_fabrikam_motorsports_py():
+    """ Test the MQTT client for Fabrikam Motorsports."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_mqttclient_fabrikam_motorsports_py", "mqttclient")
+
+
+def test_mqttclient_inkjet_py():
+    """ Test the MQTT client for Inkjet."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_mqttclient_inkjet_py", "mqttclient")
+
+
+def test_sbproducer_lightbulb_py():
+    """ Test the Service Bus producer for Lightbulb."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
+                        tmpdirname, "test_sbproducer_lightbulb_py", "sbproducer")
+
+
+def test_sbproducer_contoso_erp_py():
+    """ Test the Service Bus producer for Contoso ERP."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_sbproducer_contoso_erp_py", "sbproducer")
+
+
+def test_sbproducer_fabrikam_motorsports_py():
+    """ Test the Service Bus producer for Fabrikam Motorsports."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_sbproducer_fabrikam_motorsports_py", "sbproducer")
+
+
+def test_sbproducer_inkjet_py():
+    """ Test the Service Bus producer for Inkjet."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_sbproducer_inkjet_py", "sbproducer")
+
+
+def test_sbconsumer_lightbulb_py():
+    """ Test the Service Bus consumer for Lightbulb."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/lightbulb.xreg.json"),
+                        tmpdirname, "test_sbconsumer_lightbulb_py", "sbconsumer")
+
+
+def test_sbconsumer_contoso_erp_py():
+    """ Test the Service Bus consumer for Contoso ERP."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/contoso-erp.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_sbconsumer_contoso_erp_py", "sbconsumer")
+
+
+def test_sbconsumer_fabrikam_motorsports_py():
+    """ Test the Service Bus consumer for Fabrikam Motorsports."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/fabrikam-motorsports.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_sbconsumer_fabrikam_motorsports_py", "sbconsumer")
+
+
+def test_sbconsumer_inkjet_py():
+    """ Test the Service Bus consumer for Inkjet."""
+    tmpdirname = tempfile.mkdtemp()
+    run_python_test(os.path.join(project_root, "test/xreg/inkjet.xreg.json".replace(
+            '/', os.sep)), tmpdirname, "test_sbconsumer_inkjet_py", "sbconsumer")

@@ -272,6 +272,388 @@ public async Task ConsumesKafkaMessage()
 }
 ```
 
+## Production-Ready Patterns
+
+### Batch Processing
+
+Process multiple messages in batches for better throughput:
+
+```csharp
+public class BatchingKafkaConsumer
+{
+    private readonly {{ class_name }} _consumer;
+    private readonly List<(ConsumerRecord record, CloudEvent ce, object data)> _batch = new();
+    private readonly int _batchSize = 100;
+    private readonly TimeSpan _batchTimeout = TimeSpan.FromSeconds(5);
+    private DateTime _batchStartTime = DateTime.UtcNow;
+    
+    public BatchingKafkaConsumer({{ class_name }} consumer)
+    {
+        _consumer = consumer;
+        _consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += HandleMessageAsync;
+    }
+    
+    private async Task HandleMessageAsync(ConsumerRecord record, CloudEvent cloudEvent, object data)
+    {
+        lock (_batch)
+        {
+            _batch.Add((record, cloudEvent, data));
+        }
+        
+        if (_batch.Count >= _batchSize || 
+            DateTime.UtcNow - _batchStartTime > _batchTimeout)
+        {
+            await ProcessBatchAsync();
+        }
+    }
+    
+    private async Task ProcessBatchAsync()
+    {
+        List<(ConsumerRecord, CloudEvent, object)> currentBatch;
+        lock (_batch)
+        {
+            currentBatch = new List<(ConsumerRecord, CloudEvent, object)>(_batch);
+            _batch.Clear();
+            _batchStartTime = DateTime.UtcNow;
+        }
+        
+        if (currentBatch.Count == 0) return;
+        
+        try
+        {
+            // Process all messages in parallel
+            await Task.WhenAll(currentBatch.Select(async item =>
+            {
+                await ProcessSingleMessageAsync(item.Item3);
+            }));
+            
+            _logger.LogInformation("Successfully processed batch of {Count} messages", 
+                currentBatch.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing batch");
+            throw;
+        }
+    }
+}
+```
+
+### Dead Letter Queue Pattern
+
+Handle failed messages with a dead-letter topic:
+
+```csharp
+public class DLQKafkaConsumer
+{
+    private readonly {{ class_name }} _consumer;
+    private readonly IProducer<string, byte[]> _dlqProducer;
+    private readonly string _dlqTopic;
+    
+    public DLQKafkaConsumer(
+        {{ class_name }} consumer,
+        IProducer<string, byte[]> dlqProducer,
+        string dlqTopic)
+    {
+        _consumer = consumer;
+        _dlqProducer = dlqProducer;
+        _dlqTopic = dlqTopic;
+        
+        _consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += HandleWithDLQAsync;
+    }
+    
+    private async Task HandleWithDLQAsync(ConsumerRecord record, CloudEvent cloudEvent, object data)
+    {
+        try
+        {
+            await ProcessMessageAsync(data);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Message processing failed. Sending to DLQ");
+            
+            var dlqMessage = new Message<string, byte[]>
+            {
+                Key = record.Key,
+                Value = record.Value,
+                Headers = new Headers
+                {
+                    { "original-topic", Encoding.UTF8.GetBytes(record.Topic) },
+                    { "error-message", Encoding.UTF8.GetBytes(ex.Message) },
+                    { "error-type", Encoding.UTF8.GetBytes(ex.GetType().Name) },
+                    { "failed-at", Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("O")) }
+                }
+            };
+            
+            await _dlqProducer.ProduceAsync(_dlqTopic, dlqMessage);
+        }
+    }
+}
+```
+
+### Retry Logic with Exponential Backoff
+
+Implement retry for transient failures:
+
+```csharp
+public class RetryingKafkaConsumer
+{
+    private readonly {{ class_name }} _consumer;
+    private readonly int _maxRetries = 3;
+    
+    public RetryingKafkaConsumer({{ class_name }} consumer)
+    {
+        _consumer = consumer;
+        _consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += HandleWithRetryAsync;
+    }
+    
+    private async Task HandleWithRetryAsync(ConsumerRecord record, CloudEvent cloudEvent, object data)
+    {
+        int retryCount = 0;
+        TimeSpan delay = TimeSpan.FromMilliseconds(100);
+        
+        while (true)
+        {
+            try
+            {
+                await ProcessMessageAsync(data);
+                return;
+            }
+            catch (Exception ex) when (retryCount < _maxRetries && IsTransientError(ex))
+            {
+                retryCount++;
+                _logger.LogWarning(ex, 
+                    "Processing failed (attempt {Attempt}/{Max}). Retrying after {Delay}ms",
+                    retryCount, _maxRetries, delay.TotalMilliseconds);
+                
+                await Task.Delay(delay);
+                delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
+            }
+        }
+    }
+    
+    private bool IsTransientError(Exception ex)
+    {
+        return ex is TimeoutException || 
+               ex is HttpRequestException ||
+               ex is TaskCanceledException;
+    }
+}
+```
+
+### Circuit Breaker Pattern
+
+Prevent cascading failures when downstream services are unavailable:
+
+```csharp
+public class CircuitBreakerKafkaConsumer
+{
+    private int _failureCount = 0;
+    private DateTime _lastFailureTime = DateTime.MinValue;
+    private readonly int _failureThreshold = 5;
+    private readonly TimeSpan _timeout = TimeSpan.FromSeconds(60);
+    
+    public enum CircuitState { Closed, Open, HalfOpen }
+    
+    public CircuitState State
+    {
+        get
+        {
+            if (_failureCount >= _failureThreshold)
+            {
+                if (DateTime.UtcNow - _lastFailureTime > _timeout)
+                    return CircuitState.HalfOpen;
+                return CircuitState.Open;
+            }
+            return CircuitState.Closed;
+        }
+    }
+    
+    public async Task HandleWithCircuitBreakerAsync(ConsumerRecord record, CloudEvent ce, object data)
+    {
+        if (State == CircuitState.Open)
+        {
+            _logger.LogWarning("Circuit breaker is OPEN. Skipping message processing");
+            // Could send to DLQ or parking lot queue here
+            return;
+        }
+        
+        try
+        {
+            await ProcessMessageAsync(data);
+            
+            if (State == CircuitState.HalfOpen)
+            {
+                _failureCount = 0; // Reset on success
+                _logger.LogInformation("Circuit breaker reset to CLOSED");
+            }
+        }
+        catch (Exception ex)
+        {
+            _failureCount++;
+            _lastFailureTime = DateTime.UtcNow;
+            _logger.LogError(ex, 
+                "Message processing failed. Circuit breaker failure count: {Count}", 
+                _failureCount);
+            throw;
+        }
+    }
+}
+```
+
+### Observability with Distributed Tracing
+
+Integrate OpenTelemetry for end-to-end tracing:
+
+```csharp
+using System.Diagnostics;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
+
+// Configure tracing
+var tracerProvider = Sdk.CreateTracerProviderBuilder()
+    .AddSource("{{ project_name | pascal }}.Kafka")
+    .AddConsoleExporter()
+    .Build();
+
+public class TracedKafkaConsumer
+{
+    private static readonly ActivitySource _activitySource = 
+        new ActivitySource("{{ project_name | pascal }}.Kafka");
+    
+    public async Task HandleWithTracingAsync(ConsumerRecord record, CloudEvent cloudEvent, object data)
+    {
+        // Extract trace context from CloudEvent or Kafka headers
+        ActivityContext parentContext = default;
+        if (cloudEvent.Extensions?.ContainsKey("traceparent") == true)
+        {
+            var traceparent = cloudEvent.Extensions["traceparent"]?.ToString();
+            if (ActivityContext.TryParse(traceparent, null, out var ctx))
+            {
+                parentContext = ctx;
+            }
+        }
+        
+        using var activity = _activitySource.StartActivity(
+            "kafka.consume", 
+            ActivityKind.Consumer, 
+            parentContext);
+        
+        activity?.SetTag("messaging.system", "kafka");
+        activity?.SetTag("messaging.destination", record.Topic);
+        activity?.SetTag("messaging.operation", "receive");
+        activity?.SetTag("messaging.kafka.partition", record.Partition);
+        activity?.SetTag("messaging.kafka.offset", record.Offset);
+        activity?.SetTag("messaging.message_id", cloudEvent.Id);
+        
+        try
+        {
+            await ProcessMessageAsync(data);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            throw;
+        }
+    }
+}
+```
+
+### Metrics Collection
+
+Track consumer performance with detailed metrics:
+
+```csharp
+using System.Diagnostics.Metrics;
+
+public class MetricsKafkaConsumer
+{
+    private static readonly Meter _meter = new Meter("{{ project_name | pascal }}.Kafka");
+    
+    private static readonly Counter<long> _messagesProcessed = 
+        _meter.CreateCounter<long>("kafka.consumer.messages.processed", "messages");
+    
+    private static readonly Counter<long> _processingErrors = 
+        _meter.CreateCounter<long>("kafka.consumer.errors", "errors");
+    
+    private static readonly Histogram<double> _processingDuration = 
+        _meter.CreateHistogram<double>("kafka.consumer.processing.duration", "ms");
+    
+    private static readonly ObservableGauge<long> _consumerLag = 
+        _meter.CreateObservableGauge<long>("kafka.consumer.lag", "messages", 
+            () => new[] { new Measurement<long>(GetConsumerLag()) });
+    
+    public async Task HandleWithMetricsAsync(ConsumerRecord record, CloudEvent cloudEvent, object data)
+    {
+        var sw = Stopwatch.StartNew();
+        var tags = new KeyValuePair<string, object?>[]
+        {
+            new("topic", record.Topic),
+            new("partition", record.Partition.ToString())
+        };
+        
+        try
+        {
+            await ProcessMessageAsync(data);
+            
+            _messagesProcessed.Add(1, tags);
+            _processingDuration.Record(sw.Elapsed.TotalMilliseconds, tags);
+        }
+        catch (Exception ex)
+        {
+            _processingErrors.Add(1, 
+                new KeyValuePair<string, object?>("topic", record.Topic),
+                new KeyValuePair<string, object?>("error_type", ex.GetType().Name));
+            throw;
+        }
+    }
+    
+    private long GetConsumerLag()
+    {
+        // Query Kafka for consumer lag
+        // This is a simplified example
+        return 0;
+    }
+}
+```
+
+### Rate Limiting / Backpressure
+
+Control processing rate to protect downstream systems:
+
+```csharp
+public class RateLimitedKafkaConsumer
+{
+    private readonly SemaphoreSlim _semaphore;
+    private readonly {{ class_name }} _consumer;
+    
+    public RateLimitedKafkaConsumer({{ class_name }} consumer, int maxConcurrent = 10)
+    {
+        _consumer = consumer;
+        _semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
+        _consumer.{{ messagegroup.messages.keys() | first | strip_dots | pascal }}Async += HandleWithRateLimitAsync;
+    }
+    
+    private async Task HandleWithRateLimitAsync(ConsumerRecord record, CloudEvent ce, object data)
+    {
+        await _semaphore.WaitAsync();
+        try
+        {
+            await ProcessMessageAsync(data);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+}
+
+// Usage
+var rateLimitedConsumer = new RateLimitedKafkaConsumer(consumer, maxConcurrent: 5);
+```
+
 ## Performance Tips
 
 1. **Batch processing**: Process multiple messages before committing

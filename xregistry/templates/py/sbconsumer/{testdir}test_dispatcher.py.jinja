@@ -1,0 +1,229 @@
+{%- import "util.include.jinja" as util -%}
+# pylint: disable=missing-function-docstring, wrong-import-position, import-error, no-name-in-module, import-outside-toplevel, no-member, redefined-outer-name, unused-argument, unused-variable, invalid-name, redefined-outer-name, missing-class-docstring
+
+import asyncio
+import logging
+import os
+import sys
+import json
+import tempfile
+import pytest
+import pytest_asyncio
+from azure.servicebus.aio import ServiceBusClient
+from azure.servicebus import ServiceBusMessage
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.network import Network
+from testcontainers.core.waiting_utils import wait_for_logs
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{data_project_name}}/tests')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../{{main_project_name}}/src')))
+
+{%- set imports = [] %}
+{%- set test_imports = [] %}
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "MessageDispatcher" %}
+from {{main_project_name}}.dispatcher import {{class_name}}, MessageProcessorRunner
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + (type_name | pascal | strip_namespace) %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- set test_class_name = "Test_" + (type_name | pascal | strip_namespace) %}
+{%- set test_module_name = "test_" + (type_name | dotunderscore | lower) %}
+{%- set test_import_statement = "from " + test_module_name + " import " + test_class_name %}
+{%- if test_import_statement not in test_imports %}
+{%- set _ = test_imports.append(test_import_statement) %}
+{{ test_import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+@pytest_asyncio.fixture(scope="function")
+async def service_bus_emulator():
+    """Set up Service Bus emulator with SQL Edge"""
+    network = Network()
+    network.create()
+    
+    # Service Bus emulator configuration
+    config_content = {
+        "UserConfig": {
+            "Namespaces": [
+                {
+                    "Name": "sbemulatorns",
+                    "Queues": [
+                        {
+                            "Name": "myqueue",
+                            "Properties": {
+                                "DeadLetteringOnMessageExpiration": False,
+                                "DefaultMessageTimeToLive": "PT1H",
+                                "LockDuration": "PT1M",
+                                "MaxDeliveryCount": 10,
+                                "RequiresDuplicateDetection": False,
+                                "RequiresSession": False
+                            }
+                        }
+                    ]
+                }
+            ],
+            "Logging": {
+                "Type": "File"
+            }
+        }
+    }
+    
+    config_file = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json')
+    json.dump(config_content, config_file)
+    config_file.flush()
+    config_file.close()
+    config_file_path = config_file.name
+    os.chmod(config_file_path, 0o666)
+    
+    try:
+        # Start SQL Edge container
+        sql_edge_container = DockerContainer("mcr.microsoft.com/azure-sql-edge:latest") \
+            .with_env("ACCEPT_EULA", "Y") \
+            .with_env("MSSQL_SA_PASSWORD", "StrongPassword!1") \
+            .with_network(network) \
+            .with_network_aliases("sqledge")
+        
+        sql_edge_container.start()
+        logging.info("SQL Edge container started")
+        await asyncio.sleep(10)  # Wait for SQL Edge to initialize
+        
+        # Start Service Bus emulator container
+        sb_emulator_container = DockerContainer("mcr.microsoft.com/azure-messaging/servicebus-emulator:latest") \
+            .with_volume_mapping(config_file_path, "/ServiceBus_Emulator/ConfigFiles/Config.json") \
+            .with_bind_ports(5672, 5672) \
+            .with_network(network) \
+            .with_network_aliases("sb-emulator") \
+            .with_env("SQL_SERVER", "sqledge") \
+            .with_env("MSSQL_SA_PASSWORD", "StrongPassword!1") \
+            .with_env("ACCEPT_EULA", "Y")
+        
+        sb_emulator_container.start()
+        logging.info("Service Bus emulator container started")
+        
+        try:
+            wait_for_logs(sb_emulator_container, ".*Emulator Service is Successfully Up!", timeout=60)
+        except TimeoutError as e:
+            stdoutlog, stderrlog = sb_emulator_container.get_logs()
+            logging.error("stdout: %s", stdoutlog)
+            logging.error("stderr: %s", stderrlog)
+            raise e
+        
+        # Extended wait for Service Bus emulator to fully initialize
+        await asyncio.sleep(45)
+        
+        connection_string = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+        
+        yield {
+            "connection_string": connection_string,
+            "queue_name": "myqueue",
+            "network": network,
+            "sql_edge_container": sql_edge_container,
+            "sb_emulator_container": sb_emulator_container
+        }
+        
+        # Cleanup
+        sb_emulator_container.stop()
+        sql_edge_container.stop()
+        network.remove()
+    finally:
+        os.unlink(config_file_path)
+
+{%- for messagegroupid, messagegroup in root.messagegroups.items() %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots ) + "MessageDispatcher" %}
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
+{%- set message_snake = messageid | dotunderscore | snake %}
+{%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- set isCloudEvent = (message | exists("envelope","CloudEvents/1.0")) %}
+
+@pytest.mark.asyncio
+async def {{ test_function_name | dotunderscore }}(service_bus_emulator):
+    """Test the {{ messagename }} message from the {{ groupname }} message group"""
+    
+    if sys.gettrace() is not None:
+        logging.basicConfig(level=logging.DEBUG)
+        azure_logger = logging.getLogger('azure')
+        azure_logger.setLevel(logging.DEBUG)
+        logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
+    
+    connection_string = service_bus_emulator["connection_string"]
+    queue_name = service_bus_emulator["queue_name"]
+    
+    # Create dispatcher
+    dispatcher = {{class_name}}()
+    runner = MessageProcessorRunner.from_connection_string(connection_string, queue_name)
+    runner.add_dispatcher(dispatcher)
+    
+    # Set up event handler
+    received_event = asyncio.Event()
+    received_data = None
+    
+    async def handle_message({%if isCloudEvent%}sb_message, cloud_event, {%else%}sb_message, {%endif%}data):
+        nonlocal received_data
+        received_data = data
+        received_event.set()
+    
+    dispatcher.{{ message_snake }}_async = handle_message
+    
+    # Start the dispatcher
+    await runner.start()
+    
+    try:
+        # Send a test message
+        servicebus_client = ServiceBusClient.from_connection_string(conn_str=connection_string, logging_enable=True)
+        async with servicebus_client:
+            sender = servicebus_client.get_queue_sender(queue_name=queue_name)
+            async with sender:
+                {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+                {%- if data_type != "object" %}
+                # Create valid test data using the test helper
+                test_data_instance = Test_{{ data_type | pascal | strip_namespace }}.create_instance()
+                msg_body = test_data_instance.to_byte_array("application/json")
+                {%- else %}
+                msg_body = json.dumps({}).encode('utf-8')
+                {%- endif %}
+                
+                {%- if isCloudEvent %}
+                # Create CloudEvent message
+                message = ServiceBusMessage(
+                    body=msg_body,
+                    content_type="application/json",
+                    application_properties={
+                        "cloudEvents:type": "{{ messageid }}",
+                        "cloudEvents:source": "test",
+                        "cloudEvents:id": "test-id",
+                        "cloudEvents:specversion": "1.0"
+                    }
+                )
+                {%- else %}
+                # Create plain AMQP message
+                message = ServiceBusMessage(
+                    body=msg_body,
+                    content_type="application/json",
+                    subject="{{ messageid }}"
+                )
+                {%- endif %}
+                await sender.send_messages(message)
+        
+        # Wait for the message to be received
+        await asyncio.wait_for(received_event.wait(), timeout=30)
+        
+        # Verify the message was received
+        assert received_data is not None, "Message should have been received"
+        
+    finally:
+        await runner.stop()
+
+{% endfor %}
+{% endfor %}

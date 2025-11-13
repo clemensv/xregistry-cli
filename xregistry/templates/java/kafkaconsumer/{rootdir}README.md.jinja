@@ -275,6 +275,724 @@ class {{ class_name }}Test {
 - [CloudEvents Kafka Protocol Binding](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/bindings/kafka-protocol-binding.md)
 - [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
 
+## Production-Ready Patterns
+
+This section provides best-practice patterns for building production-grade Kafka consumers in Java.
+
+### 1. Connection Management with ExecutorService
+
+Manage consumer threads properly with dedicated ExecutorService and proper lifecycle.
+
+```java
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class ManagedKafkaConsumer<K, V> {
+    private final KafkaConsumer<K, V> consumer;
+    private final ExecutorService executorService;
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    
+    public ManagedKafkaConsumer(Properties properties, List<String> topics) {
+        this.consumer = new KafkaConsumer<>(properties);
+        this.consumer.subscribe(topics);
+        this.executorService = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "kafka-consumer-thread");
+            t.setDaemon(false);
+            return t;
+        });
+    }
+    
+    public void start(java.util.function.Consumer<ConsumerRecord<K, V>> handler) {
+        if (running.compareAndSet(false, true)) {
+            executorService.submit(() -> {
+                try {
+                    while (running.get()) {
+                        ConsumerRecords<K, V> records = consumer.poll(Duration.ofMillis(100));
+                        for (ConsumerRecord<K, V> record : records) {
+                            try {
+                                handler.accept(record);
+                            } catch (Exception e) {
+                                // Error handling
+                            }
+                        }
+                    }
+                } finally {
+                    shutdownLatch.countDown();
+                }
+            });
+        }
+    }
+    
+    public void shutdown() {
+        running.set(false);
+        try {
+            shutdownLatch.await(30, TimeUnit.SECONDS);
+            consumer.close(Duration.ofSeconds(10));
+            executorService.shutdown();
+            executorService.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+```
+
+### 2. Retry Logic with Resilience4j
+
+Implement exponential backoff retry with Resilience4j library.
+
+```java
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+
+public class RetryableKafkaConsumer {
+    private final Retry retry;
+    
+    public RetryableKafkaConsumer() {
+        RetryConfig config = RetryConfig.custom()
+            .maxAttempts(3)
+            .waitDuration(Duration.ofMillis(500))
+            .exponentialBackoffMultiplier(2.0)
+            .retryExceptions(
+                org.apache.kafka.common.errors.TimeoutException.class,
+                org.apache.kafka.common.errors.NetworkException.class,
+                org.apache.kafka.common.errors.BrokerNotAvailableException.class
+            )
+            .ignoreExceptions(
+                IllegalArgumentException.class,
+                IllegalStateException.class
+            )
+            .build();
+        
+        RetryRegistry registry = RetryRegistry.of(config);
+        this.retry = registry.retry("kafka-consumer");
+    }
+    
+    public void processWithRetry(
+        ConsumerRecord<String, byte[]> record,
+        java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler
+    ) {
+        Callable<Void> decorated = Retry.decorateCallable(retry, () -> {
+            handler.accept(record);
+            return null;
+        });
+        
+        try {
+            decorated.call();
+        } catch (Exception e) {
+            // Handle exhausted retries
+            sendToDLQ(record, e);
+        }
+    }
+    
+    private void sendToDLQ(ConsumerRecord<String, byte[]> record, Exception error) {
+        // DLQ implementation
+    }
+}
+```
+
+### 3. Circuit Breaker for Downstream Dependencies
+
+Protect downstream services with Resilience4j circuit breaker.
+
+```java
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+
+public class CircuitBreakerKafkaConsumer {
+    private final CircuitBreaker circuitBreaker;
+    
+    public CircuitBreakerKafkaConsumer() {
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+            .failureRateThreshold(50.0f)  // Open if 50% fail
+            .waitDurationInOpenState(Duration.ofSeconds(60))
+            .slidingWindowSize(10)
+            .minimumNumberOfCalls(5)
+            .permittedNumberOfCallsInHalfOpenState(3)
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+        
+        CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
+        this.circuitBreaker = registry.circuitBreaker("downstream-api");
+        
+        // Event logging
+        circuitBreaker.getEventPublisher()
+            .onStateTransition(event -> 
+                System.out.println("Circuit breaker state: " + event.getStateTransition())
+            );
+    }
+    
+    public void processWithCircuitBreaker(
+        ConsumerRecord<String, byte[]> record,
+        java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler
+    ) {
+        try {
+            circuitBreaker.executeRunnable(() -> handler.accept(record));
+        } catch (io.github.resilience4j.circuitbreaker.CallNotPermittedException e) {
+            // Circuit is open, use fallback
+            System.err.println("Circuit breaker OPEN, routing to fallback");
+            handleFallback(record);
+        }
+    }
+    
+    private void handleFallback(ConsumerRecord<String, byte[]> record) {
+        // Fallback logic (e.g., cache, DLQ)
+    }
+}
+```
+
+### 4. Rate Limiting with Guava RateLimiter
+
+Control message processing rate using Guava's token bucket algorithm.
+
+```java
+import com.google.common.util.concurrent.RateLimiter;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+
+public class RateLimitedKafkaConsumer {
+    private final RateLimiter rateLimiter;
+    
+    public RateLimitedKafkaConsumer(double permitsPerSecond) {
+        this.rateLimiter = RateLimiter.create(permitsPerSecond);
+    }
+    
+    public void processWithRateLimit(
+        ConsumerRecord<String, byte[]> record,
+        java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler
+    ) {
+        // Blocks if necessary to honor rate limit
+        rateLimiter.acquire();
+        
+        handler.accept(record);
+    }
+    
+    public void processWithTimeout(
+        ConsumerRecord<String, byte[]> record,
+        java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler,
+        Duration timeout
+    ) {
+        // Try to acquire, timeout if not available
+        if (rateLimiter.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            handler.accept(record);
+        } else {
+            System.err.println("Rate limit timeout, skipping message");
+        }
+    }
+}
+```
+
+### 5. Batch Processing
+
+Process messages in batches for improved throughput.
+
+```java
+import org.apache.kafka.clients.consumer.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class BatchKafkaConsumer {
+    private final KafkaConsumer<String, byte[]> consumer;
+    private final int batchSize;
+    private final Duration batchTimeout;
+    private final List<ConsumerRecord<String, byte[]>> batch = new ArrayList<>();
+    private long lastFlush = System.currentTimeMillis();
+    
+    public BatchKafkaConsumer(
+        Properties properties, 
+        List<String> topics,
+        int batchSize,
+        Duration batchTimeout
+    ) {
+        this.consumer = new KafkaConsumer<>(properties);
+        this.consumer.subscribe(topics);
+        this.batchSize = batchSize;
+        this.batchTimeout = batchTimeout;
+    }
+    
+    public void consumeWithBatching(
+        java.util.function.Consumer<List<ConsumerRecord<String, byte[]>>> batchHandler
+    ) {
+        while (true) {
+            ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(100));
+            
+            for (ConsumerRecord<String, byte[]> record : records) {
+                batch.add(record);
+                
+                // Flush conditions: size or timeout
+                boolean shouldFlush = 
+                    batch.size() >= batchSize ||
+                    System.currentTimeMillis() - lastFlush >= batchTimeout.toMillis();
+                
+                if (shouldFlush) {
+                    processBatch(batchHandler);
+                }
+            }
+        }
+    }
+    
+    private void processBatch(
+        java.util.function.Consumer<List<ConsumerRecord<String, byte[]>>> handler
+    ) {
+        if (batch.isEmpty()) return;
+        
+        try {
+            handler.accept(new ArrayList<>(batch));
+            
+            // Commit last offset in batch
+            ConsumerRecord<String, byte[]> lastRecord = batch.get(batch.size() - 1);
+            consumer.commitSync(Collections.singletonMap(
+                new TopicPartition(lastRecord.topic(), lastRecord.partition()),
+                new OffsetAndMetadata(lastRecord.offset() + 1)
+            ));
+            
+        } catch (Exception e) {
+            System.err.println("Batch processing failed: " + e.getMessage());
+        } finally {
+            batch.clear();
+            lastFlush = System.currentTimeMillis();
+        }
+    }
+}
+```
+
+### 6. Dead Letter Queue (DLQ) Pattern
+
+Route failed messages to DLQ topic with metadata.
+
+```java
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+
+public class DLQKafkaConsumer {
+    private final KafkaConsumer<String, byte[]> consumer;
+    private final KafkaProducer<String, byte[]> dlqProducer;
+    private final String dlqTopic;
+    private final int maxRetries;
+    
+    public DLQKafkaConsumer(
+        Properties consumerProps,
+        Properties producerProps,
+        List<String> topics,
+        String dlqTopic,
+        int maxRetries
+    ) {
+        this.consumer = new KafkaConsumer<>(consumerProps);
+        this.consumer.subscribe(topics);
+        this.dlqProducer = new KafkaProducer<>(producerProps);
+        this.dlqTopic = dlqTopic;
+        this.maxRetries = maxRetries;
+    }
+    
+    public void processWithDLQ(
+        ConsumerRecord<String, byte[]> record,
+        java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler
+    ) {
+        int retries = 0;
+        Exception lastError = null;
+        
+        while (retries < maxRetries) {
+            try {
+                handler.accept(record);
+                consumer.commitSync();
+                return;  // Success
+            } catch (Exception e) {
+                lastError = e;
+                retries++;
+                System.err.println(
+                    "Retry " + retries + "/" + maxRetries + " for message: " + e.getMessage()
+                );
+                
+                if (retries < maxRetries) {
+                    // Exponential backoff
+                    try {
+                        Thread.sleep((long) Math.pow(2, retries) * 1000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Exhausted retries, send to DLQ
+        sendToDLQ(record, lastError);
+        consumer.commitSync();  // Commit to avoid reprocessing
+    }
+    
+    private void sendToDLQ(ConsumerRecord<String, byte[]> record, Exception error) {
+        ProducerRecord<String, byte[]> dlqRecord = new ProducerRecord<>(
+            dlqTopic,
+            null,
+            record.key(),
+            record.value()
+        );
+        
+        // Add DLQ metadata headers
+        dlqRecord.headers()
+            .add(new RecordHeader("original-topic", 
+                record.topic().getBytes(StandardCharsets.UTF_8)))
+            .add(new RecordHeader("original-partition", 
+                String.valueOf(record.partition()).getBytes(StandardCharsets.UTF_8)))
+            .add(new RecordHeader("original-offset", 
+                String.valueOf(record.offset()).getBytes(StandardCharsets.UTF_8)))
+            .add(new RecordHeader("error-message", 
+                error.getMessage().getBytes(StandardCharsets.UTF_8)))
+            .add(new RecordHeader("error-class", 
+                error.getClass().getName().getBytes(StandardCharsets.UTF_8)))
+            .add(new RecordHeader("failed-at", 
+                Instant.now().toString().getBytes(StandardCharsets.UTF_8)))
+            .add(new RecordHeader("retry-count", 
+                String.valueOf(maxRetries).getBytes(StandardCharsets.UTF_8)));
+        
+        // Preserve original headers
+        record.headers().forEach(dlqRecord.headers()::add);
+        
+        dlqProducer.send(dlqRecord, (metadata, exception) -> {
+            if (exception != null) {
+                System.err.println("Failed to send to DLQ: " + exception.getMessage());
+            } else {
+                System.err.println("Message sent to DLQ: " + dlqTopic);
+            }
+        });
+    }
+    
+    public void close() {
+        dlqProducer.flush();
+        dlqProducer.close(Duration.ofSeconds(10));
+        consumer.close(Duration.ofSeconds(10));
+    }
+}
+```
+
+### 7. OpenTelemetry Observability
+
+Instrument Kafka consumer with distributed tracing and metrics.
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.*;
+import io.opentelemetry.api.metrics.*;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapGetter;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.Header;
+
+public class ObservableKafkaConsumer {
+    private final Tracer tracer;
+    private final LongCounter messagesProcessed;
+    private final LongHistogram processingDuration;
+    private final ObservableLongGauge consumerLag;
+    
+    public ObservableKafkaConsumer(OpenTelemetry openTelemetry) {
+        this.tracer = openTelemetry.getTracer("kafka-consumer");
+        
+        Meter meter = openTelemetry.getMeter("kafka-consumer");
+        this.messagesProcessed = meter
+            .counterBuilder("kafka.messages.processed")
+            .setDescription("Total messages processed")
+            .build();
+        
+        this.processingDuration = meter
+            .histogramBuilder("kafka.message.processing.duration")
+            .setDescription("Message processing duration")
+            .setUnit("ms")
+            .ofLongs()
+            .build();
+        
+        this.consumerLag = meter
+            .gaugeBuilder("kafka.consumer.lag")
+            .setDescription("Consumer lag per partition")
+            .ofLongs()
+            .buildObserver();
+    }
+    
+    public void processWithTracing(
+        ConsumerRecord<String, byte[]> record,
+        java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler
+    ) {
+        // Extract trace context from headers
+        Context extractedContext = openTelemetry.getPropagators()
+            .getTextMapPropagator()
+            .extract(Context.current(), record.headers(), new KafkaHeaderGetter());
+        
+        Span span = tracer.spanBuilder("kafka.consume")
+            .setSpanKind(SpanKind.CONSUMER)
+            .setParent(extractedContext)
+            .setAttribute("messaging.system", "kafka")
+            .setAttribute("messaging.destination", record.topic())
+            .setAttribute("messaging.kafka.partition", record.partition())
+            .setAttribute("messaging.kafka.offset", record.offset())
+            .setAttribute("messaging.kafka.message_key", 
+                record.key() != null ? record.key() : "")
+            .startSpan();
+        
+        long startTime = System.currentTimeMillis();
+        try (Scope scope = span.makeCurrent()) {
+            handler.accept(record);
+            
+            // Record metrics
+            long duration = System.currentTimeMillis() - startTime;
+            processingDuration.record(duration, 
+                Attributes.of(
+                    AttributeKey.stringKey("topic"), record.topic(),
+                    AttributeKey.stringKey("status"), "success"
+                ));
+            
+            messagesProcessed.add(1, 
+                Attributes.of(
+                    AttributeKey.stringKey("topic"), record.topic(),
+                    AttributeKey.stringKey("status"), "success"
+                ));
+            
+            span.setStatus(StatusCode.OK);
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            
+            messagesProcessed.add(1, 
+                Attributes.of(
+                    AttributeKey.stringKey("topic"), record.topic(),
+                    AttributeKey.stringKey("status"), "error"
+                ));
+            
+            throw e;
+        } finally {
+            span.end();
+        }
+    }
+    
+    // Text map getter for extracting trace context from Kafka headers
+    private static class KafkaHeaderGetter implements TextMapGetter<Iterable<Header>> {
+        @Override
+        public Iterable<String> keys(Iterable<Header> headers) {
+            List<String> keys = new ArrayList<>();
+            headers.forEach(h -> keys.add(h.key()));
+            return keys;
+        }
+        
+        @Override
+        public String get(Iterable<Header> headers, String key) {
+            for (Header header : headers) {
+                if (header.key().equals(key)) {
+                    return new String(header.value(), StandardCharsets.UTF_8);
+                }
+            }
+            return null;
+        }
+    }
+}
+```
+
+### 8. Graceful Shutdown
+
+Ensure clean shutdown with proper offset commits and resource cleanup.
+
+```java
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class GracefulKafkaConsumer {
+    private final KafkaConsumer<String, byte[]> consumer;
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private final Thread consumerThread;
+    
+    public GracefulKafkaConsumer(Properties properties, List<String> topics) {
+        this.consumer = new KafkaConsumer<>(properties);
+        this.consumer.subscribe(topics);
+        
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+        
+        this.consumerThread = new Thread(this::runConsumerLoop);
+        this.consumerThread.setName("kafka-consumer-main");
+    }
+    
+    public void start(java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler) {
+        running.set(true);
+        consumerThread.start();
+    }
+    
+    private void runConsumerLoop(
+        java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler
+    ) {
+        try {
+            while (running.get()) {
+                ConsumerRecords<String, byte[]> records = 
+                    consumer.poll(Duration.ofMillis(100));
+                
+                for (ConsumerRecord<String, byte[]> record : records) {
+                    try {
+                        handler.accept(record);
+                    } catch (Exception e) {
+                        System.err.println("Error processing message: " + e.getMessage());
+                    }
+                }
+                
+                // Commit offsets periodically
+                consumer.commitAsync((offsets, exception) -> {
+                    if (exception != null) {
+                        System.err.println("Commit failed: " + exception.getMessage());
+                    }
+                });
+            }
+        } catch (Exception e) {
+            System.err.println("Consumer loop error: " + e.getMessage());
+        } finally {
+            shutdown();
+        }
+    }
+    
+    public void shutdown() {
+        if (running.compareAndSet(true, false)) {
+            System.out.println("Initiating graceful shutdown...");
+            
+            // Wait for consumer thread to finish current poll
+            try {
+                consumerThread.join(TimeUnit.SECONDS.toMillis(10));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            // Final synchronous commit
+            try {
+                consumer.commitSync(Duration.ofSeconds(5));
+                System.out.println("Final offset commit completed");
+            } catch (Exception e) {
+                System.err.println("Final commit failed: " + e.getMessage());
+            }
+            
+            // Close consumer
+            consumer.close(Duration.ofSeconds(10));
+            System.out.println("Consumer closed gracefully");
+        }
+    }
+}
+```
+
+### Configuration Best Practices
+
+```java
+import java.util.Properties;
+
+public class KafkaConsumerConfig {
+    public static Properties createProductionConfig(
+        String bootstrapServers,
+        String groupId
+    ) {
+        Properties props = new Properties();
+        
+        // Connection
+        props.put("bootstrap.servers", bootstrapServers);
+        props.put("group.id", groupId);
+        
+        // Deserialization
+        props.put("key.deserializer", 
+            "org.apache.kafka.common.serialization.StringDeserializer");
+        props.put("value.deserializer", 
+            "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+        
+        // Reliability
+        props.put("enable.auto.commit", "false");  // Manual commits
+        props.put("auto.offset.reset", "earliest");
+        props.put("isolation.level", "read_committed");  // Transactional reads
+        
+        // Performance
+        props.put("fetch.min.bytes", "1024");  // Wait for 1KB
+        props.put("fetch.max.wait.ms", "500");
+        props.put("max.poll.records", "500");
+        props.put("max.partition.fetch.bytes", "1048576");  // 1MB
+        
+        // Timeouts
+        props.put("session.timeout.ms", "45000");  // 45s heartbeat timeout
+        props.put("max.poll.interval.ms", "300000");  // 5 minutes
+        props.put("request.timeout.ms", "30000");  // 30s
+        
+        // Security (for production)
+        props.put("security.protocol", "SASL_SSL");
+        props.put("sasl.mechanism", "PLAIN");
+        props.put("sasl.jaas.config", 
+            "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+            "username=\"${KAFKA_USERNAME}\" password=\"${KAFKA_PASSWORD}\";");
+        
+        return props;
+    }
+}
+```
+
+### Integration Example
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import com.google.common.util.concurrent.RateLimiter;
+
+public class ProductionKafkaConsumer {
+    public static void main(String[] args) {
+        // Configuration
+        Properties props = KafkaConsumerConfig.createProductionConfig(
+            "broker1:9092,broker2:9092,broker3:9092",
+            "my-consumer-group"
+        );
+        
+        // Initialize components
+        GracefulKafkaConsumer gracefulConsumer = new GracefulKafkaConsumer(
+            props,
+            List.of("my-topic")
+        );
+        
+        RetryableKafkaConsumer retryConsumer = new RetryableKafkaConsumer();
+        CircuitBreakerKafkaConsumer cbConsumer = new CircuitBreakerKafkaConsumer();
+        RateLimitedKafkaConsumer rateLimitedConsumer = 
+            new RateLimitedKafkaConsumer(100.0);  // 100 msg/sec
+        
+        // OpenTelemetry setup
+        OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .setMeterProvider(meterProvider)
+            .buildAndRegisterGlobal();
+        
+        ObservableKafkaConsumer observableConsumer = 
+            new ObservableKafkaConsumer(openTelemetry);
+        
+        // Message handler with all patterns
+        java.util.function.Consumer<ConsumerRecord<String, byte[]>> handler = record -> {
+            // Rate limiting
+            rateLimitedConsumer.processWithRateLimit(record, r -> {
+                // Observability
+                observableConsumer.processWithTracing(r, rec -> {
+                    // Circuit breaker
+                    cbConsumer.processWithCircuitBreaker(rec, record2 -> {
+                        // Retry logic
+                        retryConsumer.processWithRetry(record2, r2 -> {
+                            // Business logic
+                            processBusinessLogic(r2);
+                        });
+                    });
+                });
+            });
+        };
+        
+        // Start consuming
+        gracefulConsumer.start(handler);
+        
+        // Application runs until SIGTERM/SIGINT
+        // Shutdown handled by shutdown hook
+    }
+    
+    private static void processBusinessLogic(ConsumerRecord<String, byte[]> record) {
+        // Your business logic here
+    }
+}
+```
+
 ## Generated Code
 
 This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).

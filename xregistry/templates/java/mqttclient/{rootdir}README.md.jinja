@@ -298,6 +298,1063 @@ class {{ class_name }}Test {
 - [CloudEvents Specification](https://cloudevents.io/)
 - [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
 
+## Production-Ready Patterns
+
+This section provides best-practice patterns for building production-grade MQTT clients in Java.
+
+### 1. Connection Management with Automatic Reconnection
+
+Maintain resilient connections with exponential backoff and connection state tracking.
+
+```java
+import org.eclipse.paho.mqttv5.client.*;
+import org.eclipse.paho.mqttv5.common.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
+
+public class ManagedMqttClient {
+    private final MqttAsyncClient client;
+    private final MqttConnectionOptions options;
+    private final AtomicBoolean connected = new AtomicBoolean(false);
+    private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
+    private static final int MAX_RECONNECT_DELAY_MS = 60000;  // 1 minute
+    private static final int BASE_DELAY_MS = 1000;  // 1 second
+    
+    public ManagedMqttClient(String broker, String clientId) throws MqttException {
+        this.client = new MqttAsyncClient(broker, clientId, 
+            new MqttDefaultFilePersistence(System.getProperty("java.io.tmpdir")));
+        
+        this.options = new MqttConnectionOptions();
+        options.setAutomaticReconnect(false);  // Manual control for exponential backoff
+        options.setCleanStart(false);  // Persistent session
+        options.setKeepAliveInterval(60);
+        options.setConnectionTimeout(30);
+        options.setMaxReconnectDelay(MAX_RECONNECT_DELAY_MS);
+        
+        // Connection callbacks
+        client.setCallback(new MqttCallback() {
+            @Override
+            public void disconnected(MqttDisconnectResponse disconnectResponse) {
+                connected.set(false);
+                System.err.println("Disconnected: " + disconnectResponse.getReasonString());
+                scheduleReconnect();
+            }
+            
+            @Override
+            public void mqttErrorOccurred(MqttException exception) {
+                System.err.println("MQTT error: " + exception.getMessage());
+            }
+            
+            @Override
+            public void messageArrived(String topic, MqttMessage message) {
+                // Handled by subscribers
+            }
+            
+            @Override
+            public void deliveryComplete(IMqttToken token) {
+                // Message delivered
+            }
+            
+            @Override
+            public void connectComplete(boolean reconnect, String serverURI) {
+                connected.set(true);
+                reconnectAttempts.set(0);
+                System.out.println("Connected to: " + serverURI + 
+                    (reconnect ? " (reconnected)" : ""));
+            }
+            
+            @Override
+            public void authPacketArrived(int reasonCode, MqttProperties properties) {
+                // Authentication handling
+            }
+        });
+    }
+    
+    /**
+     * Connect with automatic retry and exponential backoff.
+     */
+    public void connect() throws MqttException {
+        IMqttToken token = client.connect(options);
+        token.waitForCompletion(options.getConnectionTimeout() * 1000);
+        connected.set(true);
+    }
+    
+    /**
+     * Schedule reconnection with exponential backoff.
+     */
+    private void scheduleReconnect() {
+        int attempts = reconnectAttempts.incrementAndGet();
+        int delayMs = Math.min(
+            BASE_DELAY_MS * (int) Math.pow(2, attempts - 1),
+            MAX_RECONNECT_DELAY_MS
+        );
+        
+        System.out.println("Reconnect attempt " + attempts + " in " + delayMs + "ms");
+        
+        new Thread(() -> {
+            try {
+                TimeUnit.MILLISECONDS.sleep(delayMs);
+                if (!connected.get() && !client.isConnected()) {
+                    connect();
+                }
+            } catch (Exception e) {
+                System.err.println("Reconnection failed: " + e.getMessage());
+                scheduleReconnect();  // Try again
+            }
+        }).start();
+    }
+    
+    /**
+     * Publish with connection check.
+     */
+    public IMqttToken publish(String topic, MqttMessage message) throws MqttException {
+        if (!connected.get()) {
+            throw new MqttException(MqttException.REASON_CODE_CLIENT_NOT_CONNECTED);
+        }
+        return client.publish(topic, message);
+    }
+    
+    /**
+     * Subscribe with connection check.
+     */
+    public IMqttToken subscribe(String topic, int qos, IMqttMessageListener listener) 
+        throws MqttException {
+        if (!connected.get()) {
+            throw new MqttException(MqttException.REASON_CODE_CLIENT_NOT_CONNECTED);
+        }
+        return client.subscribe(topic, qos, listener);
+    }
+    
+    public boolean isConnected() {
+        return connected.get() && client.isConnected();
+    }
+    
+    public void disconnect() throws MqttException {
+        if (client.isConnected()) {
+            client.disconnect().waitForCompletion();
+        }
+        connected.set(false);
+    }
+}
+```
+
+### 2. Message Retry with Dead Letter Queue
+
+Implement retry logic with exponential backoff and DLQ for failed messages.
+
+```java
+import io.github.resilience4j.retry.*;
+import java.time.Duration;
+import java.util.concurrent.*;
+
+public class RetryableMqttPublisher {
+    private final MqttAsyncClient client;
+    private final Retry retry;
+    private final String dlqTopic;
+    private final ScheduledExecutorService scheduler = 
+        Executors.newScheduledThreadPool(2);
+    
+    public RetryableMqttPublisher(
+        MqttAsyncClient client,
+        String dlqTopic
+    ) {
+        this.client = client;
+        this.dlqTopic = dlqTopic;
+        
+        // Configure retry for transient failures
+        RetryConfig config = RetryConfig.custom()
+            .maxAttempts(5)
+            .waitDuration(Duration.ofMillis(500))
+            .exponentialBackoffMultiplier(2.0)
+            .retryExceptions(
+                MqttException.class  // Retry on MQTT errors
+            )
+            .ignoreExceptions(
+                IllegalArgumentException.class  // Don't retry client errors
+            )
+            .build();
+        
+        this.retry = Retry.of("mqtt-publisher", config);
+        
+        // Log retry attempts
+        retry.getEventPublisher()
+            .onRetry(event -> 
+                System.err.println("Retry attempt " + event.getNumberOfRetryAttempts() + 
+                    " for message")
+            );
+    }
+    
+    /**
+     * Publish with automatic retry on failure.
+     * Sends to DLQ if all retries exhausted.
+     */
+    public CompletableFuture<IMqttToken> publishWithRetry(
+        String topic,
+        MqttMessage message
+    ) {
+        CompletableFuture<IMqttToken> future = new CompletableFuture<>();
+        
+        try {
+            IMqttToken token = retry.executeCallable(() -> 
+                client.publish(topic, message)
+            );
+            
+            token.waitForCompletion(10000);  // 10s timeout
+            future.complete(token);
+            
+        } catch (Exception e) {
+            System.err.println("All retries exhausted, sending to DLQ: " + e.getMessage());
+            
+            // Send to DLQ
+            sendToDLQ(topic, message, e.getMessage())
+                .thenAccept(dlqToken -> future.completeExceptionally(e))
+                .exceptionally(dlqError -> {
+                    future.completeExceptionally(
+                        new RuntimeException("Failed to send to DLQ", dlqError)
+                    );
+                    return null;
+                });
+        }
+        
+        return future;
+    }
+    
+    /**
+     * Send failed message to dead letter queue with metadata.
+     */
+    private CompletableFuture<IMqttToken> sendToDLQ(
+        String originalTopic,
+        MqttMessage originalMessage,
+        String errorReason
+    ) {
+        CompletableFuture<IMqttToken> future = new CompletableFuture<>();
+        
+        try {
+            MqttMessage dlqMessage = new MqttMessage(originalMessage.getPayload());
+            dlqMessage.setQos(1);  // At least once for DLQ
+            dlqMessage.setRetained(false);
+            
+            // Add metadata as user properties (MQTT 5.0)
+            MqttProperties props = new MqttProperties();
+            props.setUserProperty("original-topic", originalTopic);
+            props.setUserProperty("error-reason", errorReason);
+            props.setUserProperty("timestamp", String.valueOf(System.currentTimeMillis()));
+            dlqMessage.setProperties(props);
+            
+            IMqttToken token = client.publish(dlqTopic, dlqMessage);
+            token.setActionCallback(new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    System.out.println("Message sent to DLQ: " + dlqTopic);
+                    future.complete(asyncActionToken);
+                }
+                
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                    System.err.println("Failed to send to DLQ: " + exception.getMessage());
+                    future.completeExceptionally(exception);
+                }
+            });
+            
+        } catch (Exception e) {
+            future.completeExceptionally(e);
+        }
+        
+        return future;
+    }
+    
+    public void shutdown() {
+        scheduler.shutdown();
+    }
+}
+```
+
+### 3. Circuit Breaker for Broker Protection
+
+Protect MQTT broker from being overwhelmed during high error rates.
+
+```java
+import io.github.resilience4j.circuitbreaker.*;
+
+public class CircuitBreakerMqttClient {
+    private final MqttAsyncClient client;
+    private final CircuitBreaker circuitBreaker;
+    private final String fallbackBroker;
+    
+    public CircuitBreakerMqttClient(
+        String primaryBroker,
+        String fallbackBroker,
+        String clientId
+    ) throws MqttException {
+        this.client = new MqttAsyncClient(primaryBroker, clientId);
+        this.fallbackBroker = fallbackBroker;
+        
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+            .failureRateThreshold(50.0f)  // Open at 50% failure
+            .waitDurationInOpenState(Duration.ofSeconds(60))
+            .slidingWindowSize(20)
+            .minimumNumberOfCalls(10)
+            .permittedNumberOfCallsInHalfOpenState(5)
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+        
+        this.circuitBreaker = CircuitBreaker.of("mqtt-client", config);
+        
+        // Event logging
+        circuitBreaker.getEventPublisher()
+            .onStateTransition(event -> 
+                System.err.println("Circuit breaker state: " + event.getStateTransition())
+            )
+            .onError(event -> 
+                System.err.println("Circuit breaker error: " + event.getThrowable().getMessage())
+            );
+    }
+    
+    /**
+     * Publish with circuit breaker protection.
+     * Falls back to alternative broker when circuit opens.
+     */
+    public IMqttToken publishWithCircuitBreaker(String topic, MqttMessage message) 
+        throws MqttException {
+        
+        try {
+            return circuitBreaker.executeCallable(() -> {
+                IMqttToken token = client.publish(topic, message);
+                token.waitForCompletion(10000);
+                return token;
+            });
+            
+        } catch (CallNotPermittedException e) {
+            System.err.println("Circuit OPEN, using fallback broker");
+            
+            // Fallback to secondary broker
+            MqttAsyncClient fallbackClient = new MqttAsyncClient(
+                fallbackBroker, 
+                client.getClientId() + "-fallback"
+            );
+            
+            MqttConnectionOptions opts = new MqttConnectionOptions();
+            opts.setAutomaticReconnect(true);
+            fallbackClient.connect(opts).waitForCompletion();
+            
+            IMqttToken token = fallbackClient.publish(topic, message);
+            token.waitForCompletion(10000);
+            
+            fallbackClient.disconnect().waitForCompletion();
+            return token;
+        } catch (Exception e) {
+            throw new MqttException(e);
+        }
+    }
+}
+```
+
+### 4. Rate Limiting for QoS Control
+
+Control message publishing rate to prevent broker overload.
+
+```java
+import com.google.common.util.concurrent.RateLimiter;
+import java.util.concurrent.TimeUnit;
+
+public class RateLimitedMqttPublisher {
+    private final MqttAsyncClient client;
+    private final RateLimiter rateLimiter;
+    private final ExecutorService executor = Executors.newFixedThreadPool(4);
+    
+    /**
+     * @param client MQTT client instance
+     * @param messagesPerSecond Maximum messages per second
+     */
+    public RateLimitedMqttPublisher(MqttAsyncClient client, double messagesPerSecond) {
+        this.client = client;
+        this.rateLimiter = RateLimiter.create(messagesPerSecond);
+    }
+    
+    /**
+     * Publish with rate limiting (blocks if necessary).
+     */
+    public CompletableFuture<IMqttToken> publishWithRateLimit(
+        String topic,
+        MqttMessage message
+    ) {
+        CompletableFuture<IMqttToken> future = new CompletableFuture<>();
+        
+        executor.submit(() -> {
+            try {
+                rateLimiter.acquire();  // Blocks until permit available
+                
+                IMqttToken token = client.publish(topic, message);
+                token.setActionCallback(new IMqttActionListener() {
+                    @Override
+                    public void onSuccess(IMqttToken asyncActionToken) {
+                        future.complete(asyncActionToken);
+                    }
+                    
+                    @Override
+                    public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                        future.completeExceptionally(exception);
+                    }
+                });
+                
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        
+        return future;
+    }
+    
+    /**
+     * Publish with timeout on rate limit.
+     * Returns null if timeout exceeded.
+     */
+    public CompletableFuture<IMqttToken> publishWithTimeout(
+        String topic,
+        MqttMessage message,
+        Duration timeout
+    ) {
+        CompletableFuture<IMqttToken> future = new CompletableFuture<>();
+        
+        executor.submit(() -> {
+            try {
+                boolean acquired = rateLimiter.tryAcquire(
+                    timeout.toMillis(),
+                    TimeUnit.MILLISECONDS
+                );
+                
+                if (acquired) {
+                    IMqttToken token = client.publish(topic, message);
+                    token.waitForCompletion(10000);
+                    future.complete(token);
+                } else {
+                    future.completeExceptionally(
+                        new TimeoutException("Rate limit timeout")
+                    );
+                }
+                
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        
+        return future;
+    }
+    
+    public void shutdown() {
+        executor.shutdown();
+    }
+}
+```
+
+### 5. Message Buffering for Offline Support
+
+Buffer messages when client is offline, replay when reconnected.
+
+```java
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class BufferedMqttPublisher {
+    private final MqttAsyncClient client;
+    private final BlockingQueue<QueuedMessage> messageBuffer;
+    private final AtomicBoolean connected = new AtomicBoolean(false);
+    private final ScheduledExecutorService scheduler = 
+        Executors.newSingleThreadScheduledExecutor();
+    
+    private static class QueuedMessage {
+        final String topic;
+        final MqttMessage message;
+        final long timestamp;
+        
+        QueuedMessage(String topic, MqttMessage message) {
+            this.topic = topic;
+            this.message = message;
+            this.timestamp = System.currentTimeMillis();
+        }
+        
+        boolean isExpired(long maxAgeMs) {
+            return System.currentTimeMillis() - timestamp > maxAgeMs;
+        }
+    }
+    
+    public BufferedMqttPublisher(
+        MqttAsyncClient client,
+        int bufferSize
+    ) {
+        this.client = client;
+        this.messageBuffer = new LinkedBlockingQueue<>(bufferSize);
+        
+        // Connection callback
+        client.setCallback(new MqttCallback() {
+            @Override
+            public void connectComplete(boolean reconnect, String serverURI) {
+                connected.set(true);
+                System.out.println("Connected, flushing buffer (" + 
+                    messageBuffer.size() + " messages)");
+                flushBuffer();
+            }
+            
+            @Override
+            public void disconnected(MqttDisconnectResponse response) {
+                connected.set(false);
+                System.err.println("Disconnected, buffering messages");
+            }
+            
+            @Override
+            public void messageArrived(String topic, MqttMessage message) {}
+            
+            @Override
+            public void deliveryComplete(IMqttToken token) {}
+            
+            @Override
+            public void mqttErrorOccurred(MqttException exception) {}
+            
+            @Override
+            public void authPacketArrived(int reasonCode, MqttProperties properties) {}
+        });
+        
+        // Periodic buffer flush attempt
+        scheduler.scheduleAtFixedRate(
+            this::flushBuffer,
+            10, 10,
+            TimeUnit.SECONDS
+        );
+    }
+    
+    /**
+     * Publish immediately if connected, buffer if offline.
+     */
+    public CompletableFuture<IMqttToken> publishOrBuffer(
+        String topic,
+        MqttMessage message
+    ) {
+        CompletableFuture<IMqttToken> future = new CompletableFuture<>();
+        
+        if (connected.get() && client.isConnected()) {
+            try {
+                IMqttToken token = client.publish(topic, message);
+                token.setActionCallback(new IMqttActionListener() {
+                    @Override
+                    public void onSuccess(IMqttToken asyncActionToken) {
+                        future.complete(asyncActionToken);
+                    }
+                    
+                    @Override
+                    public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                        // Buffer on failure
+                        bufferMessage(topic, message);
+                        future.completeExceptionally(exception);
+                    }
+                });
+                
+            } catch (MqttException e) {
+                bufferMessage(topic, message);
+                future.completeExceptionally(e);
+            }
+        } else {
+            bufferMessage(topic, message);
+            future.completeExceptionally(
+                new MqttException(MqttException.REASON_CODE_CLIENT_NOT_CONNECTED)
+            );
+        }
+        
+        return future;
+    }
+    
+    private void bufferMessage(String topic, MqttMessage message) {
+        QueuedMessage qm = new QueuedMessage(topic, message);
+        
+        if (!messageBuffer.offer(qm)) {
+            // Buffer full, remove oldest
+            messageBuffer.poll();
+            messageBuffer.offer(qm);
+            System.err.println("Buffer full, oldest message dropped");
+        }
+        
+        System.out.println("Message buffered (queue size: " + 
+            messageBuffer.size() + ")");
+    }
+    
+    /**
+     * Flush buffered messages when connection restored.
+     */
+    private void flushBuffer() {
+        if (!connected.get() || !client.isConnected()) {
+            return;
+        }
+        
+        int flushed = 0;
+        int expired = 0;
+        long maxAgeMs = TimeUnit.MINUTES.toMillis(5);  // 5 minute TTL
+        
+        QueuedMessage qm;
+        while ((qm = messageBuffer.poll()) != null) {
+            if (qm.isExpired(maxAgeMs)) {
+                expired++;
+                continue;
+            }
+            
+            try {
+                client.publish(qm.topic, qm.message);
+                flushed++;
+            } catch (MqttException e) {
+                // Re-queue on failure
+                messageBuffer.offer(qm);
+                System.err.println("Flush failed, re-queued: " + e.getMessage());
+                break;
+            }
+        }
+        
+        if (flushed > 0 || expired > 0) {
+            System.out.println("Buffer flush complete: " + flushed + 
+                " sent, " + expired + " expired");
+        }
+    }
+    
+    public int getBufferSize() {
+        return messageBuffer.size();
+    }
+    
+    public void shutdown() {
+        scheduler.shutdown();
+    }
+}
+```
+
+### 6. OpenTelemetry Observability
+
+Instrument MQTT client with distributed tracing and metrics.
+
+```java
+import io.opentelemetry.api.*;
+import io.opentelemetry.api.trace.*;
+import io.opentelemetry.api.metrics.*;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapSetter;
+
+public class ObservableMqttClient {
+    private final MqttAsyncClient client;
+    private final Tracer tracer;
+    private final LongCounter messagesSent;
+    private final LongCounter messagesReceived;
+    private final LongHistogram publishDuration;
+    private final OpenTelemetry openTelemetry;
+    
+    public ObservableMqttClient(
+        String broker,
+        String clientId,
+        OpenTelemetry openTelemetry
+    ) throws MqttException {
+        this.client = new MqttAsyncClient(broker, clientId);
+        this.openTelemetry = openTelemetry;
+        this.tracer = openTelemetry.getTracer("mqtt-client");
+        
+        Meter meter = openTelemetry.getMeter("mqtt-client");
+        this.messagesSent = meter
+            .counterBuilder("mqtt.messages.sent")
+            .setDescription("Total MQTT messages sent")
+            .build();
+        
+        this.messagesReceived = meter
+            .counterBuilder("mqtt.messages.received")
+            .setDescription("Total MQTT messages received")
+            .build();
+        
+        this.publishDuration = meter
+            .histogramBuilder("mqtt.publish.duration")
+            .setDescription("MQTT publish duration")
+            .setUnit("ms")
+            .ofLongs()
+            .build();
+    }
+    
+    /**
+     * Publish with distributed tracing and metrics.
+     */
+    public CompletableFuture<IMqttToken> publishWithTracing(
+        String topic,
+        MqttMessage message
+    ) {
+        Span span = tracer.spanBuilder("mqtt.publish")
+            .setSpanKind(SpanKind.PRODUCER)
+            .setAttribute("messaging.system", "mqtt")
+            .setAttribute("messaging.destination", topic)
+            .setAttribute("messaging.protocol", "mqtt")
+            .setAttribute("messaging.protocol_version", "5.0")
+            .setAttribute("messaging.message.payload_size_bytes", message.getPayload().length)
+            .setAttribute("mqtt.qos", message.getQos())
+            .startSpan();
+        
+        long startTime = System.currentTimeMillis();
+        CompletableFuture<IMqttToken> future = new CompletableFuture<>();
+        
+        try (Scope scope = span.makeCurrent()) {
+            // Inject trace context into MQTT user properties
+            MqttProperties props = message.getProperties();
+            if (props == null) {
+                props = new MqttProperties();
+                message.setProperties(props);
+            }
+            
+            openTelemetry.getPropagators().getTextMapPropagator()
+                .inject(Context.current(), props, new MqttPropertiesSetter());
+            
+            IMqttToken token = client.publish(topic, message);
+            token.setActionCallback(new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    long duration = System.currentTimeMillis() - startTime;
+                    
+                    span.setStatus(StatusCode.OK);
+                    span.setAttribute("mqtt.message_id", asyncActionToken.getMessageId());
+                    span.end();
+                    
+                    messagesSent.add(1,
+                        Attributes.of(
+                            AttributeKey.stringKey("topic"), topic,
+                            AttributeKey.stringKey("status"), "success"
+                        ));
+                    
+                    publishDuration.record(duration,
+                        Attributes.of(
+                            AttributeKey.stringKey("topic"), topic,
+                            AttributeKey.stringKey("qos"), String.valueOf(message.getQos())
+                        ));
+                    
+                    future.complete(asyncActionToken);
+                }
+                
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                    span.recordException(exception);
+                    span.setStatus(StatusCode.ERROR, exception.getMessage());
+                    span.end();
+                    
+                    messagesSent.add(1,
+                        Attributes.of(
+                            AttributeKey.stringKey("topic"), topic,
+                            AttributeKey.stringKey("status"), "error"
+                        ));
+                    
+                    future.completeExceptionally(exception);
+                }
+            });
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            span.end();
+            future.completeExceptionally(e);
+        }
+        
+        return future;
+    }
+    
+    /**
+     * Subscribe with tracing.
+     */
+    public IMqttToken subscribeWithTracing(
+        String topic,
+        int qos,
+        IMqttMessageListener listener
+    ) throws MqttException {
+        Span span = tracer.spanBuilder("mqtt.subscribe")
+            .setSpanKind(SpanKind.CONSUMER)
+            .setAttribute("messaging.system", "mqtt")
+            .setAttribute("messaging.destination", topic)
+            .setAttribute("mqtt.qos", qos)
+            .startSpan();
+        
+        try (Scope scope = span.makeCurrent()) {
+            IMqttMessageListener tracedListener = (receivedTopic, message) -> {
+                Span receiveSpan = tracer.spanBuilder("mqtt.receive")
+                    .setSpanKind(SpanKind.CONSUMER)
+                    .setAttribute("messaging.system", "mqtt")
+                    .setAttribute("messaging.destination", receivedTopic)
+                    .setAttribute("messaging.message.payload_size_bytes", 
+                        message.getPayload().length)
+                    .startSpan();
+                
+                try (Scope receiveScope = receiveSpan.makeCurrent()) {
+                    listener.messageArrived(receivedTopic, message);
+                    receiveSpan.setStatus(StatusCode.OK);
+                    
+                    messagesReceived.add(1,
+                        Attributes.of(
+                            AttributeKey.stringKey("topic"), receivedTopic
+                        ));
+                    
+                } catch (Exception e) {
+                    receiveSpan.recordException(e);
+                    receiveSpan.setStatus(StatusCode.ERROR, e.getMessage());
+                    throw e;
+                } finally {
+                    receiveSpan.end();
+                }
+            };
+            
+            IMqttToken token = client.subscribe(topic, qos, tracedListener);
+            token.waitForCompletion();
+            
+            span.setStatus(StatusCode.OK);
+            return token;
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            throw e;
+        } finally {
+            span.end();
+        }
+    }
+    
+    // TextMapSetter for injecting trace context into MQTT properties
+    private static class MqttPropertiesSetter implements TextMapSetter<MqttProperties> {
+        @Override
+        public void set(MqttProperties props, String key, String value) {
+            props.setUserProperty(key, value);
+        }
+    }
+}
+```
+
+### 7. Graceful Shutdown
+
+Ensure all messages are delivered before application termination.
+
+```java
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class GracefulMqttClient {
+    private final MqttAsyncClient client;
+    private final AtomicInteger pendingMessages = new AtomicInteger(0);
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private volatile boolean shuttingDown = false;
+    
+    public GracefulMqttClient(String broker, String clientId) throws MqttException {
+        this.client = new MqttAsyncClient(broker, clientId);
+        
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+    }
+    
+    /**
+     * Publish with pending message tracking.
+     */
+    public CompletableFuture<IMqttToken> publish(String topic, MqttMessage message) {
+        if (shuttingDown) {
+            return CompletableFuture.failedFuture(
+                new IllegalStateException("Client shutting down")
+            );
+        }
+        
+        pendingMessages.incrementAndGet();
+        CompletableFuture<IMqttToken> future = new CompletableFuture<>();
+        
+        try {
+            IMqttToken token = client.publish(topic, message);
+            token.setActionCallback(new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    pendingMessages.decrementAndGet();
+                    future.complete(asyncActionToken);
+                }
+                
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                    pendingMessages.decrementAndGet();
+                    future.completeExceptionally(exception);
+                }
+            });
+            
+        } catch (Exception e) {
+            pendingMessages.decrementAndGet();
+            future.completeExceptionally(e);
+        }
+        
+        return future;
+    }
+    
+    /**
+     * Graceful shutdown: wait for pending messages, then disconnect.
+     */
+    public void shutdown() {
+        if (shuttingDown) {
+            return;
+        }
+        
+        shuttingDown = true;
+        System.out.println("Initiating graceful shutdown...");
+        
+        try {
+            // Wait for pending messages (up to 30 seconds)
+            long timeout = 30000;
+            long start = System.currentTimeMillis();
+            
+            while (pendingMessages.get() > 0 && 
+                   System.currentTimeMillis() - start < timeout) {
+                System.out.println("Waiting for " + pendingMessages.get() + 
+                    " pending messages...");
+                TimeUnit.SECONDS.sleep(1);
+            }
+            
+            if (pendingMessages.get() > 0) {
+                System.err.println("Timeout: " + pendingMessages.get() + 
+                    " messages still pending");
+            } else {
+                System.out.println("All messages delivered");
+            }
+            
+            // Disconnect gracefully
+            if (client.isConnected()) {
+                client.disconnect(5000).waitForCompletion();
+                System.out.println("Disconnected from broker");
+            }
+            
+            client.close();
+            
+        } catch (Exception e) {
+            System.err.println("Error during shutdown: " + e.getMessage());
+        } finally {
+            shutdownLatch.countDown();
+        }
+    }
+    
+    /**
+     * Wait for shutdown to complete.
+     */
+    public void awaitShutdown() throws InterruptedException {
+        shutdownLatch.await();
+    }
+    
+    public int getPendingMessageCount() {
+        return pendingMessages.get();
+    }
+}
+```
+
+### Configuration Best Practices
+
+```java
+public class MqttClientConfig {
+    public static MqttConnectionOptions createProductionOptions() {
+        MqttConnectionOptions options = new MqttConnectionOptions();
+        
+        // Connection
+        options.setAutomaticReconnect(true);
+        options.setMaxReconnectDelay(60000);  // 1 minute max
+        options.setKeepAliveInterval(60);     // 60 second heartbeat
+        options.setConnectionTimeout(30);     // 30 second timeout
+        
+        // Session
+        options.setCleanStart(false);  // Persistent session
+        options.setSessionExpiryInterval(3600L);  // 1 hour
+        
+        // Quality of Service
+        options.setMaxInflight(10);    // Max 10 unacknowledged messages
+        options.setMqttVersion(MqttConnectionOptions.MQTT_VERSION_5_0);
+        
+        // Last Will and Testament
+        MqttProperties lwt Properties = new MqttProperties();
+        lwtProperties.setMessageExpiryInterval(300L);  // 5 minutes
+        
+        options.setWill(
+            "status/" + options.getClientId(),
+            "offline".getBytes(),
+            1,    // QoS 1
+            true, // Retained
+            lwtProperties
+        );
+        
+        // TLS/SSL (for production)
+        try {
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
+            sslContext.init(null, null, null);
+            options.setSocketFactory(sslContext.getSocketFactory());
+            options.setHttpsHostnameVerificationEnabled(true);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to configure SSL", e);
+        }
+        
+        // Authentication
+        options.setUserName(System.getenv("MQTT_USERNAME"));
+        options.setPassword(System.getenv("MQTT_PASSWORD").toCharArray());
+        
+        return options;
+    }
+}
+```
+
+### Integration Example
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+
+public class ProductionMqttClient {
+    public static void main(String[] args) throws Exception {
+        String broker = "ssl://broker.hivemq.com:8883";
+        String clientId = "production-client-" + System.currentTimeMillis();
+        
+        // Create managed client with all patterns
+        ManagedMqttClient managedClient = new ManagedMqttClient(broker, clientId);
+        managedClient.connect();
+        
+        // Wrap with additional patterns
+        RetryableMqttPublisher retryPublisher = new RetryableMqttPublisher(
+            managedClient.getClient(),
+            "dlq/failed-messages"
+        );
+        
+        RateLimitedMqttPublisher rateLimitedPublisher = new RateLimitedMqttPublisher(
+            managedClient.getClient(),
+            1000.0  // 1000 messages/second
+        );
+        
+        BufferedMqttPublisher bufferedPublisher = new BufferedMqttPublisher(
+            managedClient.getClient(),
+            10000  // Buffer up to 10,000 messages
+        );
+        
+        // OpenTelemetry setup
+        OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .setMeterProvider(meterProvider)
+            .buildAndRegisterGlobal();
+        
+        ObservableMqttClient observableClient = new ObservableMqttClient(
+            broker,
+            clientId + "-observable",
+            openTelemetry
+        );
+        
+        GracefulMqttClient gracefulClient = new GracefulMqttClient(broker, clientId);
+        
+        // Publish with all patterns
+        String topic = "sensors/temperature";
+        MqttMessage message = new MqttMessage("22.5".getBytes());
+        message.setQos(1);
+        
+        // Apply patterns
+        rateLimitedPublisher.publishWithRateLimit(topic, message).get();
+        retryPublisher.publishWithRetry(topic, message).get();
+        bufferedPublisher.publishOrBuffer(topic, message);
+        observableClient.publishWithTracing(topic, message).get();
+        
+        // Graceful shutdown
+        gracefulClient.shutdown();
+        gracefulClient.awaitShutdown();
+        
+        retryPublisher.shutdown();
+        rateLimitedPublisher.shutdown();
+        bufferedPublisher.shutdown();
+    }
+}
+```
+
 ## Generated Code
 
 This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).

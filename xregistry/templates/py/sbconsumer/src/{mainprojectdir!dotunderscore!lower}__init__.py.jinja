@@ -1,0 +1,17 @@
+{%- import "util.include.jinja" as util -%}
+""" __init__.py """
+
+{%- set messagegroups = root.messagegroups %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"MessageDispatcher" %}
+from .dispatcher import {{ class_name }}
+{%- endfor %}
+
+__all__ = [
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"MessageDispatcher" %}
+    "{{ class_name }}",
+{%- endfor %}
+]

@@ -1,0 +1,263 @@
+{%- import "util.include.jinja" as util -%}
+
+# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
+import json
+import typing
+from typing import Callable, Awaitable, Optional
+import asyncio
+import paho.mqtt.client as mqtt
+from cloudevents.conversion import to_binary, to_structured
+from cloudevents.http import CloudEvent
+import {{ data_project_name | dotunderscore | lower }}
+
+
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set class_name = type_name | strip_namespace %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + class_name %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+
+class _ClientBase:
+    """Base class for MQTT client with CloudEvent detection."""
+    
+    @staticmethod
+    def _is_cloud_event(message: mqtt.MQTTMessage) -> bool:
+        """Check if the MQTT message contains a CloudEvent."""
+        try:
+            if message.payload:
+                # Check for structured mode (JSON with CloudEvent fields)
+                if isinstance(message.payload, bytes):
+                    payload_str = message.payload.decode('utf-8')
+                    data = json.loads(payload_str)
+                    return all(k in data for k in ['specversion', 'type', 'source', 'id'])
+                # Check for binary mode would require inspecting user properties (MQTT 5.0)
+                # For now, we focus on structured mode detection
+            return False
+        except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
+            return False
+    
+    @staticmethod
+    def _cloud_event_from_message(message: mqtt.MQTTMessage) -> Optional[CloudEvent]:
+        """Extract CloudEvent from MQTT message (structured mode)."""
+        try:
+            if isinstance(message.payload, bytes):
+                payload_str = message.payload.decode('utf-8')
+                data = json.loads(payload_str)
+                
+                # Structured CloudEvent mode
+                if all(k in data for k in ['specversion', 'type', 'source', 'id']):
+                    attributes = {
+                        'specversion': data['specversion'],
+                        'type': data['type'],
+                        'source': data['source'],
+                        'id': data['id']
+                    }
+                    # Optional attributes
+                    for attr in ['time', 'datacontenttype', 'dataschema', 'subject']:
+                        if attr in data:
+                            attributes[attr] = data[attr]
+                    
+                    # Extract data
+                    event_data = data.get('data', b'')
+                    if isinstance(event_data, dict):
+                        event_data = json.dumps(event_data).encode('utf-8')
+                    elif isinstance(event_data, str):
+                        event_data = event_data.encode('utf-8')
+                    
+                    return CloudEvent(attributes, event_data)
+            return None
+        except (json.JSONDecodeError, UnicodeDecodeError, KeyError):
+            return None
+
+
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroupid.split('.') -%}
+{%- set groupName = parts | join('_') | lower %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"MqttClient" %}
+
+class {{ class_name }}(_ClientBase):
+    """MQTT Client for producing and consuming messages in the {{ messagegroupid }} message group."""
+    
+    def __init__(self, client: mqtt.Client, content_mode: typing.Literal['structured', 'binary'] = 'structured', loop: Optional[asyncio.AbstractEventLoop] = None):
+        """
+        Initialize the MQTT client.
+
+        Args:
+            client: Paho MQTT client instance
+            content_mode: The content mode for CloudEvents ('structured' or 'binary')
+            loop: Optional event loop to use for async operations. If None, will try to get the running loop.
+        """
+        self.client = client
+        self.content_mode = content_mode
+        self.loop = loop
+        
+        # Message handler callbacks (Dispatcher pattern)
+        {% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
+        {%- set messagename = messageid | dotunderscore | snake %}
+        {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+        self.{{messagename.split('.')[-1]}}_async: Optional[Callable[[mqtt.MQTTMessage, CloudEvent, {{type_name}}], Awaitable[None]]] = None
+        {% endfor %}
+        
+        # Attach message callback
+        self.client.on_message = self._on_message
+    
+    def _on_message(self, client, userdata, message: mqtt.MQTTMessage):
+        """Internal MQTT message callback that dispatches to async handlers."""
+        loop = self.loop
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.get_event_loop()
+        asyncio.run_coroutine_threadsafe(self._process_message(message), loop)
+    
+    async def _process_message(self, message: mqtt.MQTTMessage):
+        """Process incoming MQTT message and dispatch to appropriate handler."""
+        try:
+            if self._is_cloud_event(message):
+                cloud_event = self._cloud_event_from_message(message)
+                if cloud_event:
+                    await self._dispatch_cloud_event(message, cloud_event)
+            else:
+                # Handle plain MQTT messages (if needed)
+                pass
+        except Exception as e:
+            print(f"Error processing message: {e}")
+    
+    async def _dispatch_cloud_event(self, mqtt_message: mqtt.MQTTMessage, cloud_event: CloudEvent):
+        """Dispatch CloudEvent to the appropriate handler based on type."""
+        event_type = cloud_event['type']
+        
+        {% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
+        {%- set messagename = messageid | dotunderscore | snake %}
+        {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+        {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+        if event_type == "{{ message.envelopemetadata["type"]["value"] }}":
+        {%- else %}
+        if event_type == "{{ messageid }}":
+        {%- endif %}
+            if self.{{messagename.split('.')[-1]}}_async:
+                try:
+                    content_type = cloud_event.get_attributes().get('datacontenttype', 'application/json')
+                    data = {{type_name}}.from_data(cloud_event.data, content_type)
+                    await self.{{messagename.split('.')[-1]}}_async(mqtt_message, cloud_event, data)
+                except Exception as e:
+                    print(f"Error in {{messagename.split('.')[-1]}} handler: {e}")
+            return
+        {% endfor %}
+    
+    async def subscribe(self, topics: typing.List[str], qos: int = 0):
+        """
+        Subscribe to MQTT topics.
+
+        Args:
+            topics: List of topic patterns to subscribe to
+            qos: Quality of Service level (0, 1, or 2)
+        """
+        for topic in topics:
+            self.client.subscribe(topic, qos)
+    
+    async def unsubscribe(self, topics: typing.List[str]):
+        """
+        Unsubscribe from MQTT topics.
+
+        Args:
+            topics: List of topics to unsubscribe from
+        """
+        for topic in topics:
+            self.client.unsubscribe(topic)
+    
+    async def connect(self, broker: str, port: int = 1883, keepalive: int = 60):
+        """
+        Connect to MQTT broker.
+
+        Args:
+            broker: Broker hostname or IP
+            port: Broker port
+            keepalive: Keepalive interval in seconds
+        """
+        self.client.connect(broker, port, keepalive)
+        self.client.loop_start()
+    
+    async def disconnect(self):
+        """Disconnect from MQTT broker."""
+        self.client.loop_stop()
+        self.client.disconnect()
+
+    # Producer methods
+    {% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
+    {%- set messagename = messageid | dotunderscore | snake %}
+    {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+    async def publish_{{messagename.split('.')[-1]}}(self,
+        topic: str,
+        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.value -%}
+        {%- if attribute.type != "uritemplate" -%}
+        _{{ attrname | snake }}: str,
+        {%- endif -%}
+        {%- endfor %}
+        data: {{type_name}},
+        content_type: str = "application/json") -> None:
+        """
+        Publish the '{{ messageid }}' event to an MQTT topic.
+
+        Args:
+            topic: MQTT topic to publish to
+        {% for attrname, attribute in message.envelopemetadata.items() if not attribute.value -%}
+        {%- if attribute.type != "uritemplate" -%}
+            _{{ attrname | snake }}: CloudEvents attribute '{{attrname}}'
+        {%- endif -%}
+        {%- endfor %}
+            data: The event data to be published
+            content_type: The content type for the event data
+        """
+        attributes = {
+        {%- for attrname, attribute in message.envelopemetadata.items() %}
+             "{{ attrname }}":
+            {%- if attribute.value -%}
+            "{{ attribute.value }}"
+            {%- if attribute.type == "uritemplate" -%}
+                {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+                {%- if phs -%}
+                .format(
+                {%- for placeholder in phs -%}
+                    {{ placeholder }} = data.{{ placeholder | snake }}
+                {%- if not loop.last -%},{%- endif%}
+                {%- endfor -%}
+                )
+                {%- endif %}
+            {%- endif %}
+            {%- else -%}
+                _{{ attrname }}
+            {%- endif-%}
+            {%- if not loop.last -%},{%- endif %}
+        {%- endfor %}
+        }
+        attributes["datacontenttype"] = content_type
+        byte_data = data.to_byte_array(content_type) if data is not None else b''
+        event = CloudEvent(attributes, byte_data)
+        
+        if self.content_mode == "structured":
+            headers, body = to_structured(event)
+            payload = body
+        else:
+            headers, body = to_binary(event)
+            payload = body
+            # Binary mode headers would go into MQTT 5.0 user properties
+            # For MQTT 3.1.1, we'll use structured mode
+        
+        self.client.publish(topic, payload, qos=1)
+
+    {% endfor %}
+{% endfor %}

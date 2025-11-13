@@ -196,6 +196,490 @@ catch (Exception ex)
 }
 ```
 
+## Production-Ready Patterns
+
+This section provides production-ready patterns for building reliable Service Bus producer applications.
+
+### 1. Connection Pooling and Reuse
+
+Service Bus sender clients should be long-lived and reused. They are thread-safe:
+
+```csharp
+public class ServiceBusSenderPool
+{
+    private static readonly Lazy<ServiceBusSender> _sender = new Lazy<ServiceBusSender>(() =>
+    {
+        var connectionString = Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION_STRING");
+        var queueOrTopicName = Environment.GetEnvironmentVariable("SERVICEBUS_ENTITY_NAME");
+        
+        var client = new ServiceBusClient(connectionString, new ServiceBusClientOptions
+        {
+            RetryOptions = new ServiceBusRetryOptions
+            {
+                Mode = ServiceBusRetryMode.Exponential,
+                MaxRetries = 3,
+                Delay = TimeSpan.FromMilliseconds(100),
+                MaxDelay = TimeSpan.FromSeconds(10),
+                TryTimeout = TimeSpan.FromSeconds(60)
+            },
+            TransportType = ServiceBusTransportType.AmqpTcp
+        });
+
+        return client.CreateSender(queueOrTopicName);
+    });
+
+    public static ServiceBusSender Instance => _sender.Value;
+}
+```
+
+### 2. Batch Sending with Size Management
+
+Use ServiceBusMessageBatch for efficient batching:
+
+```csharp
+public async Task<int> SendBatchAsync<T>(IEnumerable<T> messages, CancellationToken cancellationToken = default)
+{
+    var sender = ServiceBusSenderPool.Instance;
+    int totalSent = 0;
+
+    using var currentBatch = await sender.CreateMessageBatchAsync(cancellationToken);
+
+    foreach (var message in messages)
+    {
+        var serviceBusMessage = {{ groupname }}EventProducer.Create{{ messagename }}Message(message);
+
+        if (!currentBatch.TryAddMessage(serviceBusMessage))
+        {
+            // Batch is full, send it
+            if (currentBatch.Count > 0)
+            {
+                await sender.SendMessagesAsync(currentBatch, cancellationToken);
+                totalSent += currentBatch.Count;
+                Console.WriteLine($"Sent batch of {currentBatch.Count} messages");
+            }
+
+            // Start new batch
+            using var newBatch = await sender.CreateMessageBatchAsync(cancellationToken);
+            if (!newBatch.TryAddMessage(serviceBusMessage))
+            {
+                throw new InvalidOperationException("Message is too large to fit in a batch");
+            }
+
+            await sender.SendMessagesAsync(newBatch, cancellationToken);
+            totalSent += newBatch.Count;
+        }
+    }
+
+    // Send remaining messages
+    if (currentBatch.Count > 0)
+    {
+        await sender.SendMessagesAsync(currentBatch, cancellationToken);
+        totalSent += currentBatch.Count;
+    }
+
+    return totalSent;
+}
+```
+
+### 3. Transaction Support
+
+Use transactions for atomic multi-message sends:
+
+```csharp
+public class TransactionalServiceBusProducer
+{
+    private readonly ServiceBusClient _client;
+    private readonly ServiceBusSender _sender;
+
+    public TransactionalServiceBusProducer(string connectionString, string queueName)
+    {
+        _client = new ServiceBusClient(connectionString);
+        _sender = _client.CreateSender(queueName);
+    }
+
+    public async Task SendTransactionalBatchAsync<T>(
+        IEnumerable<T> messages,
+        CancellationToken cancellationToken = default)
+    {
+        using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
+
+        try
+        {
+            var serviceBusMessages = messages.Select(m => 
+                {{ groupname }}EventProducer.Create{{ messagename }}Message(m)).ToList();
+
+            // All sends in this transaction
+            await _sender.SendMessagesAsync(serviceBusMessages, cancellationToken);
+
+            // Database operations would also participate in the same transaction
+            // await SaveToDatabaseAsync(messages);
+
+            // Commit transaction
+            scope.Complete();
+            Console.WriteLine($"Transaction completed for {serviceBusMessages.Count} messages");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Transaction failed: {ex.Message}");
+            // Transaction automatically rolls back
+            throw;
+        }
+    }
+}
+```
+
+### 4. Retry Logic with Azure SDK Policies
+
+Leverage built-in retry mechanisms:
+
+```csharp
+using Polly;
+using Polly.Retry;
+
+public class ResilientServiceBusProducer
+{
+    private readonly ServiceBusSender _sender;
+    private readonly AsyncRetryPolicy _retryPolicy;
+
+    public ResilientServiceBusProducer(ServiceBusSender sender)
+    {
+        _sender = sender;
+
+        _retryPolicy = Policy
+            .Handle<ServiceBusException>(ex => IsTransient(ex))
+            .Or<TimeoutException>()
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt => 
+                    TimeSpan.FromMilliseconds(100 * Math.Pow(2, retryAttempt - 1)),
+                onRetry: (exception, timeSpan, retryCount, context) =>
+                {
+                    Console.WriteLine($"Retry {retryCount} after {timeSpan.TotalMilliseconds}ms. Error: {exception.Message}");
+                });
+    }
+
+    public async Task SendWithRetryAsync(ServiceBusMessage message, CancellationToken cancellationToken = default)
+    {
+        await _retryPolicy.ExecuteAsync(async () =>
+        {
+            await _sender.SendMessageAsync(message, cancellationToken);
+        });
+    }
+
+    private static bool IsTransient(ServiceBusException ex)
+    {
+        return ex.Reason switch
+        {
+            ServiceBusFailureReason.ServiceTimeout => true,
+            ServiceBusFailureReason.ServiceBusy => true,
+            ServiceBusFailureReason.ServiceCommunicationProblem => true,
+            _ => false
+        };
+    }
+}
+```
+
+### 5. Circuit Breaker Pattern
+
+Prevent cascading failures when Service Bus is unavailable:
+
+```csharp
+public class CircuitBreakerServiceBusProducer
+{
+    private int _failureCount = 0;
+    private DateTime _lastFailureTime = DateTime.MinValue;
+    private readonly int _failureThreshold;
+    private readonly TimeSpan _timeout;
+    private CircuitState _state = CircuitState.Closed;
+    private readonly ServiceBusSender _sender;
+
+    public CircuitBreakerServiceBusProducer(
+        ServiceBusSender sender,
+        int failureThreshold = 5,
+        TimeSpan? timeout = null)
+    {
+        _sender = sender;
+        _failureThreshold = failureThreshold;
+        _timeout = timeout ?? TimeSpan.FromSeconds(60);
+    }
+
+    public async Task SendWithCircuitBreakerAsync(
+        ServiceBusMessage message,
+        CancellationToken cancellationToken = default)
+    {
+        if (_state == CircuitState.Open)
+        {
+            if (DateTime.UtcNow - _lastFailureTime >= _timeout)
+            {
+                Console.WriteLine("Circuit breaker: Transitioning to HalfOpen");
+                _state = CircuitState.HalfOpen;
+            }
+            else
+            {
+                throw new InvalidOperationException("Circuit breaker is open. Service Bus unavailable.");
+            }
+        }
+
+        try
+        {
+            await _sender.SendMessageAsync(message, cancellationToken);
+            
+            if (_state == CircuitState.HalfOpen)
+            {
+                Console.WriteLine("Circuit breaker: Success in HalfOpen, transitioning to Closed");
+                _state = CircuitState.Closed;
+                _failureCount = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            _failureCount++;
+            _lastFailureTime = DateTime.UtcNow;
+
+            if (_failureCount >= _failureThreshold)
+            {
+                Console.WriteLine($"Circuit breaker: Threshold ({_failureThreshold}) reached, opening circuit");
+                _state = CircuitState.Open;
+            }
+
+            throw;
+        }
+    }
+
+    private enum CircuitState { Closed, Open, HalfOpen }
+}
+```
+
+### 6. Rate Limiting
+
+Control send rate to avoid throttling:
+
+```csharp
+public class RateLimitedServiceBusProducer
+{
+    private readonly SemaphoreSlim _semaphore;
+    private readonly ServiceBusSender _sender;
+
+    public RateLimitedServiceBusProducer(
+        ServiceBusSender sender,
+        int maxConcurrentSends = 100)
+    {
+        _sender = sender;
+        _semaphore = new SemaphoreSlim(maxConcurrentSends, maxConcurrentSends);
+    }
+
+    public async Task SendAsync(
+        ServiceBusMessage message,
+        CancellationToken cancellationToken = default)
+    {
+        await _semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            await _sender.SendMessageAsync(message, cancellationToken);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+}
+```
+
+### 7. Application Insights Integration
+
+Deep observability with Azure Application Insights:
+
+```csharp
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.DataContracts;
+using Microsoft.ApplicationInsights.Extensibility;
+
+public class ObservableServiceBusProducer
+{
+    private readonly TelemetryClient _telemetry;
+    private readonly ServiceBusSender _sender;
+
+    public ObservableServiceBusProducer(ServiceBusSender sender, string instrumentationKey)
+    {
+        _sender = sender;
+        var config = TelemetryConfiguration.CreateDefault();
+        config.ConnectionString = $"InstrumentationKey={instrumentationKey}";
+        _telemetry = new TelemetryClient(config);
+    }
+
+    public async Task SendWithTelemetryAsync<T>(
+        T message,
+        CancellationToken cancellationToken = default)
+    {
+        using var operation = _telemetry.StartOperation<DependencyTelemetry>("ServiceBus-Send");
+        operation.Telemetry.Type = "Azure Service Bus";
+        operation.Telemetry.Target = _sender.EntityPath;
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var serviceBusMessage = {{ groupname }}EventProducer.Create{{ messagename }}Message(message);
+            await _sender.SendMessageAsync(serviceBusMessage, cancellationToken);
+            
+            stopwatch.Stop();
+            operation.Telemetry.Success = true;
+            operation.Telemetry.Duration = stopwatch.Elapsed;
+
+            _telemetry.TrackMetric("ServiceBus.MessagesSent", 1,
+                new Dictionary<string, string> { { "Entity", _sender.EntityPath } });
+            
+            _telemetry.TrackMetric("ServiceBus.SendDuration", stopwatch.Elapsed.TotalMilliseconds,
+                new Dictionary<string, string> { { "Entity", _sender.EntityPath } });
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            operation.Telemetry.Success = false;
+            operation.Telemetry.Duration = stopwatch.Elapsed;
+            
+            _telemetry.TrackException(ex, new Dictionary<string, string>
+            {
+                { "Entity", _sender.EntityPath },
+                { "Operation", "Send" }
+            });
+            
+            throw;
+        }
+    }
+}
+```
+
+### 8. Claim Check Pattern for Large Messages
+
+Handle messages larger than 256KB using blob storage:
+
+```csharp
+using Azure.Storage.Blobs;
+
+public class ClaimCheckServiceBusProducer
+{
+    private readonly ServiceBusSender _sender;
+    private readonly BlobContainerClient _blobContainer;
+    private readonly int _sizeThreshold;
+
+    public ClaimCheckServiceBusProducer(
+        ServiceBusSender sender,
+        BlobContainerClient blobContainer,
+        int sizeThresholdKB = 200)
+    {
+        _sender = sender;
+        _blobContainer = blobContainer;
+        _sizeThreshold = sizeThresholdKB * 1024;
+    }
+
+    public async Task SendWithClaimCheckAsync<T>(
+        T message,
+        CancellationToken cancellationToken = default)
+    {
+        var json = JsonSerializer.Serialize(message);
+        var bytes = Encoding.UTF8.GetBytes(json);
+
+        ServiceBusMessage serviceBusMessage;
+
+        if (bytes.Length > _sizeThreshold)
+        {
+            // Upload large payload to blob storage
+            var blobName = $"messages/{Guid.NewGuid()}.json";
+            var blobClient = _blobContainer.GetBlobClient(blobName);
+            
+            await blobClient.UploadAsync(
+                new BinaryData(bytes),
+                cancellationToken);
+
+            Console.WriteLine($"Large message ({bytes.Length} bytes) uploaded to blob: {blobName}");
+
+            // Send claim check (reference) via Service Bus
+            serviceBusMessage = new ServiceBusMessage
+            {
+                ApplicationProperties =
+                {
+                    ["ClaimCheck"] = blobClient.Uri.ToString(),
+                    ["OriginalSize"] = bytes.Length,
+                    ["ContentType"] = "application/json"
+                },
+                Subject = "claim-check-reference"
+            };
+        }
+        else
+        {
+            // Send normally for small messages
+            serviceBusMessage = new ServiceBusMessage(bytes)
+            {
+                ContentType = "application/json"
+            };
+        }
+
+        await _sender.SendMessageAsync(serviceBusMessage, cancellationToken);
+    }
+}
+
+// Consumer side would check for ClaimCheck property and download from blob if present
+```
+
+### 9. Metrics Collection
+
+Track producer metrics with System.Diagnostics.Metrics:
+
+```csharp
+using System.Diagnostics.Metrics;
+
+public class MetricsServiceBusProducer
+{
+    private static readonly Meter Meter = new Meter("MyApp.ServiceBus.Producer", "1.0.0");
+    private static readonly Counter<long> MessagesSent = Meter.CreateCounter<long>(
+        "servicebus.producer.messages.sent",
+        "messages",
+        "Number of messages sent");
+    
+    private static readonly Counter<long> SendErrors = Meter.CreateCounter<long>(
+        "servicebus.producer.errors",
+        "errors",
+        "Number of send errors");
+    
+    private static readonly Histogram<double> SendDuration = Meter.CreateHistogram<double>(
+        "servicebus.producer.send.duration",
+        "ms",
+        "Duration of send operations");
+
+    private readonly ServiceBusSender _sender;
+
+    public MetricsServiceBusProducer(ServiceBusSender sender)
+    {
+        _sender = sender;
+    }
+
+    public async Task SendWithMetricsAsync(
+        ServiceBusMessage message,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var tags = new TagList { { "entity", _sender.EntityPath } };
+
+        try
+        {
+            await _sender.SendMessageAsync(message, cancellationToken);
+            
+            stopwatch.Stop();
+            MessagesSent.Add(1, tags);
+            SendDuration.Record(stopwatch.Elapsed.TotalMilliseconds, tags);
+        }
+        catch (Exception)
+        {
+            stopwatch.Stop();
+            SendErrors.Add(1, tags);
+            SendDuration.Record(stopwatch.Elapsed.TotalMilliseconds, tags);
+            throw;
+        }
+    }
+}
+```
+
 ## Testing
 
 ```bash

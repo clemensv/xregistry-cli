@@ -287,4 +287,673 @@ Converts a Kafka record to a CloudEvent.
 
 Args:
 - `record`: The Kafka record.
+
+## Production-Ready Patterns
+
+This section provides best-practice patterns for building production-grade Kafka consumers in Python.
+
+### 1. Connection Management with Consumer Pooling
+
+Maintain a single long-lived KafkaConsumer per consumer group. Kafka consumers are thread-bound and not thread-safe.
+
+```python
+from confluent_kafka import Consumer, KafkaError, KafkaException
+from typing import Dict, Any
+import threading
+
+class KafkaConsumerPool:
+    """
+    Manages a pool of Kafka consumers for different consumer groups.
+    Each consumer runs in its own thread.
+    """
+    _lock = threading.Lock()
+    _consumers: Dict[str, Consumer] = {}
+    _threads: Dict[str, threading.Thread] = {}
+
+    @classmethod
+    def get_consumer(cls, group_id: str, bootstrap_servers: str, topics: list[str], 
+                     config: Dict[str, Any] = None) -> Consumer:
+        """
+        Get or create a Kafka consumer for the specified group.
+        Thread-safe singleton pattern per consumer group.
+        """
+        with cls._lock:
+            if group_id not in cls._consumers:
+                consumer_config = {
+                    'bootstrap.servers': bootstrap_servers,
+                    'group.id': group_id,
+                    'auto.offset.reset': 'earliest',
+                    'enable.auto.commit': False,  # Manual commit for reliability
+                    'session.timeout.ms': 45000,
+                    'max.poll.interval.ms': 300000,
+                    **(config or {})
+                }
+                cls._consumers[group_id] = Consumer(consumer_config)
+                cls._consumers[group_id].subscribe(topics)
+        
+        return cls._consumers[group_id]
+
+    @classmethod
+    def close_all(cls):
+        """Close all consumers gracefully."""
+        with cls._lock:
+            for consumer in cls._consumers.values():
+                consumer.close()
+            cls._consumers.clear()
+```
+
+### 2. Retry Logic with Exponential Backoff
+
+Handle transient failures with configurable retry policies using the `tenacity` library.
+
+```python
+from tenacity import (
+    retry, stop_after_attempt, wait_exponential, 
+    retry_if_exception_type, before_sleep_log
+)
+from confluent_kafka import KafkaException, KafkaError
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Transient Kafka errors that should trigger retries
+RETRIABLE_ERRORS = (
+    KafkaError._TIMED_OUT,
+    KafkaError._NETWORK_EXCEPTION,
+    KafkaError._BROKER_NOT_AVAILABLE,
+    KafkaError._NOT_COORDINATOR,
+    KafkaError._COORDINATOR_LOAD_IN_PROGRESS,
+)
+
+def is_retriable_kafka_error(exception: Exception) -> bool:
+    """Check if a Kafka exception is retriable."""
+    if isinstance(exception, KafkaException):
+        error = exception.args[0]
+        return error.code() in RETRIABLE_ERRORS
+    return False
+
+@retry(
+    retry=retry_if_exception_type(KafkaException),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    retry_error_callback=lambda retry_state: None
+)
+async def process_message_with_retry(message, handler):
+    """
+    Process a message with automatic retry on transient failures.
+    Raises non-retriable exceptions immediately.
+    """
+    try:
+        await handler(message)
+    except Exception as e:
+        if not is_retriable_kafka_error(e):
+            raise  # Non-retriable, fail fast
+        logger.warning(f"Retriable error processing message: {e}")
+        raise
+```
+
+### 3. Circuit Breaker Pattern
+
+Protect downstream services from cascading failures using `pybreaker`.
+
+```python
+import pybreaker
+from typing import Callable, Any
+import asyncio
+
+# Circuit breaker for downstream HTTP API
+api_breaker = pybreaker.CircuitBreaker(
+    fail_max=5,  # Open after 5 failures
+    timeout_duration=60,  # Stay open for 60 seconds
+    exclude=[ValueError, KeyError],  # Don't trip on validation errors
+    name='downstream_api'
+)
+
+class CircuitBreakerEventProcessor:
+    """Event processor with circuit breaker for downstream dependencies."""
+    
+    def __init__(self, consumer: Consumer):
+        self.consumer = consumer
+        self.breaker = api_breaker
+
+    async def process_event(self, message, handler: Callable):
+        """
+        Process message with circuit breaker protection.
+        Falls back to DLQ if circuit is open.
+        """
+        try:
+            # Protected call to downstream service
+            await self.breaker.call_async(handler, message)
+            self.consumer.commit(message)
+        except pybreaker.CircuitBreakerError:
+            logger.error(f"Circuit breaker OPEN, routing to DLQ: {message.key()}")
+            await self.send_to_dlq(message, "Circuit breaker open")
+            self.consumer.commit(message)  # Commit to avoid reprocessing
+        except Exception as e:
+            logger.exception(f"Error processing message: {e}")
+            raise
+
+    async def send_to_dlq(self, message, error_reason: str):
+        """Send failed message to dead letter queue."""
+        # DLQ implementation (see pattern #5)
+        pass
+```
+
+### 4. Rate Limiting with Token Bucket
+
+Control message processing rate to prevent overwhelming downstream systems.
+
+```python
+import asyncio
+import time
+from collections import deque
+
+class TokenBucketRateLimiter:
+    """
+    Token bucket rate limiter for controlling message processing throughput.
+    Allows bursts while maintaining average rate.
+    """
+    def __init__(self, rate: float, capacity: int):
+        """
+        Args:
+            rate: Tokens added per second (messages/second)
+            capacity: Maximum burst size
+        """
+        self.rate = rate
+        self.capacity = capacity
+        self.tokens = capacity
+        self.last_update = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self, tokens: int = 1):
+        """
+        Acquire tokens, blocking if insufficient tokens available.
+        Returns when tokens are acquired.
+        """
+        async with self._lock:
+            while self.tokens < tokens:
+                # Refill tokens based on elapsed time
+                now = time.monotonic()
+                elapsed = now - self.last_update
+                self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+                self.last_update = now
+                
+                if self.tokens < tokens:
+                    # Wait for next token
+                    sleep_time = (tokens - self.tokens) / self.rate
+                    await asyncio.sleep(sleep_time)
+            
+            self.tokens -= tokens
+
+class RateLimitedConsumer:
+    """Kafka consumer with rate limiting."""
+    
+    def __init__(self, consumer: Consumer, messages_per_second: float = 100):
+        self.consumer = consumer
+        self.rate_limiter = TokenBucketRateLimiter(
+            rate=messages_per_second, 
+            capacity=int(messages_per_second * 2)  # Allow 2x burst
+        )
+
+    async def consume_with_rate_limit(self, handler: Callable):
+        """Consume messages with rate limiting."""
+        while True:
+            msg = self.consumer.poll(timeout=1.0)
+            if msg is None:
+                continue
+            
+            if msg.error():
+                if msg.error().code() == KafkaError._PARTITION_EOF:
+                    continue
+                raise KafkaException(msg.error())
+            
+            # Acquire rate limit token before processing
+            await self.rate_limiter.acquire()
+            
+            try:
+                await handler(msg)
+                self.consumer.commit(msg)
+            except Exception as e:
+                logger.exception(f"Error processing message: {e}")
+```
+
+### 5. Dead Letter Queue (DLQ) Pattern
+
+Route unprocessable messages to a DLQ topic after exhausting retries.
+
+```python
+from confluent_kafka import Producer
+from datetime import datetime
+import json
+
+class DLQKafkaConsumer:
+    """
+    Kafka consumer with DLQ support for failed messages.
+    Routes messages to a dead letter topic after retry exhaustion.
+    """
+    def __init__(self, consumer: Consumer, bootstrap_servers: str, 
+                 dlq_topic: str, max_retries: int = 3):
+        self.consumer = consumer
+        self.dlq_topic = dlq_topic
+        self.max_retries = max_retries
+        
+        # Separate producer for DLQ
+        self.dlq_producer = Producer({
+            'bootstrap.servers': bootstrap_servers,
+            'linger.ms': 10,  # Batch DLQ messages
+        })
+
+    async def process_with_dlq(self, msg, handler: Callable):
+        """
+        Process message with automatic DLQ routing on failure.
+        """
+        retry_count = 0
+        original_topic = msg.topic()
+        
+        while retry_count < self.max_retries:
+            try:
+                await handler(msg)
+                self.consumer.commit(msg)
+                return  # Success
+            except Exception as e:
+                retry_count += 1
+                logger.warning(
+                    f"Retry {retry_count}/{self.max_retries} for message "
+                    f"from {original_topic}: {e}"
+                )
+                
+                if retry_count < self.max_retries:
+                    # Exponential backoff between retries
+                    await asyncio.sleep(2 ** retry_count)
+        
+        # Exhausted retries, send to DLQ
+        await self.send_to_dlq(msg, original_topic, "Max retries exceeded")
+        self.consumer.commit(msg)  # Commit to avoid reprocessing
+
+    async def send_to_dlq(self, msg, original_topic: str, error_reason: str):
+        """Send message to dead letter queue with metadata."""
+        dlq_headers = [
+            ('original-topic', original_topic.encode('utf-8')),
+            ('error-reason', error_reason.encode('utf-8')),
+            ('failed-at', datetime.utcnow().isoformat().encode('utf-8')),
+            ('original-partition', str(msg.partition()).encode('utf-8')),
+            ('original-offset', str(msg.offset()).encode('utf-8')),
+        ]
+        
+        # Preserve original headers
+        if msg.headers():
+            dlq_headers.extend(msg.headers())
+        
+        self.dlq_producer.produce(
+            topic=self.dlq_topic,
+            key=msg.key(),
+            value=msg.value(),
+            headers=dlq_headers,
+            callback=lambda err, msg: logger.error(f"DLQ delivery failed: {err}") if err else None
+        )
+        self.dlq_producer.flush(timeout=10)
+        
+        logger.error(
+            f"Message sent to DLQ: topic={self.dlq_topic}, "
+            f"original_topic={original_topic}, reason={error_reason}"
+        )
+```
+
+### 6. Batch Processing for Throughput
+
+Process messages in batches to improve throughput and reduce I/O overhead.
+
+```python
+import asyncio
+from typing import List
+from datetime import datetime, timedelta
+
+class BatchProcessor:
+    """
+    Batches messages for efficient bulk processing.
+    Flushes on size threshold or timeout.
+    """
+    def __init__(self, batch_size: int = 100, batch_timeout_seconds: float = 5.0):
+        self.batch_size = batch_size
+        self.batch_timeout = timedelta(seconds=batch_timeout_seconds)
+        self.batch: List = []
+        self.last_flush = datetime.now()
+        self._lock = asyncio.Lock()
+
+    async def add_message(self, msg, handler: Callable):
+        """
+        Add message to batch. Flushes if batch is full or timeout elapsed.
+        """
+        async with self._lock:
+            self.batch.append(msg)
+            
+            # Flush conditions: size threshold or time threshold
+            should_flush = (
+                len(self.batch) >= self.batch_size or
+                datetime.now() - self.last_flush >= self.batch_timeout
+            )
+            
+            if should_flush:
+                await self.flush_batch(handler)
+
+    async def flush_batch(self, handler: Callable):
+        """Process and commit current batch."""
+        if not self.batch:
+            return
+        
+        try:
+            # Process batch (e.g., bulk database insert)
+            await handler(self.batch)
+            
+            # Commit the last message offset (commits entire batch)
+            last_msg = self.batch[-1]
+            self.consumer.commit(last_msg)
+            
+            logger.info(f"Processed batch of {len(self.batch)} messages")
+        except Exception as e:
+            logger.exception(f"Batch processing failed: {e}")
+            raise
+        finally:
+            self.batch.clear()
+            self.last_flush = datetime.now()
+
+    async def close(self, handler: Callable):
+        """Flush remaining messages on shutdown."""
+        async with self._lock:
+            await self.flush_batch(handler)
+```
+
+### 7. OpenTelemetry Observability
+
+Instrument Kafka consumer with distributed tracing and metrics.
+
+```python
+from opentelemetry import trace, metrics
+from opentelemetry.trace import Status, StatusCode
+from opentelemetry.propagate import extract
+from opentelemetry.metrics import get_meter
+from confluent_kafka import Consumer
+from typing import Dict
+
+tracer = trace.get_tracer(__name__)
+meter = get_meter(__name__)
+
+# Metrics
+messages_processed = meter.create_counter(
+    "kafka.messages.processed",
+    description="Total messages processed",
+    unit="1"
+)
+processing_duration = meter.create_histogram(
+    "kafka.message.processing.duration",
+    description="Message processing duration",
+    unit="ms"
+)
+consumer_lag = meter.create_observable_gauge(
+    "kafka.consumer.lag",
+    description="Consumer lag per partition",
+    unit="1"
+)
+
+class ObservableKafkaConsumer:
+    """Kafka consumer with OpenTelemetry tracing and metrics."""
+    
+    def __init__(self, consumer: Consumer):
+        self.consumer = consumer
+
+    async def process_with_tracing(self, msg, handler: Callable):
+        """Process message with distributed tracing."""
+        # Extract trace context from Kafka headers
+        ctx = extract({h[0]: h[1] for h in (msg.headers() or [])})
+        
+        with tracer.start_as_current_span(
+            "kafka.consume",
+            context=ctx,
+            kind=trace.SpanKind.CONSUMER
+        ) as span:
+            span.set_attribute("messaging.system", "kafka")
+            span.set_attribute("messaging.destination", msg.topic())
+            span.set_attribute("messaging.kafka.partition", msg.partition())
+            span.set_attribute("messaging.kafka.offset", msg.offset())
+            span.set_attribute("messaging.message_id", msg.key().decode() if msg.key() else "")
+            
+            start_time = time.monotonic()
+            try:
+                await handler(msg)
+                
+                # Record success metrics
+                duration_ms = (time.monotonic() - start_time) * 1000
+                processing_duration.record(duration_ms, {
+                    "topic": msg.topic(),
+                    "status": "success"
+                })
+                messages_processed.add(1, {
+                    "topic": msg.topic(),
+                    "status": "success"
+                })
+                
+                span.set_status(Status(StatusCode.OK))
+                self.consumer.commit(msg)
+                
+            except Exception as e:
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+                messages_processed.add(1, {
+                    "topic": msg.topic(),
+                    "status": "error"
+                })
+                raise
+
+    def get_consumer_lag(self) -> Dict[str, int]:
+        """
+        Calculate consumer lag per partition.
+        Lag = High Water Mark - Current Offset
+        """
+        lag_by_partition = {}
+        for partition in self.consumer.assignment():
+            committed = self.consumer.committed([partition])
+            watermarks = self.consumer.get_watermark_offsets(partition)
+            
+            if committed and watermarks:
+                current_offset = committed[0].offset
+                high_water_mark = watermarks[1]
+                lag_by_partition[f"{partition.topic}-{partition.partition}"] = \
+                    high_water_mark - current_offset
+        
+        return lag_by_partition
+```
+
+### 8. Backpressure Control
+
+Prevent memory exhaustion by controlling in-flight message processing.
+
+```python
+import asyncio
+
+class BackpressureController:
+    """
+    Controls backpressure using a semaphore to limit concurrent processing.
+    Prevents memory exhaustion from unbounded message queuing.
+    """
+    def __init__(self, max_concurrent: int = 50):
+        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.in_flight = 0
+        self._lock = asyncio.Lock()
+
+    async def process_with_backpressure(self, msg, handler: Callable):
+        """
+        Process message with backpressure control.
+        Blocks new message consumption when at capacity.
+        """
+        async with self.semaphore:
+            async with self._lock:
+                self.in_flight += 1
+            
+            try:
+                await handler(msg)
+            finally:
+                async with self._lock:
+                    self.in_flight -= 1
+
+    def get_metrics(self) -> Dict[str, int]:
+        """Get current backpressure metrics."""
+        return {
+            "in_flight": self.in_flight,
+            "available_slots": self.semaphore._value
+        }
+```
+
+### 9. Graceful Shutdown
+
+Ensure clean shutdown with proper resource cleanup and offset commits.
+
+```python
+import signal
+import asyncio
+
+class GracefulConsumer:
+    """Kafka consumer with graceful shutdown support."""
+    
+    def __init__(self, consumer: Consumer):
+        self.consumer = consumer
+        self.shutdown_event = asyncio.Event()
+        self.processing_tasks = set()
+        
+        # Register signal handlers
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals."""
+        logger.info(f"Received signal {signum}, initiating graceful shutdown")
+        self.shutdown_event.set()
+
+    async def consume_loop(self, handler: Callable):
+        """
+        Main consumption loop with graceful shutdown.
+        Waits for in-flight messages to complete before exiting.
+        """
+        try:
+            while not self.shutdown_event.is_set():
+                msg = self.consumer.poll(timeout=1.0)
+                
+                if msg is None:
+                    continue
+                
+                if msg.error():
+                    if msg.error().code() == KafkaError._PARTITION_EOF:
+                        continue
+                    raise KafkaException(msg.error())
+                
+                # Process message asynchronously
+                task = asyncio.create_task(self._process_message(msg, handler))
+                self.processing_tasks.add(task)
+                task.add_done_callback(self.processing_tasks.discard)
+            
+            # Shutdown initiated, wait for in-flight messages
+            logger.info(f"Waiting for {len(self.processing_tasks)} in-flight messages")
+            if self.processing_tasks:
+                await asyncio.gather(*self.processing_tasks, return_exceptions=True)
+            
+            logger.info("All messages processed, closing consumer")
+            
+        finally:
+            self.consumer.close()
+
+    async def _process_message(self, msg, handler: Callable):
+        """Process individual message with error handling."""
+        try:
+            await handler(msg)
+            self.consumer.commit(msg)
+        except Exception as e:
+            logger.exception(f"Error processing message: {e}")
+```
+
+### Configuration Best Practices
+
+```python
+# Production-grade Kafka consumer configuration
+PRODUCTION_CONFIG = {
+    # Connection
+    'bootstrap.servers': 'broker1:9092,broker2:9092,broker3:9092',
+    'group.id': 'my-consumer-group',
+    
+    # Reliability
+    'enable.auto.commit': False,  # Manual commits for exactly-once semantics
+    'auto.offset.reset': 'earliest',  # Process from beginning on new group
+    
+    # Performance
+    'fetch.min.bytes': 1024,  # Wait for at least 1KB before returning
+    'fetch.wait.max.ms': 500,  # Max wait time for fetch.min.bytes
+    'max.partition.fetch.bytes': 1048576,  # 1MB per partition
+    
+    # Timeouts
+    'session.timeout.ms': 45000,  # 45s heartbeat timeout
+    'max.poll.interval.ms': 300000,  # 5 minutes between polls
+    'request.timeout.ms': 30000,  # 30s request timeout
+    
+    # Security (for production)
+    'security.protocol': 'SASL_SSL',
+    'sasl.mechanism': 'PLAIN',
+    'sasl.username': '${KAFKA_USERNAME}',
+    'sasl.password': '${KAFKA_PASSWORD}',
+    
+    # Metrics
+    'statistics.interval.ms': 60000,  # Emit metrics every 60s
+}
+```
+
+### Integration Example
+
+```python
+import asyncio
+from confluent_kafka import Consumer
+
+async def main():
+    """Complete integration example with all patterns."""
+    consumer = Consumer(PRODUCTION_CONFIG)
+    consumer.subscribe(['my-topic'])
+    
+    # Initialize components
+    graceful_consumer = GracefulConsumer(consumer)
+    observable_consumer = ObservableKafkaConsumer(consumer)
+    rate_limiter = RateLimitedConsumer(consumer, messages_per_second=100)
+    dlq_consumer = DLQKafkaConsumer(
+        consumer, 
+        bootstrap_servers='broker1:9092',
+        dlq_topic='my-topic-dlq'
+    )
+    batch_processor = BatchProcessor(batch_size=100, batch_timeout_seconds=5.0)
+    backpressure = BackpressureController(max_concurrent=50)
+    
+    async def process_message(msg):
+        """Combined message processing with all patterns."""
+        # Rate limiting
+        await rate_limiter.rate_limiter.acquire()
+        
+        # Backpressure control
+        await backpressure.process_with_backpressure(msg, async_handler)
+        
+        # Observability
+        await observable_consumer.process_with_tracing(msg, async_handler)
+        
+        # DLQ on failure
+        await dlq_consumer.process_with_dlq(msg, async_handler)
+    
+    async def async_handler(msg):
+        """Your business logic here."""
+        # Decode message
+        data = json.loads(msg.value().decode('utf-8'))
+        
+        # Process data
+        await process_business_logic(data)
+    
+    # Start consumption with graceful shutdown
+    await graceful_consumer.consume_loop(process_message)
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
 {% endfilter %}

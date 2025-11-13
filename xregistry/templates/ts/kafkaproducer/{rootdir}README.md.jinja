@@ -162,4 +162,802 @@ try {
 4. **Batch messages** when possible for better throughput
 5. **Configure appropriate timeouts** based on your network
 6. **Use SSL/SASL** for production deployments
+
+## Production-Ready Patterns
+
+This section provides enterprise-grade patterns for building reliable Kafka producers in TypeScript/Node.js.
+
+### 1. Connection Pooling and Lifecycle Management
+
+Efficiently manage Kafka producer connections with singleton pattern.
+
+```typescript
+import { Kafka, Producer, ProducerConfig } from 'kafkajs';
+
+export class KafkaProducerPool {
+    private static producers: Map<string, Producer> = new Map();
+    
+    static async getProducer(
+        brokers: string[],
+        clientId: string,
+        config?: Partial<ProducerConfig>
+    ): Promise<Producer> {
+        const key = `${clientId}-${brokers.join(',')}`;
+        
+        if (!this.producers.has(key)) {
+            const kafka = new Kafka({
+                clientId,
+                brokers,
+                retry: {
+                    initialRetryTime: 300,
+                    retries: 8,
+                    maxRetryTime: 30000,
+                    multiplier: 2
+                }
+            });
+            
+            const producer = kafka.producer({
+                idempotent: true,
+                maxInFlightRequests: 5,
+                transactionalId: config?.transactionalId,
+                ...config
+            });
+            
+            await producer.connect();
+            
+            this.producers.set(key, producer);
+            console.log(`Created new Kafka producer: ${key}`);
+        }
+        
+        return this.producers.get(key)!;
+    }
+    
+    static async closeProducer(clientId: string, brokers: string[]): Promise<void> {
+        const key = `${clientId}-${brokers.join(',')}`;
+        const producer = this.producers.get(key);
+        
+        if (producer) {
+            await producer.disconnect();
+            this.producers.delete(key);
+            console.log(`Closed producer: ${key}`);
+        }
+    }
+    
+    static async closeAll(): Promise<void> {
+        const disconnectPromises = Array.from(this.producers.values()).map(p => p.disconnect());
+        await Promise.all(disconnectPromises);
+        this.producers.clear();
+        console.log('All producers closed');
+    }
+}
+
+// Setup graceful shutdown
+process.on('SIGTERM', () => KafkaProducerPool.closeAll());
+process.on('SIGINT', () => KafkaProducerPool.closeAll());
+```
+
+### 2. Batch Sending with Automatic Splitting
+
+Optimize throughput with intelligent batch management.
+
+```typescript
+import { Message, Producer } from 'kafkajs';
+
+interface BatchConfig {
+    maxBatchSize: number;
+    maxBatchBytes: number;
+    lingerMs: number;
+}
+
+export class BatchKafkaProducer {
+    private batches: Map<string, Message[]> = new Map();
+    private batchTimers: Map<string, NodeJS.Timeout> = new Map();
+    private config: BatchConfig;
+    
+    constructor(
+        private producer: Producer,
+        config?: Partial<BatchConfig>
+    ) {
+        this.config = {
+            maxBatchSize: 100,
+            maxBatchBytes: 1048576, // 1MB
+            lingerMs: 100,
+            ...config
+        };
+    }
+    
+    async send(topic: string, message: Message): Promise<void> {
+        const key = topic;
+        
+        if (!this.batches.has(key)) {
+            this.batches.set(key, []);
+            this.scheduleBatchSend(topic);
+        }
+        
+        const batch = this.batches.get(key)!;
+        batch.push(message);
+        
+        // Check if should flush immediately
+        const batchSize = this.calculateBatchSize(batch);
+        
+        if (batch.length >= this.config.maxBatchSize || batchSize >= this.config.maxBatchBytes) {
+            await this.flushBatch(topic);
+        }
+    }
+    
+    private calculateBatchSize(batch: Message[]): number {
+        return batch.reduce((sum, msg) => {
+            const valueSize = msg.value ? Buffer.byteLength(msg.value.toString()) : 0;
+            const keySize = msg.key ? Buffer.byteLength(msg.key.toString()) : 0;
+            return sum + valueSize + keySize;
+        }, 0);
+    }
+    
+    private scheduleBatchSend(topic: string): void {
+        const timer = setTimeout(() => {
+            this.flushBatch(topic);
+        }, this.config.lingerMs);
+        
+        this.batchTimers.set(topic, timer);
+    }
+    
+    private async flushBatch(topic: string): Promise<void> {
+        const batch = this.batches.get(topic);
+        
+        if (!batch || batch.length === 0) {
+            return;
+        }
+        
+        // Clear timer
+        const timer = this.batchTimers.get(topic);
+        if (timer) {
+            clearTimeout(timer);
+            this.batchTimers.delete(topic);
+        }
+        
+        try {
+            await this.producer.send({
+                topic,
+                messages: batch
+            });
+            
+            console.log(`Sent batch of ${batch.length} messages to ${topic}`);
+            
+        } catch (error) {
+            console.error(`Failed to send batch to ${topic}:`, error);
+            throw error;
+            
+        } finally {
+            // Clear batch and reschedule
+            this.batches.set(topic, []);
+            this.scheduleBatchSend(topic);
+        }
+    }
+    
+    async flush(): Promise<void> {
+        const flushPromises = Array.from(this.batches.keys()).map(topic => 
+            this.flushBatch(topic)
+        );
+        
+        await Promise.all(flushPromises);
+    }
+    
+    async disconnect(): Promise<void> {
+        await this.flush();
+        
+        for (const timer of this.batchTimers.values()) {
+            clearTimeout(timer);
+        }
+        
+        await this.producer.disconnect();
+    }
+}
+```
+
+### 3. Retry Logic with Exponential Backoff
+
+Handle transient failures with intelligent retry policies.
+
+```typescript
+interface RetryConfig {
+    maxAttempts: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+}
+
+export class RetryableKafkaProducer {
+    private config: RetryConfig;
+    
+    constructor(
+        private producer: Producer,
+        config?: Partial<RetryConfig>
+    ) {
+        this.config = {
+            maxAttempts: 5,
+            initialDelayMs: 500,
+            maxDelayMs: 30000,
+            backoffMultiplier: 2,
+            ...config
+        };
+    }
+    
+    async send(topic: string, messages: Message[]): Promise<void> {
+        let attempt = 0;
+        
+        while (attempt < this.config.maxAttempts) {
+            try {
+                await this.producer.send({ topic, messages });
+                return; // Success
+                
+            } catch (error: any) {
+                attempt++;
+                
+                if (this.isRetriableError(error) && attempt < this.config.maxAttempts) {
+                    const delay = Math.min(
+                        this.config.initialDelayMs * Math.pow(this.config.backoffMultiplier, attempt - 1),
+                        this.config.maxDelayMs
+                    );
+                    
+                    console.warn(`Retry attempt ${attempt}/${this.config.maxAttempts} after ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('Max retries exceeded or non-retriable error');
+                    throw error;
+                }
+            }
+        }
+    }
+    
+    private isRetriableError(error: any): boolean {
+        const retriableErrors = [
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'NetworkError',
+            'RequestTimedOut',
+            'NotLeaderForPartition',
+            'LeaderNotAvailable'
+        ];
+        
+        return retriableErrors.some(err => 
+            error.message?.includes(err) || 
+            error.name === err ||
+            error.type === err
+        );
+    }
+    
+    async disconnect(): Promise<void> {
+        await this.producer.disconnect();
+    }
+}
+```
+
+### 4. Circuit Breaker for Downstream Protection
+
+Protect Kafka from being overwhelmed during outages.
+
+```typescript
+enum CircuitState {
+    CLOSED = 'CLOSED',
+    OPEN = 'OPEN',
+    HALF_OPEN = 'HALF_OPEN'
+}
+
+interface CircuitBreakerConfig {
+    failureThreshold: number;
+    successThreshold: number;
+    timeout: number;
+}
+
+export class CircuitBreakerKafkaProducer {
+    private state: CircuitState = CircuitState.CLOSED;
+    private failures: number = 0;
+    private successes: number = 0;
+    private lastFailureTime: number = 0;
+    private config: CircuitBreakerConfig;
+    private fallbackQueue: Message[] = [];
+    
+    constructor(
+        private producer: Producer,
+        private topic: string,
+        config?: Partial<CircuitBreakerConfig>
+    ) {
+        this.config = {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 60000,
+            ...config
+        };
+    }
+    
+    async send(messages: Message[]): Promise<void> {
+        if (this.state === CircuitState.OPEN) {
+            const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+            
+            if (timeSinceLastFailure > this.config.timeout) {
+                console.log('Circuit breaker transitioning to HALF_OPEN');
+                this.state = CircuitState.HALF_OPEN;
+                this.successes = 0;
+            } else {
+                console.warn('Circuit breaker OPEN, buffering messages');
+                this.fallbackQueue.push(...messages);
+                return;
+            }
+        }
+        
+        try {
+            await this.producer.send({ topic: this.topic, messages });
+            this.onSuccess();
+            
+            // Try to flush fallback queue
+            if (this.fallbackQueue.length > 0) {
+                await this.flushFallbackQueue();
+            }
+            
+        } catch (error) {
+            this.onFailure();
+            throw error;
+        }
+    }
+    
+    private onSuccess(): void {
+        this.failures = 0;
+        
+        if (this.state === CircuitState.HALF_OPEN) {
+            this.successes++;
+            
+            if (this.successes >= this.config.successThreshold) {
+                console.log('Circuit breaker transitioning to CLOSED');
+                this.state = CircuitState.CLOSED;
+                this.successes = 0;
+            }
+        }
+    }
+    
+    private onFailure(): void {
+        this.failures++;
+        this.lastFailureTime = Date.now();
+        
+        if (this.failures >= this.config.failureThreshold) {
+            console.error('Circuit breaker transitioning to OPEN');
+            this.state = CircuitState.OPEN;
+            this.failures = 0;
+        }
+    }
+    
+    private async flushFallbackQueue(): Promise<void> {
+        const messages = [...this.fallbackQueue];
+        this.fallbackQueue = [];
+        
+        try {
+            await this.producer.send({ topic: this.topic, messages });
+            console.log(`Flushed ${messages.length} messages from fallback queue`);
+        } catch (error) {
+            console.error('Failed to flush fallback queue:', error);
+            this.fallbackQueue.unshift(...messages);
+        }
+    }
+    
+    getState(): { state: CircuitState; fallbackQueueSize: number } {
+        return {
+            state: this.state,
+            fallbackQueueSize: this.fallbackQueue.length
+        };
+    }
+    
+    async disconnect(): Promise<void> {
+        if (this.fallbackQueue.length > 0) {
+            console.warn(`${this.fallbackQueue.length} messages in fallback queue, attempting final flush`);
+            await this.flushFallbackQueue();
+        }
+        
+        await this.producer.disconnect();
+    }
+}
+```
+
+### 5. Rate Limiting
+
+Control message send rate to prevent quota exhaustion.
+
+```typescript
+export class RateLimitedKafkaProducer {
+    private tokensPerSecond: number;
+    private availableTokens: number;
+    private lastRefill: number = Date.now();
+    
+    constructor(
+        private producer: Producer,
+        messagesPerSecond: number
+    ) {
+        this.tokensPerSecond = messagesPerSecond;
+        this.availableTokens = messagesPerSecond;
+        
+        // Refill tokens periodically
+        setInterval(() => this.refillTokens(), 100);
+    }
+    
+    private refillTokens(): void {
+        const now = Date.now();
+        const elapsed = (now - this.lastRefill) / 1000;
+        const tokensToAdd = elapsed * this.tokensPerSecond;
+        
+        this.availableTokens = Math.min(
+            this.availableTokens + tokensToAdd,
+            this.tokensPerSecond
+        );
+        
+        this.lastRefill = now;
+    }
+    
+    private async acquireTokens(count: number): Promise<void> {
+        while (this.availableTokens < count) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        this.availableTokens -= count;
+    }
+    
+    async send(topic: string, messages: Message[]): Promise<void> {
+        await this.acquireTokens(messages.length);
+        await this.producer.send({ topic, messages });
+    }
+    
+    async sendSingle(topic: string, message: Message): Promise<void> {
+        await this.acquireTokens(1);
+        await this.producer.send({ topic, messages: [message] });
+    }
+    
+    getAvailableTokens(): number {
+        return this.availableTokens;
+    }
+    
+    async disconnect(): Promise<void> {
+        await this.producer.disconnect();
+    }
+}
+```
+
+### 6. Transactional Producer
+
+Ensure exactly-once delivery with Kafka transactions.
+
+```typescript
+export class TransactionalKafkaProducer {
+    private inTransaction: boolean = false;
+    
+    constructor(
+        private producer: Producer,
+        private transactionalId: string
+    ) {}
+    
+    async beginTransaction(): Promise<void> {
+        if (this.inTransaction) {
+            throw new Error('Transaction already in progress');
+        }
+        
+        const transaction = await this.producer.transaction();
+        this.inTransaction = true;
+        
+        return transaction;
+    }
+    
+    async sendTransactional(
+        operations: Array<{ topic: string; messages: Message[] }>
+    ): Promise<void> {
+        const transaction = await this.producer.transaction();
+        
+        try {
+            for (const op of operations) {
+                await transaction.send({
+                    topic: op.topic,
+                    messages: op.messages
+                });
+            }
+            
+            await transaction.commit();
+            console.log(`Transaction committed: ${operations.length} operations`);
+            
+        } catch (error) {
+            await transaction.abort();
+            console.error('Transaction aborted:', error);
+            throw error;
+        }
+    }
+    
+    async sendWithOffsetCommit(
+        topic: string,
+        messages: Message[],
+        consumer: { groupId: string },
+        offsets: Array<{ topic: string; partition: number; offset: string }>
+    ): Promise<void> {
+        const transaction = await this.producer.transaction();
+        
+        try {
+            await transaction.send({ topic, messages });
+            
+            await transaction.sendOffsets({
+                consumerGroupId: consumer.groupId,
+                topics: offsets.map(offset => ({
+                    topic: offset.topic,
+                    partitions: [{
+                        partition: offset.partition,
+                        offset: offset.offset
+                    }]
+                }))
+            });
+            
+            await transaction.commit();
+            console.log('Transactional send with offset commit successful');
+            
+        } catch (error) {
+            await transaction.abort();
+            console.error('Transaction aborted:', error);
+            throw error;
+        }
+    }
+    
+    async disconnect(): Promise<void> {
+        await this.producer.disconnect();
+    }
+}
+```
+
+### 7. OpenTelemetry Observability
+
+Instrument Kafka producer with distributed tracing and metrics.
+
+```typescript
+import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { metrics } from '@opentelemetry/api-metrics';
+
+export class ObservableKafkaProducer {
+    private tracer = trace.getTracer('kafka-producer');
+    private meter = metrics.getMeter('kafka-producer');
+    private messagesSent = this.meter.createCounter('kafka.messages.sent');
+    private sendDuration = this.meter.createHistogram('kafka.send.duration');
+    
+    constructor(private producer: Producer) {}
+    
+    async send(topic: string, messages: Message[]): Promise<void> {
+        const span = this.tracer.startSpan('kafka.send', {
+            kind: 2, // PRODUCER
+            attributes: {
+                'messaging.system': 'kafka',
+                'messaging.destination': topic,
+                'messaging.batch.message_count': messages.length
+            }
+        });
+        
+        const startTime = Date.now();
+        
+        try {
+            // Inject trace context into message headers
+            const messagesWithTrace = messages.map(msg => ({
+                ...msg,
+                headers: {
+                    ...msg.headers,
+                    traceparent: span.spanContext().toString()
+                }
+            }));
+            
+            await this.producer.send({ topic, messages: messagesWithTrace });
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            // Record metrics
+            this.messagesSent.add(messages.length, {
+                topic,
+                status: 'success'
+            });
+            
+            const duration = Date.now() - startTime;
+            this.sendDuration.record(duration, { topic });
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: error.message
+            });
+            
+            this.messagesSent.add(messages.length, {
+                topic,
+                status: 'error'
+            });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    async disconnect(): Promise<void> {
+        await this.producer.disconnect();
+    }
+}
+```
+
+### 8. Graceful Shutdown
+
+Ensure all pending messages are sent before shutdown.
+
+```typescript
+export class GracefulKafkaProducer {
+    private pendingMessages: number = 0;
+    private isShuttingDown: boolean = false;
+    
+    constructor(private producer: Producer) {
+        this.setupShutdownHandlers();
+    }
+    
+    private setupShutdownHandlers(): void {
+        process.on('SIGTERM', () => this.shutdown());
+        process.on('SIGINT', () => this.shutdown());
+    }
+    
+    async send(topic: string, messages: Message[]): Promise<void> {
+        if (this.isShuttingDown) {
+            throw new Error('Producer is shutting down');
+        }
+        
+        this.pendingMessages += messages.length;
+        
+        try {
+            await this.producer.send({ topic, messages });
+            console.log(`Sent ${messages.length} messages to ${topic}`);
+            
+        } finally {
+            this.pendingMessages -= messages.length;
+        }
+    }
+    
+    private async shutdown(): Promise<void> {
+        if (this.isShuttingDown) {
+            return;
+        }
+        
+        console.log('Initiating graceful shutdown...');
+        this.isShuttingDown = true;
+        
+        // Wait for pending messages (up to 30 seconds)
+        const timeout = 30000;
+        const start = Date.now();
+        
+        while (this.pendingMessages > 0 && Date.now() - start < timeout) {
+            console.log(`Waiting for ${this.pendingMessages} pending messages...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (this.pendingMessages > 0) {
+            console.warn(`Timeout: ${this.pendingMessages} messages not sent`);
+        } else {
+            console.log('All messages sent');
+        }
+        
+        await this.producer.disconnect();
+        console.log('Kafka producer disconnected');
+        process.exit(0);
+    }
+    
+    getPendingCount(): number {
+        return this.pendingMessages;
+    }
+}
+```
+
+### Integration Example
+
+```typescript
+import { Kafka } from 'kafkajs';
+import {
+    KafkaProducerPool,
+    BatchKafkaProducer,
+    RetryableKafkaProducer,
+    CircuitBreakerKafkaProducer,
+    RateLimitedKafkaProducer,
+    TransactionalKafkaProducer,
+    ObservableKafkaProducer,
+    GracefulKafkaProducer
+} from './patterns';
+
+async function main() {
+    const brokers = ['localhost:9092'];
+    const topic = 'my-topic';
+    
+    // 1. Connection pooling
+    const producer = await KafkaProducerPool.getProducer(brokers, 'my-app', {
+        idempotent: true
+    });
+    
+    // 2. Batch producer
+    const batchProducer = new BatchKafkaProducer(producer, {
+        maxBatchSize: 100,
+        lingerMs: 100
+    });
+    
+    await batchProducer.send(topic, {
+        value: JSON.stringify({ data: 'test' })
+    });
+    
+    // 3. Retry producer
+    const retryProducer = new RetryableKafkaProducer(producer, {
+        maxAttempts: 5,
+        initialDelayMs: 500
+    });
+    
+    await retryProducer.send(topic, [{
+        value: JSON.stringify({ data: 'test' })
+    }]);
+    
+    // 4. Circuit breaker
+    const cbProducer = new CircuitBreakerKafkaProducer(producer, topic, {
+        failureThreshold: 5,
+        timeout: 60000
+    });
+    
+    await cbProducer.send([{
+        value: JSON.stringify({ data: 'test' })
+    }]);
+    
+    // 5. Rate limited
+    const rateLimitedProducer = new RateLimitedKafkaProducer(producer, 100);
+    
+    await rateLimitedProducer.send(topic, [{
+        value: JSON.stringify({ data: 'test' })
+    }]);
+    
+    // 6. Transactional
+    const kafka = new Kafka({ clientId: 'my-app', brokers });
+    const txProducer = kafka.producer({ transactionalId: 'my-tx-id' });
+    await txProducer.connect();
+    
+    const txKafkaProducer = new TransactionalKafkaProducer(txProducer, 'my-tx-id');
+    
+    await txKafkaProducer.sendTransactional([
+        { topic: 'topic1', messages: [{ value: 'msg1' }] },
+        { topic: 'topic2', messages: [{ value: 'msg2' }] }
+    ]);
+    
+    // 7. Observable
+    const observableProducer = new ObservableKafkaProducer(producer);
+    
+    await observableProducer.send(topic, [{
+        value: JSON.stringify({ data: 'test' })
+    }]);
+    
+    // 8. Graceful shutdown
+    const gracefulProducer = new GracefulKafkaProducer(producer);
+    
+    await gracefulProducer.send(topic, [{
+        value: JSON.stringify({ data: 'test' })
+    }]);
+    
+    // Producer will handle SIGTERM/SIGINT gracefully
+    
+    await KafkaProducerPool.closeAll();
+}
+
+main().catch(console.error);
+```
+
+### Dependencies
+
+Add these packages to your `package.json`:
+
+```json
+{
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/api-metrics": "^0.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+```
+
 {% endfor %}

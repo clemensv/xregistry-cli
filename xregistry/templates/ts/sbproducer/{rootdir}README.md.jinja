@@ -186,4 +186,756 @@ try {
 4. **Use sessions** when message ordering is required
 5. **Monitor throttling** and adjust send rate accordingly
 6. **Use Azure Identity** instead of connection strings for production
+
+## Production-Ready Patterns
+
+Enterprise-grade patterns for Azure Service Bus producers in TypeScript/Node.js.
+
+### 1. Service Bus Producer Pool
+
+Manage multiple sender clients with connection pooling.
+
+```typescript
+import { ServiceBusClient, ServiceBusSender } from '@azure/service-bus';
+
+export class ServiceBusProducerPool {
+    private static pools = new Map<string, ServiceBusSender>();
+    private static client: ServiceBusClient;
+    
+    static initialize(connectionString: string): void {
+        this.client = new ServiceBusClient(connectionString);
+    }
+    
+    static async getSender(entityPath: string): Promise<ServiceBusSender> {
+        if (!this.client) {
+            throw new Error('Pool not initialized. Call initialize() first.');
+        }
+        
+        if (!this.pools.has(entityPath)) {
+            console.log(`Creating new Service Bus sender for ${entityPath}`);
+            
+            const sender = this.client.createSender(entityPath);
+            this.pools.set(entityPath, sender);
+        }
+        
+        return this.pools.get(entityPath)!;
+    }
+    
+    static async closeAll(): Promise<void> {
+        console.log(`Closing ${this.pools.size} Service Bus senders...`);
+        
+        const closePromises = Array.from(this.pools.values()).map(
+            sender => sender.close()
+        );
+        
+        await Promise.all(closePromises);
+        
+        this.pools.clear();
+        
+        if (this.client) {
+            await this.client.close();
+        }
+        
+        console.log('All senders closed');
+    }
+}
+
+// Setup graceful shutdown
+process.on('SIGTERM', async () => {
+    await ServiceBusProducerPool.closeAll();
+    process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+    await ServiceBusProducerPool.closeAll();
+    process.exit(0);
+});
+```
+
+### 2. Batch Message Sender
+
+Automatically batch messages for optimal throughput.
+
+```typescript
+import { ServiceBusSender, ServiceBusMessage } from '@azure/service-bus';
+
+interface BatchConfig {
+    maxBatchSize: number;
+    lingerMs: number;
+}
+
+export class BatchMessageSender {
+    private pendingMessages: ServiceBusMessage[] = [];
+    private flushTimer: NodeJS.Timeout | null = null;
+    private config: BatchConfig;
+    
+    constructor(
+        private sender: ServiceBusSender,
+        config?: Partial<BatchConfig>
+    ) {
+        this.config = {
+            maxBatchSize: 100,
+            lingerMs: 100,
+            ...config
+        };
+    }
+    
+    async send(message: ServiceBusMessage): Promise<void> {
+        this.pendingMessages.push(message);
+        
+        // Size-based trigger
+        if (this.pendingMessages.length >= this.config.maxBatchSize) {
+            await this.flush();
+            return;
+        }
+        
+        // Time-based trigger
+        if (!this.flushTimer) {
+            this.flushTimer = setTimeout(
+                () => this.flush(),
+                this.config.lingerMs
+            );
+        }
+    }
+    
+    async flush(): Promise<void> {
+        if (this.flushTimer) {
+            clearTimeout(this.flushTimer);
+            this.flushTimer = null;
+        }
+        
+        if (this.pendingMessages.length === 0) {
+            return;
+        }
+        
+        const messages = [...this.pendingMessages];
+        this.pendingMessages = [];
+        
+        console.log(`Flushing batch of ${messages.length} messages`);
+        
+        try {
+            // Create multiple batches if needed
+            let currentBatch = await this.sender.createMessageBatch();
+            const batches = [currentBatch];
+            
+            for (const message of messages) {
+                const added = currentBatch.tryAddMessage(message);
+                
+                if (!added) {
+                    // Current batch is full, create new one
+                    currentBatch = await this.sender.createMessageBatch();
+                    batches.push(currentBatch);
+                    
+                    const addedToNew = currentBatch.tryAddMessage(message);
+                    if (!addedToNew) {
+                        throw new Error('Message too large for batch');
+                    }
+                }
+            }
+            
+            // Send all batches
+            for (const batch of batches) {
+                if (batch.count > 0) {
+                    await this.sender.sendMessages(batch);
+                }
+            }
+            
+            console.log(`Successfully sent ${messages.length} messages in ${batches.length} batch(es)`);
+            
+        } catch (error) {
+            console.error('Batch send failed:', error);
+            // Re-add messages to pending
+            this.pendingMessages.unshift(...messages);
+            throw error;
+        }
+    }
+}
+```
+
+### 3. Retry Logic with Exponential Backoff
+
+Handle transient failures with configurable retry.
+
+```typescript
+interface RetryConfig {
+    maxAttempts: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+}
+
+export class RetryableMessageSender {
+    private retryConfig: RetryConfig;
+    
+    constructor(
+        private sender: ServiceBusSender,
+        config?: Partial<RetryConfig>
+    ) {
+        this.retryConfig = {
+            maxAttempts: 5,
+            initialDelayMs: 500,
+            maxDelayMs: 30000,
+            backoffMultiplier: 2,
+            ...config
+        };
+    }
+    
+    async sendWithRetry(message: ServiceBusMessage): Promise<void> {
+        let attempt = 0;
+        
+        while (attempt < this.retryConfig.maxAttempts) {
+            try {
+                await this.sender.sendMessages(message);
+                return; // Success
+                
+            } catch (error: any) {
+                attempt++;
+                
+                if (this.isRetriableError(error) && attempt < this.retryConfig.maxAttempts) {
+                    const delay = Math.min(
+                        this.retryConfig.initialDelayMs * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+                        this.retryConfig.maxDelayMs
+                    );
+                    
+                    console.warn(`Retry attempt ${attempt}/${this.retryConfig.maxAttempts} after ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('Send failed after max retries or permanent error');
+                    throw error;
+                }
+            }
+        }
+    }
+    
+    private isRetriableError(error: any): boolean {
+        const retriableErrors = [
+            'ETIMEDOUT',
+            'ECONNREFUSED',
+            'ECONNRESET',
+            'ServerBusyError',
+            'ServiceUnavailableError',
+            'MessagingError'
+        ];
+        
+        return retriableErrors.some(code => 
+            error.code === code || 
+            error.name?.includes(code) ||
+            error.message?.includes('server busy') ||
+            error.message?.includes('timeout')
+        );
+    }
+}
+```
+
+### 4. Circuit Breaker Pattern
+
+Protect Service Bus from being overwhelmed during failures.
+
+```typescript
+enum CircuitState {
+    CLOSED = 'CLOSED',
+    OPEN = 'OPEN',
+    HALF_OPEN = 'HALF_OPEN'
+}
+
+interface CircuitBreakerConfig {
+    failureThreshold: number;
+    successThreshold: number;
+    timeout: number;
+}
+
+export class CircuitBreakerMessageSender {
+    private state: CircuitState = CircuitState.CLOSED;
+    private failures: number = 0;
+    private successes: number = 0;
+    private lastFailureTime: number = 0;
+    private config: CircuitBreakerConfig;
+    private fallbackQueue: ServiceBusMessage[] = [];
+    
+    constructor(
+        private sender: ServiceBusSender,
+        config?: Partial<CircuitBreakerConfig>
+    ) {
+        this.config = {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 60000,
+            ...config
+        };
+    }
+    
+    async send(message: ServiceBusMessage): Promise<void> {
+        if (this.state === CircuitState.OPEN) {
+            const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+            
+            if (timeSinceLastFailure > this.config.timeout) {
+                console.log('Circuit breaker transitioning to HALF_OPEN');
+                this.state = CircuitState.HALF_OPEN;
+                this.successes = 0;
+            } else {
+                console.warn('Circuit breaker is OPEN, queuing message');
+                this.fallbackQueue.push(message);
+                return;
+            }
+        }
+        
+        try {
+            await this.sender.sendMessages(message);
+            this.onSuccess();
+            
+            // Flush fallback queue on recovery
+            if (this.state === CircuitState.CLOSED && this.fallbackQueue.length > 0) {
+                await this.flushFallbackQueue();
+            }
+            
+        } catch (error) {
+            this.onFailure();
+            throw error;
+        }
+    }
+    
+    private onSuccess(): void {
+        this.failures = 0;
+        
+        if (this.state === CircuitState.HALF_OPEN) {
+            this.successes++;
+            
+            if (this.successes >= this.config.successThreshold) {
+                console.log('Circuit breaker transitioning to CLOSED');
+                this.state = CircuitState.CLOSED;
+                this.successes = 0;
+            }
+        }
+    }
+    
+    private onFailure(): void {
+        this.failures++;
+        this.lastFailureTime = Date.now();
+        
+        if (this.failures >= this.config.failureThreshold) {
+            console.error('Circuit breaker transitioning to OPEN');
+            this.state = CircuitState.OPEN;
+            this.failures = 0;
+        }
+    }
+    
+    private async flushFallbackQueue(): Promise<void> {
+        console.log(`Flushing ${this.fallbackQueue.length} queued messages...`);
+        
+        const queue = [...this.fallbackQueue];
+        this.fallbackQueue = [];
+        
+        for (const message of queue) {
+            try {
+                await this.send(message);
+            } catch (error) {
+                console.error('Failed to flush queued message:', error);
+                this.fallbackQueue.push(message);
+            }
+        }
+    }
+    
+    getState(): CircuitState {
+        return this.state;
+    }
+    
+    getQueueSize(): number {
+        return this.fallbackQueue.length;
+    }
+}
+```
+
+### 5. Rate Limiting
+
+Control send rate to prevent Service Bus throttling.
+
+```typescript
+export class RateLimitedMessageSender {
+    private tokensPerSecond: number;
+    private availableTokens: number;
+    private lastRefill: number = Date.now();
+    
+    constructor(
+        private sender: ServiceBusSender,
+        messagesPerSecond: number
+    ) {
+        this.tokensPerSecond = messagesPerSecond;
+        this.availableTokens = messagesPerSecond;
+        
+        // Refill tokens periodically
+        setInterval(() => this.refillTokens(), 100);
+    }
+    
+    private refillTokens(): void {
+        const now = Date.now();
+        const elapsed = (now - this.lastRefill) / 1000;
+        const tokensToAdd = elapsed * this.tokensPerSecond;
+        
+        this.availableTokens = Math.min(
+            this.availableTokens + tokensToAdd,
+            this.tokensPerSecond
+        );
+        
+        this.lastRefill = now;
+    }
+    
+    private async acquireToken(): Promise<void> {
+        while (this.availableTokens < 1) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        this.availableTokens--;
+    }
+    
+    async send(message: ServiceBusMessage): Promise<void> {
+        await this.acquireToken();
+        await this.sender.sendMessages(message);
+    }
+    
+    async sendBatch(messages: ServiceBusMessage[]): Promise<void> {
+        // Acquire tokens for batch
+        for (let i = 0; i < messages.length; i++) {
+            await this.acquireToken();
+        }
+        
+        await this.sender.sendMessages(messages);
+    }
+    
+    getAvailableTokens(): number {
+        return this.availableTokens;
+    }
+}
+```
+
+### 6. Transaction Support
+
+Send messages within transactions for exactly-once semantics.
+
+```typescript
+import { ServiceBusClient, ServiceBusSender } from '@azure/service-bus';
+
+export class TransactionalMessageSender {
+    constructor(
+        private client: ServiceBusClient,
+        private sender: ServiceBusSender
+    ) {}
+    
+    async sendTransactional(messages: ServiceBusMessage[]): Promise<void> {
+        // Create transaction
+        const transaction = await this.client.createTransaction();
+        
+        try {
+            // Send all messages in transaction
+            for (const message of messages) {
+                await this.sender.sendMessages(message, { transaction });
+            }
+            
+            // Commit transaction
+            await this.client.commitTransaction(transaction);
+            console.log(`Transaction committed: ${messages.length} messages sent`);
+            
+        } catch (error) {
+            // Rollback on failure
+            console.error('Transaction failed, rolling back:', error);
+            await this.client.rollbackTransaction(transaction);
+            throw error;
+        }
+    }
+}
+```
+
+### 7. OpenTelemetry Observability
+
+Instrument Service Bus producer with distributed tracing.
+
+```typescript
+import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { metrics } from '@opentelemetry/api-metrics';
+
+export class ObservableMessageSender {
+    private tracer = trace.getTracer('servicebus-producer');
+    private meter = metrics.getMeter('servicebus-producer');
+    private messagesSent = this.meter.createCounter('servicebus.messages.sent');
+    private sendDuration = this.meter.createHistogram('servicebus.send.duration');
+    private batchSize = this.meter.createHistogram('servicebus.batch.size');
+    
+    constructor(private sender: ServiceBusSender) {}
+    
+    async send(message: ServiceBusMessage): Promise<void> {
+        const span = this.tracer.startSpan('servicebus.send', {
+            kind: 2, // PRODUCER
+            attributes: {
+                'messaging.system': 'servicebus',
+                'messaging.destination': this.sender.entityPath,
+                'messaging.protocol': 'amqp',
+                'messaging.message_id': message.messageId
+            }
+        });
+        
+        // Inject trace context
+        const traceContext = this.extractTraceContext();
+        message.applicationProperties = {
+            ...message.applicationProperties,
+            traceparent: traceContext
+        };
+        
+        const startTime = Date.now();
+        
+        try {
+            await this.sender.sendMessages(message);
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            const duration = Date.now() - startTime;
+            
+            this.messagesSent.add(1, { status: 'success' });
+            this.sendDuration.record(duration);
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            
+            this.messagesSent.add(1, { status: 'error' });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    async sendBatch(messages: ServiceBusMessage[]): Promise<void> {
+        const span = this.tracer.startSpan('servicebus.send_batch', {
+            kind: 2, // PRODUCER
+            attributes: {
+                'messaging.system': 'servicebus',
+                'messaging.batch.message_count': messages.length
+            }
+        });
+        
+        const startTime = Date.now();
+        
+        try {
+            await this.sender.sendMessages(messages);
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            const duration = Date.now() - startTime;
+            
+            this.messagesSent.add(messages.length, { status: 'success' });
+            this.sendDuration.record(duration);
+            this.batchSize.record(messages.length);
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            
+            this.messagesSent.add(messages.length, { status: 'error' });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    private extractTraceContext(): string {
+        const activeSpan = trace.getSpan(context.active());
+        if (activeSpan) {
+            const spanContext = activeSpan.spanContext();
+            return `00-${spanContext.traceId}-${spanContext.spanId}-01`;
+        }
+        return '';
+    }
+}
+```
+
+### 8. Graceful Shutdown
+
+Ensure all messages are sent before shutdown.
+
+```typescript
+export class GracefulMessageSender {
+    private pendingSends: number = 0;
+    private isShuttingDown: boolean = false;
+    
+    constructor(private sender: ServiceBusSender) {
+        this.setupShutdownHandlers();
+    }
+    
+    private setupShutdownHandlers(): void {
+        process.on('SIGTERM', () => this.shutdown());
+        process.on('SIGINT', () => this.shutdown());
+    }
+    
+    async send(message: ServiceBusMessage): Promise<void> {
+        if (this.isShuttingDown) {
+            throw new Error('Sender is shutting down');
+        }
+        
+        this.pendingSends++;
+        
+        try {
+            await this.sender.sendMessages(message);
+        } finally {
+            this.pendingSends--;
+        }
+    }
+    
+    async sendBatch(messages: ServiceBusMessage[]): Promise<void> {
+        if (this.isShuttingDown) {
+            throw new Error('Sender is shutting down');
+        }
+        
+        this.pendingSends++;
+        
+        try {
+            await this.sender.sendMessages(messages);
+        } finally {
+            this.pendingSends--;
+        }
+    }
+    
+    private async shutdown(): Promise<void> {
+        if (this.isShuttingDown) return;
+        
+        console.log('Initiating graceful shutdown...');
+        this.isShuttingDown = true;
+        
+        // Wait for pending sends (up to 30 seconds)
+        const timeout = 30000;
+        const start = Date.now();
+        
+        while (this.pendingSends > 0 && Date.now() - start < timeout) {
+            console.log(`Waiting for ${this.pendingSends} pending sends...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (this.pendingSends > 0) {
+            console.warn(`Timeout: ${this.pendingSends} messages not sent`);
+        } else {
+            console.log('All messages sent');
+        }
+        
+        await this.sender.close();
+        console.log('Service Bus sender closed');
+        
+        process.exit(0);
+    }
+    
+    getPendingCount(): number {
+        return this.pendingSends;
+    }
+}
+```
+
+### Integration Example
+
+```typescript
+import { ServiceBusClient } from '@azure/service-bus';
+import { DefaultAzureCredential } from '@azure/identity';
+import {
+    ServiceBusProducerPool,
+    BatchMessageSender,
+    RetryableMessageSender,
+    CircuitBreakerMessageSender,
+    RateLimitedMessageSender,
+    TransactionalMessageSender,
+    ObservableMessageSender,
+    GracefulMessageSender
+} from './patterns';
+
+async function main() {
+    // 1. Initialize producer pool
+    ServiceBusProducerPool.initialize('connection-string');
+    
+    // Or use Azure Identity
+    const credential = new DefaultAzureCredential();
+    const client = new ServiceBusClient(
+        'namespace.servicebus.windows.net',
+        credential
+    );
+    
+    // 2. Get sender from pool
+    const sender = await ServiceBusProducerPool.getSender('queue-name');
+    
+    // 3. Initialize patterns
+    const batchSender = new BatchMessageSender(sender, {
+        maxBatchSize: 100,
+        lingerMs: 100
+    });
+    
+    const retrySender = new RetryableMessageSender(sender, {
+        maxAttempts: 5,
+        initialDelayMs: 500
+    });
+    
+    const circuitBreaker = new CircuitBreakerMessageSender(sender, {
+        failureThreshold: 5,
+        timeout: 60000
+    });
+    
+    const rateLimiter = new RateLimitedMessageSender(sender, 1000);
+    
+    const transactional = new TransactionalMessageSender(client, sender);
+    
+    const observable = new ObservableMessageSender(sender);
+    
+    const graceful = new GracefulMessageSender(sender);
+    
+    // 4. Send messages with patterns
+    const message = {
+        body: { temperature: 25.5, humidity: 60 },
+        applicationProperties: { deviceId: 'sensor-001' },
+        sessionId: 'device-session-001',
+        messageId: 'msg-' + Date.now()
+    };
+    
+    // Batch sending
+    await batchSender.send(message);
+    
+    // Retry logic
+    await retrySender.sendWithRetry(message);
+    
+    // Circuit breaker
+    await circuitBreaker.send(message);
+    
+    // Rate limited
+    await rateLimiter.send(message);
+    
+    // Transactional
+    await transactional.sendTransactional([message]);
+    
+    // Observable
+    await observable.send(message);
+    
+    // Graceful (will handle SIGTERM/SIGINT)
+    await graceful.send(message);
+    
+    // Flush batch
+    await batchSender.flush();
+}
+
+main().catch(console.error);
+```
+
+### Dependencies
+
+Add these packages to your `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@azure/service-bus": "^7.9.0",
+    "@azure/identity": "^4.0.0",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/api-metrics": "^0.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+```
+
 {% endfor %}

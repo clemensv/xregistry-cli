@@ -1,0 +1,144 @@
+{%- import "util.include.jinja" as util -%}
+
+# pylint: disable=unused-import, line-too-long, missing-module-docstring, missing-function-docstring, missing-class-docstring, consider-using-f-string, trailing-whitespace, trailing-newlines
+import json
+import typing
+from azure.servicebus.aio import ServiceBusClient
+from azure.servicebus import ServiceBusMessage
+from cloudevents.conversion import to_binary, to_structured
+from cloudevents.http import CloudEvent
+
+
+{%- set messagegroups = root.messagegroups %}
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for messageid, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set class_name = type_name | strip_namespace %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + class_name %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set parts = messagegroupid.split('.') -%}
+{%- set groupName = parts | join('_') | lower %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"EventProducer" %}
+
+class {{ class_name }}:
+    def __init__(self, servicebus_client: ServiceBusClient, queue_or_topic_name: str, content_mode:typing.Literal['structured','binary']= 'structured'):
+        """
+        Initializes the Service Bus producer
+
+        Args:
+            servicebus_client (ServiceBusClient): The Service Bus client
+            queue_or_topic_name (str): The Service Bus queue or topic name
+            content_mode (typing.Literal['structured','binary']): The content mode to use for sending events
+        """
+        self.servicebus_client = servicebus_client
+        self.queue_or_topic_name = queue_or_topic_name
+        self.content_mode = content_mode
+
+    @classmethod
+    def from_connection_string(cls, connection_string: str, queue_or_topic_name: str, content_mode:typing.Literal['structured','binary']= 'structured') -> '{{ class_name }}':
+        """
+        Creates a producer from a connection string.
+
+        Args:
+            connection_string (str): The Service Bus connection string
+            queue_or_topic_name (str): The Service Bus queue or topic name
+            content_mode (typing.Literal['structured','binary']): The content mode to use for sending events
+
+        Returns:
+            {{ class_name }}: A new instance of the producer
+        """
+        client = ServiceBusClient.from_connection_string(conn_str=connection_string, logging_enable=True)
+        return cls(client, queue_or_topic_name, content_mode)
+
+    {% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
+    {%- set messagename = messageid | dotunderscore | snake %}
+    async def send_{{messagename.split('.')[-1]}}(self,
+    {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
+        _{{ attrname }}: str, {{ '' }}
+    {%- endfor -%}
+    {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
+        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} : str, {% endfor -%}
+    {%- endfor -%}
+    data: {{ util.DeclareDataType( project_name, root, message ) | strip_namespace -}}, content_type: str = "application/json"
+    {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
+        , _{{ attrname }}: typing.Optional[str] = None
+    {%- endfor -%} ) -> None:
+        """
+        Sends the '{{ messageid }}' event to the EventHub
+
+        Args:
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
+            _{{ attrname }}(str) : {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+        {%- endfor -%}
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+            _{{ placeholder | snake }}(str):  Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+            {%- endfor -%}
+        {%- endfor %}
+            data: ({{ util.DeclareDataType( project_name, root, message ) | strip_namespace -}}): The event data to be sent
+            content_type (str): The content type that the event data shall be sent with
+        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined %}
+            _{{ attrname }}(typing.Optional[str]): {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+        {%- endfor %}
+        """
+
+        attributes = {
+        {%- for attrname, attribute in message.envelopemetadata.items() %}
+             "{{ attrname }}":
+            {%- if attribute.value -%}
+            "{{ attribute.value }}"
+            {%- if attribute.type == "uritemplate" -%}
+                {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+                {%- if phs -%}
+                .format(
+                {%- for placeholder in phs -%}
+                    {{ placeholder }} = _{{ placeholder | snake }}
+                {%- if not loop.last -%},{%- endif%}
+                {%- endfor -%}
+                )
+                {%- endif %}
+            {%- endif %}
+            {%- else -%}
+                _{{ attrname }}
+            {%- endif-%}
+            {%- if not loop.last -%},{%- endif %}
+        {%- endfor %}
+        }
+        attributes["datacontenttype"] = content_type
+        byte_data = data.to_byte_array(content_type) if data is not None else b''
+        event = CloudEvent(attributes, byte_data)
+        
+        async with self.servicebus_client.get_queue_sender(queue_name=self.queue_or_topic_name) as sender:
+            if self.content_mode == "structured":
+                headers, body = to_structured(event)
+                message = ServiceBusMessage(body=body)
+                if "Content-Type" in headers:
+                    message.content_type = headers["Content-Type"]
+                # Initialize application_properties dict to ensure it's never None
+                if message.application_properties is None:
+                    message.application_properties = {}
+            else:
+                headers, body = to_binary(event)
+                message = ServiceBusMessage(body=body)
+                message.content_type = attributes.get("datacontenttype", "application/octet-stream")
+                # Initialize application_properties dict if not already set
+                if message.application_properties is None:
+                    message.application_properties = {}
+                for key, value in headers.items():
+                    if key.lower().startswith("ce-"):
+                        message.application_properties["cloudEvents:"+key[3:]] = value
+            
+            await sender.send_messages(message)
+{% endfor %}
+{% endfor %}

@@ -277,6 +277,988 @@ class {{ class_name }}Test {
 - [CloudEvents Specification](https://cloudevents.io/)
 - [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
 
+## Production-Ready Patterns
+
+This section provides best-practice patterns for building production-grade Service Bus consumers in Java.
+
+### 1. Managed Processor with Auto Lock Renewal
+
+Maintain reliable message processing with automatic lock renewal and proper resource management.
+
+```java
+import com.azure.messaging.servicebus.*;
+import com.azure.identity.DefaultAzureCredential;
+import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class ManagedServiceBusConsumer {
+    private final ServiceBusProcessorClient processor;
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private static final ConcurrentHashMap<String, ManagedServiceBusConsumer> consumers = 
+        new ConcurrentHashMap<>();
+    
+    private ManagedServiceBusConsumer(
+        String fullyQualifiedNamespace,
+        String queueOrTopicName,
+        boolean isQueue
+    ) {
+        ServiceBusClientBuilder clientBuilder = new ServiceBusClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .credential(new DefaultAzureCredential());
+        
+        ServiceBusProcessorClientBuilder processorBuilder = isQueue 
+            ? clientBuilder.processor()
+                .queueName(queueOrTopicName)
+            : clientBuilder.processor()
+                .topicName(queueOrTopicName)
+                .subscriptionName("default-subscription");
+        
+        this.processor = processorBuilder
+            .processMessage(this::processMessage)
+            .processError(this::processError)
+            .maxConcurrentCalls(10)
+            .prefetchCount(20)
+            .maxAutoLockRenewDuration(Duration.ofMinutes(5))  // Auto-renew locks
+            .disableAutoComplete()  // Manual settlement
+            .buildProcessorClient();
+    }
+    
+    /**
+     * Get or create managed consumer (singleton per queue/topic).
+     */
+    public static ManagedServiceBusConsumer getConsumer(
+        String fullyQualifiedNamespace,
+        String queueOrTopicName,
+        boolean isQueue
+    ) {
+        String key = fullyQualifiedNamespace + "/" + queueOrTopicName;
+        
+        return consumers.computeIfAbsent(key, k -> 
+            new ManagedServiceBusConsumer(fullyQualifiedNamespace, queueOrTopicName, isQueue)
+        );
+    }
+    
+    /**
+     * Start processing messages.
+     */
+    public void start() {
+        if (running.compareAndSet(false, true)) {
+            processor.start();
+            System.out.println("Service Bus processor started");
+        } else {
+            System.out.println("Processor already running");
+        }
+    }
+    
+    /**
+     * Stop processing gracefully.
+     */
+    public void stop() {
+        if (running.compareAndSet(true, false)) {
+            processor.stop();
+            System.out.println("Service Bus processor stopped");
+        }
+    }
+    
+    private void processMessage(ServiceBusReceivedMessageContext context) {
+        ServiceBusReceivedMessage message = context.getMessage();
+        
+        System.out.println("Processing message: " + message.getMessageId());
+        System.out.println("Delivery count: " + message.getDeliveryCount());
+        
+        try {
+            // Process message...
+            
+            // Complete on success
+            context.complete();
+            
+        } catch (Exception e) {
+            System.err.println("Processing failed: " + e.getMessage());
+            
+            // Abandon for retry or dead-letter if max retries exceeded
+            if (message.getDeliveryCount() >= 3) {
+                context.deadLetter(new DeadLetterOptions()
+                    .setDeadLetterReason("MaxRetriesExceeded")
+                    .setDeadLetterErrorDescription(e.getMessage()));
+            } else {
+                context.abandon();
+            }
+        }
+    }
+    
+    private void processError(ServiceBusErrorContext context) {
+        System.err.println("Error source: " + context.getErrorSource());
+        System.err.println("Error: " + context.getException().getMessage());
+    }
+    
+    /**
+     * Shutdown all consumers gracefully.
+     */
+    public static void shutdownAll() {
+        consumers.values().forEach(ManagedServiceBusConsumer::stop);
+        consumers.clear();
+    }
+    
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(ManagedServiceBusConsumer::shutdownAll));
+    }
+}
+```
+
+### 2. Session-Enabled Consumer for Ordered Processing
+
+Process messages in FIFO order within sessions.
+
+```java
+import java.util.concurrent.*;
+
+public class SessionServiceBusConsumer {
+    private final ServiceBusSessionProcessorClient sessionProcessor;
+    private final ConcurrentHashMap<String, Instant> sessionActivity = 
+        new ConcurrentHashMap<>();
+    
+    public SessionServiceBusConsumer(
+        String fullyQualifiedNamespace,
+        String queueOrTopicName,
+        boolean isQueue
+    ) {
+        ServiceBusClientBuilder clientBuilder = new ServiceBusClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .credential(new DefaultAzureCredential());
+        
+        ServiceBusSessionProcessorClientBuilder sessionBuilder = isQueue 
+            ? clientBuilder.sessionProcessor()
+                .queueName(queueOrTopicName)
+            : clientBuilder.sessionProcessor()
+                .topicName(queueOrTopicName)
+                .subscriptionName("default-subscription");
+        
+        this.sessionProcessor = sessionBuilder
+            .processMessage(this::processSessionMessage)
+            .processError(this::processError)
+            .maxConcurrentSessions(5)  // Process 5 sessions concurrently
+            .prefetchCount(10)
+            .maxAutoLockRenewDuration(Duration.ofMinutes(5))
+            .disableAutoComplete()
+            .buildProcessorClient();
+    }
+    
+    /**
+     * Process message within session (FIFO ordering guaranteed per session).
+     */
+    private void processSessionMessage(ServiceBusReceivedMessageContext context) {
+        ServiceBusReceivedMessage message = context.getMessage();
+        String sessionId = message.getSessionId();
+        
+        // Track session activity
+        sessionActivity.put(sessionId, Instant.now());
+        
+        System.out.println("Session: " + sessionId + 
+            ", Message: " + message.getMessageId() +
+            ", Sequence: " + message.getSequenceNumber());
+        
+        try {
+            // Process message in order...
+            
+            // Set session state if needed
+            byte[] state = "processed".getBytes();
+            context.getSessionContext().setState(state);
+            
+            context.complete();
+            
+        } catch (Exception e) {
+            System.err.println("Session processing failed: " + e.getMessage());
+            
+            if (message.getDeliveryCount() >= 3) {
+                context.deadLetter(new DeadLetterOptions()
+                    .setDeadLetterReason("SessionProcessingFailed")
+                    .setDeadLetterErrorDescription(e.getMessage()));
+            } else {
+                context.abandon();
+            }
+        } finally {
+            sessionActivity.remove(sessionId);
+        }
+    }
+    
+    private void processError(ServiceBusErrorContext context) {
+        System.err.println("Session error: " + context.getException().getMessage());
+    }
+    
+    /**
+     * Get active session count.
+     */
+    public int getActiveSessionCount() {
+        // Remove stale sessions (no activity in last 5 minutes)
+        Instant cutoff = Instant.now().minus(Duration.ofMinutes(5));
+        sessionActivity.entrySet().removeIf(entry -> entry.getValue().isBefore(cutoff));
+        
+        return sessionActivity.size();
+    }
+    
+    public void start() {
+        sessionProcessor.start();
+    }
+    
+    public void stop() {
+        sessionProcessor.stop();
+    }
+}
+```
+
+### 3. Retry Logic with Dead Letter Queue
+
+Implement smart retry with exponential backoff and DLQ routing.
+
+```java
+import io.github.resilience4j.retry.*;
+
+public class RetryableServiceBusConsumer {
+    private final ServiceBusProcessorClient processor;
+    private final Retry retry;
+    private final ServiceBusSenderClient dlqSender;
+    
+    public RetryableServiceBusConsumer(
+        String connectionString,
+        String queueName,
+        ServiceBusSenderClient dlqSender
+    ) {
+        this.dlqSender = dlqSender;
+        
+        // Configure retry for transient failures
+        RetryConfig config = RetryConfig.custom()
+            .maxAttempts(5)
+            .waitDuration(Duration.ofMillis(500))
+            .exponentialBackoffMultiplier(2.0)
+            .retryExceptions(
+                com.azure.core.exception.AzureException.class,
+                java.net.SocketException.class
+            )
+            .ignoreExceptions(
+                IllegalArgumentException.class
+            )
+            .build();
+        
+        this.retry = Retry.of("servicebus-consumer", config);
+        
+        // Log retry attempts
+        retry.getEventPublisher()
+            .onRetry(event -> 
+                System.err.println("Retry attempt " + event.getNumberOfRetryAttempts())
+            );
+        
+        this.processor = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .processor()
+            .queueName(queueName)
+            .processMessage(this::processWithRetry)
+            .processError(this::processError)
+            .maxConcurrentCalls(10)
+            .disableAutoComplete()
+            .buildProcessorClient();
+    }
+    
+    /**
+     * Process message with automatic retry.
+     */
+    private void processWithRetry(ServiceBusReceivedMessageContext context) {
+        ServiceBusReceivedMessage message = context.getMessage();
+        
+        try {
+            retry.executeRunnable(() -> {
+                processMessage(message);
+            });
+            
+            // Success - complete
+            context.complete();
+            
+        } catch (Exception e) {
+            System.err.println("All retries exhausted: " + e.getMessage());
+            
+            // Check delivery count before dead-lettering
+            if (message.getDeliveryCount() >= 3) {
+                context.deadLetter(new DeadLetterOptions()
+                    .setDeadLetterReason("RetriesExhausted")
+                    .setDeadLetterErrorDescription(e.getMessage()));
+            } else {
+                // Abandon for Service Bus to redeliver
+                context.abandon();
+            }
+        }
+    }
+    
+    /**
+     * Process individual message.
+     * Override for custom processing logic.
+     */
+    protected void processMessage(ServiceBusReceivedMessage message) {
+        // Custom processing logic
+        System.out.println("Processing: " + message.getMessageId());
+    }
+    
+    private void processError(ServiceBusErrorContext context) {
+        System.err.println("Error: " + context.getException().getMessage());
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        processor.stop();
+    }
+}
+```
+
+### 4. Circuit Breaker for Downstream Protection
+
+Protect downstream services from being overwhelmed during consumer processing.
+
+```java
+import io.github.resilience4j.circuitbreaker.*;
+
+public class CircuitBreakerServiceBusConsumer {
+    private final ServiceBusProcessorClient processor;
+    private final CircuitBreaker circuitBreaker;
+    private final ServiceBusSenderClient fallbackQueue;
+    
+    public CircuitBreakerServiceBusConsumer(
+        String connectionString,
+        String queueName,
+        ServiceBusSenderClient fallbackQueue
+    ) {
+        this.fallbackQueue = fallbackQueue;
+        
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+            .failureRateThreshold(50.0f)
+            .waitDurationInOpenState(Duration.ofSeconds(60))
+            .slidingWindowSize(20)
+            .minimumNumberOfCalls(10)
+            .permittedNumberOfCallsInHalfOpenState(5)
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+        
+        this.circuitBreaker = CircuitBreaker.of("servicebus-consumer", config);
+        
+        // Event logging
+        circuitBreaker.getEventPublisher()
+            .onStateTransition(event -> 
+                System.err.println("Circuit breaker: " + event.getStateTransition())
+            );
+        
+        this.processor = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .processor()
+            .queueName(queueName)
+            .processMessage(this::processWithCircuitBreaker)
+            .processError(this::processError)
+            .maxConcurrentCalls(10)
+            .disableAutoComplete()
+            .buildProcessorClient();
+    }
+    
+    /**
+     * Process message with circuit breaker protection.
+     */
+    private void processWithCircuitBreaker(ServiceBusReceivedMessageContext context) {
+        ServiceBusReceivedMessage message = context.getMessage();
+        
+        try {
+            circuitBreaker.executeRunnable(() -> {
+                processMessage(message);
+            });
+            
+            context.complete();
+            
+        } catch (CallNotPermittedException e) {
+            System.err.println("Circuit OPEN, routing to fallback queue");
+            
+            // Send to fallback queue
+            ServiceBusMessage fallbackMessage = new ServiceBusMessage(message.getBody())
+                .setMessageId(message.getMessageId())
+                .setCorrelationId(message.getCorrelationId());
+            
+            fallbackMessage.getApplicationProperties().put("fallback-reason", "circuit-open");
+            fallbackMessage.getApplicationProperties().put("original-queue", context.getEntityPath());
+            
+            fallbackQueue.sendMessage(fallbackMessage);
+            
+            // Complete original message
+            context.complete();
+            
+        } catch (Exception e) {
+            System.err.println("Processing failed: " + e.getMessage());
+            
+            if (message.getDeliveryCount() >= 3) {
+                context.deadLetter(new DeadLetterOptions()
+                    .setDeadLetterReason("ProcessingFailed")
+                    .setDeadLetterErrorDescription(e.getMessage()));
+            } else {
+                context.abandon();
+            }
+        }
+    }
+    
+    protected void processMessage(ServiceBusReceivedMessage message) {
+        // Custom processing logic
+        System.out.println("Processing: " + message.getMessageId());
+    }
+    
+    private void processError(ServiceBusErrorContext context) {
+        System.err.println("Error: " + context.getException().getMessage());
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        processor.stop();
+        fallbackQueue.close();
+    }
+}
+```
+
+### 5. Rate Limiting with Backpressure
+
+Control message processing rate to prevent overwhelming downstream systems.
+
+```java
+import com.google.common.util.concurrent.RateLimiter;
+import java.util.concurrent.Semaphore;
+
+public class RateLimitedServiceBusConsumer {
+    private final ServiceBusProcessorClient processor;
+    private final RateLimiter rateLimiter;
+    private final Semaphore backpressure;
+    
+    public RateLimitedServiceBusConsumer(
+        String connectionString,
+        String queueName,
+        double messagesPerSecond,
+        int maxConcurrent
+    ) {
+        this.rateLimiter = RateLimiter.create(messagesPerSecond);
+        this.backpressure = new Semaphore(maxConcurrent);
+        
+        this.processor = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .processor()
+            .queueName(queueName)
+            .processMessage(this::processWithRateLimit)
+            .processError(this::processError)
+            .maxConcurrentCalls(maxConcurrent)
+            .prefetchCount(0)  // Disable prefetch for better backpressure control
+            .disableAutoComplete()
+            .buildProcessorClient();
+    }
+    
+    /**
+     * Process message with rate limiting and backpressure.
+     */
+    private void processWithRateLimit(ServiceBusReceivedMessageContext context) {
+        ServiceBusReceivedMessage message = context.getMessage();
+        
+        try {
+            // Apply rate limit (blocks if necessary)
+            rateLimiter.acquire();
+            
+            // Apply backpressure control
+            backpressure.acquire();
+            
+            try {
+                processMessage(message);
+                context.complete();
+                
+            } catch (Exception e) {
+                System.err.println("Processing failed: " + e.getMessage());
+                
+                if (message.getDeliveryCount() >= 3) {
+                    context.deadLetter(new DeadLetterOptions()
+                        .setDeadLetterReason("ProcessingFailed")
+                        .setDeadLetterErrorDescription(e.getMessage()));
+                } else {
+                    context.abandon();
+                }
+                
+            } finally {
+                backpressure.release();
+            }
+            
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.err.println("Rate limiting interrupted");
+            context.abandon();
+        }
+    }
+    
+    protected void processMessage(ServiceBusReceivedMessage message) {
+        // Custom processing logic
+        System.out.println("Processing: " + message.getMessageId());
+    }
+    
+    private void processError(ServiceBusErrorContext context) {
+        System.err.println("Error: " + context.getException().getMessage());
+    }
+    
+    /**
+     * Get current backpressure level.
+     */
+    public int getAvailablePermits() {
+        return backpressure.availablePermits();
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        processor.stop();
+    }
+}
+```
+
+### 6. OpenTelemetry Observability
+
+Instrument Service Bus consumer with distributed tracing and metrics.
+
+```java
+import io.opentelemetry.api.*;
+import io.opentelemetry.api.trace.*;
+import io.opentelemetry.api.metrics.*;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapGetter;
+
+public class ObservableServiceBusConsumer {
+    private final ServiceBusProcessorClient processor;
+    private final Tracer tracer;
+    private final LongCounter messagesProcessed;
+    private final LongHistogram processingDuration;
+    private final OpenTelemetry openTelemetry;
+    
+    public ObservableServiceBusConsumer(
+        String connectionString,
+        String queueName,
+        OpenTelemetry openTelemetry
+    ) {
+        this.openTelemetry = openTelemetry;
+        this.tracer = openTelemetry.getTracer("servicebus-consumer");
+        
+        Meter meter = openTelemetry.getMeter("servicebus-consumer");
+        this.messagesProcessed = meter
+            .counterBuilder("servicebus.messages.processed")
+            .setDescription("Total messages processed")
+            .build();
+        
+        this.processingDuration = meter
+            .histogramBuilder("servicebus.processing.duration")
+            .setDescription("Message processing duration")
+            .setUnit("ms")
+            .ofLongs()
+            .build();
+        
+        this.processor = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .processor()
+            .queueName(queueName)
+            .processMessage(this::processWithTracing)
+            .processError(this::processError)
+            .maxConcurrentCalls(10)
+            .disableAutoComplete()
+            .buildProcessorClient();
+    }
+    
+    /**
+     * Process message with distributed tracing.
+     */
+    private void processWithTracing(ServiceBusReceivedMessageContext context) {
+        ServiceBusReceivedMessage message = context.getMessage();
+        
+        // Extract trace context from message properties
+        Context extractedContext = openTelemetry.getPropagators()
+            .getTextMapPropagator()
+            .extract(Context.current(), message.getApplicationProperties(), 
+                new ServiceBusPropertiesGetter());
+        
+        Span span = tracer.spanBuilder("servicebus.receive")
+            .setParent(extractedContext)
+            .setSpanKind(SpanKind.CONSUMER)
+            .setAttribute("messaging.system", "servicebus")
+            .setAttribute("messaging.destination", context.getEntityPath())
+            .setAttribute("messaging.message_id", message.getMessageId())
+            .setAttribute("messaging.conversation_id", message.getSessionId())
+            .setAttribute("messaging.servicebus.delivery_count", message.getDeliveryCount())
+            .startSpan();
+        
+        long startTime = System.currentTimeMillis();
+        
+        try (Scope scope = span.makeCurrent()) {
+            processMessage(message);
+            
+            context.complete();
+            
+            long duration = System.currentTimeMillis() - startTime;
+            
+            span.setStatus(StatusCode.OK);
+            span.setAttribute("messaging.operation", "process");
+            
+            messagesProcessed.add(1,
+                Attributes.of(
+                    AttributeKey.stringKey("queue"), context.getEntityPath(),
+                    AttributeKey.stringKey("status"), "success"
+                ));
+            
+            processingDuration.record(duration,
+                Attributes.of(
+                    AttributeKey.stringKey("queue"), context.getEntityPath()
+                ));
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            
+            messagesProcessed.add(1,
+                Attributes.of(
+                    AttributeKey.stringKey("queue"), context.getEntityPath(),
+                    AttributeKey.stringKey("status"), "error"
+                ));
+            
+            if (message.getDeliveryCount() >= 3) {
+                context.deadLetter(new DeadLetterOptions()
+                    .setDeadLetterReason("ProcessingFailed")
+                    .setDeadLetterErrorDescription(e.getMessage()));
+            } else {
+                context.abandon();
+            }
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    protected void processMessage(ServiceBusReceivedMessage message) {
+        // Custom processing logic
+        System.out.println("Processing: " + message.getMessageId());
+    }
+    
+    private void processError(ServiceBusErrorContext context) {
+        System.err.println("Error: " + context.getException().getMessage());
+    }
+    
+    // TextMapGetter for extracting trace context from Service Bus properties
+    private static class ServiceBusPropertiesGetter 
+        implements TextMapGetter<Map<String, Object>> {
+        
+        @Override
+        public Iterable<String> keys(Map<String, Object> carrier) {
+            return carrier.keySet();
+        }
+        
+        @Override
+        public String get(Map<String, Object> carrier, String key) {
+            Object value = carrier.get(key);
+            return value != null ? value.toString() : null;
+        }
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        processor.stop();
+    }
+}
+```
+
+### 7. Graceful Shutdown
+
+Ensure all messages are processed and completed before shutdown.
+
+```java
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class GracefulServiceBusConsumer {
+    private final ServiceBusProcessorClient processor;
+    private final AtomicInteger inFlightMessages = new AtomicInteger(0);
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private volatile boolean shuttingDown = false;
+    
+    public GracefulServiceBusConsumer(
+        String connectionString,
+        String queueName
+    ) {
+        this.processor = new ServiceBusClientBuilder()
+            .connectionString(connectionString)
+            .processor()
+            .queueName(queueName)
+            .processMessage(this::processMessage)
+            .processError(this::processError)
+            .maxConcurrentCalls(10)
+            .disableAutoComplete()
+            .buildProcessorClient();
+        
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+    }
+    
+    /**
+     * Process message with in-flight tracking.
+     */
+    private void processMessage(ServiceBusReceivedMessageContext context) {
+        if (shuttingDown) {
+            System.out.println("Shutdown in progress, abandoning message");
+            context.abandon();
+            return;
+        }
+        
+        inFlightMessages.incrementAndGet();
+        ServiceBusReceivedMessage message = context.getMessage();
+        
+        try {
+            // Process message
+            System.out.println("Processing: " + message.getMessageId());
+            
+            // Complete
+            context.complete();
+            
+        } catch (Exception e) {
+            System.err.println("Processing failed: " + e.getMessage());
+            
+            if (message.getDeliveryCount() >= 3) {
+                context.deadLetter(new DeadLetterOptions()
+                    .setDeadLetterReason("ProcessingFailed")
+                    .setDeadLetterErrorDescription(e.getMessage()));
+            } else {
+                context.abandon();
+            }
+            
+        } finally {
+            inFlightMessages.decrementAndGet();
+        }
+    }
+    
+    private void processError(ServiceBusErrorContext context) {
+        System.err.println("Error: " + context.getException().getMessage());
+    }
+    
+    /**
+     * Graceful shutdown: wait for in-flight messages, then stop.
+     */
+    public void shutdown() {
+        if (shuttingDown) {
+            return;
+        }
+        
+        shuttingDown = true;
+        System.out.println("Initiating graceful shutdown...");
+        
+        try {
+            // Wait for in-flight messages (up to 30 seconds)
+            long timeout = 30000;
+            long start = System.currentTimeMillis();
+            
+            while (inFlightMessages.get() > 0 && 
+                   System.currentTimeMillis() - start < timeout) {
+                System.out.println("Waiting for " + inFlightMessages.get() + 
+                    " in-flight messages...");
+                TimeUnit.SECONDS.sleep(1);
+            }
+            
+            if (inFlightMessages.get() > 0) {
+                System.err.println("Timeout: " + inFlightMessages.get() + 
+                    " messages still in-flight");
+            } else {
+                System.out.println("All messages processed");
+            }
+            
+            // Stop processor
+            processor.stop();
+            System.out.println("Service Bus processor stopped");
+            
+        } catch (Exception e) {
+            System.err.println("Error during shutdown: " + e.getMessage());
+        } finally {
+            shutdownLatch.countDown();
+        }
+    }
+    
+    /**
+     * Wait for shutdown to complete.
+     */
+    public void awaitShutdown() throws InterruptedException {
+        shutdownLatch.await();
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public int getInFlightCount() {
+        return inFlightMessages.get();
+    }
+}
+```
+
+### Configuration Best Practices
+
+```java
+public class ServiceBusConsumerConfig {
+    public static ServiceBusProcessorClient createProductionProcessor(
+        String fullyQualifiedNamespace,
+        String queueName
+    ) {
+        return new ServiceBusClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .credential(new DefaultAzureCredential())
+            .processor()
+            .queueName(queueName)
+            
+            // Concurrency control
+            .maxConcurrentCalls(10)              // Process 10 messages concurrently
+            .prefetchCount(20)                   // Prefetch 20 messages
+            
+            // Lock management
+            .maxAutoLockRenewDuration(Duration.ofMinutes(5))  // Auto-renew for 5 minutes
+            
+            // Message settlement
+            .disableAutoComplete()  // Manual settlement for reliability
+            
+            // Retry configuration
+            .retryOptions(new AmqpRetryOptions()
+                .setMaxRetries(3)
+                .setDelay(Duration.ofSeconds(1))
+                .setMaxDelay(Duration.ofSeconds(30))
+                .setTryTimeout(Duration.ofSeconds(60)))
+            
+            // Event handlers
+            .processMessage(context -> {
+                // Process message
+            })
+            .processError(context -> {
+                System.err.println("Error: " + context.getException().getMessage());
+            })
+            
+            .buildProcessorClient();
+    }
+    
+    /**
+     * Session-enabled processor configuration.
+     */
+    public static ServiceBusSessionProcessorClient createSessionProcessor(
+        String fullyQualifiedNamespace,
+        String queueName
+    ) {
+        return new ServiceBusClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .credential(new DefaultAzureCredential())
+            .sessionProcessor()
+            .queueName(queueName)
+            .maxConcurrentSessions(5)            // Process 5 sessions concurrently
+            .prefetchCount(10)
+            .maxAutoLockRenewDuration(Duration.ofMinutes(5))
+            .disableAutoComplete()
+            .processMessage(context -> {
+                // Process session message
+            })
+            .processError(context -> {
+                System.err.println("Session error: " + context.getException().getMessage());
+            })
+            .buildProcessorClient();
+    }
+}
+```
+
+### Integration Example
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+
+public class ProductionServiceBusConsumer {
+    public static void main(String[] args) throws Exception {
+        String fullyQualifiedNamespace = "mybus.servicebus.windows.net";
+        String queueName = "orders";
+        
+        // Create managed consumer
+        ManagedServiceBusConsumer managedConsumer = 
+            ManagedServiceBusConsumer.getConsumer(
+                fullyQualifiedNamespace, queueName, true
+            );
+        
+        // Session-enabled consumer for ordered processing
+        SessionServiceBusConsumer sessionConsumer = 
+            new SessionServiceBusConsumer(fullyQualifiedNamespace, queueName, true);
+        
+        // Create fallback queue sender for circuit breaker
+        ServiceBusSenderClient fallbackSender = new ServiceBusClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .credential(new DefaultAzureCredential())
+            .sender()
+            .queueName("orders-fallback")
+            .buildClient();
+        
+        // Create DLQ sender for retry pattern
+        ServiceBusSenderClient dlqSender = new ServiceBusClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .credential(new DefaultAzureCredential())
+            .sender()
+            .queueName("orders/$deadletterqueue")
+            .buildClient();
+        
+        // Create pattern-enhanced consumers
+        RetryableServiceBusConsumer retryConsumer = 
+            new RetryableServiceBusConsumer(connectionString, queueName, dlqSender);
+        
+        CircuitBreakerServiceBusConsumer cbConsumer = 
+            new CircuitBreakerServiceBusConsumer(
+                connectionString, queueName, fallbackSender
+            );
+        
+        RateLimitedServiceBusConsumer rateLimitedConsumer = 
+            new RateLimitedServiceBusConsumer(
+                connectionString, queueName, 100.0, 10  // 100 msg/sec, 10 concurrent
+            );
+        
+        // OpenTelemetry setup
+        OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .setMeterProvider(meterProvider)
+            .buildAndRegisterGlobal();
+        
+        ObservableServiceBusConsumer observableConsumer = 
+            new ObservableServiceBusConsumer(connectionString, queueName, openTelemetry);
+        
+        GracefulServiceBusConsumer gracefulConsumer = 
+            new GracefulServiceBusConsumer(connectionString, queueName);
+        
+        // Start all processors
+        managedConsumer.start();
+        sessionConsumer.start();
+        retryConsumer.start();
+        cbConsumer.start();
+        rateLimitedConsumer.start();
+        observableConsumer.start();
+        gracefulConsumer.start();
+        
+        // Wait for shutdown signal
+        gracefulConsumer.awaitShutdown();
+        
+        // Stop all processors
+        managedConsumer.stop();
+        sessionConsumer.stop();
+        retryConsumer.stop();
+        cbConsumer.stop();
+        rateLimitedConsumer.stop();
+        observableConsumer.stop();
+        
+        ManagedServiceBusConsumer.shutdownAll();
+    }
+}
+```
+
 ## Generated Code
 
 This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).

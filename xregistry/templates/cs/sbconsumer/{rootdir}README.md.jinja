@@ -415,6 +415,540 @@ public async Task ProcessesServiceBusMessage()
 }
 ```
 
+## Production-Ready Patterns
+
+This section provides production-ready patterns for building reliable Service Bus consumer applications.
+
+### 1. Batch Processing with Auto-Complete
+
+Process messages in batches for better throughput:
+
+```csharp
+public class BatchServiceBusConsumer
+{
+    private readonly {{ class_name }} _consumer;
+    private readonly List<(ServiceBusReceivedMessage, CloudEvent, {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }})> _batch = new();
+    private readonly SemaphoreSlim _batchLock = new(1, 1);
+    private readonly int _batchSize;
+    private readonly TimeSpan _batchTimeout;
+    private DateTime _lastProcessTime = DateTime.UtcNow;
+
+    public BatchServiceBusConsumer({{ class_name }} consumer, int batchSize = 100, TimeSpan? batchTimeout = null)
+    {
+        _consumer = consumer;
+        _batchSize = batchSize;
+        _batchTimeout = batchTimeout ?? TimeSpan.FromSeconds(5);
+
+{%- set first_message = messagegroup.messages.items() | first %}
+{%- if first_message %}
+{%- set messageid, message = first_message %}
+{%- set messagename = messageid | strip_dots | pascal %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+        _consumer.{{ messagename }}Async += OnMessageReceivedAsync;
+{%- endif %}
+
+        _ = Task.Run(ProcessBatchPeriodically);
+    }
+
+    private async Task OnMessageReceivedAsync(ServiceBusReceivedMessage message, CloudEvent cloudEvent, {{ message_body_type }} data)
+    {
+        await _batchLock.WaitAsync();
+        try
+        {
+            _batch.Add((message, cloudEvent, data));
+
+            if (_batch.Count >= _batchSize)
+            {
+                await ProcessBatchAsync();
+            }
+        }
+        finally
+        {
+            _batchLock.Release();
+        }
+    }
+
+    private async Task ProcessBatchPeriodically()
+    {
+        while (true)
+        {
+            await Task.Delay(_batchTimeout);
+            
+            await _batchLock.WaitAsync();
+            try
+            {
+                if (_batch.Count > 0 && DateTime.UtcNow - _lastProcessTime >= _batchTimeout)
+                {
+                    await ProcessBatchAsync();
+                }
+            }
+            finally
+            {
+                _batchLock.Release();
+            }
+        }
+    }
+
+    private async Task ProcessBatchAsync()
+    {
+        if (_batch.Count == 0) return;
+
+        var currentBatch = _batch.ToList();
+        _batch.Clear();
+        _lastProcessTime = DateTime.UtcNow;
+
+        try
+        {
+            await Task.WhenAll(currentBatch.Select(item => ProcessMessageAsync(item.Item2, item.Item3)));
+            Console.WriteLine($"Successfully processed batch of {currentBatch.Count} messages");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error processing batch: {ex.Message}");
+        }
+    }
+
+    private async Task ProcessMessageAsync(CloudEvent cloudEvent, {{ message_body_type }} data)
+    {
+        // Your business logic here
+        await Task.CompletedTask;
+    }
+}
+```
+
+### 2. Session-Enabled Processing
+
+Handle session-enabled queues/topics for ordered, stateful message processing:
+
+```csharp
+public class SessionAwareServiceBusConsumer
+{
+    private readonly ServiceBusClient _client;
+    private readonly ServiceBusSessionProcessor _processor;
+    private readonly ConcurrentDictionary<string, object> _sessionState = new();
+
+    public SessionAwareServiceBusConsumer(string connectionString, string queueName)
+    {
+        _client = new ServiceBusClient(connectionString);
+        
+        var options = new ServiceBusSessionProcessorOptions
+        {
+            AutoCompleteMessages = false,
+            MaxConcurrentSessions = 10,
+            MaxConcurrentCallsPerSession = 1,  // Sequential processing per session
+            SessionIdleTimeout = TimeSpan.FromMinutes(1)
+        };
+
+        _processor = _client.CreateSessionProcessor(queueName, options);
+        
+        _processor.ProcessMessageAsync += ProcessMessageAsync;
+        _processor.ProcessErrorAsync += ProcessErrorAsync;
+        _processor.SessionInitializingAsync += SessionInitializingAsync;
+        _processor.SessionClosingAsync += SessionClosingAsync;
+    }
+
+    private Task SessionInitializingAsync(ProcessSessionEventArgs args)
+    {
+        Console.WriteLine($"Session initializing: {args.SessionId}");
+        _sessionState[args.SessionId] = new { StartTime = DateTime.UtcNow };
+        return Task.CompletedTask;
+    }
+
+    private Task SessionClosingAsync(ProcessSessionEventArgs args)
+    {
+        Console.WriteLine($"Session closing: {args.SessionId}");
+        _sessionState.TryRemove(args.SessionId, out _);
+        return Task.CompletedTask;
+    }
+
+    private async Task ProcessMessageAsync(ProcessSessionMessageEventArgs args)
+    {
+        try
+        {
+            var message = args.Message;
+            var sessionId = message.SessionId;
+
+            // Get session state
+            var sessionStateData = await args.GetSessionStateAsync();
+            Console.WriteLine($"Processing message in session {sessionId}");
+
+            // Process your message
+            var cloudEvent = message.Body.ToObjectFromJson<CloudEvent>();
+            // ... process data ...
+
+            // Update session state
+            var newState = BinaryData.FromString($"Processed at {DateTime.UtcNow:O}");
+            await args.SetSessionStateAsync(newState);
+
+            // Complete the message
+            await args.CompleteMessageAsync(message);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error processing session message: {ex.Message}");
+            await args.AbandonMessageAsync(args.Message);
+        }
+    }
+
+    private Task ProcessErrorAsync(ProcessErrorEventArgs args)
+    {
+        Console.Error.WriteLine($"Session processor error: {args.Exception.Message}");
+        return Task.CompletedTask;
+    }
+
+    public async Task StartAsync() => await _processor.StartProcessingAsync();
+    public async Task StopAsync() => await _processor.StopProcessingAsync();
+}
+```
+
+### 3. Transaction Support
+
+Use transactions for atomic operations across multiple messages:
+
+```csharp
+public class TransactionalServiceBusConsumer
+{
+    private readonly ServiceBusClient _client;
+    private readonly ServiceBusProcessor _processor;
+
+    public TransactionalServiceBusConsumer(string connectionString, string queueName)
+    {
+        _client = new ServiceBusClient(connectionString);
+        
+        var options = new ServiceBusProcessorOptions
+        {
+            AutoCompleteMessages = false,
+            MaxConcurrentCalls = 1,  // Process one at a time for transactions
+            ReceiveMode = ServiceBusReceiveMode.PeekLock
+        };
+
+        _processor = _client.CreateProcessor(queueName, options);
+        _processor.ProcessMessageAsync += ProcessMessageWithTransactionAsync;
+        _processor.ProcessErrorAsync += ProcessErrorAsync;
+    }
+
+    private async Task ProcessMessageWithTransactionAsync(ProcessMessageEventArgs args)
+    {
+        using var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
+        
+        try
+        {
+            var message = args.Message;
+            
+            // Process message
+            var cloudEvent = message.Body.ToObjectFromJson<CloudEvent>();
+            await ProcessBusinessLogicAsync(cloudEvent);
+
+            // Database operations would participate in the same transaction
+            // await SaveToDatabaseAsync(data);
+
+            // Complete message within transaction
+            await args.CompleteMessageAsync(message);
+
+            // Commit transaction
+            scope.Complete();
+            Console.WriteLine($"Transaction completed for message {message.MessageId}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Transaction failed: {ex.Message}");
+            await args.AbandonMessageAsync(args.Message);
+            // Transaction automatically rolls back
+        }
+    }
+
+    private async Task ProcessBusinessLogicAsync(CloudEvent cloudEvent)
+    {
+        // Your business logic
+        await Task.CompletedTask;
+    }
+
+    private Task ProcessErrorAsync(ProcessErrorEventArgs args)
+    {
+        Console.Error.WriteLine($"Processor error: {args.Exception.Message}");
+        return Task.CompletedTask;
+    }
+
+    public async Task StartAsync() => await _processor.StartProcessingAsync();
+    public async Task StopAsync() => await _processor.StopProcessingAsync();
+}
+```
+
+### 4. Circuit Breaker for Downstream Dependencies
+
+Protect downstream systems from cascading failures:
+
+```csharp
+public class CircuitBreakerServiceBusConsumer
+{
+    private int _failureCount = 0;
+    private DateTime _lastFailureTime = DateTime.MinValue;
+    private readonly int _failureThreshold;
+    private readonly TimeSpan _timeout;
+    private CircuitState _state = CircuitState.Closed;
+    private readonly {{ class_name }} _consumer;
+
+    public CircuitBreakerServiceBusConsumer({{ class_name }} consumer, int failureThreshold = 5, TimeSpan? timeout = null)
+    {
+        _consumer = consumer;
+        _failureThreshold = failureThreshold;
+        _timeout = timeout ?? TimeSpan.FromMinutes(1);
+
+{%- if first_message %}
+        _consumer.{{ messagename }}Async += ProcessWithCircuitBreakerAsync;
+{%- endif %}
+    }
+
+    private async Task ProcessWithCircuitBreakerAsync(ServiceBusReceivedMessage message, CloudEvent cloudEvent, {{ message_body_type }} data)
+    {
+        if (_state == CircuitState.Open)
+        {
+            if (DateTime.UtcNow - _lastFailureTime >= _timeout)
+            {
+                Console.WriteLine("Circuit breaker: Transitioning to HalfOpen");
+                _state = CircuitState.HalfOpen;
+            }
+            else
+            {
+                Console.WriteLine($"Circuit breaker open. Abandoning message {message.MessageId}");
+                throw new InvalidOperationException("Circuit breaker is open");
+            }
+        }
+
+        try
+        {
+            await ProcessMessageAsync(data);
+            
+            if (_state == CircuitState.HalfOpen)
+            {
+                Console.WriteLine("Circuit breaker: Success in HalfOpen, transitioning to Closed");
+                _state = CircuitState.Closed;
+                _failureCount = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            _failureCount++;
+            _lastFailureTime = DateTime.UtcNow;
+
+            if (_failureCount >= _failureThreshold)
+            {
+                Console.WriteLine($"Circuit breaker: Threshold ({_failureThreshold}) reached, opening circuit");
+                _state = CircuitState.Open;
+            }
+
+            throw;
+        }
+    }
+
+    private async Task ProcessMessageAsync({{ message_body_type }} data)
+    {
+        await Task.CompletedTask;
+    }
+
+    private enum CircuitState { Closed, Open, HalfOpen }
+}
+```
+
+### 5. Application Insights Integration
+
+Deep observability with Azure Application Insights:
+
+```csharp
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.DataContracts;
+using Microsoft.ApplicationInsights.Extensibility;
+
+public class ObservableServiceBusConsumer
+{
+    private readonly TelemetryClient _telemetry;
+    private readonly {{ class_name }} _consumer;
+
+    public ObservableServiceBusConsumer({{ class_name }} consumer, string instrumentationKey)
+    {
+        _consumer = consumer;
+        var config = TelemetryConfiguration.CreateDefault();
+        config.ConnectionString = $"InstrumentationKey={instrumentationKey}";
+        _telemetry = new TelemetryClient(config);
+
+{%- if first_message %}
+        _consumer.{{ messagename }}Async += ProcessWithTelemetryAsync;
+{%- endif %}
+    }
+
+    private async Task ProcessWithTelemetryAsync(ServiceBusReceivedMessage message, CloudEvent cloudEvent, {{ message_body_type }} data)
+    {
+        using var operation = _telemetry.StartOperation<RequestTelemetry>("Process-{{ messagename }}");
+        operation.Telemetry.Properties["CloudEvent.Id"] = cloudEvent.Id ?? string.Empty;
+        operation.Telemetry.Properties["CloudEvent.Type"] = cloudEvent.Type ?? string.Empty;
+        operation.Telemetry.Properties["CloudEvent.Source"] = cloudEvent.Source?.ToString() ?? string.Empty;
+        operation.Telemetry.Properties["MessageId"] = message.MessageId;
+        operation.Telemetry.Properties["SessionId"] = message.SessionId ?? "none";
+        operation.Telemetry.Properties["DeliveryCount"] = message.DeliveryCount.ToString();
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            await ProcessMessageAsync(data);
+            
+            stopwatch.Stop();
+            operation.Telemetry.Success = true;
+            operation.Telemetry.Duration = stopwatch.Elapsed;
+
+            _telemetry.TrackMetric("ServiceBus.ProcessingDuration", stopwatch.Elapsed.TotalMilliseconds,
+                new Dictionary<string, string> { { "MessageType", cloudEvent.Type ?? "unknown" } });
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            operation.Telemetry.Success = false;
+            operation.Telemetry.Duration = stopwatch.Elapsed;
+            
+            _telemetry.TrackException(ex, new Dictionary<string, string>
+            {
+                { "CloudEvent.Id", cloudEvent.Id ?? string.Empty },
+                { "MessageId", message.MessageId }
+            });
+            
+            throw;
+        }
+    }
+
+    private async Task ProcessMessageAsync({{ message_body_type }} data)
+    {
+        await Task.CompletedTask;
+    }
+}
+```
+
+### 6. Retry Logic with Exponential Backoff
+
+Handle transient failures with intelligent retry:
+
+```csharp
+using Polly;
+using Polly.Retry;
+
+public class ResilientServiceBusConsumer
+{
+    private readonly {{ class_name }} _consumer;
+    private readonly AsyncRetryPolicy _retryPolicy;
+
+    public ResilientServiceBusConsumer({{ class_name }} consumer)
+    {
+        _consumer = consumer;
+
+        _retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .Or<TimeoutException>()
+            .Or<Azure.RequestFailedException>(ex => IsTransient(ex))
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt => TimeSpan.FromMilliseconds(100 * Math.Pow(2, retryAttempt - 1)),
+                onRetry: (exception, timeSpan, retryCount, context) =>
+                {
+                    Console.WriteLine($"Retry {retryCount} after {timeSpan.TotalMilliseconds}ms due to: {exception.Message}");
+                });
+
+{%- if first_message %}
+        _consumer.{{ messagename }}Async += ProcessWithRetryAsync;
+{%- endif %}
+    }
+
+    private async Task ProcessWithRetryAsync(ServiceBusReceivedMessage message, CloudEvent cloudEvent, {{ message_body_type }} data)
+    {
+        await _retryPolicy.ExecuteAsync(async () =>
+        {
+            await ProcessMessageAsync(data);
+        });
+    }
+
+    private static bool IsTransient(Azure.RequestFailedException ex)
+    {
+        return ex.Status switch
+        {
+            408 => true, // Request Timeout
+            429 => true, // Too Many Requests
+            500 => true, // Internal Server Error
+            502 => true, // Bad Gateway
+            503 => true, // Service Unavailable
+            504 => true, // Gateway Timeout
+            _ => false
+        };
+    }
+
+    private async Task ProcessMessageAsync({{ message_body_type }} data)
+    {
+        await Task.CompletedTask;
+    }
+}
+```
+
+### 7. Dead Letter Queue Monitoring
+
+Monitor and process messages from the dead letter queue:
+
+```csharp
+public class DeadLetterQueueMonitor
+{
+    private readonly ServiceBusClient _client;
+    private readonly ServiceBusProcessor _dlqProcessor;
+
+    public DeadLetterQueueMonitor(string connectionString, string queueName)
+    {
+        _client = new ServiceBusClient(connectionString);
+        
+        // Create processor for dead letter sub-queue
+        var options = new ServiceBusProcessorOptions
+        {
+            AutoCompleteMessages = false,
+            MaxConcurrentCalls = 1,
+            SubQueue = SubQueue.DeadLetter
+        };
+
+        _dlqProcessor = _client.CreateProcessor(queueName, options);
+        _dlqProcessor.ProcessMessageAsync += ProcessDeadLetterMessageAsync;
+        _dlqProcessor.ProcessErrorAsync += ProcessErrorAsync;
+    }
+
+    private async Task ProcessDeadLetterMessageAsync(ProcessMessageEventArgs args)
+    {
+        var message = args.Message;
+        
+        Console.WriteLine($"Dead letter message: {message.MessageId}");
+        Console.WriteLine($"  Reason: {message.DeadLetterReason}");
+        Console.WriteLine($"  Error Description: {message.DeadLetterErrorDescription}");
+        Console.WriteLine($"  Delivery Count: {message.DeliveryCount}");
+        Console.WriteLine($"  Enqueued Time: {message.EnqueuedTime}");
+
+        // Log to monitoring system
+        await LogDeadLetterMessageAsync(message);
+
+        // Optionally reprocess or archive
+        // await ReprocessMessageAsync(message);
+
+        // Complete to remove from DLQ
+        await args.CompleteMessageAsync(message);
+    }
+
+    private async Task LogDeadLetterMessageAsync(ServiceBusReceivedMessage message)
+    {
+        // Log to Application Insights, database, etc.
+        await Task.CompletedTask;
+    }
+
+    private Task ProcessErrorAsync(ProcessErrorEventArgs args)
+    {
+        Console.Error.WriteLine($"DLQ processor error: {args.Exception.Message}");
+        return Task.CompletedTask;
+    }
+
+    public async Task StartAsync() => await _dlqProcessor.StartProcessingAsync();
+    public async Task StopAsync() => await _dlqProcessor.StopProcessingAsync();
+}
+```
+
 ## Configuration
 
 ```json

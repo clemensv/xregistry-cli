@@ -1,0 +1,306 @@
+"""
+Dispatcher module for processing messages from Azure Service Bus.
+"""
+
+{% import "cloudevents.jinja.include" as cloudEvents -%}
+{%- import "util.include.jinja" as util -%}
+{%- set messagegroups = root.messagegroups %}
+{%- set uses_cloudevents_message = (root | exists("envelope","CloudEvents/1.0")) %}
+
+import asyncio
+from typing import Awaitable, Callable, List
+from azure.servicebus.aio import ServiceBusClient
+from azure.servicebus import ServiceBusReceivedMessage
+from cloudevents.http import CloudEvent
+
+{%- set imports = [] %}
+{%- for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- for _, message in messagegroup.messages.items() -%}
+{%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+{%- if type_name != "object" %}
+{%- set class_name = type_name | strip_namespace %}
+{%- set import_statement = "from " + (data_project_name | dotunderscore | lower) + " import " + class_name %}
+{%- if import_statement not in imports %}
+{%- set _ = imports.append(import_statement) %}
+{{ import_statement }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+
+class _DispatcherBase:
+    """
+    Base class for dispatching Service Bus messages. {%if uses_cloudevents_message%}Handles CloudEvent detection and conversion.{%endif%}
+    """
+    {%- if uses_cloudevents_message%}
+    CLOUDEVENT_PREFIX = "cloudEvents:"
+    {%- endif%}
+
+    async def _unhandled_event(self, _sb_msg, de):
+        """ Default event handler """
+        await asyncio.sleep(0)
+
+    async def _unhandled_event_ce(self, _sb_msg, _ce, de):
+        """ Default event handler """
+        await asyncio.sleep(0)
+
+    {%- if uses_cloudevents_message%}
+    @staticmethod
+    def _is_cloud_event(message: ServiceBusReceivedMessage):
+        """
+        Checks if the message is a CloudEvent.
+
+        Args:
+            message: The Service Bus message to check.
+
+        Returns:
+            True if the message is a CloudEvent, False otherwise.
+        """
+        def key_to_str(key):
+            return key.decode('utf-8') if isinstance(key, bytes) else str(key)
+        
+        return (message.content_type and 'application/cloudevents' in message.content_type) or \
+               (message.application_properties and any(key_to_str(key).startswith(_DispatcherBase.CLOUDEVENT_PREFIX) for key in message.application_properties))
+
+    @staticmethod
+    def _cloud_event_from_message(message: ServiceBusReceivedMessage):
+        """
+        Converts a Service Bus message to a CloudEvent.
+
+        Args:
+            message: The Service Bus message to convert.
+
+        Returns:
+            A CloudEvent object.
+        """
+        if message.content_type and 'application/cloudevents+json' in message.content_type:
+            # Structured mode
+            import json
+            # message.body is a generator, need to consume it
+            body_bytes = b''.join(message.body)
+            event_dict = json.loads(body_bytes.decode('utf-8'))
+            return CloudEvent(event_dict)
+        else:
+            # Binary mode
+            headers = {
+                "datacontenttype": message.content_type or "application/octet-stream"
+            }
+            for key, value in message.application_properties.items():
+                key_str = key.decode('utf-8') if isinstance(key, bytes) else str(key)
+                value_str = value.decode('utf-8') if isinstance(value, bytes) else str(value)
+                if key_str.startswith(_DispatcherBase.CLOUDEVENT_PREFIX):
+                    headers[key_str[len(_DispatcherBase.CLOUDEVENT_PREFIX):]] = value_str
+            
+            # Decode body based on content type
+            # message.body is a generator, need to consume it
+            body_bytes = b''.join(message.body)
+            if message.content_type and ('json' in message.content_type or 'text' in message.content_type):
+                body_data = body_bytes.decode('utf-8')
+            else:
+                body_data = body_bytes
+            
+            return CloudEvent(attributes=headers, data=body_data)
+    {%- endif %}
+
+class MessageProcessorRunner:
+    """ Message Processor Runner for Service Bus """
+    def __init__(self, client: ServiceBusClient, queue_or_topic_name: str, subscription_name: str = None):
+        self.client = client
+        self.queue_or_topic_name = queue_or_topic_name
+        self.subscription_name = subscription_name
+        self.dispatchers: List[_DispatcherBase] = []
+        self.receive_task = None
+
+    async def __aenter__(self):
+        """ Enter the context """
+        await self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """ Exit the context """
+        await self.stop()
+
+    def add_dispatcher(self, dispatcher: _DispatcherBase):
+        """ Add a dispatcher to the runner """
+        self.dispatchers.append(dispatcher)
+
+    def remove_dispatcher(self, dispatcher: _DispatcherBase):
+        """ Remove a dispatcher from the runner """
+        self.dispatchers.remove(dispatcher)
+
+    async def _process_message(self, message: ServiceBusReceivedMessage):
+        """ Process a message """
+        for dispatcher in self.dispatchers:
+            await dispatcher._process_message(message)
+
+    async def _receive_messages(self):
+        """ Receive messages from Service Bus """
+        if self.subscription_name:
+            receiver = self.client.get_subscription_receiver(
+                topic_name=self.queue_or_topic_name,
+                subscription_name=self.subscription_name
+            )
+        else:
+            receiver = self.client.get_queue_receiver(
+                queue_name=self.queue_or_topic_name
+            )
+        
+        async with receiver:
+            while True:
+                received_msgs = await receiver.receive_messages(max_wait_time=5, max_message_count=10)
+                for msg in received_msgs:
+                    try:
+                        await self._process_message(msg)
+                        await receiver.complete_message(msg)
+                    except Exception as e:
+                        print(f"Error processing message: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        await receiver.abandon_message(msg)
+
+    async def start(self):
+        """ Start receiving messages """
+        if self.receive_task is None or self.receive_task.done():
+            self.receive_task = asyncio.create_task(self._receive_messages())
+
+    async def stop(self):
+        """ Stop receiving messages """
+        if self.receive_task and not self.receive_task.done():
+            self.receive_task.cancel()
+            try:
+                await self.receive_task
+            except asyncio.CancelledError:
+                pass
+
+    @classmethod
+    def from_connection_string(cls, connection_string: str, queue_or_topic_name: str, subscription_name: str = None) -> 'MessageProcessorRunner':
+        """
+        Creates a MessageProcessorRunner from a connection string.
+
+        Args:
+            connection_string: The Service Bus connection string.
+            queue_or_topic_name: The queue or topic name.
+            subscription_name: The subscription name (required for topics).
+
+        Returns:
+            A MessageProcessorRunner instance.
+        """
+        client = ServiceBusClient.from_connection_string(conn_str=connection_string, logging_enable=True)
+        return cls(client, queue_or_topic_name, subscription_name)
+
+    @classmethod
+    def create(cls, fully_qualified_namespace: str, queue_or_topic_name: str, credential, subscription_name: str = None) -> 'MessageProcessorRunner':
+        """
+        Creates a MessageProcessorRunner.
+
+        Args:
+            fully_qualified_namespace: The Service Bus namespace.
+            queue_or_topic_name: The queue or topic name.
+            credential: The credential to use for authentication.
+            subscription_name: The subscription name (required for topics).
+
+        Returns:
+            A MessageProcessorRunner instance.
+        """
+        client = ServiceBusClient(fully_qualified_namespace=fully_qualified_namespace, credential=credential, logging_enable=True)
+        return cls(client, queue_or_topic_name, subscription_name)
+
+{% for messagegroupid, messagegroup in messagegroups.items() %}
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+{%- set groupname = messagegroupid | pascal %}
+{%- set class_name = ( groupname | strip_dots )+"MessageDispatcher" %}
+
+class {{ class_name }}(_DispatcherBase):
+    """
+    Dispatcher for {{ groupname }} messages.
+    """
+    def __init__(self):
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+        {%- if message.description %}
+        # {{ message.description }}
+        {%- endif %}
+        {%- set is_cloudevent = (message | exists("envelope","CloudEvents/1.0")) %}
+        self.{{ messageid | dotunderscore | snake }}_async: Callable[[ServiceBusReceivedMessage, {%if is_cloudevent%}CloudEvent, {%endif%}{{ data_type | strip_namespace }}], Awaitable[None]] = self._unhandled_event{%if is_cloudevent%}_ce{%endif%}
+        {%- endfor %}
+
+    async def _process_message(self, message: ServiceBusReceivedMessage):
+        """
+        Processes an incoming Service Bus message.
+
+        Args:
+            message: The Service Bus message to process.
+        """
+        print(f"Processing message: content_type={message.content_type}, application_properties={message.application_properties}")
+        {%- if uses_cloudevents_message %}
+        if self._is_cloud_event(message):
+            print("Message identified as CloudEvent")
+            cloud_event = self._cloud_event_from_message(message)
+            print(f"CloudEvent extracted: type={cloud_event.get('type')}, source={cloud_event.get('source')}")
+            await self._dispatch_cloud_event(message, cloud_event)
+            return
+        {%-endif %}
+        print("Message identified as plain AMQP")
+        await self._dispatch_message(message)
+    {%- if uses_cloudevents_message %}
+
+    async def _dispatch_cloud_event(self, message: ServiceBusReceivedMessage, cloud_event: CloudEvent):
+        """
+        Dispatches a CloudEvent to the appropriate handler.
+
+        Args:
+            message: The original Service Bus message.
+            cloud_event: The CloudEvent object.
+        """
+        cloud_event_type = cloud_event['type']
+        
+        # Dispatch based on CloudEvent type
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set is_cloudevent = (message | exists("envelope","CloudEvents/1.0")) %}
+        {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+        {%- if is_cloudevent %}
+        if cloud_event_type == "{{ messageid }}":
+            try:
+                {%- if data_type != "object" %}
+                data = {{ data_type | strip_namespace }}.from_data(cloud_event.data, cloud_event["datacontenttype"])
+                {%- else %}
+                data = cloud_event.data
+                {%- endif %}
+                await self.{{ messageid | dotunderscore | snake }}_async(message, cloud_event, data)
+                return
+            except Exception as e:
+                raise RuntimeError(f"Failed to process CloudEvent type '{{ messageid }}': {e}") from e
+        {%- endif %}
+        {%- endfor %}
+        
+        print(f"No handler found for CloudEvent type: {cloud_event_type}")
+    {%- endif %}
+
+    async def _dispatch_message(self, message: ServiceBusReceivedMessage):
+        """
+        Dispatches a plain AMQP message to the appropriate handler.
+
+        Args:
+            message: The Service Bus message.
+        """
+        # For plain AMQP messages, check subject or custom properties to route
+        subject = message.subject
+        switcher = {
+            {%- for messageid, message in messagegroup.messages.items() %}
+            {%- set is_cloudevent = (message | exists("envelope","CloudEvents/1.0")) %}
+            {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+            {%- if not is_cloudevent %}
+            "{{ messageid }}": lambda: self.{{ messageid | dotunderscore | snake }}_async(message,
+            {%- if data_type != "object" %}
+                {{ data_type | strip_namespace }}.from_bytes(bytes(message.body))
+            {%- else %}
+            bytes(message.body)
+            {%- endif %}
+            ),
+            {%- endif %}
+            {%- endfor %}
+        }
+        handler = switcher.get(subject)
+        if handler:
+            await handler()
+{% endfor %}

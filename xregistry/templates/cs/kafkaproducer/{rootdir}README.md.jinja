@@ -114,3 +114,434 @@ public static EventData Create{{ messagename | strip_namespace }}Event(
 {%- endfor %}
 {%- endfor %}
 
+## Production-Ready Patterns
+
+This section provides production-ready patterns for building reliable Kafka producer applications.
+
+### 1. Connection Management and Pooling
+
+Kafka producers should be long-lived and reused across multiple produce operations. The producer is thread-safe and maintains an internal connection pool.
+
+```csharp
+public class KafkaProducerPool
+{
+    private static readonly Lazy<IProducer<string, byte[]>> _producer = new Lazy<IProducer<string, byte[]>>(() =>
+    {
+        var config = new ProducerConfig
+        {
+            BootstrapServers = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP_SERVERS") ?? "localhost:9092",
+            ClientId = Environment.GetEnvironmentVariable("KAFKA_CLIENT_ID") ?? "my-producer",
+            
+            // Idempotence for exactly-once semantics
+            EnableIdempotence = true,
+            
+            // Acknowledgment settings for durability
+            Acks = Acks.All,
+            
+            // Retry settings
+            MessageSendMaxRetries = 3,
+            RetryBackoffMs = 100,
+            
+            // Batching for throughput
+            LingerMs = 10,
+            BatchSize = 16384,
+            
+            // Compression for bandwidth optimization
+            CompressionType = CompressionType.Snappy,
+            
+            // Timeouts
+            RequestTimeoutMs = 30000,
+            MessageTimeoutMs = 300000
+        };
+
+        return new ProducerBuilder<string, byte[]>(config)
+            .SetErrorHandler((_, e) => Console.Error.WriteLine($"Producer error: {e.Reason}"))
+            .SetLogHandler((_, log) => Console.WriteLine($"Producer log: {log.Message}"))
+            .Build();
+    });
+
+    public static IProducer<string, byte[]> Instance => _producer.Value;
+}
+```
+
+### 2. Batch Sending with Task.WhenAll
+
+For high-throughput scenarios, send multiple messages in parallel and wait for all acknowledgments:
+
+```csharp
+public async Task<int> SendBatchAsync<T>(IEnumerable<T> messages, string topic, CancellationToken cancellationToken = default)
+{
+    var producer = KafkaProducerPool.Instance;
+    var sendTasks = new List<Task<DeliveryResult<string, byte[]>>>();
+
+    foreach (var message in messages)
+    {
+        var eventData = {{ groupname }}EventFactory.Create{{ messagename | strip_namespace }}Event(message);
+        var kafkaMessage = new Message<string, byte[]>
+        {
+            Key = Guid.NewGuid().ToString(), // Or derive from message
+            Value = eventData.Body.ToArray(),
+            Headers = new Headers()
+        };
+
+        // Copy CloudEvents headers to Kafka headers
+        foreach (var header in eventData.Properties)
+        {
+            kafkaMessage.Headers.Add(header.Key, Encoding.UTF8.GetBytes(header.Value.ToString() ?? string.Empty));
+        }
+
+        sendTasks.Add(producer.ProduceAsync(topic, kafkaMessage, cancellationToken));
+    }
+
+    var results = await Task.WhenAll(sendTasks);
+    return results.Count(r => !r.Status.HasError);
+}
+```
+
+### 3. Retry Logic with Exponential Backoff
+
+Handle transient failures with exponential backoff retry logic:
+
+```csharp
+public async Task<DeliveryResult<string, byte[]>> SendWithRetryAsync(
+    Message<string, byte[]> message,
+    string topic,
+    int maxRetries = 3,
+    CancellationToken cancellationToken = default)
+{
+    var producer = KafkaProducerPool.Instance;
+    int retryCount = 0;
+    Exception? lastException = null;
+
+    while (retryCount < maxRetries)
+    {
+        try
+        {
+            var result = await producer.ProduceAsync(topic, message, cancellationToken);
+            
+            if (result.Status == PersistenceStatus.Persisted)
+            {
+                return result;
+            }
+            
+            throw new InvalidOperationException($"Message not persisted: {result.Status}");
+        }
+        catch (ProduceException<string, byte[]> ex) when (IsTransientError(ex))
+        {
+            lastException = ex;
+            retryCount++;
+            
+            if (retryCount < maxRetries)
+            {
+                var delay = TimeSpan.FromMilliseconds(100 * Math.Pow(2, retryCount - 1));
+                Console.WriteLine($"Transient error producing to Kafka. Retry {retryCount}/{maxRetries} after {delay.TotalMilliseconds}ms. Error: {ex.Error.Reason}");
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+    }
+
+    throw new InvalidOperationException($"Failed to produce message after {maxRetries} retries", lastException);
+}
+
+private static bool IsTransientError(ProduceException<string, byte[]> exception)
+{
+    return exception.Error.Code switch
+    {
+        ErrorCode.NetworkException => true,
+        ErrorCode.RequestTimedOut => true,
+        ErrorCode.NotEnoughReplicas => true,
+        ErrorCode.NotEnoughReplicasAfterAppend => true,
+        ErrorCode.LeaderNotAvailable => true,
+        ErrorCode.BrokerNotAvailable => true,
+        _ => false
+    };
+}
+```
+
+### 4. Circuit Breaker Pattern
+
+Implement a circuit breaker to prevent cascading failures when Kafka is unavailable:
+
+```csharp
+public class KafkaCircuitBreaker
+{
+    private int _failureCount = 0;
+    private DateTime _lastFailureTime = DateTime.MinValue;
+    private readonly int _failureThreshold;
+    private readonly TimeSpan _timeout;
+    private CircuitState _state = CircuitState.Closed;
+
+    public KafkaCircuitBreaker(int failureThreshold = 5, TimeSpan? timeout = null)
+    {
+        _failureThreshold = failureThreshold;
+        _timeout = timeout ?? TimeSpan.FromSeconds(60);
+    }
+
+    public async Task<DeliveryResult<string, byte[]>> ExecuteAsync(
+        Func<Task<DeliveryResult<string, byte[]>>> action,
+        CancellationToken cancellationToken = default)
+    {
+        if (_state == CircuitState.Open)
+        {
+            if (DateTime.UtcNow - _lastFailureTime >= _timeout)
+            {
+                Console.WriteLine("Circuit breaker: Transitioning to HalfOpen state");
+                _state = CircuitState.HalfOpen;
+            }
+            else
+            {
+                throw new InvalidOperationException("Circuit breaker is open. Kafka producer is unavailable.");
+            }
+        }
+
+        try
+        {
+            var result = await action();
+            
+            if (_state == CircuitState.HalfOpen)
+            {
+                Console.WriteLine("Circuit breaker: Success in HalfOpen state, transitioning to Closed");
+                _state = CircuitState.Closed;
+                _failureCount = 0;
+            }
+            
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _failureCount++;
+            _lastFailureTime = DateTime.UtcNow;
+
+            if (_failureCount >= _failureThreshold)
+            {
+                Console.WriteLine($"Circuit breaker: Failure threshold ({_failureThreshold}) reached, opening circuit");
+                _state = CircuitState.Open;
+            }
+
+            throw;
+        }
+    }
+
+    private enum CircuitState { Closed, Open, HalfOpen }
+}
+```
+
+### 5. Rate Limiting
+
+Control the rate of message production to avoid overwhelming Kafka or downstream systems:
+
+```csharp
+public class RateLimitedProducer
+{
+    private readonly SemaphoreSlim _semaphore;
+    private readonly IProducer<string, byte[]> _producer;
+
+    public RateLimitedProducer(IProducer<string, byte[]> producer, int maxConcurrentSends = 100)
+    {
+        _producer = producer;
+        _semaphore = new SemaphoreSlim(maxConcurrentSends, maxConcurrentSends);
+    }
+
+    public async Task<DeliveryResult<string, byte[]>> ProduceAsync(
+        string topic,
+        Message<string, byte[]> message,
+        CancellationToken cancellationToken = default)
+    {
+        await _semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            return await _producer.ProduceAsync(topic, message, cancellationToken);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+}
+```
+
+### 6. Observability with Distributed Tracing
+
+Integrate OpenTelemetry for distributed tracing across your Kafka producer:
+
+```csharp
+using System.Diagnostics;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
+
+public class KafkaProducerWithTracing
+{
+    private static readonly ActivitySource ActivitySource = new ActivitySource("MyApp.Kafka.Producer");
+    private readonly IProducer<string, byte[]> _producer;
+
+    public KafkaProducerWithTracing(IProducer<string, byte[]> producer)
+    {
+        _producer = producer;
+    }
+
+    public async Task<DeliveryResult<string, byte[]>> ProduceWithTracingAsync(
+        string topic,
+        Message<string, byte[]> message,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity("kafka.produce", ActivityKind.Producer);
+        activity?.SetTag("messaging.system", "kafka");
+        activity?.SetTag("messaging.destination", topic);
+        activity?.SetTag("messaging.destination_kind", "topic");
+        activity?.SetTag("messaging.protocol", "kafka");
+        activity?.SetTag("messaging.message_id", message.Key);
+
+        // Inject trace context into message headers
+        if (activity != null)
+        {
+            message.Headers ??= new Headers();
+            message.Headers.Add("traceparent", Encoding.UTF8.GetBytes(activity.Id ?? string.Empty));
+            if (activity.TraceStateString != null)
+            {
+                message.Headers.Add("tracestate", Encoding.UTF8.GetBytes(activity.TraceStateString));
+            }
+        }
+
+        try
+        {
+            var result = await _producer.ProduceAsync(topic, message, cancellationToken);
+            
+            activity?.SetTag("messaging.kafka.partition", result.Partition.Value);
+            activity?.SetTag("messaging.kafka.offset", result.Offset.Value);
+            
+            return result;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);
+            throw;
+        }
+    }
+}
+
+// Configure OpenTelemetry in your startup
+public static void ConfigureOpenTelemetry(IServiceCollection services)
+{
+    services.AddOpenTelemetry()
+        .WithTracing(builder => builder
+            .AddSource("MyApp.Kafka.Producer")
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter());
+}
+```
+
+### 7. Metrics Collection
+
+Track producer metrics using System.Diagnostics.Metrics:
+
+```csharp
+using System.Diagnostics.Metrics;
+
+public class KafkaProducerMetrics
+{
+    private static readonly Meter Meter = new Meter("MyApp.Kafka.Producer", "1.0.0");
+    private static readonly Counter<long> MessagesProduced = Meter.CreateCounter<long>("kafka.producer.messages.produced", "messages", "Number of messages produced");
+    private static readonly Counter<long> ProducerErrors = Meter.CreateCounter<long>("kafka.producer.errors", "errors", "Number of producer errors");
+    private static readonly Histogram<double> ProduceDuration = Meter.CreateHistogram<double>("kafka.producer.duration", "ms", "Duration of produce operations");
+
+    private readonly IProducer<string, byte[]> _producer;
+
+    public KafkaProducerMetrics(IProducer<string, byte[]> producer)
+    {
+        _producer = producer;
+    }
+
+    public async Task<DeliveryResult<string, byte[]>> ProduceWithMetricsAsync(
+        string topic,
+        Message<string, byte[]> message,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var tags = new TagList { { "topic", topic } };
+
+        try
+        {
+            var result = await _producer.ProduceAsync(topic, message, cancellationToken);
+            
+            stopwatch.Stop();
+            MessagesProduced.Add(1, tags);
+            ProduceDuration.Record(stopwatch.Elapsed.TotalMilliseconds, tags);
+            
+            return result;
+        }
+        catch (Exception)
+        {
+            stopwatch.Stop();
+            ProducerErrors.Add(1, tags);
+            ProduceDuration.Record(stopwatch.Elapsed.TotalMilliseconds, tags);
+            throw;
+        }
+    }
+}
+```
+
+### 8. Transaction Support for Exactly-Once Semantics
+
+Use Kafka transactions for exactly-once delivery guarantees:
+
+```csharp
+public class TransactionalKafkaProducer
+{
+    private readonly IProducer<string, byte[]> _producer;
+
+    public TransactionalKafkaProducer()
+    {
+        var config = new ProducerConfig
+        {
+            BootstrapServers = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP_SERVERS") ?? "localhost:9092",
+            TransactionalId = $"my-transactional-producer-{Guid.NewGuid()}",
+            EnableIdempotence = true,
+            Acks = Acks.All,
+            MaxInFlight = 5,
+            MessageSendMaxRetries = int.MaxValue,
+            RetryBackoffMs = 100
+        };
+
+        _producer = new ProducerBuilder<string, byte[]>(config).Build();
+        _producer.InitTransactions(TimeSpan.FromSeconds(30));
+    }
+
+    public async Task<List<DeliveryResult<string, byte[]>>> ProduceTransactionalBatchAsync(
+        string topic,
+        IEnumerable<Message<string, byte[]>> messages,
+        CancellationToken cancellationToken = default)
+    {
+        _producer.BeginTransaction();
+        var results = new List<DeliveryResult<string, byte[]>>();
+
+        try
+        {
+            foreach (var message in messages)
+            {
+                var result = await _producer.ProduceAsync(topic, message, cancellationToken);
+                results.Add(result);
+            }
+
+            _producer.CommitTransaction();
+            Console.WriteLine($"Successfully committed transaction with {results.Count} messages");
+            return results;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Transaction failed: {ex.Message}");
+            _producer.AbortTransaction();
+            throw;
+        }
+    }
+
+    public void Dispose()
+    {
+        _producer?.Dispose();
+    }
+}
+```
+
+## Testing
+

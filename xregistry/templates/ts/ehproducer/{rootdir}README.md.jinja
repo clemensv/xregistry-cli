@@ -168,4 +168,711 @@ try {
 4. **Use partition keys** for ordered processing of related events
 5. **Monitor throttling** and adjust send rate accordingly
 6. **Use Azure Identity** instead of connection strings for production
+
+## Production-Ready Patterns
+
+Enterprise-grade patterns for Azure Event Hubs producers in TypeScript/Node.js.
+
+### 1. Event Hubs Producer Pool
+
+Manage multiple producer clients with connection pooling and lifecycle management.
+
+```typescript
+import { EventHubProducerClient } from '@azure/event-hubs';
+
+export class EventHubsProducerPool {
+    private static pools = new Map<string, EventHubProducerClient>();
+    
+    static async getProducer(
+        connectionString: string,
+        eventHubName: string
+    ): Promise<EventHubProducerClient> {
+        const key = `${connectionString}-${eventHubName}`;
+        
+        if (!this.pools.has(key)) {
+            console.log(`Creating new Event Hubs producer for ${eventHubName}`);
+            
+            const producer = new EventHubProducerClient(connectionString, eventHubName);
+            
+            this.pools.set(key, producer);
+        }
+        
+        return this.pools.get(key)!;
+    }
+    
+    static async closeAll(): Promise<void> {
+        console.log(`Closing ${this.pools.size} Event Hubs producers...`);
+        
+        const closePromises = Array.from(this.pools.values()).map(
+            producer => producer.close()
+        );
+        
+        await Promise.all(closePromises);
+        
+        this.pools.clear();
+        console.log('All producers closed');
+    }
+}
+
+// Setup graceful shutdown
+process.on('SIGTERM', async () => {
+    await EventHubsProducerPool.closeAll();
+    process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+    await EventHubsProducerPool.closeAll();
+    process.exit(0);
+});
+```
+
+### 2. Batch Event Sender
+
+Automatically batch events for optimal throughput.
+
+```typescript
+import { EventHubProducerClient, EventDataBatch } from '@azure/event-hubs';
+
+interface BatchConfig {
+    maxBatchSize: number;
+    lingerMs: number;
+    maxBatchBytes: number;
+}
+
+export class BatchEventSender {
+    private pendingEvents: any[] = [];
+    private flushTimer: NodeJS.Timeout | null = null;
+    private config: BatchConfig;
+    
+    constructor(
+        private producer: EventHubProducerClient,
+        config?: Partial<BatchConfig>
+    ) {
+        this.config = {
+            maxBatchSize: 100,
+            lingerMs: 100,
+            maxBatchBytes: 256 * 1024, // 256 KB
+            ...config
+        };
+    }
+    
+    async send(eventData: any, options?: any): Promise<void> {
+        this.pendingEvents.push({ eventData, options });
+        
+        // Size-based trigger
+        if (this.pendingEvents.length >= this.config.maxBatchSize) {
+            await this.flush();
+            return;
+        }
+        
+        // Time-based trigger
+        if (!this.flushTimer) {
+            this.flushTimer = setTimeout(
+                () => this.flush(),
+                this.config.lingerMs
+            );
+        }
+    }
+    
+    async flush(): Promise<void> {
+        if (this.flushTimer) {
+            clearTimeout(this.flushTimer);
+            this.flushTimer = null;
+        }
+        
+        if (this.pendingEvents.length === 0) {
+            return;
+        }
+        
+        const events = [...this.pendingEvents];
+        this.pendingEvents = [];
+        
+        console.log(`Flushing batch of ${events.length} events`);
+        
+        try {
+            // Create multiple batches if needed
+            let currentBatch = await this.producer.createBatch();
+            const batches: EventDataBatch[] = [currentBatch];
+            
+            for (const { eventData, options } of events) {
+                const added = currentBatch.tryAdd(eventData, options);
+                
+                if (!added) {
+                    // Current batch is full, create new one
+                    currentBatch = await this.producer.createBatch();
+                    batches.push(currentBatch);
+                    
+                    const addedToNew = currentBatch.tryAdd(eventData, options);
+                    if (!addedToNew) {
+                        throw new Error('Event too large for batch');
+                    }
+                }
+            }
+            
+            // Send all batches
+            for (const batch of batches) {
+                if (batch.count > 0) {
+                    await this.producer.sendBatch(batch);
+                }
+            }
+            
+            console.log(`Successfully sent ${events.length} events in ${batches.length} batch(es)`);
+            
+        } catch (error) {
+            console.error('Batch send failed:', error);
+            // Re-add events to pending
+            this.pendingEvents.unshift(...events);
+            throw error;
+        }
+    }
+}
+```
+
+### 3. Retry Logic with Exponential Backoff
+
+Handle transient failures with configurable retry.
+
+```typescript
+interface RetryConfig {
+    maxAttempts: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+}
+
+export class RetryableEventSender {
+    private retryConfig: RetryConfig;
+    
+    constructor(
+        private producer: EventHubProducerClient,
+        config?: Partial<RetryConfig>
+    ) {
+        this.retryConfig = {
+            maxAttempts: 5,
+            initialDelayMs: 500,
+            maxDelayMs: 30000,
+            backoffMultiplier: 2,
+            ...config
+        };
+    }
+    
+    async sendWithRetry(eventData: any, options?: any): Promise<void> {
+        let attempt = 0;
+        
+        while (attempt < this.retryConfig.maxAttempts) {
+            try {
+                await this.producer.sendBatch([eventData], options);
+                return; // Success
+                
+            } catch (error: any) {
+                attempt++;
+                
+                if (this.isRetriableError(error) && attempt < this.retryConfig.maxAttempts) {
+                    const delay = Math.min(
+                        this.retryConfig.initialDelayMs * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+                        this.retryConfig.maxDelayMs
+                    );
+                    
+                    console.warn(`Retry attempt ${attempt}/${this.retryConfig.maxAttempts} after ${delay}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('Send failed after max retries or permanent error');
+                    throw error;
+                }
+            }
+        }
+    }
+    
+    private isRetriableError(error: any): boolean {
+        const retriableErrors = [
+            'ETIMEDOUT',
+            'ECONNREFUSED',
+            'ECONNRESET',
+            'ServerBusyError',
+            'ServiceUnavailableError',
+            'MessagingError'
+        ];
+        
+        return retriableErrors.some(code => 
+            error.code === code || 
+            error.name?.includes(code) ||
+            error.message?.includes('server busy') ||
+            error.message?.includes('timeout')
+        );
+    }
+}
+```
+
+### 4. Circuit Breaker Pattern
+
+Protect Event Hubs from being overwhelmed during failures.
+
+```typescript
+enum CircuitState {
+    CLOSED = 'CLOSED',
+    OPEN = 'OPEN',
+    HALF_OPEN = 'HALF_OPEN'
+}
+
+interface CircuitBreakerConfig {
+    failureThreshold: number;
+    successThreshold: number;
+    timeout: number;
+}
+
+export class CircuitBreakerEventSender {
+    private state: CircuitState = CircuitState.CLOSED;
+    private failures: number = 0;
+    private successes: number = 0;
+    private lastFailureTime: number = 0;
+    private config: CircuitBreakerConfig;
+    private fallbackQueue: any[] = [];
+    
+    constructor(
+        private producer: EventHubProducerClient,
+        config?: Partial<CircuitBreakerConfig>
+    ) {
+        this.config = {
+            failureThreshold: 5,
+            successThreshold: 2,
+            timeout: 60000,
+            ...config
+        };
+    }
+    
+    async send(eventData: any, options?: any): Promise<void> {
+        if (this.state === CircuitState.OPEN) {
+            const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+            
+            if (timeSinceLastFailure > this.config.timeout) {
+                console.log('Circuit breaker transitioning to HALF_OPEN');
+                this.state = CircuitState.HALF_OPEN;
+                this.successes = 0;
+            } else {
+                console.warn('Circuit breaker is OPEN, queuing event');
+                this.fallbackQueue.push({ eventData, options });
+                return;
+            }
+        }
+        
+        try {
+            await this.producer.sendBatch([eventData], options);
+            this.onSuccess();
+            
+            // Flush fallback queue on recovery
+            if (this.state === CircuitState.CLOSED && this.fallbackQueue.length > 0) {
+                await this.flushFallbackQueue();
+            }
+            
+        } catch (error) {
+            this.onFailure();
+            throw error;
+        }
+    }
+    
+    private onSuccess(): void {
+        this.failures = 0;
+        
+        if (this.state === CircuitState.HALF_OPEN) {
+            this.successes++;
+            
+            if (this.successes >= this.config.successThreshold) {
+                console.log('Circuit breaker transitioning to CLOSED');
+                this.state = CircuitState.CLOSED;
+                this.successes = 0;
+            }
+        }
+    }
+    
+    private onFailure(): void {
+        this.failures++;
+        this.lastFailureTime = Date.now();
+        
+        if (this.failures >= this.config.failureThreshold) {
+            console.error('Circuit breaker transitioning to OPEN');
+            this.state = CircuitState.OPEN;
+            this.failures = 0;
+        }
+    }
+    
+    private async flushFallbackQueue(): Promise<void> {
+        console.log(`Flushing ${this.fallbackQueue.length} queued events...`);
+        
+        const queue = [...this.fallbackQueue];
+        this.fallbackQueue = [];
+        
+        for (const { eventData, options } of queue) {
+            try {
+                await this.send(eventData, options);
+            } catch (error) {
+                console.error('Failed to flush queued event:', error);
+                this.fallbackQueue.push({ eventData, options });
+            }
+        }
+    }
+    
+    getState(): CircuitState {
+        return this.state;
+    }
+    
+    getQueueSize(): number {
+        return this.fallbackQueue.length;
+    }
+}
+```
+
+### 5. Rate Limiting
+
+Control send rate to prevent Event Hubs throttling.
+
+```typescript
+export class RateLimitedEventSender {
+    private tokensPerSecond: number;
+    private availableTokens: number;
+    private lastRefill: number = Date.now();
+    
+    constructor(
+        private producer: EventHubProducerClient,
+        eventsPerSecond: number
+    ) {
+        this.tokensPerSecond = eventsPerSecond;
+        this.availableTokens = eventsPerSecond;
+        
+        // Refill tokens periodically
+        setInterval(() => this.refillTokens(), 100);
+    }
+    
+    private refillTokens(): void {
+        const now = Date.now();
+        const elapsed = (now - this.lastRefill) / 1000;
+        const tokensToAdd = elapsed * this.tokensPerSecond;
+        
+        this.availableTokens = Math.min(
+            this.availableTokens + tokensToAdd,
+            this.tokensPerSecond
+        );
+        
+        this.lastRefill = now;
+    }
+    
+    private async acquireToken(): Promise<void> {
+        while (this.availableTokens < 1) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        this.availableTokens--;
+    }
+    
+    async send(eventData: any, options?: any): Promise<void> {
+        await this.acquireToken();
+        await this.producer.sendBatch([eventData], options);
+    }
+    
+    async sendBatch(events: any[], options?: any): Promise<void> {
+        // Acquire tokens for batch
+        for (let i = 0; i < events.length; i++) {
+            await this.acquireToken();
+        }
+        
+        await this.producer.sendBatch(events, options);
+    }
+    
+    getAvailableTokens(): number {
+        return this.availableTokens;
+    }
+}
+```
+
+### 6. OpenTelemetry Observability
+
+Instrument Event Hubs producer with distributed tracing and metrics.
+
+```typescript
+import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { metrics } from '@opentelemetry/api-metrics';
+
+export class ObservableEventSender {
+    private tracer = trace.getTracer('eventhubs-producer');
+    private meter = metrics.getMeter('eventhubs-producer');
+    private eventsSent = this.meter.createCounter('eventhubs.events.sent');
+    private sendDuration = this.meter.createHistogram('eventhubs.send.duration');
+    private batchSize = this.meter.createHistogram('eventhubs.batch.size');
+    
+    constructor(private producer: EventHubProducerClient) {}
+    
+    async send(eventData: any, options?: any): Promise<void> {
+        const span = this.tracer.startSpan('eventhubs.send', {
+            kind: 2, // PRODUCER
+            attributes: {
+                'messaging.system': 'eventhubs',
+                'messaging.destination': 'event-hub-name',
+                'messaging.protocol': 'amqp',
+                'messaging.message_payload_size_bytes': JSON.stringify(eventData).length
+            }
+        });
+        
+        // Inject trace context into event properties
+        const traceContext = this.extractTraceContext();
+        const enrichedOptions = {
+            ...options,
+            properties: {
+                ...options?.properties,
+                traceparent: traceContext
+            }
+        };
+        
+        const startTime = Date.now();
+        
+        try {
+            await this.producer.sendBatch([eventData], enrichedOptions);
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            const duration = Date.now() - startTime;
+            
+            this.eventsSent.add(1, { status: 'success' });
+            this.sendDuration.record(duration);
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            
+            this.eventsSent.add(1, { status: 'error' });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    async sendBatch(events: any[], options?: any): Promise<void> {
+        const span = this.tracer.startSpan('eventhubs.send_batch', {
+            kind: 2, // PRODUCER
+            attributes: {
+                'messaging.system': 'eventhubs',
+                'messaging.batch.message_count': events.length
+            }
+        });
+        
+        const startTime = Date.now();
+        
+        try {
+            await this.producer.sendBatch(events, options);
+            
+            span.setStatus({ code: SpanStatusCode.OK });
+            
+            const duration = Date.now() - startTime;
+            
+            this.eventsSent.add(events.length, { status: 'success' });
+            this.sendDuration.record(duration);
+            this.batchSize.record(events.length);
+            
+        } catch (error: any) {
+            span.recordException(error);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            
+            this.eventsSent.add(events.length, { status: 'error' });
+            
+            throw error;
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    private extractTraceContext(): string {
+        // Generate W3C traceparent header
+        // Format: 00-<trace-id>-<span-id>-<flags>
+        const activeSpan = trace.getSpan(context.active());
+        if (activeSpan) {
+            const spanContext = activeSpan.spanContext();
+            return `00-${spanContext.traceId}-${spanContext.spanId}-01`;
+        }
+        return '';
+    }
+}
+```
+
+### 7. Graceful Shutdown
+
+Ensure all events are sent before shutdown.
+
+```typescript
+export class GracefulEventSender {
+    private pendingSends: number = 0;
+    private isShuttingDown: boolean = false;
+    
+    constructor(private producer: EventHubProducerClient) {
+        this.setupShutdownHandlers();
+    }
+    
+    private setupShutdownHandlers(): void {
+        process.on('SIGTERM', () => this.shutdown());
+        process.on('SIGINT', () => this.shutdown());
+    }
+    
+    async send(eventData: any, options?: any): Promise<void> {
+        if (this.isShuttingDown) {
+            throw new Error('Producer is shutting down');
+        }
+        
+        this.pendingSends++;
+        
+        try {
+            await this.producer.sendBatch([eventData], options);
+        } finally {
+            this.pendingSends--;
+        }
+    }
+    
+    async sendBatch(events: any[], options?: any): Promise<void> {
+        if (this.isShuttingDown) {
+            throw new Error('Producer is shutting down');
+        }
+        
+        this.pendingSends++;
+        
+        try {
+            await this.producer.sendBatch(events, options);
+        } finally {
+            this.pendingSends--;
+        }
+    }
+    
+    private async shutdown(): Promise<void> {
+        if (this.isShuttingDown) return;
+        
+        console.log('Initiating graceful shutdown...');
+        this.isShuttingDown = true;
+        
+        // Wait for pending sends (up to 30 seconds)
+        const timeout = 30000;
+        const start = Date.now();
+        
+        while (this.pendingSends > 0 && Date.now() - start < timeout) {
+            console.log(`Waiting for ${this.pendingSends} pending sends...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (this.pendingSends > 0) {
+            console.warn(`Timeout: ${this.pendingSends} events not sent`);
+        } else {
+            console.log('All events sent');
+        }
+        
+        await this.producer.close();
+        console.log('Event Hubs producer closed');
+        
+        process.exit(0);
+    }
+    
+    getPendingCount(): number {
+        return this.pendingSends;
+    }
+}
+```
+
+### Integration Example
+
+```typescript
+import { EventHubProducerClient } from '@azure/event-hubs';
+import { DefaultAzureCredential } from '@azure/identity';
+import {
+    EventHubsProducerPool,
+    BatchEventSender,
+    RetryableEventSender,
+    CircuitBreakerEventSender,
+    RateLimitedEventSender,
+    ObservableEventSender,
+    GracefulEventSender
+} from './patterns';
+
+async function main() {
+    // 1. Get producer from pool
+    const producer = await EventHubsProducerPool.getProducer(
+        'connection-string',
+        'event-hub-name'
+    );
+    
+    // Or use Azure Identity
+    const credential = new DefaultAzureCredential();
+    const identityProducer = new EventHubProducerClient(
+        'namespace.servicebus.windows.net',
+        'event-hub-name',
+        credential
+    );
+    
+    // 2. Initialize patterns
+    const batchSender = new BatchEventSender(producer, {
+        maxBatchSize: 100,
+        lingerMs: 100
+    });
+    
+    const retrySender = new RetryableEventSender(producer, {
+        maxAttempts: 5,
+        initialDelayMs: 500
+    });
+    
+    const circuitBreaker = new CircuitBreakerEventSender(producer, {
+        failureThreshold: 5,
+        timeout: 60000
+    });
+    
+    const rateLimiter = new RateLimitedEventSender(producer, 1000);
+    
+    const observable = new ObservableEventSender(producer);
+    
+    const graceful = new GracefulEventSender(producer);
+    
+    // 3. Send events with patterns
+    const eventData = {
+        body: { temperature: 25.5, humidity: 60 },
+        properties: { deviceId: 'sensor-001' }
+    };
+    
+    // Batch sending
+    await batchSender.send(eventData);
+    
+    // Retry logic
+    await retrySender.sendWithRetry(eventData);
+    
+    // Circuit breaker
+    await circuitBreaker.send(eventData);
+    
+    // Rate limited
+    await rateLimiter.send(eventData);
+    
+    // Observable
+    await observable.send(eventData);
+    
+    // Graceful (will handle SIGTERM/SIGINT)
+    await graceful.send(eventData);
+    
+    // Flush batch
+    await batchSender.flush();
+}
+
+main().catch(console.error);
+```
+
+### Dependencies
+
+Add these packages to your `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@azure/event-hubs": "^5.11.0",
+    "@azure/identity": "^4.0.0",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/api-metrics": "^0.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+```
+
 {% endfor %}

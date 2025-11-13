@@ -1,0 +1,888 @@
+# {{ project_name | capitalize }} - Azure Service Bus Producer{%- import "util.include.jinja" as util -%}
+
+{%- set messagegroups = root.messagegroups %}
+
+Auto-generated Python producer for sending CloudEvents to Azure Service Bus queues and topics.{%- filter wordwrap(120) %}
+
+# {{ project_name | capitalize }} - Azure Event Hubs Producer
+
+## Installation
+
+Auto-generated Python producer for sending CloudEvents to Azure Event Hubs.
+
+```bash
+
+pip install azure-servicebus azure-identity cloudevents## Overview
+
+```
+
+This module provides a type-safe Event Hubs producer for sending events with CloudEvents envelope format. Built on `azure-eventhub` SDK.
+
+## Quick Start
+
+## What is Azure Event Hubs?
+
+```python
+
+from azure.identity.aio import DefaultAzureCredential**Azure Event Hubs** is a fully managed, real-time data ingestion service that:
+
+from azure.servicebus.aio import ServiceBusClient- **Scales automatically** to handle millions of events per second
+
+from {{main_project_name}}.producer import *- **Supports multiple protocols** including AMQP, Kafka, and HTTPS
+
+- **Provides event replay** with configurable retention (1-90 days)
+
+async def send_event():- **Integrates seamlessly** with Azure services and Stream Analytics
+
+    credential = DefaultAzureCredential()
+
+    servicebus_client = ServiceBusClient(Use cases: Telemetry ingestion, log aggregation, IoT data streams, event sourcing.
+
+        fully_qualified_namespace="your-namespace.servicebus.windows.net",
+
+        credential=credential## Installation
+
+    )
+
+    ```bash
+
+    producer = EventProducer(servicebus_client, queue_or_topic_name="myqueue")pip install azure-eventhub azure-identity
+
+    # Use the generated send methods```
+
+    await servicebus_client.close()
+
+```## Generated Event Producers
+
+
+
+## Build{% for messagegroupid, messagegroup in messagegroups.items() %}
+
+{%- set uses_cloudevents_message = (messagegroup | exists("envelope","CloudEvents/1.0")) %}
+
+```bash{%- set uses_plain_amqp_message = (messagegroup | exists("protocol","AMQP/1.0")) %}
+
+make build
+
+```### {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}
+
+
+
+## Test`{{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}` sends events for the {{ messagegroupid }} message group.
+
+
+
+```bash#### Quick Start
+
+make test
+
+```##### Using Connection String
+
+
+```python
+from azure.eventhub.aio import EventHubProducerClient
+from {{ project_name | snake }} import {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}
+
+async def send_event():
+    producer = EventHubProducerClient.from_connection_string(
+        conn_str="Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=...",
+        eventhub_name="your-eventhub-name"
+    )
+    
+    event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
+    
+    # Send event
+    {%- set first_message = messagegroup.messages.items() | first %}
+    {%- if first_message %}
+    {%- set messageid, message = first_message %}
+    {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+    data = {{ data_type | strip_namespace }}(...)  # Your event data
+    await event_producer.send_{{ messageid | dotunderscore | snake }}(data=data)
+    {%- endif %}
+    
+    await producer.close()
+```
+
+##### Using Azure Identity (Recommended for Production)
+
+```python
+from azure.identity.aio import DefaultAzureCredential
+from azure.eventhub.aio import EventHubProducerClient
+
+async def send_event():
+    credential = DefaultAzureCredential()
+    producer = EventHubProducerClient(
+        fully_qualified_namespace="your-namespace.servicebus.windows.net",
+        eventhub_name="your-eventhub-name",
+        credential=credential
+    )
+    
+    event_producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(producer)
+    # ... send events
+    await producer.close()
+```
+
+#### Constructor
+
+```python
+__init__(self, producer: EventHubProducerClient, content_mode: Literal['structured', 'binary'] = 'structured') -> None
+```
+
+**Args:**
+- `producer`: The EventHub producer client
+- `content_mode`: CloudEvents content mode ('structured' or 'binary')
+
+#### Event Sending Methods
+
+{% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0") )%}
+{%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
+##### `send_{{ messageid | dotunderscore | snake }}`
+
+```python
+async def send_{{ messageid | dotunderscore | snake }}(self,
+    {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
+        _{{ attrname }}: str, 
+    {%- endfor %}
+    data: {{ data_type | strip_namespace }}, content_type: str = "application/json"
+    {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
+        , _{{ attrname }}: Optional[str] = None
+    {%- endfor -%} ) -> None
+```
+
+Sends the `{{ messageid }}` event to Event Hubs.
+
+**Args:**
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
+- `_{{ attrname }}` (str): {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+{%- endfor %}
+{%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+    {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+- `_{{ placeholder | snake }}` (str): Value for placeholder {{ placeholder }} in attribute {{ attrname }}
+    {%- endfor %}
+{%- endfor %}
+- `data` ({{ data_type | strip_namespace }}): The event data to be sent
+- `content_type` (str): The content type for the event data
+{%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined %}
+- `_{{ attrname }}` (Optional[str]): {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
+{%- endfor %}
+
+**Example:**
+
+```python
+data = {{ data_type | strip_namespace }}(...)  # Construct your event data
+await event_producer.send_{{ messageid | dotunderscore | snake }}(data=data, content_type="application/json")
+```
+
+{% endfor %}
+
+## Configuration Options
+
+### Content Modes
+
+**Structured Mode (Default):** CloudEvents envelope and data both in message body
+```python
+producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(client, content_mode='structured')
+```
+
+**Binary Mode:** CloudEvents attributes in message properties, data in body
+```python
+producer = {{ (messagegroupid | pascal | strip_dots) + "EventProducer" }}(client, content_mode='binary')
+```
+
+### Partition Keys
+
+Control event distribution across partitions:
+```python
+# Events with same partition key go to same partition
+await producer.send_event(data, partition_key="device-123")
+```
+
+## Error Handling
+
+```python
+from azure.core.exceptions import HttpResponseError
+
+async def send_with_error_handling():
+    try:
+        await event_producer.send_{{ messageid | dotunderscore | snake }}(data=data)
+    except HttpResponseError as e:
+        print(f"Failed to send event: {e}")
+        # Implement retry logic or alternative handling
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise
+```
+
+## Best Practices
+
+1. **Reuse client instances** - create once, use for multiple events
+2. **Use async context managers** for automatic resource cleanup
+3. **Implement retry logic** with exponential backoff for transient failures
+4. **Use Azure Identity** instead of connection strings for production
+5. **Monitor Event Hubs metrics** in Azure Portal
+6. **Use batch sending** for high-throughput scenarios
+7. **Handle throttling** by respecting retry-after headers
+
+## Production-Ready Patterns
+
+This section provides advanced patterns for building production-grade Azure Event Hubs producers in Python.
+
+### 1. Connection Pooling with EventHubProducerClient
+
+Maintain long-lived producer instances with proper lifecycle management and connection sharing.
+
+```python
+from azure.eventhub.aio import EventHubProducerClient
+from azure.identity.aio import DefaultAzureCredential
+from typing import Dict, Optional
+import asyncio
+
+class EventHubsProducerPool:
+    """
+    Manages Event Hubs producer clients with connection pooling.
+    Reuses clients across async tasks for efficiency.
+    """
+    _lock: asyncio.Lock = asyncio.Lock()
+    _clients: Dict[str, EventHubProducerClient] = {}
+
+    @classmethod
+    async def get_client(
+        cls,
+        fully_qualified_namespace: str,
+        eventhub_name: str,
+        credential: Optional[DefaultAzureCredential] = None
+    ) -> EventHubProducerClient:
+        """
+        Get or create an Event Hubs producer client.
+        Thread-safe singleton per Event Hub.
+        """
+        key = f"{fully_qualified_namespace}/{eventhub_name}"
+        
+        async with cls._lock:
+            if key not in cls._clients:
+                if credential is None:
+                    credential = DefaultAzureCredential()
+                
+                cls._clients[key] = EventHubProducerClient(
+                    fully_qualified_namespace=fully_qualified_namespace,
+                    eventhub_name=eventhub_name,
+                    credential=credential,
+                    # Production retry settings
+                    retry_total=3,
+                    retry_backoff_factor=0.8,
+                    retry_backoff_max=60,
+                )
+        
+        return cls._clients[key]
+
+    @classmethod
+    async def close_all(cls):
+        """Close all producer clients gracefully."""
+        async with cls._lock:
+            await asyncio.gather(
+                *[client.close() for client in cls._clients.values()],
+                return_exceptions=True
+            )
+            cls._clients.clear()
+```
+
+### 2. Batch Sending for High Throughput
+
+Send events in batches to maximize throughput and reduce network overhead.
+
+```python
+from azure.eventhub import EventData, EventDataBatch
+from azure.eventhub.aio import EventHubProducerClient
+from typing import List
+import asyncio
+
+class BatchEventProducer:
+    """
+    Batches events for efficient bulk sending to Event Hubs.
+    Automatically splits into multiple batches if size limit exceeded.
+    """
+    def __init__(self, producer: EventHubProducerClient):
+        self.producer = producer
+
+    async def send_batch(
+        self, 
+        events: List[dict], 
+        partition_key: Optional[str] = None,
+        max_batch_size: int = 1000
+    ):
+        """
+        Send events in optimized batches.
+        Handles automatic batch splitting when size limit reached.
+        """
+        event_data_list = [EventData(event) for event in events]
+        
+        # Split into chunks for parallel sending
+        chunks = [
+            event_data_list[i:i + max_batch_size] 
+            for i in range(0, len(event_data_list), max_batch_size)
+        ]
+        
+        # Send chunks in parallel
+        tasks = [
+            self._send_chunk(chunk, partition_key) 
+            for chunk in chunks
+        ]
+        await asyncio.gather(*tasks)
+
+    async def _send_chunk(
+        self, 
+        events: List[EventData], 
+        partition_key: Optional[str]
+    ):
+        """Send a single chunk of events as a batch."""
+        batch: EventDataBatch = await self.producer.create_batch(
+            partition_key=partition_key
+        )
+        
+        for event in events:
+            try:
+                batch.add(event)
+            except ValueError:
+                # Batch full, send it and start a new one
+                await self.producer.send_batch(batch)
+                batch = await self.producer.create_batch(partition_key=partition_key)
+                batch.add(event)
+        
+        # Send final batch
+        if len(batch) > 0:
+            await self.producer.send_batch(batch)
+
+    async def send_with_batching(self, events: List[dict]):
+        """
+        High-throughput batch sending with optimal performance.
+        """
+        batch_size = 100
+        for i in range(0, len(events), batch_size):
+            chunk = events[i:i + batch_size]
+            await self.send_batch(chunk)
+```
+
+### 3. Retry Logic with Azure SDK Policies
+
+Leverage Azure SDK's built-in retry policies and extend with custom logic.
+
+```python
+from azure.core.exceptions import (
+    ServiceRequestError, ServiceResponseError,
+    HttpResponseError, AzureError
+)
+from azure.core.pipeline.policies import RetryPolicy, ExponentialRetry
+from tenacity import (
+    retry, stop_after_attempt, wait_exponential,
+    retry_if_exception_type, before_sleep_log
+)
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Transient errors that should trigger retries
+RETRIABLE_ERRORS = (
+    ServiceRequestError,  # Network failures
+    ServiceResponseError,  # Transient service errors
+)
+
+@retry(
+    retry=retry_if_exception_type(RETRIABLE_ERRORS),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    before_sleep=before_sleep_log(logger, logging.WARNING)
+)
+async def send_event_with_retry(producer: EventHubProducerClient, event: EventData):
+    """
+    Send event with exponential backoff retry on transient failures.
+    """
+    try:
+        await producer.send_batch([event])
+    except HttpResponseError as e:
+        # Check if error is retriable based on status code
+        if e.status_code in {408, 429, 500, 502, 503, 504}:
+            logger.warning(f"Retriable HTTP error {e.status_code}, will retry")
+            raise  # Trigger retry
+        else:
+            logger.error(f"Non-retriable HTTP error {e.status_code}")
+            raise  # Fail fast
+    except Exception as e:
+        logger.exception(f"Error sending event: {e}")
+        raise
+
+class RetryEventProducer:
+    """Event Hubs producer with advanced retry logic."""
+    
+    def __init__(self, producer: EventHubProducerClient):
+        self.producer = producer
+
+    async def send_with_exponential_backoff(self, events: List[EventData]):
+        """Send events with exponential backoff on failure."""
+        for event in events:
+            await send_event_with_retry(self.producer, event)
+```
+
+### 4. Circuit Breaker Pattern
+
+Protect Event Hubs from being overwhelmed and fail fast during outages.
+
+```python
+import pybreaker
+from typing import Callable
+
+# Circuit breaker for Event Hubs
+eventhubs_breaker = pybreaker.CircuitBreaker(
+    fail_max=5,  # Open after 5 failures
+    timeout_duration=60,  # Stay open for 60 seconds
+    exclude=[ValueError],  # Don't count validation errors
+    name='eventhubs_producer'
+)
+
+class CircuitBreakerEventProducer:
+    """Event Hubs producer with circuit breaker protection."""
+    
+    def __init__(self, producer: EventHubProducerClient):
+        self.producer = producer
+        self.breaker = eventhubs_breaker
+
+    async def send_with_circuit_breaker(self, events: List[EventData]):
+        """
+        Send events with circuit breaker protection.
+        Fails fast when circuit is open.
+        """
+        try:
+            await self.breaker.call_async(self._send_batch, events)
+        except pybreaker.CircuitBreakerError:
+            logger.error("Circuit breaker OPEN, Event Hubs unavailable")
+            # Fallback: log to dead letter storage
+            await self.log_to_fallback(events)
+            raise
+
+    async def _send_batch(self, events: List[EventData]):
+        """Internal send method protected by circuit breaker."""
+        batch = await self.producer.create_batch()
+        for event in events:
+            try:
+                batch.add(event)
+            except ValueError:
+                # Batch full, send it
+                await self.producer.send_batch(batch)
+                batch = await self.producer.create_batch()
+                batch.add(event)
+        
+        if len(batch) > 0:
+            await self.producer.send_batch(batch)
+
+    async def log_to_fallback(self, events: List[EventData]):
+        """Log events to fallback storage when circuit is open."""
+        # Implement fallback (e.g., write to blob storage)
+        pass
+```
+
+### 5. Rate Limiting with Token Bucket
+
+Control event sending rate to prevent throttling and resource exhaustion.
+
+```python
+import asyncio
+import time
+
+class TokenBucketRateLimiter:
+    """
+    Token bucket rate limiter for controlling event sending rate.
+    Allows bursts while maintaining average throughput.
+    """
+    def __init__(self, rate: float, capacity: int):
+        """
+        Args:
+            rate: Tokens added per second (events/second)
+            capacity: Maximum burst size
+        """
+        self.rate = rate
+        self.capacity = capacity
+        self.tokens = capacity
+        self.last_update = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self, tokens: int = 1):
+        """
+        Acquire tokens before sending events.
+        Blocks if insufficient tokens available.
+        """
+        async with self._lock:
+            while self.tokens < tokens:
+                now = time.monotonic()
+                elapsed = now - self.last_update
+                self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+                self.last_update = now
+                
+                if self.tokens < tokens:
+                    sleep_time = (tokens - self.tokens) / self.rate
+                    await asyncio.sleep(sleep_time)
+            
+            self.tokens -= tokens
+
+class RateLimitedEventProducer:
+    """Event Hubs producer with rate limiting."""
+    
+    def __init__(
+        self, 
+        producer: EventHubProducerClient, 
+        events_per_second: float = 1000
+    ):
+        self.producer = producer
+        self.rate_limiter = TokenBucketRateLimiter(
+            rate=events_per_second,
+            capacity=int(events_per_second * 2)  # Allow 2x burst
+        )
+
+    async def send_with_rate_limit(self, events: List[EventData]):
+        """Send events with rate limiting."""
+        for event in events:
+            await self.rate_limiter.acquire()
+            await self.producer.send_batch([event])
+```
+
+### 6. Partition Strategy for Ordering
+
+Ensure message ordering using partition keys and direct partition targeting.
+
+```python
+from azure.eventhub import EventData
+from hashlib import md5
+
+class PartitionStrategyProducer:
+    """
+    Event Hubs producer with partition strategies.
+    Ensures ordering for related events.
+    """
+    def __init__(self, producer: EventHubProducerClient):
+        self.producer = producer
+
+    async def send_with_partition_key(
+        self, 
+        event: EventData, 
+        partition_key: str
+    ):
+        """
+        Send event with partition key.
+        All events with same key go to same partition, ensuring order.
+        """
+        batch = await self.producer.create_batch(partition_key=partition_key)
+        batch.add(event)
+        await self.producer.send_batch(batch)
+
+    async def send_to_partition(self, event: EventData, partition_id: str):
+        """
+        Send directly to specific partition.
+        Use for strict ordering requirements.
+        """
+        batch = await self.producer.create_batch(partition_id=partition_id)
+        batch.add(event)
+        await self.producer.send_batch(batch)
+
+    def compute_partition_key(self, entity_id: str) -> str:
+        """
+        Compute consistent partition key from entity ID.
+        Ensures related entities always map to same partition.
+        """
+        return md5(entity_id.encode()).hexdigest()[:8]
+
+    async def send_related_events(
+        self, 
+        events: List[tuple[str, EventData]]  # (entity_id, event)
+    ):
+        """
+        Send events grouped by entity ID to maintain ordering.
+        """
+        # Group events by partition key
+        partitioned_events = {}
+        for entity_id, event in events:
+            key = self.compute_partition_key(entity_id)
+            if key not in partitioned_events:
+                partitioned_events[key] = []
+            partitioned_events[key].append(event)
+        
+        # Send each partition's events
+        tasks = [
+            self._send_partition_batch(key, events)
+            for key, events in partitioned_events.items()
+        ]
+        await asyncio.gather(*tasks)
+
+    async def _send_partition_batch(
+        self, 
+        partition_key: str, 
+        events: List[EventData]
+    ):
+        """Send batch of events to specific partition."""
+        batch = await self.producer.create_batch(partition_key=partition_key)
+        
+        for event in events:
+            try:
+                batch.add(event)
+            except ValueError:
+                # Batch full, send it
+                await self.producer.send_batch(batch)
+                batch = await self.producer.create_batch(partition_key=partition_key)
+                batch.add(event)
+        
+        if len(batch) > 0:
+            await self.producer.send_batch(batch)
+```
+
+### 7. OpenTelemetry Observability with Application Insights
+
+Instrument Event Hubs producer with distributed tracing and metrics.
+
+```python
+from opentelemetry import trace, metrics
+from opentelemetry.trace import Status, StatusCode
+from opentelemetry.propagate import inject
+from azure.monitor.opentelemetry import configure_azure_monitor
+from typing import Dict
+import time
+
+# Configure Application Insights
+configure_azure_monitor(connection_string="InstrumentationKey=...")
+
+tracer = trace.get_tracer(__name__)
+meter = metrics.get_meter(__name__)
+
+# Metrics
+events_sent = meter.create_counter(
+    "eventhubs.events.sent",
+    description="Total events sent",
+    unit="1"
+)
+send_duration = meter.create_histogram(
+    "eventhubs.send.duration",
+    description="Event send duration",
+    unit="ms"
+)
+batch_size_metric = meter.create_histogram(
+    "eventhubs.batch.size",
+    description="Events per batch",
+    unit="1"
+)
+
+class ObservableEventProducer:
+    """Event Hubs producer with OpenTelemetry tracing and Application Insights."""
+    
+    def __init__(self, producer: EventHubProducerClient, eventhub_name: str):
+        self.producer = producer
+        self.eventhub_name = eventhub_name
+
+    async def send_with_tracing(
+        self, 
+        events: List[EventData],
+        partition_key: Optional[str] = None
+    ):
+        """Send events with distributed tracing."""
+        with tracer.start_as_current_span(
+            "eventhubs.send",
+            kind=trace.SpanKind.PRODUCER
+        ) as span:
+            span.set_attribute("messaging.system", "eventhubs")
+            span.set_attribute("messaging.destination", self.eventhub_name)
+            span.set_attribute("messaging.batch.message_count", len(events))
+            
+            if partition_key:
+                span.set_attribute("messaging.eventhubs.partition_key", partition_key)
+            
+            # Inject trace context into event properties
+            for event in events:
+                carrier: Dict[str, str] = {}
+                inject(carrier)
+                event.properties.update(carrier)
+            
+            start_time = time.monotonic()
+            try:
+                batch = await self.producer.create_batch(partition_key=partition_key)
+                
+                for event in events:
+                    try:
+                        batch.add(event)
+                    except ValueError:
+                        # Batch full, send it
+                        await self.producer.send_batch(batch)
+                        batch = await self.producer.create_batch(partition_key=partition_key)
+                        batch.add(event)
+                
+                if len(batch) > 0:
+                    await self.producer.send_batch(batch)
+                
+                # Record success metrics
+                duration_ms = (time.monotonic() - start_time) * 1000
+                send_duration.record(duration_ms, {
+                    "eventhub": self.eventhub_name,
+                    "status": "success"
+                })
+                events_sent.add(len(events), {
+                    "eventhub": self.eventhub_name,
+                    "status": "success"
+                })
+                batch_size_metric.record(len(events), {
+                    "eventhub": self.eventhub_name
+                })
+                
+                span.set_status(Status(StatusCode.OK))
+                
+            except Exception as e:
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+                events_sent.add(len(events), {
+                    "eventhub": self.eventhub_name,
+                    "status": "error"
+                })
+                raise
+```
+
+### 8. Graceful Shutdown
+
+Ensure all events are sent before application termination.
+
+```python
+import signal
+import asyncio
+import atexit
+
+class GracefulEventProducer:
+    """Event Hubs producer with graceful shutdown support."""
+    
+    def __init__(self, producer: EventHubProducerClient):
+        self.producer = producer
+        self.pending_sends = set()
+        self.shutdown_event = asyncio.Event()
+        
+        # Register shutdown handlers
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        atexit.register(self._atexit_handler)
+
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals."""
+        logger.info(f"Received signal {signum}, initiating graceful shutdown")
+        self.shutdown_event.set()
+
+    def _atexit_handler(self):
+        """Handle process exit."""
+        if self.pending_sends:
+            logger.warning(f"{len(self.pending_sends)} sends still pending at exit")
+
+    async def send_with_tracking(self, events: List[EventData]):
+        """
+        Send events with tracking for graceful shutdown.
+        Ensures all sends complete before shutdown.
+        """
+        task = asyncio.create_task(self._send_batch(events))
+        self.pending_sends.add(task)
+        task.add_done_callback(self.pending_sends.discard)
+        
+        return await task
+
+    async def _send_batch(self, events: List[EventData]):
+        """Internal send method."""
+        batch = await self.producer.create_batch()
+        
+        for event in events:
+            try:
+                batch.add(event)
+            except ValueError:
+                await self.producer.send_batch(batch)
+                batch = await self.producer.create_batch()
+                batch.add(event)
+        
+        if len(batch) > 0:
+            await self.producer.send_batch(batch)
+
+    async def close(self):
+        """
+        Close producer gracefully.
+        Waits for all pending sends to complete.
+        """
+        if self.pending_sends:
+            logger.info(f"Waiting for {len(self.pending_sends)} pending sends")
+            await asyncio.gather(*self.pending_sends, return_exceptions=True)
+        
+        await self.producer.close()
+        logger.info("Producer closed gracefully")
+```
+
+### Configuration Best Practices
+
+```python
+from azure.eventhub.aio import EventHubProducerClient
+from azure.identity.aio import DefaultAzureCredential
+
+# Production-grade Event Hubs producer configuration
+async def create_production_producer():
+    """Create Event Hubs producer with production settings."""
+    credential = DefaultAzureCredential()
+    
+    producer = EventHubProducerClient(
+        fully_qualified_namespace="<namespace>.servicebus.windows.net",
+        eventhub_name="<eventhub-name>",
+        credential=credential,
+        
+        # Retry configuration
+        retry_total=3,
+        retry_backoff_factor=0.8,
+        retry_backoff_max=60,
+        
+        # Timeouts (in seconds)
+        transport_type='Amqp',  # Use AMQP for better throughput
+    )
+    
+    return producer
+```
+
+### Integration Example
+
+```python
+import asyncio
+from azure.eventhub import EventData
+from azure.identity.aio import DefaultAzureCredential
+
+async def main():
+    """Complete integration example with all patterns."""
+    credential = DefaultAzureCredential()
+    
+    # Get pooled producer client
+    producer = await EventHubsProducerPool.get_client(
+        fully_qualified_namespace="<namespace>.servicebus.windows.net",
+        eventhub_name="<eventhub-name>",
+        credential=credential
+    )
+    
+    # Initialize components
+    graceful_producer = GracefulEventProducer(producer)
+    observable_producer = ObservableEventProducer(producer, "<eventhub-name>")
+    batch_producer = BatchEventProducer(producer)
+    partition_producer = PartitionStrategyProducer(producer)
+    rate_limited_producer = RateLimitedEventProducer(producer, events_per_second=1000)
+    
+    # Prepare events
+    events = [
+        EventData({"sensor_id": "sensor-1", "temperature": 72.5}),
+        EventData({"sensor_id": "sensor-2", "temperature": 68.3}),
+    ]
+    
+    try:
+        # Send with all patterns
+        await graceful_producer.send_with_tracking(events)
+        await observable_producer.send_with_tracing(events, partition_key="sensor-group-1")
+        await batch_producer.send_batch([e.body_as_json() for e in events])
+        await rate_limited_producer.send_with_rate_limit(events)
+        
+    finally:
+        # Graceful shutdown
+        await graceful_producer.close()
+        await EventHubsProducerPool.close_all()
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+{% endfor %}
+{%- endfilter %}

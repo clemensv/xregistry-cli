@@ -114,3 +114,451 @@ public static EventData Create{{ messagename | strip_namespace }}Event(
 {%- endfor %}
 {%- endfor %}
 
+## Production-Ready Patterns
+
+This section provides production-ready patterns for building reliable Event Hubs producer applications.
+
+### 1. Connection Pooling and Reuse
+
+Event Hubs producer clients should be long-lived and reused. They are thread-safe and maintain connection pools internally:
+
+```csharp
+public class EventHubProducerPool
+{
+    private static readonly Lazy<EventHubProducerClient> _producer = new Lazy<EventHubProducerClient>(() =>
+    {
+        var connectionString = Environment.GetEnvironmentVariable("EVENTHUB_CONNECTION_STRING");
+        var eventHubName = Environment.GetEnvironmentVariable("EVENTHUB_NAME");
+        
+        var options = new EventHubProducerClientOptions
+        {
+            RetryOptions = new EventHubsRetryOptions
+            {
+                Mode = EventHubsRetryMode.Exponential,
+                MaximumRetries = 3,
+                Delay = TimeSpan.FromMilliseconds(100),
+                MaximumDelay = TimeSpan.FromSeconds(10),
+                TryTimeout = TimeSpan.FromSeconds(60)
+            },
+            ConnectionOptions = new EventHubConnectionOptions
+            {
+                TransportType = EventHubsTransportType.AmqpTcp
+            }
+        };
+
+        if (!string.IsNullOrEmpty(connectionString))
+        {
+            return new EventHubProducerClient(connectionString, eventHubName, options);
+        }
+
+        // Use Azure AD authentication
+        var credential = new DefaultAzureCredential();
+        var fullyQualifiedNamespace = Environment.GetEnvironmentVariable("EVENTHUB_NAMESPACE");
+        return new EventHubProducerClient(fullyQualifiedNamespace, eventHubName, credential, options);
+    });
+
+    public static EventHubProducerClient Instance => _producer.Value;
+}
+```
+
+### 2. Batch Sending with Automatic Sizing
+
+Use EventDataBatch for efficient batching with automatic size management:
+
+```csharp
+public async Task<int> SendBatchAsync<T>(IEnumerable<T> messages, CancellationToken cancellationToken = default)
+{
+    var producer = EventHubProducerPool.Instance;
+    int totalSent = 0;
+
+    using var currentBatch = await producer.CreateBatchAsync(cancellationToken);
+
+    foreach (var message in messages)
+    {
+        var eventData = {{ groupname }}EventFactory.Create{{ messagename | strip_namespace }}Event(message);
+
+        if (!currentBatch.TryAdd(eventData))
+        {
+            // Batch is full, send it
+            if (currentBatch.Count > 0)
+            {
+                await producer.SendAsync(currentBatch, cancellationToken);
+                totalSent += currentBatch.Count;
+                Console.WriteLine($"Sent batch of {currentBatch.Count} events");
+            }
+
+            // Start new batch and add the current event
+            using var newBatch = await producer.CreateBatchAsync(cancellationToken);
+            if (!newBatch.TryAdd(eventData))
+            {
+                throw new InvalidOperationException("Event is too large to fit in a batch");
+            }
+
+            await producer.SendAsync(newBatch, cancellationToken);
+            totalSent += newBatch.Count;
+        }
+    }
+
+    // Send remaining events
+    if (currentBatch.Count > 0)
+    {
+        await producer.SendAsync(currentBatch, cancellationToken);
+        totalSent += currentBatch.Count;
+    }
+
+    return totalSent;
+}
+```
+
+### 3. Partition Key Strategy
+
+Route related events to the same partition for ordering guarantees:
+
+```csharp
+public async Task SendWithPartitionKeyAsync<T>(T message, string partitionKey, CancellationToken cancellationToken = default)
+{
+    var producer = EventHubProducerPool.Instance;
+    var eventData = {{ groupname }}EventFactory.Create{{ messagename | strip_namespace }}Event(message);
+
+    var batchOptions = new CreateBatchOptions
+    {
+        PartitionKey = partitionKey  // Events with same key go to same partition
+    };
+
+    using var batch = await producer.CreateBatchAsync(batchOptions, cancellationToken);
+    
+    if (!batch.TryAdd(eventData))
+    {
+        throw new InvalidOperationException("Event is too large for the batch");
+    }
+
+    await producer.SendAsync(batch, cancellationToken);
+    Console.WriteLine($"Sent event to partition with key: {partitionKey}");
+}
+
+// Send to specific partition
+public async Task SendToPartitionAsync<T>(T message, string partitionId, CancellationToken cancellationToken = default)
+{
+    var producer = EventHubProducerPool.Instance;
+    var eventData = {{ groupname }}EventFactory.Create{{ messagename | strip_namespace }}Event(message);
+
+    var batchOptions = new CreateBatchOptions
+    {
+        PartitionId = partitionId  // Direct partition assignment
+    };
+
+    using var batch = await producer.CreateBatchAsync(batchOptions, cancellationToken);
+    
+    if (!batch.TryAdd(eventData))
+    {
+        throw new InvalidOperationException("Event is too large for the batch");
+    }
+
+    await producer.SendAsync(batch, cancellationToken);
+    Console.WriteLine($"Sent event to partition: {partitionId}");
+}
+```
+
+### 4. Retry Logic with Azure.Core Policies
+
+Leverage built-in Azure SDK retry mechanisms:
+
+```csharp
+using Polly;
+using Polly.Retry;
+
+public class ResilientEventHubProducer
+{
+    private readonly EventHubProducerClient _producer;
+    private readonly AsyncRetryPolicy _retryPolicy;
+
+    public ResilientEventHubProducer(EventHubProducerClient producer)
+    {
+        _producer = producer;
+
+        _retryPolicy = Policy
+            .Handle<EventHubsException>(ex => IsTransient(ex))
+            .Or<TimeoutException>()
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt => TimeSpan.FromMilliseconds(100 * Math.Pow(2, retryAttempt - 1)),
+                onRetry: (exception, timeSpan, retryCount, context) =>
+                {
+                    Console.WriteLine($"Retry {retryCount} after {timeSpan.TotalMilliseconds}ms. Error: {exception.Message}");
+                });
+    }
+
+    public async Task SendWithRetryAsync(EventData eventData, CancellationToken cancellationToken = default)
+    {
+        await _retryPolicy.ExecuteAsync(async () =>
+        {
+            using var batch = await _producer.CreateBatchAsync(cancellationToken);
+            
+            if (!batch.TryAdd(eventData))
+            {
+                throw new InvalidOperationException("Event too large for batch");
+            }
+
+            await _producer.SendAsync(batch, cancellationToken);
+        });
+    }
+
+    private static bool IsTransient(EventHubsException ex)
+    {
+        return ex.Reason switch
+        {
+            EventHubsException.FailureReason.ServiceTimeout => true,
+            EventHubsException.FailureReason.ServiceBusy => true,
+            EventHubsException.FailureReason.ServiceCommunicationProblem => true,
+            _ => false
+        };
+    }
+}
+```
+
+### 5. Circuit Breaker Pattern
+
+Prevent cascading failures when Event Hubs is unavailable:
+
+```csharp
+public class CircuitBreakerEventHubProducer
+{
+    private int _failureCount = 0;
+    private DateTime _lastFailureTime = DateTime.MinValue;
+    private readonly int _failureThreshold;
+    private readonly TimeSpan _timeout;
+    private CircuitState _state = CircuitState.Closed;
+    private readonly EventHubProducerClient _producer;
+
+    public CircuitBreakerEventHubProducer(EventHubProducerClient producer, int failureThreshold = 5, TimeSpan? timeout = null)
+    {
+        _producer = producer;
+        _failureThreshold = failureThreshold;
+        _timeout = timeout ?? TimeSpan.FromSeconds(60);
+    }
+
+    public async Task SendWithCircuitBreakerAsync(EventData eventData, CancellationToken cancellationToken = default)
+    {
+        if (_state == CircuitState.Open)
+        {
+            if (DateTime.UtcNow - _lastFailureTime >= _timeout)
+            {
+                Console.WriteLine("Circuit breaker: Transitioning to HalfOpen");
+                _state = CircuitState.HalfOpen;
+            }
+            else
+            {
+                throw new InvalidOperationException("Circuit breaker is open. Event Hubs unavailable.");
+            }
+        }
+
+        try
+        {
+            using var batch = await _producer.CreateBatchAsync(cancellationToken);
+            
+            if (!batch.TryAdd(eventData))
+            {
+                throw new InvalidOperationException("Event too large for batch");
+            }
+
+            await _producer.SendAsync(batch, cancellationToken);
+            
+            if (_state == CircuitState.HalfOpen)
+            {
+                Console.WriteLine("Circuit breaker: Success in HalfOpen, transitioning to Closed");
+                _state = CircuitState.Closed;
+                _failureCount = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            _failureCount++;
+            _lastFailureTime = DateTime.UtcNow;
+
+            if (_failureCount >= _failureThreshold)
+            {
+                Console.WriteLine($"Circuit breaker: Threshold ({_failureThreshold}) reached, opening circuit");
+                _state = CircuitState.Open;
+            }
+
+            throw;
+        }
+    }
+
+    private enum CircuitState { Closed, Open, HalfOpen }
+}
+```
+
+### 6. Rate Limiting
+
+Control send rate to avoid throttling:
+
+```csharp
+public class RateLimitedEventHubProducer
+{
+    private readonly SemaphoreSlim _semaphore;
+    private readonly EventHubProducerClient _producer;
+
+    public RateLimitedEventHubProducer(EventHubProducerClient producer, int maxConcurrentSends = 100)
+    {
+        _producer = producer;
+        _semaphore = new SemaphoreSlim(maxConcurrentSends, maxConcurrentSends);
+    }
+
+    public async Task SendAsync(EventData eventData, CancellationToken cancellationToken = default)
+    {
+        await _semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var batch = await _producer.CreateBatchAsync(cancellationToken);
+            
+            if (!batch.TryAdd(eventData))
+            {
+                throw new InvalidOperationException("Event too large for batch");
+            }
+
+            await _producer.SendAsync(batch, cancellationToken);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+}
+```
+
+### 7. Application Insights Integration
+
+Deep observability with Azure Application Insights:
+
+```csharp
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.DataContracts;
+using Microsoft.ApplicationInsights.Extensibility;
+
+public class ObservableEventHubProducer
+{
+    private readonly TelemetryClient _telemetry;
+    private readonly EventHubProducerClient _producer;
+
+    public ObservableEventHubProducer(EventHubProducerClient producer, string instrumentationKey)
+    {
+        _producer = producer;
+        var config = TelemetryConfiguration.CreateDefault();
+        config.ConnectionString = $"InstrumentationKey={instrumentationKey}";
+        _telemetry = new TelemetryClient(config);
+    }
+
+    public async Task SendWithTelemetryAsync<T>(T message, CancellationToken cancellationToken = default)
+    {
+        using var operation = _telemetry.StartOperation<DependencyTelemetry>("EventHubs-Send");
+        operation.Telemetry.Type = "Azure Event Hubs";
+        operation.Telemetry.Target = _producer.EventHubName;
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var eventData = {{ groupname }}EventFactory.Create{{ messagename | strip_namespace }}Event(message);
+            
+            using var batch = await _producer.CreateBatchAsync(cancellationToken);
+            if (!batch.TryAdd(eventData))
+            {
+                throw new InvalidOperationException("Event too large for batch");
+            }
+
+            await _producer.SendAsync(batch, cancellationToken);
+            
+            stopwatch.Stop();
+            operation.Telemetry.Success = true;
+            operation.Telemetry.Duration = stopwatch.Elapsed;
+
+            _telemetry.TrackMetric("EventHubs.EventsSent", 1, 
+                new Dictionary<string, string> { { "EventHub", _producer.EventHubName } });
+            
+            _telemetry.TrackMetric("EventHubs.SendDuration", stopwatch.Elapsed.TotalMilliseconds,
+                new Dictionary<string, string> { { "EventHub", _producer.EventHubName } });
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            operation.Telemetry.Success = false;
+            operation.Telemetry.Duration = stopwatch.Elapsed;
+            
+            _telemetry.TrackException(ex, new Dictionary<string, string>
+            {
+                { "EventHub", _producer.EventHubName },
+                { "Operation", "Send" }
+            });
+            
+            throw;
+        }
+    }
+}
+```
+
+### 8. Metrics Collection
+
+Track producer metrics with System.Diagnostics.Metrics:
+
+```csharp
+using System.Diagnostics.Metrics;
+
+public class MetricsEventHubProducer
+{
+    private static readonly Meter Meter = new Meter("MyApp.EventHubs.Producer", "1.0.0");
+    private static readonly Counter<long> EventsSent = Meter.CreateCounter<long>(
+        "eventhubs.producer.events.sent",
+        "events",
+        "Number of events sent");
+    
+    private static readonly Counter<long> SendErrors = Meter.CreateCounter<long>(
+        "eventhubs.producer.errors",
+        "errors",
+        "Number of send errors");
+    
+    private static readonly Histogram<double> SendDuration = Meter.CreateHistogram<double>(
+        "eventhubs.producer.send.duration",
+        "ms",
+        "Duration of send operations");
+
+    private readonly EventHubProducerClient _producer;
+
+    public MetricsEventHubProducer(EventHubProducerClient producer)
+    {
+        _producer = producer;
+    }
+
+    public async Task SendWithMetricsAsync(EventData eventData, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var tags = new TagList { { "eventhub", _producer.EventHubName } };
+
+        try
+        {
+            using var batch = await _producer.CreateBatchAsync(cancellationToken);
+            
+            if (!batch.TryAdd(eventData))
+            {
+                throw new InvalidOperationException("Event too large for batch");
+            }
+
+            await _producer.SendAsync(batch, cancellationToken);
+            
+            stopwatch.Stop();
+            EventsSent.Add(1, tags);
+            SendDuration.Record(stopwatch.Elapsed.TotalMilliseconds, tags);
+        }
+        catch (Exception)
+        {
+            stopwatch.Stop();
+            SendErrors.Add(1, tags);
+            SendDuration.Record(stopwatch.Elapsed.TotalMilliseconds, tags);
+            throw;
+        }
+    }
+}
+```
+
+## Testing
+

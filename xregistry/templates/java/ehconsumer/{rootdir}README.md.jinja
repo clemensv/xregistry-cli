@@ -245,6 +245,1002 @@ class {{ class_name }}Test {
 - [CloudEvents Specification](https://cloudevents.io/)
 - [xRegistry CLI Documentation](https://github.com/clemensv/xregistry-cli)
 
+## Production-Ready Patterns
+
+This section provides best-practice patterns for building production-grade Event Hubs consumers in Java.
+
+### 1. Connection Management with Processor Pool
+
+Maintain efficient processor lifecycle with proper resource management.
+
+```java
+import com.azure.messaging.eventhubs.*;
+import com.azure.storage.blob.BlobContainerAsyncClient;
+import com.azure.identity.DefaultAzureCredential;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class ManagedEventHubsConsumer {
+    private final EventProcessorClient processor;
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private static final ConcurrentHashMap<String, ManagedEventHubsConsumer> consumers = 
+        new ConcurrentHashMap<>();
+    
+    private ManagedEventHubsConsumer(
+        String fullyQualifiedNamespace,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore
+    ) {
+        this.processor = new EventProcessorClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .consumerGroup(consumerGroup)
+            .checkpointStore(new BlobCheckpointStore(checkpointStore))
+            .credential(new DefaultAzureCredential())
+            .processEvent(this::processEvent)
+            .processError(this::processError)
+            .processPartitionInitialization(this::onPartitionInit)
+            .processPartitionClose(this::onPartitionClose)
+            .prefetchCount(300)
+            .buildEventProcessorClient();
+    }
+    
+    /**
+     * Get or create managed consumer (singleton per consumer group).
+     */
+    public static ManagedEventHubsConsumer getConsumer(
+        String fullyQualifiedNamespace,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore
+    ) {
+        String key = fullyQualifiedNamespace + "/" + eventHubName + "/" + consumerGroup;
+        
+        return consumers.computeIfAbsent(key, k -> 
+            new ManagedEventHubsConsumer(
+                fullyQualifiedNamespace, eventHubName, consumerGroup, checkpointStore
+            )
+        );
+    }
+    
+    /**
+     * Start processing events.
+     */
+    public void start() {
+        if (running.compareAndSet(false, true)) {
+            processor.start();
+            System.out.println("Event processor started");
+        } else {
+            System.out.println("Event processor already running");
+        }
+    }
+    
+    /**
+     * Stop processing gracefully.
+     */
+    public void stop() {
+        if (running.compareAndSet(true, false)) {
+            processor.stop();
+            System.out.println("Event processor stopped");
+        }
+    }
+    
+    private void processEvent(EventContext context) {
+        EventData event = context.getEventData();
+        System.out.println("Partition: " + context.getPartitionContext().getPartitionId() + 
+            ", Offset: " + event.getOffset());
+        
+        // Process event...
+        
+        // Checkpoint
+        context.updateCheckpoint();
+    }
+    
+    private void processError(ErrorContext context) {
+        System.err.println("Error processing partition " + 
+            context.getPartitionContext().getPartitionId() + 
+            ": " + context.getThrowable().getMessage());
+    }
+    
+    private void onPartitionInit(InitializationContext context) {
+        System.out.println("Started partition: " + 
+            context.getPartitionContext().getPartitionId());
+    }
+    
+    private void onPartitionClose(CloseContext context) {
+        System.out.println("Stopped partition: " + 
+            context.getPartitionContext().getPartitionId() + 
+            ", Reason: " + context.getCloseReason());
+    }
+    
+    /**
+     * Shutdown all consumers gracefully.
+     */
+    public static void shutdownAll() {
+        consumers.values().forEach(ManagedEventHubsConsumer::stop);
+        consumers.clear();
+    }
+    
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(ManagedEventHubsConsumer::shutdownAll));
+    }
+}
+```
+
+### 2. Batch Processing with Checkpointing
+
+Process events in batches for better throughput and checkpoint efficiency.
+
+```java
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class BatchEventHubsConsumer {
+    private final EventProcessorClient processor;
+    private final ConcurrentHashMap<String, BatchContext> partitionBatches = 
+        new ConcurrentHashMap<>();
+    private final int batchSize;
+    private final Duration batchTimeout;
+    
+    private static class BatchContext {
+        final ConcurrentLinkedQueue<EventData> events = new ConcurrentLinkedQueue<>();
+        Instant lastFlush = Instant.now();
+        EventContext lastContext;
+    }
+    
+    public BatchEventHubsConsumer(
+        String connectionString,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore,
+        int batchSize,
+        Duration batchTimeout
+    ) {
+        this.batchSize = batchSize;
+        this.batchTimeout = batchTimeout;
+        
+        this.processor = new EventProcessorClientBuilder()
+            .connectionString(connectionString, eventHubName)
+            .consumerGroup(consumerGroup)
+            .checkpointStore(new BlobCheckpointStore(checkpointStore))
+            .processEvent(this::bufferEvent)
+            .processError(this::processError)
+            .buildEventProcessorClient();
+        
+        // Periodic flush for timeout-based batching
+        new Thread(this::periodicFlush, "batch-flusher").start();
+    }
+    
+    /**
+     * Buffer event for batch processing.
+     */
+    private void bufferEvent(EventContext context) {
+        String partitionId = context.getPartitionContext().getPartitionId();
+        BatchContext batch = partitionBatches.computeIfAbsent(
+            partitionId, 
+            k -> new BatchContext()
+        );
+        
+        batch.events.add(context.getEventData());
+        batch.lastContext = context;
+        
+        // Flush if batch size reached
+        if (batch.events.size() >= batchSize) {
+            flushBatch(partitionId, batch);
+        }
+    }
+    
+    /**
+     * Periodic flush for timeout-based batching.
+     */
+    private void periodicFlush() {
+        while (true) {
+            try {
+                Thread.sleep(batchTimeout.toMillis() / 2);
+                
+                partitionBatches.forEach((partitionId, batch) -> {
+                    Duration age = Duration.between(batch.lastFlush, Instant.now());
+                    
+                    if (!batch.events.isEmpty() && age.compareTo(batchTimeout) >= 0) {
+                        flushBatch(partitionId, batch);
+                    }
+                });
+                
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+    }
+    
+    /**
+     * Flush batch and checkpoint.
+     */
+    private synchronized void flushBatch(String partitionId, BatchContext batch) {
+        if (batch.events.isEmpty()) {
+            return;
+        }
+        
+        List<EventData> eventList = batch.events.stream()
+            .collect(Collectors.toList());
+        
+        try {
+            // Process batch
+            processBatch(partitionId, eventList);
+            
+            // Checkpoint after successful batch processing
+            if (batch.lastContext != null) {
+                batch.lastContext.updateCheckpoint();
+                System.out.println("Partition " + partitionId + 
+                    ": Processed batch of " + eventList.size() + " events");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Batch processing failed for partition " + partitionId + 
+                ": " + e.getMessage());
+            // Don't checkpoint - will retry events
+        } finally {
+            batch.events.clear();
+            batch.lastFlush = Instant.now();
+        }
+    }
+    
+    /**
+     * Process batch of events.
+     * Override this method for custom batch processing logic.
+     */
+    protected void processBatch(String partitionId, List<EventData> events) {
+        // Custom batch processing logic
+        events.forEach(event -> {
+            System.out.println("Processing event: " + event.getSequenceNumber());
+        });
+    }
+    
+    private void processError(ErrorContext context) {
+        System.err.println("Error: " + context.getThrowable().getMessage());
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        // Flush all pending batches
+        partitionBatches.forEach(this::flushBatch);
+        processor.stop();
+    }
+}
+```
+
+### 3. Retry Logic with Dead Letter Queue
+
+Implement retry with exponential backoff and DLQ for failed events.
+
+```java
+import io.github.resilience4j.retry.*;
+import com.azure.messaging.eventhubs.EventHubProducerClient;
+
+public class RetryableEventHubsConsumer {
+    private final EventProcessorClient processor;
+    private final Retry retry;
+    private final EventHubProducerClient dlqProducer;
+    private final String dlqEventHub;
+    
+    public RetryableEventHubsConsumer(
+        String connectionString,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore,
+        EventHubProducerClient dlqProducer,
+        String dlqEventHub
+    ) {
+        this.dlqProducer = dlqProducer;
+        this.dlqEventHub = dlqEventHub;
+        
+        // Configure retry for transient failures
+        RetryConfig config = RetryConfig.custom()
+            .maxAttempts(5)
+            .waitDuration(Duration.ofMillis(500))
+            .exponentialBackoffMultiplier(2.0)
+            .retryExceptions(
+                com.azure.core.exception.AzureException.class,
+                java.net.SocketException.class
+            )
+            .ignoreExceptions(
+                IllegalArgumentException.class
+            )
+            .build();
+        
+        this.retry = Retry.of("eventhubs-consumer", config);
+        
+        // Log retry attempts
+        retry.getEventPublisher()
+            .onRetry(event -> 
+                System.err.println("Retry attempt " + event.getNumberOfRetryAttempts())
+            );
+        
+        this.processor = new EventProcessorClientBuilder()
+            .connectionString(connectionString, eventHubName)
+            .consumerGroup(consumerGroup)
+            .checkpointStore(new BlobCheckpointStore(checkpointStore))
+            .processEvent(this::processWithRetry)
+            .processError(this::processError)
+            .buildEventProcessorClient();
+    }
+    
+    /**
+     * Process event with automatic retry.
+     */
+    private void processWithRetry(EventContext context) {
+        try {
+            retry.executeRunnable(() -> {
+                processEvent(context.getEventData());
+            });
+            
+            // Success - checkpoint
+            context.updateCheckpoint();
+            
+        } catch (Exception e) {
+            System.err.println("All retries exhausted, sending to DLQ: " + 
+                e.getMessage());
+            
+            // Send to DLQ
+            sendToDLQ(context.getEventData(), e.getMessage());
+            
+            // Checkpoint to move past failed event
+            context.updateCheckpoint();
+        }
+    }
+    
+    /**
+     * Process individual event.
+     * Override for custom processing logic.
+     */
+    protected void processEvent(EventData event) {
+        // Custom processing logic
+        System.out.println("Processing: " + event.getSequenceNumber());
+    }
+    
+    /**
+     * Send failed event to dead letter queue.
+     */
+    private void sendToDLQ(EventData originalEvent, String errorReason) {
+        try {
+            // Copy original event data
+            EventData dlqEvent = new EventData(originalEvent.getBody());
+            
+            // Add failure metadata
+            dlqEvent.getProperties().put("dlq-reason", errorReason);
+            dlqEvent.getProperties().put("dlq-timestamp", 
+                Instant.now().toString());
+            dlqEvent.getProperties().put("original-offset", 
+                originalEvent.getOffset().toString());
+            dlqEvent.getProperties().put("original-sequence", 
+                String.valueOf(originalEvent.getSequenceNumber()));
+            
+            // Send to DLQ Event Hub
+            dlqProducer.send(List.of(dlqEvent));
+            
+            System.out.println("Sent to DLQ: " + dlqEventHub);
+            
+        } catch (Exception e) {
+            System.err.println("Failed to send to DLQ: " + e.getMessage());
+        }
+    }
+    
+    private void processError(ErrorContext context) {
+        System.err.println("Error: " + context.getThrowable().getMessage());
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        processor.stop();
+        dlqProducer.close();
+    }
+}
+```
+
+### 4. Circuit Breaker for Downstream Protection
+
+Protect downstream services from being overwhelmed during consumer processing.
+
+```java
+import io.github.resilience4j.circuitbreaker.*;
+
+public class CircuitBreakerEventHubsConsumer {
+    private final EventProcessorClient processor;
+    private final CircuitBreaker circuitBreaker;
+    private final EventHubProducerClient fallbackProducer;
+    
+    public CircuitBreakerEventHubsConsumer(
+        String connectionString,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore,
+        EventHubProducerClient fallbackProducer
+    ) {
+        this.fallbackProducer = fallbackProducer;
+        
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+            .failureRateThreshold(50.0f)
+            .waitDurationInOpenState(Duration.ofSeconds(60))
+            .slidingWindowSize(20)
+            .minimumNumberOfCalls(10)
+            .permittedNumberOfCallsInHalfOpenState(5)
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            .build();
+        
+        this.circuitBreaker = CircuitBreaker.of("eventhubs-consumer", config);
+        
+        // Event logging
+        circuitBreaker.getEventPublisher()
+            .onStateTransition(event -> 
+                System.err.println("Circuit breaker: " + event.getStateTransition())
+            );
+        
+        this.processor = new EventProcessorClientBuilder()
+            .connectionString(connectionString, eventHubName)
+            .consumerGroup(consumerGroup)
+            .checkpointStore(new BlobCheckpointStore(checkpointStore))
+            .processEvent(this::processWithCircuitBreaker)
+            .processError(this::processError)
+            .buildEventProcessorClient();
+    }
+    
+    /**
+     * Process event with circuit breaker protection.
+     */
+    private void processWithCircuitBreaker(EventContext context) {
+        try {
+            circuitBreaker.executeRunnable(() -> {
+                processEvent(context.getEventData());
+            });
+            
+            context.updateCheckpoint();
+            
+        } catch (CallNotPermittedException e) {
+            System.err.println("Circuit OPEN, using fallback");
+            
+            // Fallback: store in alternative Event Hub
+            EventData fallbackEvent = new EventData(context.getEventData().getBody());
+            fallbackEvent.getProperties().put("fallback-reason", "circuit-open");
+            fallbackEvent.getProperties().put("fallback-timestamp", 
+                Instant.now().toString());
+            
+            fallbackProducer.send(List.of(fallbackEvent));
+            
+            // Checkpoint to continue processing
+            context.updateCheckpoint();
+            
+        } catch (Exception e) {
+            System.err.println("Processing failed: " + e.getMessage());
+            // Don't checkpoint - will retry
+        }
+    }
+    
+    protected void processEvent(EventData event) {
+        // Custom processing logic
+        System.out.println("Processing: " + event.getSequenceNumber());
+    }
+    
+    private void processError(ErrorContext context) {
+        System.err.println("Error: " + context.getThrowable().getMessage());
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        processor.stop();
+        fallbackProducer.close();
+    }
+}
+```
+
+### 5. Rate Limiting with Backpressure
+
+Control event processing rate to prevent overwhelming downstream systems.
+
+```java
+import com.google.common.util.concurrent.RateLimiter;
+import java.util.concurrent.*;
+
+public class RateLimitedEventHubsConsumer {
+    private final EventProcessorClient processor;
+    private final RateLimiter rateLimiter;
+    private final Semaphore backpressure;
+    private final ExecutorService executor;
+    
+    public RateLimitedEventHubsConsumer(
+        String connectionString,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore,
+        double eventsPerSecond,
+        int maxConcurrent
+    ) {
+        this.rateLimiter = RateLimiter.create(eventsPerSecond);
+        this.backpressure = new Semaphore(maxConcurrent);
+        this.executor = Executors.newFixedThreadPool(maxConcurrent);
+        
+        this.processor = new EventProcessorClientBuilder()
+            .connectionString(connectionString, eventHubName)
+            .consumerGroup(consumerGroup)
+            .checkpointStore(new BlobCheckpointStore(checkpointStore))
+            .processEvent(this::processWithRateLimit)
+            .processError(this::processError)
+            .buildEventProcessorClient();
+    }
+    
+    /**
+     * Process event with rate limiting and backpressure.
+     */
+    private void processWithRateLimit(EventContext context) {
+        // Apply rate limit (blocks if necessary)
+        rateLimiter.acquire();
+        
+        // Apply backpressure control
+        try {
+            backpressure.acquire();
+            
+            // Process async with concurrency limit
+            CompletableFuture.runAsync(() -> {
+                try {
+                    processEvent(context.getEventData());
+                    context.updateCheckpoint();
+                } catch (Exception e) {
+                    System.err.println("Processing failed: " + e.getMessage());
+                } finally {
+                    backpressure.release();
+                }
+            }, executor);
+            
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.err.println("Backpressure interrupted");
+        }
+    }
+    
+    protected void processEvent(EventData event) {
+        // Custom processing logic
+        System.out.println("Processing: " + event.getSequenceNumber());
+    }
+    
+    private void processError(ErrorContext context) {
+        System.err.println("Error: " + context.getThrowable().getMessage());
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        processor.stop();
+        executor.shutdown();
+        try {
+            executor.awaitTermination(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+        }
+    }
+}
+```
+
+### 6. OpenTelemetry Observability
+
+Instrument Event Hubs consumer with distributed tracing and metrics.
+
+```java
+import io.opentelemetry.api.*;
+import io.opentelemetry.api.trace.*;
+import io.opentelemetry.api.metrics.*;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapGetter;
+
+public class ObservableEventHubsConsumer {
+    private final EventProcessorClient processor;
+    private final Tracer tracer;
+    private final LongCounter eventsProcessed;
+    private final LongHistogram processingDuration;
+    private final OpenTelemetry openTelemetry;
+    
+    public ObservableEventHubsConsumer(
+        String connectionString,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore,
+        OpenTelemetry openTelemetry
+    ) {
+        this.openTelemetry = openTelemetry;
+        this.tracer = openTelemetry.getTracer("eventhubs-consumer");
+        
+        Meter meter = openTelemetry.getMeter("eventhubs-consumer");
+        this.eventsProcessed = meter
+            .counterBuilder("eventhubs.events.processed")
+            .setDescription("Total events processed")
+            .build();
+        
+        this.processingDuration = meter
+            .histogramBuilder("eventhubs.processing.duration")
+            .setDescription("Event processing duration")
+            .setUnit("ms")
+            .ofLongs()
+            .build();
+        
+        this.processor = new EventProcessorClientBuilder()
+            .connectionString(connectionString, eventHubName)
+            .consumerGroup(consumerGroup)
+            .checkpointStore(new BlobCheckpointStore(checkpointStore))
+            .processEvent(this::processWithTracing)
+            .processError(this::processError)
+            .buildEventProcessorClient();
+    }
+    
+    /**
+     * Process event with distributed tracing.
+     */
+    private void processWithTracing(EventContext context) {
+        EventData event = context.getEventData();
+        String partitionId = context.getPartitionContext().getPartitionId();
+        
+        // Extract trace context from event properties
+        Context extractedContext = openTelemetry.getPropagators()
+            .getTextMapPropagator()
+            .extract(Context.current(), event.getProperties(), 
+                new EventDataPropertiesGetter());
+        
+        Span span = tracer.spanBuilder("eventhubs.receive")
+            .setParent(extractedContext)
+            .setSpanKind(SpanKind.CONSUMER)
+            .setAttribute("messaging.system", "eventhubs")
+            .setAttribute("messaging.destination", 
+                context.getPartitionContext().getEventHubName())
+            .setAttribute("messaging.eventhubs.partition_id", partitionId)
+            .setAttribute("messaging.message.offset", event.getOffset().toString())
+            .setAttribute("messaging.message.sequence_number", event.getSequenceNumber())
+            .startSpan();
+        
+        long startTime = System.currentTimeMillis();
+        
+        try (Scope scope = span.makeCurrent()) {
+            processEvent(event);
+            
+            context.updateCheckpoint();
+            
+            long duration = System.currentTimeMillis() - startTime;
+            
+            span.setStatus(StatusCode.OK);
+            span.setAttribute("messaging.operation", "process");
+            
+            eventsProcessed.add(1,
+                Attributes.of(
+                    AttributeKey.stringKey("partition"), partitionId,
+                    AttributeKey.stringKey("status"), "success"
+                ));
+            
+            processingDuration.record(duration,
+                Attributes.of(
+                    AttributeKey.stringKey("partition"), partitionId
+                ));
+            
+        } catch (Exception e) {
+            span.recordException(e);
+            span.setStatus(StatusCode.ERROR, e.getMessage());
+            
+            eventsProcessed.add(1,
+                Attributes.of(
+                    AttributeKey.stringKey("partition"), partitionId,
+                    AttributeKey.stringKey("status"), "error"
+                ));
+            
+        } finally {
+            span.end();
+        }
+    }
+    
+    protected void processEvent(EventData event) {
+        // Custom processing logic
+        System.out.println("Processing: " + event.getSequenceNumber());
+    }
+    
+    private void processError(ErrorContext context) {
+        System.err.println("Error: " + context.getThrowable().getMessage());
+    }
+    
+    // TextMapGetter for extracting trace context from EventData properties
+    private static class EventDataPropertiesGetter 
+        implements TextMapGetter<Map<String, Object>> {
+        
+        @Override
+        public Iterable<String> keys(Map<String, Object> carrier) {
+            return carrier.keySet();
+        }
+        
+        @Override
+        public String get(Map<String, Object> carrier, String key) {
+            Object value = carrier.get(key);
+            return value != null ? value.toString() : null;
+        }
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public void stop() {
+        processor.stop();
+    }
+}
+```
+
+### 7. Graceful Shutdown
+
+Ensure all events are processed and checkpointed before shutdown.
+
+```java
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class GracefulEventHubsConsumer {
+    private final EventProcessorClient processor;
+    private final AtomicInteger inFlightEvents = new AtomicInteger(0);
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private volatile boolean shuttingDown = false;
+    
+    public GracefulEventHubsConsumer(
+        String connectionString,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore
+    ) {
+        this.processor = new EventProcessorClientBuilder()
+            .connectionString(connectionString, eventHubName)
+            .consumerGroup(consumerGroup)
+            .checkpointStore(new BlobCheckpointStore(checkpointStore))
+            .processEvent(this::processEvent)
+            .processError(this::processError)
+            .buildEventProcessorClient();
+        
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+    }
+    
+    /**
+     * Process event with in-flight tracking.
+     */
+    private void processEvent(EventContext context) {
+        if (shuttingDown) {
+            System.out.println("Shutdown in progress, skipping event");
+            return;
+        }
+        
+        inFlightEvents.incrementAndGet();
+        
+        try {
+            // Process event
+            EventData event = context.getEventData();
+            System.out.println("Processing: " + event.getSequenceNumber());
+            
+            // Checkpoint
+            context.updateCheckpoint();
+            
+        } catch (Exception e) {
+            System.err.println("Processing failed: " + e.getMessage());
+        } finally {
+            inFlightEvents.decrementAndGet();
+        }
+    }
+    
+    private void processError(ErrorContext context) {
+        System.err.println("Error: " + context.getThrowable().getMessage());
+    }
+    
+    /**
+     * Graceful shutdown: wait for in-flight events, then stop.
+     */
+    public void shutdown() {
+        if (shuttingDown) {
+            return;
+        }
+        
+        shuttingDown = true;
+        System.out.println("Initiating graceful shutdown...");
+        
+        try {
+            // Wait for in-flight events (up to 30 seconds)
+            long timeout = 30000;
+            long start = System.currentTimeMillis();
+            
+            while (inFlightEvents.get() > 0 && 
+                   System.currentTimeMillis() - start < timeout) {
+                System.out.println("Waiting for " + inFlightEvents.get() + 
+                    " in-flight events...");
+                TimeUnit.SECONDS.sleep(1);
+            }
+            
+            if (inFlightEvents.get() > 0) {
+                System.err.println("Timeout: " + inFlightEvents.get() + 
+                    " events still in-flight");
+            } else {
+                System.out.println("All events processed");
+            }
+            
+            // Stop processor
+            processor.stop();
+            System.out.println("Event processor stopped");
+            
+        } catch (Exception e) {
+            System.err.println("Error during shutdown: " + e.getMessage());
+        } finally {
+            shutdownLatch.countDown();
+        }
+    }
+    
+    /**
+     * Wait for shutdown to complete.
+     */
+    public void awaitShutdown() throws InterruptedException {
+        shutdownLatch.await();
+    }
+    
+    public void start() {
+        processor.start();
+    }
+    
+    public int getInFlightCount() {
+        return inFlightEvents.get();
+    }
+}
+```
+
+### Configuration Best Practices
+
+```java
+public class EventHubsConsumerConfig {
+    public static EventProcessorClient createProductionProcessor(
+        String fullyQualifiedNamespace,
+        String eventHubName,
+        String consumerGroup,
+        BlobContainerAsyncClient checkpointStore
+    ) {
+        return new EventProcessorClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName(eventHubName)
+            .consumerGroup(consumerGroup)
+            .checkpointStore(new BlobCheckpointStore(checkpointStore))
+            .credential(new DefaultAzureCredential())
+            
+            // Performance tuning
+            .prefetchCount(300)              // Prefetch 300 events per partition
+            .maxBatchSize(100)               // Max 100 events per batch
+            .maxWaitTime(Duration.ofSeconds(60))  // Max wait for batch
+            
+            // Retry configuration
+            .retry(new ExponentialBackoffOptions()
+                .setMaxRetries(3)
+                .setBaseDelay(Duration.ofSeconds(1))
+                .setMaxDelay(Duration.ofSeconds(30)))
+            
+            // Event handlers
+            .processEvent(context -> {
+                // Process event
+            })
+            .processError(context -> {
+                System.err.println("Error: " + context.getThrowable().getMessage());
+            })
+            .processPartitionInitialization(context -> {
+                System.out.println("Started partition: " + 
+                    context.getPartitionContext().getPartitionId());
+            })
+            .processPartitionClose(context -> {
+                System.out.println("Stopped partition: " + 
+                    context.getPartitionContext().getPartitionId());
+            })
+            
+            .buildEventProcessorClient();
+    }
+}
+```
+
+### Integration Example
+
+```java
+import com.azure.storage.blob.BlobContainerAsyncClient;
+import com.azure.storage.blob.BlobContainerClientBuilder;
+import io.opentelemetry.api.OpenTelemetry;
+
+public class ProductionEventHubsConsumer {
+    public static void main(String[] args) throws Exception {
+        String fullyQualifiedNamespace = "myhub.servicebus.windows.net";
+        String eventHubName = "telemetry";
+        String consumerGroup = "$Default";
+        
+        // Checkpoint store
+        BlobContainerAsyncClient checkpointStore = 
+            new BlobContainerClientBuilder()
+                .connectionString(System.getenv("STORAGE_CONNECTION_STRING"))
+                .containerName("checkpoints")
+                .buildAsyncClient();
+        
+        // DLQ producer
+        EventHubProducerClient dlqProducer = new EventHubClientBuilder()
+            .fullyQualifiedNamespace(fullyQualifiedNamespace)
+            .eventHubName("telemetry-dlq")
+            .credential(new DefaultAzureCredential())
+            .buildProducerClient();
+        
+        // OpenTelemetry setup
+        OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+            .setTracerProvider(tracerProvider)
+            .setMeterProvider(meterProvider)
+            .buildAndRegisterGlobal();
+        
+        // Create managed consumer with all patterns
+        ManagedEventHubsConsumer managedConsumer = 
+            ManagedEventHubsConsumer.getConsumer(
+                fullyQualifiedNamespace, eventHubName, consumerGroup, checkpointStore
+            );
+        
+        // Wrap with additional patterns
+        RetryableEventHubsConsumer retryConsumer = 
+            new RetryableEventHubsConsumer(
+                connectionString, eventHubName, consumerGroup, 
+                checkpointStore, dlqProducer, "telemetry-dlq"
+            );
+        
+        BatchEventHubsConsumer batchConsumer = 
+            new BatchEventHubsConsumer(
+                connectionString, eventHubName, consumerGroup,
+                checkpointStore, 100, Duration.ofSeconds(30)
+            );
+        
+        RateLimitedEventHubsConsumer rateLimitedConsumer = 
+            new RateLimitedEventHubsConsumer(
+                connectionString, eventHubName, consumerGroup,
+                checkpointStore, 1000.0, 50  // 1000 events/sec, 50 concurrent
+            );
+        
+        ObservableEventHubsConsumer observableConsumer = 
+            new ObservableEventHubsConsumer(
+                connectionString, eventHubName, consumerGroup,
+                checkpointStore, openTelemetry
+            );
+        
+        GracefulEventHubsConsumer gracefulConsumer = 
+            new GracefulEventHubsConsumer(
+                connectionString, eventHubName, consumerGroup, checkpointStore
+            );
+        
+        // Start all processors
+        managedConsumer.start();
+        retryConsumer.start();
+        batchConsumer.start();
+        rateLimitedConsumer.start();
+        observableConsumer.start();
+        gracefulConsumer.start();
+        
+        // Wait for shutdown signal
+        gracefulConsumer.awaitShutdown();
+        
+        // Stop all processors
+        managedConsumer.stop();
+        retryConsumer.stop();
+        batchConsumer.stop();
+        rateLimitedConsumer.stop();
+        observableConsumer.stop();
+    }
+}
+```
+
 ## Generated Code
 
 This code was auto-generated by [xRegistry CLI](https://github.com/clemensv/xregistry-cli).
