@@ -209,6 +209,8 @@ namespace {{ project_name | pascal }}.Test
         {
             var dispatcher = new global::{{project_name | pascal}}.{{ pascal_group_name }}.{{ pascal_group_name | strip_namespace}}EventDispatcher();
             var messageHandled = new TaskCompletionSource<bool>();
+            var receivedCount = 0;
+            var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
 
             dispatcher.{{ messagename }}Async += async (message, cloudEvent, eventData) =>
             {
@@ -228,9 +230,16 @@ namespace {{ project_name | pascal }}.Test
                     {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
                     {%- if message_body_type != "byte[]" %}
                     Assert.NotNull(eventData);
+                    receivedMessages.Add(eventData);
+                    {%- else %}
+                    receivedMessages.Add(message);
                     {%- endif %}
 
-                    messageHandled.SetResult(true);
+                    Interlocked.Increment(ref receivedCount);
+                    if (receivedCount >= 5)
+                    {
+                        messageHandled.SetResult(true);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -255,7 +264,7 @@ namespace {{ project_name | pascal }}.Test
             await processor.StartProcessingAsync();
             _logger.LogInformation("Processor started for {{ messagename }} event.");
 
-            // Send test message
+            // Send 5 test messages
             var sender = _client.CreateSender("myqueue");
             {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
             {%- if message_body_type != "byte[]" %}
@@ -264,28 +273,34 @@ namespace {{ project_name | pascal }}.Test
             {%- else %}
             byte[] eventData = null;
             {%- endif %}
-            var cloudEvent = new CloudEvent
-            {
-                Id = Guid.NewGuid().ToString(),
-                {%- if message.envelopemetadata.attributes is defined %}
-                {%- set type_value = message.envelopemetadata.attributes.type if message.envelopemetadata.attributes.type is string else (message.envelopemetadata.attributes.type.value if message.envelopemetadata.attributes.type.value else messageid) %}
-                {%- else %}
-                {%- set type_value = message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid %}
-                {%- endif %}
-                Type = "{{ type_value }}",
-                Source = new Uri("/test/source", UriKind.RelativeOrAbsolute),
-                Data = eventData,
-                DataContentType = {{ cloudEvents.GetDataContentType(message, '"application/json"' if message_body_type != "byte[]" else "null") }}
-            };
+            
             JsonEventFormatter fm = new JsonEventFormatter();
+            for (int i = 0; i < 5; i++)
+            {
+                var cloudEvent = new CloudEvent
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    {%- if message.envelopemetadata.attributes is defined %}
+                    {%- set type_value = message.envelopemetadata.attributes.type if message.envelopemetadata.attributes.type is string else (message.envelopemetadata.attributes.type.value if message.envelopemetadata.attributes.type.value else messageid) %}
+                    {%- else %}
+                    {%- set type_value = message.envelopemetadata.type.value if message.envelopemetadata.type.value else messageid %}
+                    {%- endif %}
+                    Type = "{{ type_value }}",
+                    Source = new Uri("/test/source", UriKind.RelativeOrAbsolute),
+                    Data = eventData,
+                    DataContentType = {{ cloudEvents.GetDataContentType(message, '"application/json"' if message_body_type != "byte[]" else "null") }}
+                };
 
-            var message = new ServiceBusMessage(fm.EncodeStructuredModeMessage(cloudEvent, out var ct));
-            message.ContentType = ct.ToString();
-            await sender.SendMessageAsync(message);
+                var message = new ServiceBusMessage(fm.EncodeStructuredModeMessage(cloudEvent, out var ct));
+                message.ContentType = ct.ToString();
+                await sender.SendMessageAsync(message);
+            }
 
-            // Wait for the message to be processed
-            var completedTask = await Task.WhenAny(messageHandled.Task, Task.Delay(10000));
-            Assert.True(messageHandled.Task.IsCompletedSuccessfully, "The message was not handled within the timeout.");
+            // Wait for all 5 messages to be processed
+            var completedTask = await Task.WhenAny(messageHandled.Task, Task.Delay(15000));
+            Assert.True(messageHandled.Task.IsCompletedSuccessfully, "Not all messages were handled within the timeout.");
+            Assert.Equal(5, receivedCount);
+            Assert.Equal(5, receivedMessages.Count);
 
             await processor.StopProcessingAsync();
             _logger.LogInformation("Processor stopped for {{ messagename }} event.");

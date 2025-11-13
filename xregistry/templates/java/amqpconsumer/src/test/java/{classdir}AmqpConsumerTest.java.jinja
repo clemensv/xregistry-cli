@@ -21,6 +21,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -97,23 +98,23 @@ public class {{ class_name | strip_namespace }} {
             List.of(brokerUrl)
         );
         
-        CompletableFuture<Boolean> messageReceived = new CompletableFuture<>();
+        CountDownLatch messageReceived = new CountDownLatch(5);
+        List<{{ message_body_type }}> receivedMessages = new ArrayList<>();
         
         consumer.on{{ messagename }}((context, cloudEvent, data) -> {
             try {
                 logger.info("{{ messagename }} message received");
                 assertNotNull(cloudEvent, "CloudEvent should not be null");
                 assertNotNull(data, "Message data should not be null");
+                receivedMessages.add(data);
                 context.accept(); // Accept the message
-                messageReceived.complete(true);
+                messageReceived.countDown();
             } catch (AssertionError ex) {
                 logger.error("Assertion failed during message processing", ex);
                 context.reject("Assertion failed", ex.getMessage());
-                messageReceived.completeExceptionally(ex);
             } catch (Exception ex) {
                 logger.error("Error processing message", ex);
                 context.reject("Processing error", ex.getMessage());
-                messageReceived.completeExceptionally(ex);
             }
         });
         
@@ -193,14 +194,17 @@ public class {{ class_name | strip_namespace }} {
             {%- endif %}
             {%- endif %}
             
-            // Send message
-            sender.send(testMessage);
+            // Send 5 messages
+            for (int i = 0; i < 5; i++) {
+                sender.send(testMessage);
+            }
             
-            // Wait for message to be received (increased timeout for CI reliability)
-            Boolean result = messageReceived.get(MESSAGE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            assertTrue(result, "Message should be received and processed successfully");
+            // Wait for all messages to be received (increased timeout for CI reliability)
+            boolean result = messageReceived.await(MESSAGE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            assertTrue(result, "All 5 messages should be received and processed successfully");
+            assertEquals(5, receivedMessages.size(), "Should receive exactly 5 messages");
             
-            logger.info("Message received validation completed");
+            logger.info("Message received validation completed - {} messages received", receivedMessages.size());
             
             sender.close();
             connection.close();

@@ -204,52 +204,54 @@ async def {{ test_function_name | dotunderscore }}(service_bus_emulator):
     test_data = None
     {%- endif %}
     
-    # Send message
-    await producer.send_{{ message_snake.split('.')[-1] }}(
-        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
-        _{{ attrname }}="test_{{ attrname }}",
-        {%- endfor %}
-        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
-        {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
-        _{{ placeholder | snake }}="test_{{ placeholder }}",
-        {%- endfor %}
-        {%- endfor %}
-        data=test_data
-    )
+    # Send 5 messages to test message settlement and ordering
+    for i in range(5):
+        await producer.send_{{ message_snake.split('.')[-1] }}(
+            {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
+            _{{ attrname }}=f"test_{{ attrname }}_{i}",
+            {%- endfor %}
+            {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+            _{{ placeholder | snake }}=f"test_{{ placeholder }}_{i}",
+            {%- endfor %}
+            {%- endfor %}
+            data=test_data
+        )
     
-    # Verify message was sent by receiving it
+    # Verify all 5 messages were sent by receiving them
     servicebus_client = ServiceBusClient.from_connection_string(conn_str=connection_string, logging_enable=True)
     async with servicebus_client:
         receiver = servicebus_client.get_queue_receiver(queue_name=queue_name)
         async with receiver:
-            received_msgs = await receiver.receive_messages(max_wait_time=10, max_message_count=1)
-            assert len(received_msgs) == 1, "Should receive exactly one message"
+            received_msgs = await receiver.receive_messages(max_wait_time=10, max_message_count=5)
+            assert len(received_msgs) == 5, f"Should receive exactly 5 messages, got {len(received_msgs)}"
             
-            msg = received_msgs[0]
-            # Check CloudEvent properties
-            # For structured mode, CloudEvents are in the JSON body
-            # For binary mode, CloudEvents are in application_properties
-            import json
-            # Try structured mode first (body contains CloudEvents)
-            try:
-                body_data = json.loads(str(msg))
-                if "type" in body_data:
-                    # Structured mode
-                    assert body_data["type"] == "{{ messageid }}"
-                else:
+            # Verify all messages and complete them
+            for msg in received_msgs:
+                # Check CloudEvent properties
+                # For structured mode, CloudEvents are in the JSON body
+                # For binary mode, CloudEvents are in application_properties
+                import json
+                # Try structured mode first (body contains CloudEvents)
+                try:
+                    body_data = json.loads(str(msg))
+                    if "type" in body_data:
+                        # Structured mode
+                        assert body_data["type"] == "{{ messageid }}"
+                    else:
+                        # Binary mode - check application_properties
+                        app_props = msg.application_properties or {}
+                        assert "cloudEvents:type" in app_props or "cloudEvents_type" in app_props, f"CloudEvents type not found in application_properties: {app_props}"
+                        ce_type = app_props.get("cloudEvents:type") or app_props.get("cloudEvents_type")
+                        assert ce_type == "{{ messageid }}"
+                except (json.JSONDecodeError, UnicodeDecodeError):
                     # Binary mode - check application_properties
                     app_props = msg.application_properties or {}
                     assert "cloudEvents:type" in app_props or "cloudEvents_type" in app_props, f"CloudEvents type not found in application_properties: {app_props}"
                     ce_type = app_props.get("cloudEvents:type") or app_props.get("cloudEvents_type")
                     assert ce_type == "{{ messageid }}"
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                # Binary mode - check application_properties
-                app_props = msg.application_properties or {}
-                assert "cloudEvents:type" in app_props or "cloudEvents_type" in app_props, f"CloudEvents type not found in application_properties: {app_props}"
-                ce_type = app_props.get("cloudEvents:type") or app_props.get("cloudEvents_type")
-                assert ce_type == "{{ messageid }}"
-            
-            await receiver.complete_message(msg)
+                
+                await receiver.complete_message(msg)
 
 {% endfor %}
 {% endfor %}

@@ -207,7 +207,7 @@ class Test{{ class_name }}:
         
         consumer = {{ class_name }}()
         
-        # Track if message was received and settled
+        # Track if messages were received and settled
         received_messages = []
         message_settled = []
         
@@ -231,21 +231,23 @@ class Test{{ class_name }}:
         msg = Message(body=msg_body)
         msg.content_type = "application/json"
         
-        {%- if isCloudEvent %}
-        msg.properties = {
-            "cloudEvents:type": "{{ messageid }}",
-            "cloudEvents:specversion": "1.0",
-            "cloudEvents:source": "test",
-            "cloudEvents:id": "test-123"
-        }
-        {%- else %}
-        msg.properties = {
-            "subject": "{{ messageid }}"
-        }
-        {%- endif %}
-        
-        # Send message through broker
-        send_message_to_broker(artemis_container, msg)
+        # Send 5 messages through broker to test proper message settlement and ordering
+        for i in range(5):
+            {%- if isCloudEvent %}
+            msg.properties = {
+                "cloudEvents:type": "{{ messageid }}",
+                "cloudEvents:specversion": "1.0",
+                "cloudEvents:source": "test",
+                "cloudEvents:id": f"test-{i}"
+            }
+            {%- else %}
+            msg.properties = {
+                "subject": "{{ messageid }}"
+            }
+            {%- endif %}
+            
+            # Send message through broker
+            send_message_to_broker(artemis_container, msg)
         
         # Give message time to reach broker
         await asyncio.sleep(0.5)
@@ -273,9 +275,10 @@ class Test{{ class_name }}:
             def on_message(self, event):
                 # Store message and delivery for processing
                 received_msg.append((event.message, event.delivery))
-                # Close immediately after receiving one message
-                event.receiver.close()
-                event.connection.close()
+                # Close after receiving 5 messages
+                if len(received_msg) >= 5:
+                    event.receiver.close()
+                    event.connection.close()
         
         connection_url = f"{artemis_container['host']}:{artemis_container['port']}"
         receiver = SimpleReceiver(connection_url, artemis_container['address'],
@@ -289,17 +292,17 @@ class Test{{ class_name }}:
         
         receiver_thread = threading.Thread(target=run_receiver, daemon=True)
         receiver_thread.start()
-        receiver_thread.join(timeout=5.0)
+        receiver_thread.join(timeout=15.0)  # Increased timeout for 5 messages
         
-        # Now process the received message through consumer dispatcher
-        assert len(received_msg) > 0, "No message received from broker"
+        # Now process all received messages through consumer dispatcher
+        assert len(received_msg) == 5, f"Expected 5 messages from broker, got {len(received_msg)}"
         
-        received_message, delivery = received_msg[0]
-        await consumer.process_message(received_message, delivery)
+        for received_message, delivery in received_msg:
+            await consumer.process_message(received_message, delivery)
         
-        # Verify message was processed and settled
-        assert len(received_messages) > 0, "Handler was not called"
-        assert len(message_settled) > 0, "Message was not settled"
+        # Verify all messages were processed and settled
+        assert len(received_messages) == 5, f"Expected 5 handler calls, got {len(received_messages)}"
+        assert len(message_settled) == 5, f"Expected 5 settlements, got {len(message_settled)}"
 
     
     {%- endfor %}

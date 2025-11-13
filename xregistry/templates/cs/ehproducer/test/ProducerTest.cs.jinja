@@ -223,26 +223,30 @@ namespace {{ project_name | pascal }}.Test
                 {%- elif is_amqp %}
                 {%- set uriargs = amqp.DeclareUriTemplateArguments(message) -%}
                 {%- endif %}
-                {%- if message_body_type != "byte[]" %}
-                var eventDataTest = new {{ message_body_type }}Tests();
-                var eventDataInstance = eventDataTest.CreateInstance();
-                await _producer.Send{{ messagename }}Async(eventDataInstance
-                {%- if uriargs -%}
-                {%- for arg in uriargs.split(',') if arg.strip() -%}
-                , {{ arg.strip().split(' ')[1] -}}: "test"
-                {%- endfor -%}
-                {%- endif -%}
-                );
-                {%- else %}
-                await _producer.Send{{ messagename }}Async(new byte[0]
-                {%- if uriargs -%}
-                {%- for arg in uriargs.split(',') if arg.strip() -%}
-                , {{ arg.strip().split(' ')[1] -}}: "test"
-                {%- endfor -%}
-                {%- endif -%}
-                );
-                {%- endif %}
-                _logger.LogInformation("Test event sent");
+                // Send 5 messages to test proper message handling
+                for (int i = 0; i < 5; i++)
+                {
+                    {%- if message_body_type != "byte[]" %}
+                    var eventDataTest = new {{ message_body_type }}Tests();
+                    var eventDataInstance = eventDataTest.CreateInstance();
+                    await _producer.Send{{ messagename }}Async(eventDataInstance
+                    {%- if uriargs -%}
+                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                    , {{ arg.strip().split(' ')[1] -}}: "test"
+                    {%- endfor -%}
+                    {%- endif -%}
+                    );
+                    {%- else %}
+                    await _producer.Send{{ messagename }}Async(new byte[0]
+                    {%- if uriargs -%}
+                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                    , {{ arg.strip().split(' ')[1] -}}: "test"
+                    {%- endfor -%}
+                    {%- endif -%}
+                    );
+                    {%- endif %}
+                }
+                _logger.LogInformation("5 test events sent");
             }
             catch (Exception ex)
             {

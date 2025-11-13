@@ -198,55 +198,59 @@ class Test{{ class_name }}:
                     {%- set _ = extra_args.items.append('_' + attrname) %}
                 {%- endfor %}
             {%- endif %}
-            producer.send_{{ messagename | snake }}(
-                data=payload,
-            {%- for arg in extra_args.items %}
-                {{ arg }}="value"{% if not loop.last %},
-            {% endif %}
-            {%- endfor %}
-            {% if extra_args.items %},
-            {% endif %}content_type="application/json"
-            )
+            # Send 5 messages to test proper message settlement and ordering
+            for i in range(5):
+                producer.send_{{ messagename | snake }}(
+                    data=payload,
+                {%- for arg in extra_args.items %}
+                    {{ arg }}="value"{% if not loop.last %},
+                {% endif %}
+                {%- endfor %}
+                {% if extra_args.items %},
+                {% endif %}content_type="application/json"
+                )
 
-            received = _receive_single_message(artemis_container)
+            # Receive and verify all 5 messages
+            for i in range(5):
+                received = _receive_single_message(artemis_container)
 
-            if {{ 'True' if isCloudEvent else 'False' }}:
-                body = received.body
-                if isinstance(body, memoryview):
-                    body_text = body.tobytes().decode('utf-8')
-                elif isinstance(body, bytes):
-                    body_text = body.decode('utf-8')
-                elif isinstance(body, str):
-                    body_text = body
-                elif isinstance(body, dict):
-                    body_text = json.dumps(body)
-                else:
-                    body_text = str(body)
-                cloud_event_payload = json.loads(body_text)
-                assert cloud_event_payload.get("type") == "{{ messageid }}"
-                encoded_data = cloud_event_payload.get("data_base64")
-                if encoded_data:
-                    decoded = base64.b64decode(encoded_data.encode('utf-8')).decode('utf-8')
-                    assert json.loads(decoded) == payload
-                elif "data" in cloud_event_payload:
-                    data_section = cloud_event_payload["data"]
-                    if isinstance(data_section, str):
-                        assert json.loads(data_section) == payload
+                if {{ 'True' if isCloudEvent else 'False' }}:
+                    body = received.body
+                    if isinstance(body, memoryview):
+                        body_text = body.tobytes().decode('utf-8')
+                    elif isinstance(body, bytes):
+                        body_text = body.decode('utf-8')
+                    elif isinstance(body, str):
+                        body_text = body
+                    elif isinstance(body, dict):
+                        body_text = json.dumps(body)
                     else:
-                        assert data_section == payload
-            else:
-                properties = received.properties or {}
-                assert properties.get('subject') == '{{ messageid }}'
-                body = received.body
-                if isinstance(body, memoryview):
-                    body_text = body.tobytes().decode('utf-8')
-                elif isinstance(body, bytes):
-                    body_text = body.decode('utf-8')
-                elif isinstance(body, str):
-                    body_text = body
+                        body_text = str(body)
+                    cloud_event_payload = json.loads(body_text)
+                    assert cloud_event_payload.get("type") == "{{ messageid }}"
+                    encoded_data = cloud_event_payload.get("data_base64")
+                    if encoded_data:
+                        decoded = base64.b64decode(encoded_data.encode('utf-8')).decode('utf-8')
+                        assert json.loads(decoded) == payload
+                    elif "data" in cloud_event_payload:
+                        data_section = cloud_event_payload["data"]
+                        if isinstance(data_section, str):
+                            assert json.loads(data_section) == payload
+                        else:
+                            assert data_section == payload
                 else:
-                    body_text = json.dumps(body)
-                assert json.loads(body_text) == payload
+                    properties = received.properties or {}
+                    assert properties.get('subject') == '{{ messageid }}'
+                    body = received.body
+                    if isinstance(body, memoryview):
+                        body_text = body.tobytes().decode('utf-8')
+                    elif isinstance(body, bytes):
+                        body_text = body.decode('utf-8')
+                    elif isinstance(body, str):
+                        body_text = body
+                    else:
+                        body_text = json.dumps(body)
+                    assert json.loads(body_text) == payload
         finally:
             producer.close()
     

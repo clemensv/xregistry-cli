@@ -155,6 +155,8 @@ namespace {{ project_name | pascal }}.Test
             {
                 var dispatcher = new {{ class_name }}(_fixture.GetLoggerFactory());
                 var messageReceived = new TaskCompletionSource<bool>();
+                var receivedCount = 0;
+                var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
 
                 dispatcher.{{ messagename }}Async += (message, cloudEvent, messageObj) =>
                 {
@@ -165,8 +167,15 @@ namespace {{ project_name | pascal }}.Test
                         Assert.NotNull(cloudEvent);
                         {%- if message_body_type != "byte[]" %}
                         Assert.NotNull(messageObj);
+                        receivedMessages.Add(messageObj);
+                        {%- else %}
+                        receivedMessages.Add(message);
                         {%- endif %}
-                        messageReceived.SetResult(true);
+                        Interlocked.Increment(ref receivedCount);
+                        if (receivedCount >= 5)
+                        {
+                            messageReceived.SetResult(true);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -197,10 +206,11 @@ namespace {{ project_name | pascal }}.Test
                 var eventData = System.Text.Encoding.UTF8.GetBytes("Test");
                 {%- endif %}
 
-                var kafkaMessage = new Message<byte[], byte[]>
+                _logger.LogDebug("Producing 5 test messages to Kafka.");
+                for (int i = 0; i < 5; i++)
                 {
-                    Value = eventData,
-                    Headers = new Headers
+                    // Create new headers with unique ID for each message
+                    var headers = new Headers
                     {
                         new Header("content-type", Encoding.UTF8.GetBytes("application/json")),
                         {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
@@ -211,17 +221,24 @@ namespace {{ project_name | pascal }}.Test
                         new Header("ce_specversion", Encoding.UTF8.GetBytes("1.0")),
                         new Header("ce_source", Encoding.UTF8.GetBytes("/test")),
                         new Header("ce_id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()))
-                    }
-                };
-
-                _logger.LogDebug("Producing test message to Kafka.");
-                await producer.ProduceAsync(_fixture.TopicName, kafkaMessage);
+                    };
+                    
+                    var testMessage = new Message<byte[], byte[]>
+                    {
+                        Value = eventData,
+                        Headers = headers
+                    };
+                    
+                    await producer.ProduceAsync(_fixture.TopicName, testMessage);
+                }
                 producer.Flush();
-                _logger.LogInformation("Test message sent");
+                _logger.LogInformation("5 test messages sent");
 
-                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(10000));
-                Assert.True(messageReceived.Task.IsCompleted, "The message was not received within the timeout period.");
-                _logger.LogInformation("Message received validation completed");
+                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(15000));
+                Assert.True(messageReceived.Task.IsCompleted, "Not all messages were received within the timeout period.");
+                Assert.Equal(5, receivedCount);
+                Assert.Equal(5, receivedMessages.Count);
+                _logger.LogInformation($"All {receivedCount} messages received validation completed");
 
                 await processor.StopAsync();
                 _logger.LogDebug("Kafka processor stopped.");

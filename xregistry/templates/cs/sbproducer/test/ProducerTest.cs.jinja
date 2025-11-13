@@ -211,15 +211,19 @@ namespace {{ project_name | pascal }}.Test
             try
             {   
                 {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
-                {%- if message_body_type != "byte[]" %}
-                var eventDataInstance = new {{ message_body_type }}Tests().CreateInstance();
-                var message = new ServiceBusMessage(eventDataInstance.ToString()); // Serialize if needed
-                {%- else %}
-                var message = new ServiceBusMessage(new byte[0]);
-                {%- endif %}
+                // Send 5 messages to test proper message handling
+                for (int i = 0; i < 5; i++)
+                {
+                    {%- if message_body_type != "byte[]" %}
+                    var eventDataInstance = new {{ message_body_type }}Tests().CreateInstance();
+                    var message = new ServiceBusMessage(eventDataInstance.ToString()); // Serialize if needed
+                    {%- else %}
+                    var message = new ServiceBusMessage(new byte[0]);
+                    {%- endif %}
 
-                await _sender.SendMessageAsync(message);
-                _logger.LogInformation("Test message for {{ messagename }} sent.");
+                    await _sender.SendMessageAsync(message);
+                }
+                _logger.LogInformation("5 test messages for {{ messagename }} sent.");
             }
             catch (Exception ex)
             {

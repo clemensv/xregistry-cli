@@ -165,14 +165,17 @@ async def {{ test_function_name | dotunderscore }}(service_bus_emulator):
     runner = MessageProcessorRunner.from_connection_string(connection_string, queue_name)
     runner.add_dispatcher(dispatcher)
     
-    # Set up event handler
+    # Set up event handler to track multiple messages
+    received_count = 0
+    received_data_list = []
     received_event = asyncio.Event()
-    received_data = None
     
     async def handle_message({%if isCloudEvent%}sb_message, cloud_event, {%else%}sb_message, {%endif%}data):
-        nonlocal received_data
-        received_data = data
-        received_event.set()
+        nonlocal received_count
+        received_count += 1
+        received_data_list.append(data)
+        if received_count >= 5:
+            received_event.set()
     
     dispatcher.{{ message_snake }}_async = handle_message
     
@@ -180,47 +183,49 @@ async def {{ test_function_name | dotunderscore }}(service_bus_emulator):
     await runner.start()
     
     try:
-        # Send a test message
+        # Send 5 test messages to test message settlement and ordering
         servicebus_client = ServiceBusClient.from_connection_string(conn_str=connection_string, logging_enable=True)
         async with servicebus_client:
             sender = servicebus_client.get_queue_sender(queue_name=queue_name)
             async with sender:
                 {%- set data_type = util.DeclareDataType(data_project_name, root, message) %}
-                {%- if data_type != "object" %}
-                # Create valid test data using the test helper
-                test_data_instance = Test_{{ data_type | pascal | strip_namespace }}.create_instance()
-                msg_body = test_data_instance.to_byte_array("application/json")
-                {%- else %}
-                msg_body = json.dumps({}).encode('utf-8')
-                {%- endif %}
-                
-                {%- if isCloudEvent %}
-                # Create CloudEvent message
-                message = ServiceBusMessage(
-                    body=msg_body,
-                    content_type="application/json",
-                    application_properties={
-                        "cloudEvents:type": "{{ messageid }}",
-                        "cloudEvents:source": "test",
-                        "cloudEvents:id": "test-id",
-                        "cloudEvents:specversion": "1.0"
-                    }
-                )
-                {%- else %}
-                # Create plain AMQP message
-                message = ServiceBusMessage(
-                    body=msg_body,
-                    content_type="application/json",
-                    subject="{{ messageid }}"
-                )
-                {%- endif %}
-                await sender.send_messages(message)
+                for i in range(5):
+                    {%- if data_type != "object" %}
+                    # Create valid test data using the test helper
+                    test_data_instance = Test_{{ data_type | pascal | strip_namespace }}.create_instance()
+                    msg_body = test_data_instance.to_byte_array("application/json")
+                    {%- else %}
+                    msg_body = json.dumps({}).encode('utf-8')
+                    {%- endif %}
+                    
+                    {%- if isCloudEvent %}
+                    # Create CloudEvent message
+                    message = ServiceBusMessage(
+                        body=msg_body,
+                        content_type="application/json",
+                        application_properties={
+                            "cloudEvents:type": "{{ messageid }}",
+                            "cloudEvents:source": "test",
+                            "cloudEvents:id": f"test-id-{i}",
+                            "cloudEvents:specversion": "1.0"
+                        }
+                    )
+                    {%- else %}
+                    # Create plain AMQP message
+                    message = ServiceBusMessage(
+                        body=msg_body,
+                        content_type="application/json",
+                        subject="{{ messageid }}"
+                    )
+                    {%- endif %}
+                    await sender.send_messages(message)
         
-        # Wait for the message to be received
+        # Wait for all 5 messages to be received
         await asyncio.wait_for(received_event.wait(), timeout=30)
         
-        # Verify the message was received
-        assert received_data is not None, "Message should have been received"
+        # Verify all 5 messages were received
+        assert received_count == 5, f"Should have received exactly 5 messages, got {received_count}"
+        assert len(received_data_list) == 5, f"Should have 5 data items, got {len(received_data_list)}"
         
     finally:
         await runner.stop()

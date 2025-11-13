@@ -84,9 +84,13 @@ describe('{{ project_name }} Kafka Producer Tests', () => {
             try {
                 const producer = new {{ class_name }}(kafkaProducer, topicName);
                 const testData = { test: 'data' } as any; // TODO: Replace with actual schema-compliant test data
-                await producer.send{{ messagename }}(testData);
                 
-                // Test passes if send succeeds without throwing
+                // Send 5 messages to test proper message handling
+                for (let i = 0; i < 5; i++) {
+                    await producer.send{{ messagename }}(testData);
+                }
+                
+                // Test passes if all sends succeed without throwing
                 expect(true).toBe(true);
             } finally {
                 await kafkaProducer.disconnect();

@@ -154,8 +154,15 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
     dispatcher = {{ class_name }}()
 
     future = asyncio.Future()
+    received_count = 0
+    received_data_list = []
+    
     async def set_future(_cx, _e, {%if isCloudEvent %}_ce,{% endif %} data):
-        future.set_result(data)
+        nonlocal received_count
+        received_count += 1
+        received_data_list.append(data)
+        if received_count >= 5:
+            future.set_result(data)
         return future
 
     dispatcher.{{ messageid | dotunderscore | snake }}_async = set_future
@@ -253,8 +260,19 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
         {%- endif %}
         {%- endif %}
         event_data_batch.add(event_data)
-        await producer.send_batch(event_data_batch)
-        await asyncio.wait_for(future, timeout=5)
+        
+        # Send 5 batches (each with 1 event) to test message settlement
+        for i in range(5):
+            await producer.send_batch(event_data_batch)
+            # Create new batch for next iteration
+            if i < 4:
+                event_data_batch = await producer.create_batch()
+                event_data_batch.add(event_data)
+        
+        # Wait for all 5 messages to be received
+        await asyncio.wait_for(future, timeout=15)
+        assert received_count == 5, f"Expected 5 messages, got {received_count}"
+        assert len(received_data_list) == 5, f"Expected 5 data items, got {len(received_data_list)}"
         await producer.close()
 
 {% endfor %}

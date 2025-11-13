@@ -138,12 +138,16 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
     consumer = EventHubConsumerClient.from_connection_string(event_hub_conn_str, consumer_group="cg_{{ test_function_name | dotunderscore }}", eventhub_name="eh1")
 
     on_event_future = asyncio.Future()
+    received_count = 0
     
     async def on_event(partition_context, event):
+        nonlocal received_count
         try:
             assert event.properties["cloudEvents_type".encode('utf-8')] == "{{ messageid }}".encode('utf-8')
             await partition_context.update_checkpoint(event)
-            on_event_future.set_result(True)
+            received_count += 1
+            if received_count >= 5:
+                on_event_future.set_result(True)
         except Exception as e:
             on_event_future.set_exception(e)
 
@@ -207,20 +211,23 @@ async def {{ test_function_name | dotunderscore }}(event_hub_emulator):
     {%- else %}
     event_data = None
     {%- endif %}
-    await producer_instance.send_{{ messageid | dotunderscore | snake }}(
-        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
-            _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
-        {%- endfor -%}
-        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
-            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
-        {%- endfor -%}
-        data = event_data
-        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
-            , _{{ attrname }} = ''
-        {%- endfor -%}
-    )
+    
+    # Send 5 messages to test message settlement and ordering
+    for i in range(5):
+        await producer_instance.send_{{ messageid | dotunderscore | snake }}(
+            {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
+                _{{ attrname }} = {{ "f'test_{i}'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
+            {%- endfor -%}
+            {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
+                {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = f'test_{i}', {% endfor -%}
+            {%- endfor -%}
+            data = event_data
+            {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
+                , _{{ attrname }} = ''
+            {%- endfor -%}
+        )
 
-    await asyncio.wait_for(on_event_future, timeout=10)
+    await asyncio.wait_for(on_event_future, timeout=15)
     if receive_task:
         receive_task.cancel()
         try:

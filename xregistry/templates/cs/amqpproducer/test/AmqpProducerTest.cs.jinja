@@ -219,8 +219,9 @@ namespace {{ project_name | pascal }}.Test
                 try
                 {
                     var messageReceived = new TaskCompletionSource<bool>();
+                    var receivedCount = 0;
                     
-                    // Set up receiver to verify message was sent
+                    // Set up receiver to verify messages were sent
                     var factory = new ConnectionFactory();
                     var address = new Address(_fixture.ArtemisBrokerUrl?.AbsoluteUri);
                     var connection = await factory.CreateAsync(address);
@@ -232,40 +233,44 @@ namespace {{ project_name | pascal }}.Test
                             var receiver = new ReceiverLink(session, "receiver-link", "/" + _fixture.QueueName);
                             try
                             {
-                                // Start listening for message
+                                // Start listening for 5 messages
                                 var receiveTask = Task.Run(async () =>
                                 {
                                     try
                                     {
-                                        var receivedMessage = await receiver.ReceiveAsync(TimeSpan.FromSeconds(10));
-                                        if (receivedMessage != null)
+                                        for (int i = 0; i < 5; i++)
                                         {
-                                            receiver.Accept(receivedMessage);
-                                            _logger.LogInformation("{{ messagename }} message received");
-                                            
-                                            // Verify CloudEvents properties
-                                            Assert.NotNull(receivedMessage.ApplicationProperties);
-                                            Assert.Equal("1.0", receivedMessage.ApplicationProperties["cloudEvents:specversion"]);
-                                            Assert.Equal("{{ messageid }}", receivedMessage.ApplicationProperties["cloudEvents:type"]);
-                                            Assert.NotNull(receivedMessage.ApplicationProperties["cloudEvents:id"]);
-                                            Assert.NotNull(receivedMessage.ApplicationProperties["cloudEvents:source"]);
-                                            
-                                            messageReceived.SetResult(true);
+                                            var receivedMessage = await receiver.ReceiveAsync(TimeSpan.FromSeconds(15));
+                                            if (receivedMessage != null)
+                                            {
+                                                receiver.Accept(receivedMessage);
+                                                _logger.LogInformation("{{ messagename }} message {i} received", i);
+                                                
+                                                // Verify CloudEvents properties
+                                                Assert.NotNull(receivedMessage.ApplicationProperties);
+                                                Assert.Equal("1.0", receivedMessage.ApplicationProperties["cloudEvents:specversion"]);
+                                                Assert.Equal("{{ messageid }}", receivedMessage.ApplicationProperties["cloudEvents:type"]);
+                                                Assert.NotNull(receivedMessage.ApplicationProperties["cloudEvents:id"]);
+                                                Assert.NotNull(receivedMessage.ApplicationProperties["cloudEvents:source"]);
+                                                
+                                                Interlocked.Increment(ref receivedCount);
+                                            }
+                                            else
+                                            {
+                                                _logger.LogWarning("Message {i} not received within timeout", i);
+                                                break;
+                                            }
                                         }
-                                        else
-                                        {
-                                            _logger.LogWarning("No message received within timeout");
-                                            messageReceived.SetResult(false);
-                                        }
+                                        messageReceived.SetResult(receivedCount == 5);
                                     }
                                     catch (Exception ex)
                                     {
-                                        _logger.LogError(ex, "Error receiving message");
+                                        _logger.LogError(ex, "Error receiving messages");
                                         messageReceived.SetException(ex);
                                     }
                                 });
 
-                                // Send message using producer
+                                // Send 5 messages using producer
                                 {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
                                 {%- set is_amqp = amqp.is_amqp(message) %}
                                 {%- if isCloudEvent %}
@@ -273,33 +278,37 @@ namespace {{ project_name | pascal }}.Test
                                 {%- elif is_amqp %}
                                 {%- set uriargs = amqp.DeclareUriTemplateArguments(message) %}
                                 {%- endif %}
-                                {%- if message_body_type != "byte[]" %}
-                                var eventDataTest = new {{ message_body_type }}Tests();
-                                var eventData = eventDataTest.CreateInstance();
-                                await producer.Send{{ messagename }}Async(eventData
-                                {%- if uriargs -%}
-                                {%- for arg in uriargs.split(',') if arg.strip() -%}
-                                , {{ arg.strip().split(' ')[1] -}}: "test"
-                                {%- endfor -%}
-                                {%- endif -%}
-                                );
-                                {%- else %}
-                                var eventData = System.Text.Encoding.UTF8.GetBytes("test data");
-                                await producer.Send{{ messagename }}Async(eventData
-                                {%- if uriargs -%}
-                                {%- for arg in uriargs.split(',') if arg.strip() -%}
-                                , {{ arg.strip().split(' ')[1] -}}: "test"
-                                {%- endfor -%}
-                                {%- endif -%}
-                                );
-                                {%- endif %}
-                                _logger.LogInformation("{{ messagename }} message sent");
+                                for (int i = 0; i < 5; i++)
+                                {
+                                    {%- if message_body_type != "byte[]" %}
+                                    var eventDataTest = new {{ message_body_type }}Tests();
+                                    var eventData = eventDataTest.CreateInstance();
+                                    await producer.Send{{ messagename }}Async(eventData
+                                    {%- if uriargs -%}
+                                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                                    , {{ arg.strip().split(' ')[1] -}}: "test"
+                                    {%- endfor -%}
+                                    {%- endif -%}
+                                    );
+                                    {%- else %}
+                                    var eventData = System.Text.Encoding.UTF8.GetBytes("test data");
+                                    await producer.Send{{ messagename }}Async(eventData
+                                    {%- if uriargs -%}
+                                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                                    , {{ arg.strip().split(' ')[1] -}}: "test"
+                                    {%- endfor -%}
+                                    {%- endif -%}
+                                    );
+                                    {%- endif %}
+                                }
+                                _logger.LogInformation("5 {{ messagename }} messages sent");
 
-                                // Wait for message to be received
+                                // Wait for all messages to be received
                                 await receiveTask;
-                                Assert.True(messageReceived.Task.IsCompleted, "The message was not received within the timeout period.");
+                                Assert.True(messageReceived.Task.IsCompleted, "Not all messages were received within the timeout period.");
                                 Assert.True(await messageReceived.Task, "Message receive validation failed.");
-                                _logger.LogInformation("Message send and receive validation completed");
+                                Assert.Equal(5, receivedCount);
+                                _logger.LogInformation("All 5 messages sent and received validation completed");
                             }
                             finally
                             {

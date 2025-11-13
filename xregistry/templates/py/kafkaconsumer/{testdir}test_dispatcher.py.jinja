@@ -77,9 +77,16 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
     dispatcher = {{ class_name }}()
 
     future = asyncio.Future()
+    received_count = 0
+    received_data_list = []
+    
     async def set_future(consumer, record, cloud_event, data):
-        if not future.done():
-            future.set_result(data)
+        nonlocal received_count
+        received_count += 1
+        received_data_list.append(data)
+        if received_count >= 5:
+            if not future.done():
+                future.set_result(data)
 
     dispatcher.{{ messageid | dotunderscore | snake }}_async = set_future
     async with dispatcher.create_consumer({
@@ -143,15 +150,22 @@ async def {{ test_function_name | dotunderscore }}(kafka_emulator):
         {%- else %}
         event_data = b'{}'
         {%- endif %}
-        producer.produce(topic='test_topic', key=b'abc', value=event_data, headers=[
-            ("ce_type", b"{{ messageid }}"),
-            ("ce_specversion", b"1.0"),
-            ("ce_source", b"/test"),
-            ("ce_id", b"test-id"),
-            ("content-type", b"application/json")
-        ])
+        
+        # Send 5 messages to test proper message settlement and ordering
+        for i in range(5):
+            producer.produce(topic='test_topic', key=b'abc', value=event_data, headers=[
+                ("ce_type", b"{{ messageid }}"),
+                ("ce_specversion", b"1.0"),
+                ("ce_source", b"/test"),
+                ("ce_id", f"test-id-{i}".encode('utf-8')),
+                ("content-type", b"application/json")
+            ])
         producer.flush()
-        await asyncio.wait_for(future, timeout=5)
+        
+        # Wait for all 5 messages to be received
+        await asyncio.wait_for(future, timeout=15)
+        assert received_count == 5, f"Expected 5 messages, got {received_count}"
+        assert len(received_data_list) == 5, f"Expected 5 data items, got {len(received_data_list)}"
 
 {% endfor %}
 {% endfor %}

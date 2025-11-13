@@ -106,9 +106,11 @@ describe('{{ project_name }} Kafka Consumer Tests', () => {
             const processor = new KafkaProcessor(consumer, topicName);
             
             const receivedMessages: any[] = [];
+            let receivedCount = 0;
             
             dispatcher.{{ messagename }}Handler = async (message, {% if isCloudEvent %}cloudEvent, {% endif %}data) => {
                 receivedMessages.push({ message, {% if isCloudEvent %}cloudEvent, {% endif %}data });
+                receivedCount++;
             };
             
             processor.processMessage = async (payload) => {
@@ -121,51 +123,56 @@ describe('{{ project_name }} Kafka Consumer Tests', () => {
             // Wait a bit for consumer to be ready
             await new Promise(resolve => setTimeout(resolve, 2000));
             
-            // Send test message
+            // Send 5 test messages
             {%- if isCloudEvent %}
             const testData = { test: 'data' };
-            const cloudEvent = new CloudEvent({
-                {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
-                type: '{{ message.envelopemetadata["type"]["value"] }}',
-                {%- else %}
-                type: '{{ messageid }}',
-                {%- endif %}
-                source: 'test/source',
-                data: testData
-            });
-            
-            await producer.send({
-                topic: topicName,
-                messages: [{
-                    headers: {
-                        'content-type': 'application/cloudevents+json'
-                    },
-                    value: JSON.stringify(cloudEvent)
-                }]
-            });
+            for (let i = 0; i < 5; i++) {
+                const cloudEvent = new CloudEvent({
+                    {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+                    type: '{{ message.envelopemetadata["type"]["value"] }}',
+                    {%- else %}
+                    type: '{{ messageid }}',
+                    {%- endif %}
+                    source: 'test/source',
+                    id: `test-${i}`,
+                    data: testData
+                });
+                
+                await producer.send({
+                    topic: topicName,
+                    messages: [{
+                        headers: {
+                            'content-type': 'application/cloudevents+json'
+                        },
+                        value: JSON.stringify(cloudEvent)
+                    }]
+                });
+            }
             {%- else %}
             const testData = { test: 'data' };
-            
-            await producer.send({
-                topic: topicName,
-                messages: [{
-                    headers: {
-                        'subject': '{{ messageid }}',
-                        'content-type': 'application/json'
-                    },
-                    value: JSON.stringify(testData)
-                }]
-            });
+            for (let i = 0; i < 5; i++) {
+                await producer.send({
+                    topic: topicName,
+                    messages: [{
+                        headers: {
+                            'subject': '{{ messageid }}',
+                            'content-type': 'application/json'
+                        },
+                        value: JSON.stringify(testData)
+                    }]
+                });
+            }
             {%- endif %}
             
-            // Wait for message to be processed
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Wait for all messages to be processed
+            await new Promise(resolve => setTimeout(resolve, 5000));
             
             // Stop processor
             await processor.stop();
             
-            // Verify
-            expect(receivedMessages.length).toBeGreaterThan(0);
+            // Verify all 5 messages received
+            expect(receivedMessages.length).toBe(5);
+            expect(receivedCount).toBe(5);
             {%- if isCloudEvent %}
             {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
             expect(receivedMessages[0].cloudEvent.type).toBe('{{ message.envelopemetadata["type"]["value"] }}');

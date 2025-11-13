@@ -211,6 +211,8 @@ namespace {{ project_name | pascal }}.Test
             try
             {   var dispatcher = new {{ class_name }}();
                 var messageReceived = new TaskCompletionSource<bool>();
+                var receivedCount = 0;
+                var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
 
                 dispatcher.{{ messagename }}Async += (eventData, cloudEvent, eventDataObj) =>
                 {
@@ -220,7 +222,12 @@ namespace {{ project_name | pascal }}.Test
                         Assert.NotNull(eventData);
                         Assert.NotNull(cloudEvent);
                         Assert.NotNull(eventDataObj);
-                        messageReceived.SetResult(true);
+                        receivedMessages.Add(eventDataObj);
+                        Interlocked.Increment(ref receivedCount);
+                        if (receivedCount >= 5)
+                        {
+                            messageReceived.SetResult(true);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -237,31 +244,38 @@ namespace {{ project_name | pascal }}.Test
                 _logger.LogInformation("Event Processor started");
 
                 var producerClient = new EventHubProducerClient(_fixture.EventHubConnectionString, "eh1");
-                using var eventBatch = await producerClient.CreateBatchAsync();
                 {%- set message_body_type = util.body_type(data_project_name, root, message) -%}
-                {%- if message_body_type != "byte[]" %}
-                var eventDataTest = new {{ message_body_type }}Tests();
-                var eventDataInstance = eventDataTest.CreateInstance();
-                var eventData = new EventData(new BinaryData(eventDataInstance.ToByteArray("application/json")));
-                {%- else %}
-                var eventData = new EventData(new BinaryData(""));
-                {%- endif %}
-                eventData.ContentType = "application/json";
-                {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
-                eventData.Properties["cloudEvents_type"] = "{{ message.envelopemetadata["type"]["value"] }}";
-                {%- else %}
-                eventData.Properties["cloudEvents_type"] = "{{ messageid }}";
-                {%- endif %}
-                eventData.Properties["cloudEvents_specversion"] = "1.0";
-                eventData.Properties["cloudEvents_source"] = "/test";
-                eventData.Properties["cloudEvents_id"] = Guid.NewGuid().ToString();
-                eventBatch.TryAdd(eventData);
-                await producerClient.SendAsync(eventBatch);
-                _logger.LogInformation("Test event sent");
+                
+                // Send 5 messages to test proper message handling
+                for (int i = 0; i < 5; i++)
+                {
+                    using var eventBatch = await producerClient.CreateBatchAsync();
+                    {%- if message_body_type != "byte[]" %}
+                    var eventDataTest = new {{ message_body_type }}Tests();
+                    var eventDataInstance = eventDataTest.CreateInstance();
+                    var eventData = new EventData(new BinaryData(eventDataInstance.ToByteArray("application/json")));
+                    {%- else %}
+                    var eventData = new EventData(new BinaryData(""));
+                    {%- endif %}
+                    eventData.ContentType = "application/json";
+                    {%- if "type" in message.envelopemetadata and "value" in message.envelopemetadata["type"] %}
+                    eventData.Properties["cloudEvents_type"] = "{{ message.envelopemetadata["type"]["value"] }}";
+                    {%- else %}
+                    eventData.Properties["cloudEvents_type"] = "{{ messageid }}";
+                    {%- endif %}
+                    eventData.Properties["cloudEvents_specversion"] = "1.0";
+                    eventData.Properties["cloudEvents_source"] = "/test";
+                    eventData.Properties["cloudEvents_id"] = Guid.NewGuid().ToString();
+                    eventBatch.TryAdd(eventData);
+                    await producerClient.SendAsync(eventBatch);
+                }
+                _logger.LogInformation("5 test events sent");
 
-                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(10000));
-                Assert.True(messageReceived.Task.IsCompleted, "The message was not received within the timeout period.");
-                _logger.LogInformation("Message received validation completed");
+                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(15000));
+                Assert.True(messageReceived.Task.IsCompleted, "Not all messages were received within the timeout period.");
+                Assert.Equal(5, receivedCount);
+                Assert.Equal(5, receivedMessages.Count);
+                _logger.LogInformation($"All {receivedCount} messages received validation completed");
 
                 await processorClient.StopProcessingAsync();
                 _logger.LogInformation("Event Processor stopped");

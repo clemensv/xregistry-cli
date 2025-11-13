@@ -219,6 +219,9 @@ namespace {{ project_name | pascal }}.Test
                 try
                 {
                     var messageReceived = new TaskCompletionSource<bool>();
+                    var receivedCount = 0;
+                    var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
+                    
                     dispatcher.{{ messagename }}Async += (amqpMessage, messageObj, context) =>
                     {
                         try
@@ -226,8 +229,13 @@ namespace {{ project_name | pascal }}.Test
                             _logger.LogInformation("{{ messagename }} message received");
                             Assert.NotNull(amqpMessage);
                             Assert.NotNull(messageObj);
+                            receivedMessages.Add(messageObj);
                             context.Accept();
-                            messageReceived.SetResult(true);
+                            Interlocked.Increment(ref receivedCount);
+                            if (receivedCount >= 5)
+                            {
+                                messageReceived.SetResult(true);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -272,10 +280,18 @@ namespace {{ project_name | pascal }}.Test
                                 amqpMessage.ApplicationProperties["cloudEvents:id"] = Guid.NewGuid().ToString();
                                 amqpMessage.ApplicationProperties["cloudEvents:source"] = "urn:example-com:example-source";
                                 amqpMessage.ApplicationProperties["cloudEvents:time"] = DateTime.UtcNow.ToString("O");
-                                await sender.SendAsync(amqpMessage);
-                                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(10000));
-                                Assert.True(messageReceived.Task.IsCompleted, "The message was not received within the timeout period.");
-                                _logger.LogInformation("Message received validation completed");
+                                
+                                // Send 5 messages
+                                for (int i = 0; i < 5; i++)
+                                {
+                                    await sender.SendAsync(amqpMessage);
+                                }
+                                
+                                var messageReceivedTask = await Task.WhenAny(messageReceived.Task, Task.Delay(15000));
+                                Assert.True(messageReceived.Task.IsCompleted, "Not all messages were received within the timeout period.");
+                                Assert.Equal(5, receivedCount);
+                                Assert.Equal(5, receivedMessages.Count);
+                                _logger.LogInformation("All 5 messages received validation completed");
                             }
                             finally
                             {

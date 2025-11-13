@@ -24,6 +24,7 @@ import org.testcontainers.utility.DockerImageName;
 import org.apache.qpid.protonj2.client.*;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
+import java.util.concurrent.CountDownLatch;
 {%- if uses_cloudevents.value %}
 {{ cloudEvents.CloudEventsImports() }}
 {%- endif %}
@@ -88,9 +89,10 @@ public class {{ class_name | strip_namespace }} {
             new ArrayList<>(List.of(brokerUrl))
         );
         
-        CompletableFuture<Message<?>> messageReceived = new CompletableFuture<>();
+        List<Message<?>> messagesReceived = new ArrayList<>();
+        CountDownLatch receiveLatch = new CountDownLatch(5);
         
-        // Start a receiver to verify the message was sent
+        // Start a receiver to verify the messages were sent
         Thread receiverThread = new Thread(() -> {
             Client client = null;
             Connection connection = null;
@@ -103,14 +105,17 @@ public class {{ class_name | strip_namespace }} {
                 connection = client.connect(brokerUrl.getHost(), brokerUrl.getPort(), connOptions);
                 Receiver receiver = connection.openReceiver(QUEUE_NAME);
                 
-                // Wait for message with timeout
-                Delivery delivery = receiver.receive(30, TimeUnit.SECONDS);
-                if (delivery != null) {
-                    Message<?> message = delivery.message();
-                    messageReceived.complete(message);
-                    delivery.accept();
-                } else {
-                    messageReceived.completeExceptionally(new Exception("No message received within timeout"));
+                // Wait for 5 messages with timeout
+                int attempts = 0;
+                while (messagesReceived.size() < 5 && attempts < 15) {
+                    Delivery delivery = receiver.receive(2, TimeUnit.SECONDS);
+                    if (delivery != null) {
+                        Message<?> message = delivery.message();
+                        messagesReceived.add(message);
+                        receiveLatch.countDown();
+                        delivery.accept();
+                    }
+                    attempts++;
                 }
                 
                 receiver.close();
@@ -118,7 +123,6 @@ public class {{ class_name | strip_namespace }} {
                 client.close();
             } catch (Exception ex) {
                 logger.error("Error in receiver thread", ex);
-                messageReceived.completeExceptionally(ex);
                 try {
                     if (connection != null) connection.close();
                     if (client != null) client.close();
@@ -255,12 +259,46 @@ public class {{ class_name | strip_namespace }} {
         {%- endif -%}
         );
         
-        // Wait for message to be received
-        Message<?> received = messageReceived.get(30, TimeUnit.SECONDS);
-        assertNotNull(received, "Message should be received");
+        // Send 5 messages
+        for (int i = 0; i < 5; i++) {
+            producer.send{{ messagename }}(testData
+            {%- if cloudEvents.isCloudEvent(message) -%}
+            {%- if message.envelopemetadata -%}
+            {%- for attrname, attribute in message.envelopemetadata.items() -%}
+            {%- if attribute.type == "uritemplate" -%}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+            , "test-{{ placeholder }}"
+            {%- endfor -%}
+            {%- elif attribute.value is not defined and attrname not in ["id", "time", "datacontenttype", "dataschema"] -%}
+            , "test-{{ attrname }}"
+            {%- endif -%}
+            {%- endfor -%}
+            {%- endif -%}
+            {%- elif amqp.is_amqp(message) -%}
+            {%- if message.metadata -%}
+            {%- for attrname, attribute in message.metadata.items() -%}
+            {%- if attribute.type == "uritemplate" -%}
+            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') -%}
+            , "test-{{ placeholder }}"
+            {%- endfor -%}
+            {%- elif attribute.value is not defined -%}
+            , "test-{{ attrname }}"
+            {%- endif -%}
+            {%- endfor -%}
+            {%- endif -%}
+            {%- endif -%}
+            );
+        }
         
-        // Verify message body
-        Object bodyObj = received.body();
+        // Wait for all messages to be received
+        boolean received = receiveLatch.await(30, TimeUnit.SECONDS);
+        assertTrue(received, "All 5 messages should be received");
+        assertEquals(5, messagesReceived.size(), "Should receive exactly 5 messages");
+        
+        // Verify first message body as sample
+        Message<?> firstMessage = messagesReceived.get(0);
+        assertNotNull(firstMessage, "First message should not be null");
+        Object bodyObj = firstMessage.body();
         assertNotNull(bodyObj, "Message body should not be null");
         assertTrue(bodyObj instanceof byte[], "Message body should be byte array");
         byte[] receivedBody = (byte[]) bodyObj;

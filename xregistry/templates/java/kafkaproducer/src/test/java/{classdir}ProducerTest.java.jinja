@@ -122,35 +122,37 @@ public class {{ class_name | strip_namespace }} {
                 {%- endif %}
             {%- endif %}
             
-            // Send message
-            producer.send{{ messagename }}(testData).get();
+            // Send 5 messages to test proper message handling
+            for (int i = 0; i < 5; i++) {
+                producer.send{{ messagename }}(testData).get();
+            }
             producer.flush();
             
-            logger.info("Message sent, waiting for consumption");
+            logger.info("5 messages sent, waiting for consumption");
             
-            // Consume and verify
+            // Consume and verify all 5 messages
             KafkaConsumer<byte[], byte[]> consumer = createConsumer("{{ topic }}");
             try {
-                boolean messageReceived = false;
+                int messagesReceived = 0;
                 int attempts = 0;
                 
-                while (!messageReceived && attempts < 10) {
+                while (messagesReceived < 5 && attempts < 15) {
                     ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofSeconds(2));
                     if (!records.isEmpty()) {
                         for (ConsumerRecord<byte[], byte[]> record : records) {
-                            logger.info("Received message from topic {} partition {} offset {}", 
-                                record.topic(), record.partition(), record.offset());
+                            logger.info("Received message {} from topic {} partition {} offset {}", 
+                                messagesReceived, record.topic(), record.partition(), record.offset());
                             
                             assertNotNull(record.value(), "Message value should not be null");
                             assertTrue(record.value().length > 0, "Message should have content");
-                            messageReceived = true;
+                            messagesReceived++;
                         }
                     }
                     attempts++;
                 }
                 
-                assertTrue(messageReceived, "{{ messagename }} message should be received");
-                logger.info("{{ messagename }} message test completed successfully");
+                assertEquals(5, messagesReceived, "Should receive all 5 {{ messagename }} messages");
+                logger.info("All 5 {{ messagename }} messages test completed successfully");
                 
             } finally {
                 consumer.close();
