@@ -164,15 +164,15 @@ async def test_{{groupName}}_{{messagename.split('.')[-1]}}_py(mosquitto_broker)
     for i in range(5):
         await publisher_client.publish_{{messagename.split('.')[-1]}}(
             topic=test_topic,
-            {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.value %}
-            {%- if attribute.type == "uritemplate" %}
+            {%- for attrname, attribute in message.envelopemetadata.items() %}
+            {%- if attribute.type == "uritemplate" and attribute.value %}
             {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
             {%- if phs %}
             {%- for placeholder in phs %}
-            _{{ placeholder | snake }}=f"test_{{placeholder}}_{i}",
+            {{ placeholder | snake }}=f"test_{{placeholder}}_{i}",
             {%- endfor %}
             {%- endif %}
-            {%- else %}
+            {%- elif not attribute.value %}
             _{{ attrname | snake }}=f"test_{{attrname}}_{i}",
             {%- endif %}
             {%- endfor %}

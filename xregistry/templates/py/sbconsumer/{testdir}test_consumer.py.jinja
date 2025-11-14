@@ -198,9 +198,9 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
     from cloudevents.kafka import to_binary, to_structured
     cloud_event = CloudEvent(attributes, byte_data)
     
-    # Use structured mode for testing
-    headers, body = to_structured(cloud_event)
-    kafka_headers = [(k, v.encode() if isinstance(v, str) else v) for k, v in headers.items()]
+    # Use structured mode for testing - to_structured returns headers dict and body bytes
+    headers_dict, body = to_structured(cloud_event)
+    kafka_headers = [(k, v.encode() if isinstance(v, str) else v) for k, v in headers_dict.items()]
     
     # Send message via Kafka producer
     producer.produce(
