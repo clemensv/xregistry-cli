@@ -91,6 +91,9 @@ public class ConsumerTest {
     public void test{{ messagename }}MessageConsumption() throws Exception {
         logger.info("Starting test{{ messagename }}MessageConsumption");
         
+        // Use unique topic name per test to avoid message accumulation
+        String topicName = "test-topic-{{ messagename | lower }}";
+        
         // Create test data
         {%- if message_body_type == "byte[]" %}
         {{ message_body_type }} testData = "Test message data".getBytes();
@@ -144,11 +147,11 @@ public class ConsumerTest {
         try {
             // Send 5 messages
             for (int i = 0; i < 5; i++) {
-                ProducerRecord<byte[], byte[]> record = new ProducerRecord<>(SHARED_TOPIC, messageBytes);
+                ProducerRecord<byte[], byte[]> record = new ProducerRecord<>(topicName, messageBytes);
                 producer.send(record).get();
             }
             producer.flush();
-            logger.info("5 test messages sent to shared topic {}", SHARED_TOPIC);
+            logger.info("5 test messages sent to topic {}", topicName);
         } finally {
             producer.close();
         }
@@ -166,8 +169,8 @@ public class ConsumerTest {
             new org.apache.kafka.clients.consumer.KafkaConsumer<>(consumerProps);
         
         try {
-            consumer.subscribe(Collections.singletonList(SHARED_TOPIC));
-            logger.info("Subscribed to shared topic, starting poll loop");
+            consumer.subscribe(Collections.singletonList(topicName));
+            logger.info("Subscribed to topic {}, starting poll loop", topicName);
             
             int messagesReceived = 0;
             long endTime = System.currentTimeMillis() + 30000; // 30 second timeout

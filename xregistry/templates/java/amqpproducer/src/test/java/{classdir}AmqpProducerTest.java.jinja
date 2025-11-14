@@ -77,9 +77,12 @@ public class {{ class_name | strip_namespace }} {
     public void test{{ messagename }}MessageSend() throws Exception {
         logger.info("Starting test{{ messagename }}MessageSend");
         
+        // Use unique queue name per test to avoid message accumulation
+        String queueName = "test-queue-{{ messagename | lower }}";
+        
         PlainEndpointCredential credential = new PlainEndpointCredential("guest", "guest");
         Map<String, String> options = new HashMap<>();
-        options.put("node", QUEUE_NAME);
+        options.put("node", queueName);
         {{ class_name }} producer = {{ class_name }}.createProducer(
             credential,
             {%- if cloudEvents.isCloudEvent(message) %}
@@ -103,7 +106,7 @@ public class {{ class_name | strip_namespace }} {
                 connOptions.password("guest");
                 
                 connection = client.connect(brokerUrl.getHost(), brokerUrl.getPort(), connOptions);
-                Receiver receiver = connection.openReceiver(QUEUE_NAME);
+                Receiver receiver = connection.openReceiver(queueName);
                 
                 // Wait for 5 messages with timeout
                 int attempts = 0;
