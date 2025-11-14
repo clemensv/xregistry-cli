@@ -200,12 +200,28 @@ class {{ class_name }}(_ClientBase):
     {% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
     {%- set messagename = messageid | dotunderscore | snake %}
     {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
+    {%- set uri_template_vars = [] %}
+    {%- for attrname, attribute in message.envelopemetadata.items() %}
+        {%- if attribute.value and attribute.type == "uritemplate" %}
+            {%- set phs = attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
+            {%- if phs %}
+                {%- for placeholder in phs %}
+                    {%- if placeholder not in uri_template_vars %}
+                        {%- set _ = uri_template_vars.append(placeholder) %}
+                    {%- endif %}
+                {%- endfor %}
+            {%- endif %}
+        {%- endif %}
+    {%- endfor %}
     async def publish_{{messagename.split('.')[-1]}}(self,
         topic: str,
         {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.value -%}
         {%- if attribute.type != "uritemplate" -%}
         _{{ attrname | snake }}: str,
         {%- endif -%}
+        {%- endfor %}
+        {%- for var in uri_template_vars %}
+        {{ var | snake }}: str,
         {%- endfor %}
         data: {{type_name}},
         content_type: str = "application/json") -> None:
@@ -218,6 +234,9 @@ class {{ class_name }}(_ClientBase):
         {%- if attribute.type != "uritemplate" -%}
             _{{ attrname | snake }}: CloudEvents attribute '{{attrname}}'
         {%- endif -%}
+        {%- endfor %}
+        {%- for var in uri_template_vars %}
+            {{ var | snake }}: URI template variable for '{{var}}'
         {%- endfor %}
             data: The event data to be published
             content_type: The content type for the event data
@@ -232,7 +251,7 @@ class {{ class_name }}(_ClientBase):
                 {%- if phs -%}
                 .format(
                 {%- for placeholder in phs -%}
-                    {{ placeholder }} = data.{{ placeholder | snake }}
+                    {{ placeholder }} = {{ placeholder | snake }}
                 {%- if not loop.last -%},{%- endif%}
                 {%- endfor -%}
                 )

@@ -70,7 +70,7 @@ def parse_cloudevent(msg: Message) -> CloudEvent:
 
 {%- for messagegroupid, messagegroup in root.messagegroups.items() %}
 {%- set groupname = messagegroupid | pascal %}
-{%- set class_name = ( groupname | strip_dots ) + "EventProducer" %}
+{%- set dispatcher_class_name = ( groupname | strip_dots ) + "MessageDispatcher" %}
 {%- for messageid, message in messagegroup.messages.items() %}
 {%- set messagename = messageid | pascal | strip_dots | strip_namespace %}
 {%- set test_function_name = "test_" + groupname | lower | replace(" ", "_") + "_" + messagename | lower | replace(" ", "_") %}
@@ -117,8 +117,6 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
             if cloudevent['type'] == "{{ messageid }}":
                 return True
 
-    kafka_producer = Producer({'bootstrap.servers': bootstrap_servers})
-    producer_instance = {{ class_name }}(kafka_producer, topic, 'binary')
     {%- set type_name = util.DeclareDataType( data_project_name, root, message ) %}
     {%- if type_name != "object" %}
     # Create minimal test data instance to satisfy schema requirements
@@ -175,21 +173,44 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
     {%- else %}
     event_data = {}
     {%- endif %}
-    producer_instance.send_{{ messageid | dotunderscore | snake }}(
-        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
-            _{{ attrname }} = {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
-        {%- endfor -%}
-        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" -%}
-            {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}_{{ placeholder | snake }} = 'test', {% endfor -%}
-        {%- endfor -%}
-        data = event_data
-        {%- for attrname, attribute in message.envelopemetadata.items() if not attribute.required and attribute.value is not defined -%}
-            , _{{ attrname }} = ''
-        {%- endfor -%}
+    
+    # Create CloudEvent with required attributes
+    attributes = {
+        "type": "{{ messageid }}",
+        "source": "test",
+        {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
+        "{{ attrname }}": {{ "'test'" if not attrname == 'time' else 'datetime.datetime.now().isoformat()' }},
+        {%- endfor %}
+        "datacontenttype": "application/json"
+    }
+    
+    # Serialize event data
+    if event_data:
+        if hasattr(event_data, 'to_byte_array'):
+            byte_data = event_data.to_byte_array('application/json')
+        else:
+            byte_data = json.dumps(event_data).encode('utf-8') if not isinstance(event_data, bytes) else event_data
+    else:
+        byte_data = b'{}'
+    
+    # Create CloudEvent and convert to Kafka message format
+    from cloudevents.http import CloudEvent
+    from cloudevents.kafka import to_binary, to_structured
+    cloud_event = CloudEvent(attributes, byte_data)
+    
+    # Use structured mode for testing
+    headers, body = to_structured(cloud_event)
+    kafka_headers = [(k, v.encode() if isinstance(v, str) else v) for k, v in headers.items()]
+    
+    # Send message via Kafka producer
+    producer.produce(
+        topic,
+        value=body,
+        headers=kafka_headers
     )
     
     # Flush producer to ensure message is sent before consumer polling
-    kafka_producer.flush(timeout=5.0)
+    producer.flush(timeout=5.0)
 
     assert on_event()
     consumer.close()
