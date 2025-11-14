@@ -3,7 +3,7 @@ name = "{{main_project_name|replace("_","-")}}"
 description = "{{project_name | capitalize}} Azure Event Hubs consumer library"
 authors = ["Your Name <your.email@example.com>"]
 version = "{{ "0.1.0" if not package_version else package_version }}"  # Placeholder version, dynamic versioning can be handled with plugins
-packages = [{include = "{{main_project_name}}", from = "src"}]
+packages = [{include = "{{main_project_name|lower}}", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "<4.0,>=3.10"
