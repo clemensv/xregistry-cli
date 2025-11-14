@@ -284,7 +284,7 @@ public class {{ class_name | strip_namespace }} {
         
         {%- if cloudEvents.isCloudEvent(message) %}
         // For CloudEvents messages, verify the content-type header
-        String contentType = received.contentType();
+        String contentType = firstMessage.contentType();
         assertTrue(contentType != null && contentType.contains("cloudevents"), 
             "Message should have CloudEvents content type, got: " + contentType);
         
