@@ -123,9 +123,9 @@ class {{ class_name }}:
             message = to_structured(event, data_marshaller=lambda x: {% if data_type != "object"%}json.loads(x.to_json()){%else%}json.dumps(x){%endif%}, key_mapper=lambda x: self.__key_mapper(x, data, key_mapper))
             message.headers[b"content-type"] = b"application/cloudevents+json"
         else:
-            content_type = "application/json"
-            event["content-type"] = content_type
-            message = to_binary(event, data_marshaller=lambda x: {% if data_type != "object"%}x.to_byte_array(content_type){%else%}json.dumps(x){%endif%}, key_mapper=lambda x: self.__key_mapper(x, data, key_mapper))
+            # For binary mode, datacontenttype is already set in attributes above
+            # The to_binary() function will create the ce_datacontenttype header
+            message = to_binary(event, data_marshaller=lambda x: {% if data_type != "object"%}x.to_byte_array("application/json"){%else%}json.dumps(x){%endif%}, key_mapper=lambda x: self.__key_mapper(x, data, key_mapper))
         self.producer.produce(self.topic, key=message.key, value=message.value, headers=message.headers)
         if flush_producer:
             self.producer.flush()
