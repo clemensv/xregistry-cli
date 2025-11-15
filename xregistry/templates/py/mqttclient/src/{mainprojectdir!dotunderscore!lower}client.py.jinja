@@ -151,7 +151,11 @@ class {{ class_name }}(_ClientBase):
             if self.{{messagename.split('.')[-1]}}_async:
                 try:
                     content_type = cloud_event.get_attributes().get('datacontenttype', 'application/json')
+                    {%- if type_name == "object" %}
+                    data = cloud_event.data
+                    {%- else %}
                     data = {{type_name}}.from_data(cloud_event.data, content_type)
+                    {%- endif %}
                     await self.{{messagename.split('.')[-1]}}_async(mqtt_message, cloud_event, data)
                 except Exception as e:
                     print(f"Error in {{messagename.split('.')[-1]}} handler: {e}")

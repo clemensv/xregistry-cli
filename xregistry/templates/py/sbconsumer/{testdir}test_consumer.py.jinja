@@ -195,17 +195,18 @@ def {{ test_function_name | dotunderscore }}(kafka_emulator):
     
     # Create CloudEvent and convert to Kafka message format
     from cloudevents.http import CloudEvent
-    from cloudevents.kafka import to_binary, to_structured
+    from cloudevents.kafka import to_structured
     cloud_event = CloudEvent(attributes, byte_data)
     
-    # Use structured mode for testing - to_structured returns headers dict and body bytes
-    headers_dict, body = to_structured(cloud_event)
-    kafka_headers = [(k, v.encode() if isinstance(v, str) else v) for k, v in headers_dict.items()]
+    # Use structured mode for testing - to_structured returns a KafkaMessage object
+    kafka_message = to_structured(cloud_event)
+    # Extract headers as list of tuples for confluent_kafka
+    kafka_headers = [(k, v) for k, v in kafka_message.headers.items()]
     
     # Send message via Kafka producer
     producer.produce(
         topic,
-        value=body,
+        value=kafka_message.value,
         headers=kafka_headers
     )
     
