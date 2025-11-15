@@ -202,6 +202,17 @@ async def {{ test_function_name | dotunderscore }}(service_bus_emulator):
     event_data = {}
     {%- endif %}
     
+    # Serialize event data first - dataclasses-json provides to_dict()
+    if event_data:
+        if hasattr(event_data, 'to_dict'):
+            # dataclasses-json objects have to_dict()
+            serialized_data = event_data.to_dict()
+        else:
+            # Fallback for plain dicts or other serializable types
+            serialized_data = event_data if isinstance(event_data, dict) else {}
+    else:
+        serialized_data = {}
+    
     # Create CloudEvent with required attributes
     attributes = {
         "specversion": "1.0",
@@ -213,21 +224,10 @@ async def {{ test_function_name | dotunderscore }}(service_bus_emulator):
         "datacontenttype": "application/json"
     }
     
-    # Serialize event data
-    if event_data:
-        if hasattr(event_data, 'to_json'):
-            body = event_data.to_json()
-        elif hasattr(event_data, 'to_byte_array'):
-            body = event_data.to_byte_array('application/json')
-        else:
-            body = json.dumps(event_data).encode('utf-8') if not isinstance(event_data, bytes) else event_data
-    else:
-        body = b'{}'
-    
     # Create CloudEvent and send via Service Bus
     from cloudevents.http import CloudEvent
-    from cloudevents.conversion import to_structured, to_binary
-    cloud_event = CloudEvent(attributes, event_data if event_data else None)
+    from cloudevents.conversion import to_structured
+    cloud_event = CloudEvent(attributes, serialized_data)
     
     # Convert to structured mode for Service Bus
     headers, body = to_structured(cloud_event)
