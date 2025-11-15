@@ -202,14 +202,18 @@ async def {{ test_function_name | dotunderscore }}(service_bus_emulator):
     event_data = {}
     {%- endif %}
     
-    # Serialize event data first - dataclasses-json provides to_dict()
+    # Serialize event data to dict with proper nested object/enum handling
+    # dataclasses-json's to_json() properly serializes nested objects and enums,
+    # so we convert to JSON and back to get a pure dict
     if event_data:
-        if hasattr(event_data, 'to_dict'):
-            # dataclasses-json objects have to_dict()
-            serialized_data = event_data.to_dict()
+        if hasattr(event_data, 'to_json'):
+            # dataclasses-json objects: serialize to JSON then parse back to dict
+            json_str = event_data.to_json()
+            serialized_data = json.loads(json_str)
+        elif isinstance(event_data, dict):
+            serialized_data = event_data
         else:
-            # Fallback for plain dicts or other serializable types
-            serialized_data = event_data if isinstance(event_data, dict) else {}
+            serialized_data = {}
     else:
         serialized_data = {}
     
