@@ -119,6 +119,9 @@ export class {{ class_name }} {
      {%- endif %}
      * @param data The message data object
      {%- if isCloudEvent %}
+     {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+     * @param {{ attrname }} CloudEvent required attribute '{{ attrname }}'
+     {%- endfor %}
      {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
      {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
      * @param {{ placeholder }} Value for placeholder {{ placeholder }} in attribute {{ attrname }}
@@ -134,6 +137,9 @@ export class {{ class_name }} {
     async send{{ messagename }}(
         data: {{ type_name }},
         {%- if isCloudEvent %}
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+        {{ attrname }}: string,
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
         {{ placeholder }}: string,
@@ -147,6 +153,13 @@ export class {{ class_name }} {
     ): Promise<void> {
         {%- if isCloudEvent %}
         const cloudEvent = new CloudEvent({
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+        {%- if attrname == "type" %}
+            type: {{ attrname }},
+        {%- elif attrname == "source" %}
+            source: {{ attrname }},
+        {%- endif %}
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() %}
         {%- if attrname == "type" %}
             type: {% if attribute.value %}'{{ attribute.value }}'{% else %}{{ attrname }}{% endif %},
@@ -211,6 +224,9 @@ export class {{ class_name }} {
      * Send multiple `{{ messagename }}` messages in a batch
      * @param dataArray Array of message data objects
      {%- if isCloudEvent %}
+     {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+     * @param {{ attrname }} CloudEvent required attribute '{{ attrname }}'
+     {%- endfor %}
      {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
      {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
      * @param {{ placeholder }} Value for placeholder {{ placeholder }} in attribute {{ attrname }}
@@ -226,6 +242,9 @@ export class {{ class_name }} {
     async send{{ messagename }}Batch(
         dataArray: {{ type_name }}[],
         {%- if isCloudEvent %}
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+        {{ attrname }}: string,
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
         {{ placeholder }}: string,
@@ -240,6 +259,13 @@ export class {{ class_name }} {
         const messages: ServiceBusMessage[] = dataArray.map(data => {
             {%- if isCloudEvent %}
             const cloudEvent = new CloudEvent({
+            {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+            {%- if attrname == "type" %}
+                type: {{ attrname }},
+            {%- elif attrname == "source" %}
+                source: {{ attrname }},
+            {%- endif %}
+            {%- endfor %}
             {%- for attrname, attribute in message.envelopemetadata.items() %}
             {%- if attrname == "type" %}
                 type: {% if attribute.value %}'{{ attribute.value }}'{% else %}{{ attrname }}{% endif %},

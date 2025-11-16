@@ -81,6 +81,9 @@ export class {{ class_name }} {
      * Send a {{ messagename }} event
      * @param data The event data
      {%- if isCloudEvent %}
+     {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+     * @param {{ attrname }} CloudEvent required attribute '{{ attrname }}'
+     {%- endfor %}
      {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
      {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
      * @param {{ placeholder }} Value for placeholder {{ placeholder }} in attribute {{ attrname }}
@@ -96,6 +99,9 @@ export class {{ class_name }} {
     async send{{ messagename | strip_namespace }}(
         data: {{ type_name }},
         {%- if isCloudEvent %}
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+        {{ attrname }}: string,
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
         {{ placeholder }}: string,
@@ -110,6 +116,9 @@ export class {{ class_name }} {
         const message = this.create{{ messagename | strip_namespace }}Message(
             data,
             {%- if isCloudEvent %}
+            {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+            {{ attrname }},
+            {%- endfor %}
             {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
             {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
             {{ placeholder }},
@@ -132,6 +141,9 @@ export class {{ class_name }} {
      * Send a batch of {{ messagename }} events
      * @param dataArray Array of event data
      {%- if isCloudEvent %}
+     {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+     * @param {{ attrname }} CloudEvent required attribute '{{ attrname }}'
+     {%- endfor %}
      {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
      {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
      * @param {{ placeholder }} Value for placeholder {{ placeholder }} in attribute {{ attrname }}
@@ -147,6 +159,9 @@ export class {{ class_name }} {
     async send{{ messagename | strip_namespace }}Batch(
         dataArray: {{ type_name }}[],
         {%- if isCloudEvent %}
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+        {{ attrname }}: string,
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
         {{ placeholder }}: string,
@@ -162,6 +177,9 @@ export class {{ class_name }} {
             this.create{{ messagename | strip_namespace }}Message(
                 data,
                 {%- if isCloudEvent %}
+                {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+                {{ attrname }},
+                {%- endfor %}
                 {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
                 {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
                 {{ placeholder }},
@@ -187,6 +205,9 @@ export class {{ class_name }} {
     private create{{ messagename | strip_namespace }}Message(
         data: {{ type_name }},
         {%- if isCloudEvent %}
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+        {{ attrname }}: string,
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
         {{ placeholder }}: string,
@@ -200,6 +221,13 @@ export class {{ class_name }} {
     ): Message {
         {%- if isCloudEvent %}
         const cloudEvent = new CloudEvent({
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+        {%- if attrname == "type" %}
+            type: {{ attrname }},
+        {%- elif attrname == "source" %}
+            source: {{ attrname }},
+        {%- endif %}
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() %}
         {%- if attrname == "type" %}
             type: {% if attribute.value %}'{{ attribute.value }}'{% else %}{{ attrname }}{% endif %},
