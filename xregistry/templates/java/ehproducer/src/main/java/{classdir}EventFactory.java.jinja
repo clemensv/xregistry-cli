@@ -80,10 +80,8 @@ public class {{ class_name }} {
                 .withType("{{ messageid }}")
                 {%- endif %}
                 {%- if message.envelopemetadata and message.envelopemetadata.source %}
-                {%- if message.envelopemetadata.source.value %}
+                {%- if message.envelopemetadata.source.value and message.envelopemetadata.source.type != "uritemplate" %}
                 .withSource(URI.create("{{ message.envelopemetadata.source.value }}"))
-                {%- elif message.envelopemetadata.source.type == "uritemplate" %}
-                // Source URI template requires runtime values
                 {%- else %}
                 .withSource(URI.create("urn:{{ messagegroupid }}"))
                 {%- endif %}
