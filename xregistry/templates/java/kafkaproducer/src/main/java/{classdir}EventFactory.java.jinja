@@ -86,8 +86,22 @@ public class {{ class_name }} {
         // Create CloudEvent
         CloudEvent cloudEvent = CloudEventBuilder.v1()
             .withId(UUID.randomUUID().toString())
+            {%- if message.envelopemetadata and message.envelopemetadata.type and message.envelopemetadata.type.value %}
+            .withType("{{ message.envelopemetadata.type.value }}")
+            {%- else %}
             .withType("{{ messageid }}")
-            .withSource(URI.create("urn:{{ project_name | lower }}"))
+            {%- endif %}
+            {%- if message.envelopemetadata and message.envelopemetadata.source %}
+            {%- if message.envelopemetadata.source.value %}
+            .withSource(URI.create("{{ message.envelopemetadata.source.value }}"))
+            {%- elif message.envelopemetadata.source.type == "uritemplate" %}
+            // Source URI template requires runtime values
+            {%- else %}
+            .withSource(URI.create("urn:{{ messagegroupid }}"))
+            {%- endif %}
+            {%- else %}
+            .withSource(URI.create("urn:{{ messagegroupid }}"))
+            {%- endif %}
             {%- if "datacontenttype" in message.metadata and "value" in message.metadata.datacontenttype %}
             .withDataContentType("{{ message.metadata.datacontenttype.value }}")
             {%- else %}
