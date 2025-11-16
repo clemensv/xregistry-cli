@@ -23,6 +23,9 @@ using CloudNative.CloudEvents.Avro;
 
 {#- Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates -#}
 {%- macro DeclareUriTemplateArguments(message) -%}
+{%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata -%}
+, string {{ attrname }}
+{%- endfor -%}
 {%- for attrname in message.envelopemetadata if attrname not in ["datacontenttype", "dataschema"] -%}
 {%- set attribute = message.envelopemetadata[attrname] -%}
     {%- if attribute.type == "uritemplate" -%}
@@ -42,6 +45,9 @@ CloudEvent {{ variable }} = new CloudEvent()
 {
 {%- if "type" not in message.envelopemetadata %}
     Type = "{{ message.messageid }}",
+{%- endif %}
+{%- if "source" not in message.envelopemetadata %}
+    Source = new Uri(source),
 {%- endif %}
 {%- for attrname in message.envelopemetadata -%}
 {%- set attribute = message.envelopemetadata[attrname] -%}
