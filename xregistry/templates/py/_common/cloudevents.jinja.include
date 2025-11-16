@@ -2,6 +2,11 @@
 
 # CloudEvents macros
 
+# Helper macro to check if a required CloudEvents attribute is missing from envelopemetadata
+{%- macro IsRequiredAttributeMissing(message, attrname) -%}
+{{- (attrname in ['source', 'type', 'id'] and attrname not in message.envelopemetadata) -}}
+{%- endmacro -%}
+
 # Generates a list of arguments for "send" methods that correspond to placeholders in uritemplates
 {%- macro DeclareUriTemplateArguments(message) -%}
 {%- for attrname in message.envelopemetadata if attrname not in ["datacontenttype", "dataschema"] -%}

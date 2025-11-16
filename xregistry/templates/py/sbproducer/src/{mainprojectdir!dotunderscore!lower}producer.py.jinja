@@ -64,6 +64,9 @@ class {{ class_name }}:
     {% for messageid, message in messagegroup.messages.items() if (message | exists("envelope","CloudEvents/1.0")) -%}
     {%- set messagename = messageid | dotunderscore | snake %}
     async def send_{{messagename.split('.')[-1]}}(self,
+    {%- for attrname in ['source', 'type', 'id'] if attrname not in message.envelopemetadata -%}
+        _{{ attrname }}: str, {{ '' }}
+    {%- endfor -%}
     {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
         _{{ attrname }}: str, {{ '' }}
     {%- endfor -%}
@@ -78,6 +81,9 @@ class {{ class_name }}:
         Sends the '{{ messageid }}' event to the EventHub
 
         Args:
+        {%- for attrname in ['source', 'type', 'id'] if attrname not in message.envelopemetadata %}
+            _{{ attrname }}(str) : CloudEvents required attribute '{{ attrname }}'
+        {%- endfor -%}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
             _{{ attrname }}(str) : {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
         {%- endfor -%}
@@ -94,6 +100,9 @@ class {{ class_name }}:
         """
 
         attributes = {
+        {%- for attrname in ['source', 'type', 'id'] if attrname not in message.envelopemetadata %}
+             "{{ attrname }}": _{{ attrname }},
+        {%- endfor -%}
         {%- for attrname, attribute in message.envelopemetadata.items() %}
              "{{ attrname }}":
             {%- if attribute.value -%}

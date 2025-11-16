@@ -64,6 +64,9 @@ class {{ class_name }}:
     {%- set data_type = util.DeclareDataType( data_project_name, root, message ) %}
 
     def send_{{message_snake}}(self,
+        {%- for attrname in ['source', 'type', 'id'] if attrname not in message.envelopemetadata -%}
+        _{{ attrname }}: str, {{ '' }}
+        {%- endfor -%}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined -%}
         _{{ attrname }}: str, {{ '' }}
         {%- endfor -%}
@@ -78,6 +81,9 @@ class {{ class_name }}:
         Sends the '{{ messageid }}' event to the Kafka topic
 
         Args:
+        {%- for attrname in ['source', 'type', 'id'] if attrname not in message.envelopemetadata %}
+            _{{ attrname }}(str) : CloudEvents required attribute '{{ attrname }}'
+        {%- endfor -%}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.required and attribute.value is not defined %}
             _{{ attrname }}(str) : {{ attribute.description if attribute.description else "CloudEvents attribute '"+attrname+"'" }}
         {%- endfor -%}
@@ -96,6 +102,9 @@ class {{ class_name }}:
                 The default key mapper maps the CloudEvent type, source, and subject to the Kafka key
         """
         attributes = {
+        {%- for attrname in ['source', 'type', 'id'] if attrname not in message.envelopemetadata %}
+             "{{ attrname }}": _{{ attrname }},
+        {%- endfor -%}
         {%- for attrname, attribute in message.envelopemetadata.items() %}
              "{{ attrname }}":
             {%- if attribute.value -%}

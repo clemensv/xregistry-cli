@@ -100,6 +100,9 @@ class {{ class_name }}:
     def send_{{ messagename | snake }}(self,
         data: {{ type_name }},
         {%- if isCloudEvent %}
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+        _{{ attrname }}: str,
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
         _{{ placeholder | snake }}: str,
@@ -118,6 +121,9 @@ class {{ class_name }}:
         
         Args:
         {%- if isCloudEvent %}
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+            _{{ attrname }} (str): CloudEvents required attribute '{{ attrname }}'
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() if attribute.type == "uritemplate" %}
         {%- for placeholder in attribute.value | regex_search('\\{([A-Za-z0-9_]+)\\}') %}
             _{{ placeholder | snake }} (str): Value for placeholder {{ placeholder }} in attribute {{ attrname }}
@@ -133,6 +139,9 @@ class {{ class_name }}:
         {%- if isCloudEvent %}
         # Build CloudEvent attributes
         attributes = {
+        {%- for attrname in ['source', 'type'] if attrname not in message.envelopemetadata %}
+            "{{ attrname }}": _{{ attrname }},
+        {%- endfor %}
         {%- for attrname, attribute in message.envelopemetadata.items() %}
             "{{ attrname }}": 
             {%- if attrname == "id" %}
