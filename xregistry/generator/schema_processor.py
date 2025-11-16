@@ -254,8 +254,7 @@ class SchemaProcessor(ResourceProcessor):
 
     def _requires_avrotize(self, language: str, schema_format_short: str) -> bool:
         """Check if schema requires avrotize processing."""
-        return (language in ["py", "cs", "java", "js", "ts"] and 
-                schema_format_short != "proto")
+        return language in ["py", "cs", "java", "js", "ts"]
 
     def convert_jsons_to_avro(self, schema_reference: str, schema_root: JsonNode,
                              namespace_name: str, class_name: str) -> JsonNode:

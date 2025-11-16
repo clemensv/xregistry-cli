@@ -205,6 +205,9 @@ class TemplateRenderer:
                 # Convert JSON Schema to Avro if needed
                 if schema_info["format_short"] == "jsonschema":
                     self.convert_json_to_avro_if_needed(schema_info)
+                # Convert Proto to Avro if needed
+                elif schema_info["format_short"] == "proto":
+                    self.convert_proto_to_avro_if_needed(schema_info)
                 
                 avrotize_queue.append(schema_info)
             else:
@@ -1048,8 +1051,7 @@ class TemplateRenderer:
 
     def should_use_avrotize(self, schema_info: Dict[str, Any]) -> bool:
         """Check if schema should be processed with avrotize."""
-        return (self.language in ["py", "cs", "java", "js", "ts"] and 
-                schema_info["format_short"] != "proto")
+        return self.language in ["py", "cs", "java", "js", "ts"]
 
     def convert_json_to_avro_if_needed(self, schema_info: Dict[str, Any]) -> None:
         """Convert JSON schema to Avro if needed."""
@@ -1059,6 +1061,41 @@ class TemplateRenderer:
                 schema_info["content"], schema_info["class_name"], namespace
             )
             schema_info["format_short"] = "avro"
+
+    def convert_proto_to_avro_if_needed(self, schema_info: Dict[str, Any]) -> None:
+        """Convert Protobuf schema to Avro if needed."""
+        if schema_info["format_short"] == "proto":
+            import avrotize.prototoavro as prototoavro
+            import tempfile
+            import os
+            
+            # prototoavro works with files, so we need temp files
+            proto_content = schema_info["content"]
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.proto', delete=False) as proto_file:
+                proto_file.write(proto_content)
+                temp_proto_path = proto_file.name
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.avsc', delete=False) as avro_file:
+                temp_avro_path = avro_file.name
+            
+            try:
+                # Convert proto to avro (automatically detects proto2 vs proto3)
+                prototoavro.convert_proto_to_avro(temp_proto_path, temp_avro_path)
+                
+                # Read the converted avro schema
+                with open(temp_avro_path, 'r', encoding='utf-8') as f:
+                    import json
+                    avro_schema = json.load(f)
+                
+                schema_info["content"] = avro_schema
+                schema_info["format_short"] = "avro"
+            finally:
+                # Clean up temp files
+                if os.path.exists(temp_proto_path):
+                    os.unlink(temp_proto_path)
+                if os.path.exists(temp_avro_path):
+                    os.unlink(temp_avro_path)
 
     def _convert_json_to_avro(self, json_schema: JsonNode, class_name: str, namespace: str = "") -> JsonNode:
         """Basic JSON to Avro conversion."""
