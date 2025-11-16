@@ -75,19 +75,24 @@ class {{ type_name | snake }}:
         {%- endif %}
 
     @classmethod
-    def from_data(cls, data: Union[str, Dict[str, Any], '{{prefix_type_name}}{{ type_name | snake }}']) -> '{{prefix_type_name}}{{ type_name | snake }}':
-        """Create an instance of {{prefix_type_name}}{{ type_name | snake }} from a dictionary or JSON string"""
+    def from_data(cls, data: Union[str, bytes, Dict[str, Any], '{{prefix_type_name}}{{ type_name | snake }}'], content_type: str = 'application/json') -> '{{prefix_type_name}}{{ type_name | snake }}':
+        """Create an instance of {{prefix_type_name}}{{ type_name | snake }} from a dictionary, JSON string, or bytes"""
         if isinstance(data, cls):
             return data
         elif isinstance(data, dict):
             return cls(data)
+        elif isinstance(data, bytes):
+            try:
+                return cls(json.loads(data.decode('utf-8')))
+            except (ValueError, UnicodeDecodeError) as e:
+                raise ValueError(f"Error parsing bytes as JSON: {str(e)}") from e
         elif isinstance(data, str):
             try:
                 return cls(json.loads(data))
             except ValueError as e:
                 raise ValueError(f"Error parsing string as JSON: {str(e)}") from e
         else:
-            raise TypeError("Data is not of a supported type for conversion to {{prefix_type_name}}{{ type_name | snake }}")
+            raise TypeError(f"Data is not of a supported type for conversion to {{prefix_type_name}}{{ type_name | snake }}, got {type(data)}")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert this object to a dictionary"""

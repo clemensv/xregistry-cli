@@ -53,31 +53,12 @@ class _ClientBase:
         try:
             if isinstance(message.payload, bytes):
                 payload_str = message.payload.decode('utf-8')
-                data = json.loads(payload_str)
-                
-                # Structured CloudEvent mode
-                if all(k in data for k in ['specversion', 'type', 'source', 'id']):
-                    attributes = {
-                        'specversion': data['specversion'],
-                        'type': data['type'],
-                        'source': data['source'],
-                        'id': data['id']
-                    }
-                    # Optional attributes
-                    for attr in ['time', 'datacontenttype', 'dataschema', 'subject']:
-                        if attr in data:
-                            attributes[attr] = data[attr]
-                    
-                    # Extract data
-                    event_data = data.get('data', b'')
-                    if isinstance(event_data, dict):
-                        event_data = json.dumps(event_data).encode('utf-8')
-                    elif isinstance(event_data, str):
-                        event_data = event_data.encode('utf-8')
-                    
-                    return CloudEvent(attributes, event_data)
+                # Use CloudEvents library's from_json to properly deserialize
+                from cloudevents.http import from_json
+                event = from_json(payload_str)
+                return event
             return None
-        except (json.JSONDecodeError, UnicodeDecodeError, KeyError):
+        except (json.JSONDecodeError, UnicodeDecodeError, KeyError, Exception):
             return None
 
 
@@ -154,6 +135,7 @@ class {{ class_name }}(_ClientBase):
                     {%- if type_name == "object" %}
                     data = cloud_event.data
                     {%- else %}
+                    # CloudEvent.data is now a dict or string, not bytes
                     data = {{type_name}}.from_data(cloud_event.data, content_type)
                     {%- endif %}
                     await self.{{messagename.split('.')[-1]}}_async(mqtt_message, cloud_event, data)
