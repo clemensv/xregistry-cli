@@ -29,17 +29,15 @@
           "description": "A set of metrics emitted by a temperature sensor",
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "type": "string",
-                "value": "Contoso.Sensors.Temperature.Metrics",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/contoso/{site}/sensors/{sensorid}",
-                "required": true
-              }
+            "type": {
+              "type": "string",
+              "value": "Contoso.Sensors.Temperature.Metrics",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/contoso/{site}/sensors/{sensorid}",
+              "required": true
             }
           },
           "dataschemaformat": "Avro/1.11.0",

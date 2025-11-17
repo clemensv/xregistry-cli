@@ -26,25 +26,23 @@
         "myevent": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "id": {
-                "type": "string",
-                "required": true
-              },
-              "type": {
-                "type": "string",
-                "value": "myevent",
-                "required": true
-              },
-              "time": {
-                "type": "datetime",
-                "required": true
-              },
-              "source": {
-                "type": "uritemplate",
-                "value": "/me",
-                "required": true
-              }
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "value": "myevent",
+              "required": true
+            },
+            "time": {
+              "type": "datetime",
+              "required": true
+            },
+            "source": {
+              "type": "uritemplate",
+              "value": "/me",
+              "required": true
             }
           }
         }

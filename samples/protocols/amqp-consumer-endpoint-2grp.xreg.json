@@ -31,10 +31,7 @@
           "protocol": "AMQP/1.0",
           "protocoloptions": {
             "header": {
-              "ttl": {
-                "type": "integer",
-                "value": "1000"
-              }
+              "ttl": 1000
             },
             "properties": {
               "subject": {
@@ -67,10 +64,7 @@
           "protocol": "AMQP/1.0",
           "protocoloptions": {
             "header": {
-              "ttl": {
-                "type": "integer",
-                "value": "1000"
-              }
+              "ttl": 1000
             },
             "properties": {
               "subject": {

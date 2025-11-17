@@ -6,10 +6,9 @@
         "com.example.group1.event1": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "value": "com.example.group1.event1"
-              }
+            "type": {
+              "type": "string",
+              "value": "com.example.group1.event1"
             }
           },
           "dataschemaformat": "AVRO/1.11.2",

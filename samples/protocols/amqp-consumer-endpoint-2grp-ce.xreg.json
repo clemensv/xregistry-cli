@@ -30,20 +30,15 @@
         "Contoso.MyGroup1.MyEvent": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "type": "string",
-                "value": "Contoso.MyGroup1.MyEvent"
-              }
+            "type": {
+              "type": "string",
+              "value": "Contoso.MyGroup1.MyEvent"
             }
           },
           "protocol": "AMQP/1.0",
           "protocoloptions": {
             "header": {
-              "ttl": {
-                "type": "integer",
-                "value": "1000"
-              }
+              "ttl": 1000
             },
             "properties": {
               "subject": {
@@ -75,20 +70,15 @@
         "Contoso.MyGroup2.MyEvent": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "type": "string",
-                "value": "Contoso.MyGroup2.MyEvent"
-              }
+            "type": {
+              "type": "string",
+              "value": "Contoso.MyGroup2.MyEvent"
             }
           },
           "protocol": "AMQP/1.0",
           "protocoloptions": {
             "header": {
-              "ttl": {
-                "type": "integer",
-                "value": "1000"
-              }
+              "ttl": 1000
             },
             "properties": {
               "subject": {

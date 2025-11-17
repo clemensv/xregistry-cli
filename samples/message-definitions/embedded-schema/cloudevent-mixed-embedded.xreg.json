@@ -6,10 +6,9 @@
         "com.example.group1.event1": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "value": "com.example.group1.event1"
-              }
+            "type": {
+              "type": "string",
+              "value": "com.example.group1.event1"
             }
           },
           "dataschemaformat": "AVRO/1.11.2",
@@ -28,10 +27,9 @@
         "com.example.group1.event2": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "value": "com.example.group1.event2"
-              }
+            "type": {
+              "type": "string",
+              "value": "com.example.group1.event2"
             }
           },
           "dataschemaformat": "Proto/3",
@@ -40,10 +38,9 @@
         "com.example.group1.event3": {
           "envelope": "CloudEvents/1.0",
           "envelopemetadata": {
-            "attributes": {
-              "type": {
-                "value": "com.example.group1.event3"
-              }
+            "type": {
+              "type": "string",
+              "value": "com.example.group1.event3"
             }
           },
           "dataschemaformat": "JSONSchema/draft-07",
