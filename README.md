@@ -3,26 +3,35 @@
 [![Python Test](https://github.com/clemensv/xregistry-cli/actions/workflows/test.yml/badge.svg)](https://github.com/clemensv/xregistry-cli/actions/workflows/test.yml)
 [![Python Release](https://github.com/clemensv/xregistry-cli/actions/workflows/build.yml/badge.svg)](https://github.com/clemensv/xregistry-cli/actions/workflows/build.yml)
 
-This project is a command line client for the xRegistry document format and API, with
-a focus on generating code artifacts from xRegistry definitions, especially message catalogs.
+A command-line tool for working with xRegistry documents and APIs, with powerful code generation capabilities for building messaging and eventing applications.
 
-The extensible code templates in this project allows you to generate type-safe
-producer and consumer clients for Java, C#, Python, and TypeScript for several
-messaging and eventing products, including geeric clients for MQTT, AMQP, and
-Kafka and produce-specific clients for Azure Event Hubs and Azure Service Bus,
-with broader coverage planned.
+## Why xRegistry CLI?
 
-The generator can also convert xRegistry endpoint and message definitions into
-AsyncAPI and OpenAPI documents.
+### Production-Ready Code, Not Just Snippets
 
-Unlike most other code generators of this kind, this tool does not just drop a
-single file that might or might not compile correctly, but creates SDK-like
-projects that include unit and integration tests. When you generate a Kafka
-producer, that producer come with an embedded integration test against
-Docker/Testcontainers. For the "data transfer objects", the classes that reflect
-the payload schemas, this tool leans on
-[Avrotize](https://github.com/clemensv/avrotize), which is a robust schema
-converter/normalizer and code generator that can deal with substantial complexity. 
+Unlike typical code generators that dump a single file and leave you to figure out the rest, xRegistry CLI generates complete, **SDK-like projects** with:
+
+- ✅ **Working integration tests** out of the box (using Docker/Testcontainers)
+- ✅ **Type-safe producer and consumer clients** for multiple platforms
+- ✅ **Compile-ready projects** with proper dependency management
+- ✅ **Best-practice code structure** following language conventions
+- ✅ **Robust schema handling** via [Avrotize](https://github.com/clemensv/avrotize)
+
+### Broad Platform Support
+
+Generate type-safe clients for Java, C#, Python, and TypeScript across multiple messaging systems:
+
+- Generic clients: MQTT, AMQP, Apache Kafka
+- Azure-specific: Event Hubs, Service Bus, Event Grid
+- Protocol conversions: AsyncAPI and OpenAPI documents
+
+### Flexible Workflows
+
+Work with xRegistry definitions using:
+
+- **Local files** (manifest mode) for offline development
+- **Remote registries** (catalog mode) for team collaboration
+- **Custom templates** for organization-specific code generation
 
 ## Table of Contents
 
@@ -61,15 +70,15 @@ xRegistry Message Catalogs are a set of registries that are built on top of
 xRegistry and are designed to support the discovery and description of messaging
 and eventing endpoints. The following catalogs are defined:
 
--   **Schema Catalog**: A registry for schemas that can be used to validate
+- **Schema Catalog**: A registry for schemas that can be used to validate
     messages.
--   **Message Catalog**: A registry for message definitions that describe the
+- **Message Catalog**: A registry for message definitions that describe the
     structure of messages. Messages can be defined as abstract, transport
     neutral envelopes based on [CloudEvents](https://cloudevents.io) or as concrete
     messages that are bound to a specific transport protocol, whereby AMQP, HTTP, MQTT,
     and Apache Kafka are directly supported. Each message definition can associated
     with a schema from the schema catalog for describing the message payload.
--   **Endpoint Catalog**: A registry for endpoints that can be used to send or
+- **Endpoint Catalog**: A registry for endpoints that can be used to send or
     receive messages. Each endpoint can be associated with one or more groups of
     message definitions from the message catalog.
 
@@ -79,44 +88,145 @@ referring to message definition groups and message definitions referring to sche
 You can study some examples of xRegistry Message Catalog documents in the
 samples directory of this repository:
 
--   [**Contoso ERP**](samples/message-definitions/contoso-erp.xreg.json): A
+- [**Contoso ERP**](samples/message-definitions/contoso-erp.xreg.json): A
     simple example of a message catalog for a fictional ERP system.
--   [**Inkjet Printer**](samples/message-definitions/inkjet.xreg.json): A
+- [**Inkjet Printer**](samples/message-definitions/inkjet.xreg.json): A
     fictitious group of events as they may be raised by an inkhet printer.
--   [**Fabrikam Motorsports**](samples/message-definitions/fabrikam-motorsports.xreg.json):
+- [**Fabrikam Motorsports**](samples/message-definitions/fabrikam-motorsports.xreg.json):
     An example for an event stream as it may be used in a motorsports telemetry
     scenario.
--   [**Vacuum Cleaner**](samples/message-definitions/vacuumcleaner.xreg.json):
+- [**Vacuum Cleaner**](samples/message-definitions/vacuumcleaner.xreg.json):
     A fictitious group of events as they may be raised by a vacuum cleaner.
 
 ## Installation
 
-The tool requires Python 3.10 or later. Until the tool is published in an
-official package source (_this is a prototype, remember?_), you can install the
-tool with pip directly from the repo:
+The tool requires Python 3.10 or later. Install directly from GitHub:
 
-```
-pip install git+https://github.com/clemensv/cloudevents-registry-cli.git
+```bash
+pip install git+https://github.com/clemensv/xregistry-cli.git
 ```
 
-If you want to develop locally and/or run the included tests follow the
-instructions in [Development Environment](docs/development_environment.md).
+This installs the `xregistry` package with two command-line aliases:
+
+- `xregistry` - Full command name
+- `xcg` - Short alias for convenience
+
+Both commands are functionally identical. Use whichever you prefer.
+
+For local development and testing, see [Development Environment](docs/development_environment.md).
 
 ## Usage
 
-The tool is invoked as `xregistry` and supports the following subcommands:
+The tool is invoked as `xregistry` (or `xcg`) and supports the following subcommands:
 
-- `xregistry manifest`: Generate a manifest document (a file-based catalog) for a s et of schemas and definitions
-- `xregistry catalog`: Interact with a catalog service (specifically [https://github.com/duglin/xreg-github/](https://github.com/duglin/xreg-github/) at the moment; no authNZ supported yet)
-- `xregistry generate`: Generate code
-- `xregistry validate`: Validate a definition
-- `xregistry list`: List available templates
+- `xregistry generate`: Generate code from xRegistry definitions
+- `xregistry validate`: Validate xRegistry definition files
+- `xregistry list`: List available code generation templates
+- `xregistry config`: Manage tool configuration (defaults, registry URLs, auth)
+- `xregistry manifest`: Work with local xRegistry files (offline mode)
+- `xregistry catalog`: Interact with remote xRegistry services (online mode)
 
-### Manifest and Catalog commands
+### Working with xRegistry Data: Manifest vs Catalog
 
-The `manifest` and `catalog` commands allow you to interact with the xRegistry catalog service and manage manifests, endpoints, message groups, messages, and schemas.
+xRegistry CLI supports two modes for managing registry data:
 
-Run `xregistry manifest --help` or `xregistry catalog --help` for more information.
+#### Manifest Mode (Local Files)
+
+Use `xregistry manifest` commands to work with **local JSON files** containing xRegistry definitions:
+
+```bash
+# Create/update local manifest file
+xregistry manifest messagegroup add --manifest=./my-registry.json --id=orders ...
+
+# Add messages to the local file
+xregistry manifest message add --manifest=./my-registry.json --messagegroupid=orders ...
+```
+
+**When to use manifest mode:**
+
+- Offline development and testing
+- Version-controlled registry definitions (Git)
+- Local-first workflows
+- No network dependency
+
+#### Catalog Mode (Remote Service)
+
+Use `xregistry catalog` commands to interact with a **remote xRegistry HTTP API**:
+
+```bash
+# Set up registry connection
+xregistry config set registry.base_url https://registry.example.com
+xregistry config set registry.auth_token <token>
+
+# Work with remote registry
+xregistry catalog messagegroup add --id=orders ...
+xregistry catalog message add --messagegroupid=orders ...
+```
+
+**When to use catalog mode:**
+
+- Team collaboration with shared registry
+- Central governance and discovery
+- Integration with CI/CD pipelines
+- Live registry queries
+
+**Note:** Currently supports [xreg-github](https://github.com/duglin/xreg-github/) registry implementation.
+
+Run `xregistry manifest --help` or `xregistry catalog --help` to see all available operations (add, get, update, delete, list) for endpoints, message groups, messages, and schemas.
+
+### Config Command
+
+Manage persistent configuration to avoid repeating common arguments:
+
+```bash
+# View all configuration
+xregistry config list
+
+# Set default values
+xregistry config set defaults.project_name MyProject
+xregistry config set defaults.language cs
+xregistry config set defaults.style producer
+xregistry config set defaults.output_dir ./generated
+
+# Set registry connection
+xregistry config set registry.base_url https://registry.example.com
+xregistry config set registry.auth_token <your-token>
+
+# Set custom model URL
+xregistry config set model.url https://example.com/custom-model.json
+
+# Get specific value
+xregistry config get defaults.language
+
+# Clear a value
+xregistry config unset defaults.language
+
+# Reset all to defaults
+xregistry config reset
+
+# Export as JSON
+xregistry config list --format json
+```
+
+Configuration is stored in a platform-specific location:
+
+- **Windows:** `%APPDATA%\xregistry\config.json`
+- **macOS:** `~/Library/Application Support/xregistry/config.json`
+- **Linux:** `~/.config/xregistry/config.json`
+
+**Available configuration keys:**
+
+| Key | Description |
+|-----|-------------|
+| `defaults.project_name` | Default project name for code generation |
+| `defaults.language` | Default language (cs, java, py, ts, etc.) |
+| `defaults.style` | Default style (producer, consumer, etc.) |
+| `defaults.output_dir` | Default output directory |
+| `registry.base_url` | Base URL for remote xRegistry catalog |
+| `registry.auth_token` | Authentication token for catalog access |
+| `registry.timeout` | HTTP timeout for catalog requests (seconds) |
+| `model.url` | Custom model.json URL (overrides built-in) |
+| `model.cache_timeout` | Cache duration for model downloads (seconds) |
 
 ### Generate
 
@@ -141,7 +251,7 @@ The `generate` command takes the following options:
 
 The tool supports the following languages and styles (as emitted by the `list` command):
 
-```
+```text
 --languages options:
 styles: 
 ├── asaql: Azure Stream Analytics
@@ -280,8 +390,8 @@ native ecosystem by making our systems interoperable with CloudEvents.
 The main mailing list for e-mail communications:
 
 - Send emails to: [cncf-cloudevents](mailto:cncf-cloudevents@lists.cncf.io)
-- To subscribe see: https://lists.cncf.io/g/cncf-cloudevents
-- Archives are at: https://lists.cncf.io/g/cncf-cloudevents/topics
+- To subscribe see: <https://lists.cncf.io/g/cncf-cloudevents>
+- Archives are at: <https://lists.cncf.io/g/cncf-cloudevents/topics>
 
 And a #cloudevents Slack channel under
 [CNCF's Slack workspace](http://slack.cncf.io/).

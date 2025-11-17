@@ -8,7 +8,7 @@ dynamic = ["version"]
 authors = [
     { name = "Clemens Vasters", email = "clemensv@microsoft.com"}
 ]
-description = "A command line utility for the CloudEvents Registry"
+description = "A command-line tool for xRegistry with code generation for messaging and eventing applications"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
