@@ -6,6 +6,24 @@
 This project is a command line client for the xRegistry document format and API, with
 a focus on generating code artifacts from xRegistry definitions, especially message catalogs.
 
+The extensible code templates in this project allows you to generate type-safe
+producer and consumer clients for Java, C#, Python, and TypeScript for several
+messaging and eventing products, including geeric clients for MQTT, AMQP, and
+Kafka and produce-specific clients for Azure Event Hubs and Azure Service Bus,
+with broader coverage planned.
+
+The generator can also convert xRegistry endpoint and message definitions into
+AsyncAPI and OpenAPI documents.
+
+Unlike most other code generators of this kind, this tool does not just drop a
+single file that might or might not compile correctly, but creates SDK-like
+projects that include unit and integration tests. When you generate a Kafka
+producer, that producer come with an embedded integration test against
+Docker/Testcontainers. For the "data transfer objects", the classes that reflect
+the payload schemas, this tool leans on
+[Avrotize](https://github.com/clemensv/avrotize), which is a robust schema
+converter/normalizer and code generator that can deal with substantial complexity. 
+
 ## Table of Contents
 
 - [What is xRegistry?](#what-is-xregistry)
