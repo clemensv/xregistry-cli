@@ -15,15 +15,23 @@ const extensionConfig = {
     platform: "node",
     format: "cjs",
     entryPoints: ["./src/extension.ts"],
-    outfile: "./out/extension.js",
+    outfile: "./dist/extension.js",
     external: ["vscode"],
     plugins: [
-        // copy schema file(s) from parent cergistry/schemas directory to out directory
+        // copy schema file(s) from parent xregistry/schemas directory to out directory
         copy({
             resolveFrom: "cwd",
             assets: {
               from: ["../xregistry/schemas/*.json"],
               to: ["./schemas"],
+            },
+        }),
+        // copy commands.json from parent xregistry directory to out directory
+        copy({
+            resolveFrom: "cwd",
+            assets: {
+              from: ["../xregistry/commands.json"],
+              to: ["./dist"],
             },
         })
     ]

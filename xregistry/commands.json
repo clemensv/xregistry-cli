@@ -1,0 +1,702 @@
+[
+  {
+    "command": "generate-py-amqpconsumer",
+    "description": "Generate Python AMQP 1.0 Consumer",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "amqpconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-amqpconsumer"
+  },
+  {
+    "command": "generate-py-amqpproducer",
+    "description": "Generate Python AMQP 1.0 Producer",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "amqpproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-amqpproducer"
+  },
+  {
+    "command": "generate-py-ehconsumer",
+    "description": "Generate Python Azure Event Hubs Consumer",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "ehconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-ehconsumer"
+  },
+  {
+    "command": "generate-py-ehproducer",
+    "description": "Generate Python Azure Event Hubs Producer",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "ehproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-ehproducer"
+  },
+  {
+    "command": "generate-py-kafkaconsumer",
+    "description": "Generate Python Apache Kafka Consumer",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "kafkaconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-kafkaconsumer"
+  },
+  {
+    "command": "generate-py-kafkaproducer",
+    "description": "Generate Python Apache Kafka Producer",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "kafkaproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-kafkaproducer"
+  },
+  {
+    "command": "generate-py-mqttclient",
+    "description": "Generate Python MQTT Client",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "mqttclient",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-mqttclient"
+  },
+  {
+    "command": "generate-py-sbconsumer",
+    "description": "Generate Python Azure Service Bus Consumer",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "sbconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-sbconsumer"
+  },
+  {
+    "command": "generate-py-sbproducer",
+    "description": "Generate Python Azure Service Bus Producer",
+    "extensions": [".xreg.json"],
+    "group": "python",
+    "language": "py",
+    "style": "sbproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-py-sbproducer"
+  },
+  {
+    "command": "generate-ts-amqpconsumer",
+    "description": "Generate TypeScript AMQP 1.0 Consumer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "amqpconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-amqpconsumer"
+  },
+  {
+    "command": "generate-ts-amqpproducer",
+    "description": "Generate TypeScript AMQP 1.0 Producer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "amqpproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-amqpproducer"
+  },
+  {
+    "command": "generate-ts-egproducer",
+    "description": "Generate TypeScript Azure Event Grid Producer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "egproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-egproducer"
+  },
+  {
+    "command": "generate-ts-ehproducer",
+    "description": "Generate TypeScript Azure Event Hubs Producer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "ehproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-ehproducer"
+  },
+  {
+    "command": "generate-ts-mqttclient",
+    "description": "Generate TypeScript MQTT 5.0 Client",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "mqttclient",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-mqttclient"
+  },
+  {
+    "command": "generate-ts-producerhttp",
+    "description": "Generate TypeScript HTTP Producer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "producerhttp",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-producerhttp"
+  },
+  {
+    "command": "generate-ts-sbconsumer",
+    "description": "Generate TypeScript Azure Service Bus Consumer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "sbconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-sbconsumer"
+  },
+  {
+    "command": "generate-ts-sbproducer",
+    "description": "Generate TypeScript Azure Service Bus Producer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "sbproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-sbproducer"
+  },
+  {
+    "command": "generate-ts-dashboard",
+    "description": "Generate TypeScript Dashboard",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "dashboard",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-dashboard"
+  },
+  {
+    "command": "generate-ts-ehconsumer",
+    "description": "Generate TypeScript Azure Event Hubs Consumer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "ehconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-ehconsumer"
+  },
+  {
+    "command": "generate-ts-kafkaconsumer",
+    "description": "Generate TypeScript Apache Kafka Consumer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "kafkaconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-kafkaconsumer"
+  },
+  {
+    "command": "generate-ts-kafkaproducer",
+    "description": "Generate TypeScript Apache Kafka Producer",
+    "extensions": [".xreg.json"],
+    "group": "typescript",
+    "language": "ts",
+    "style": "kafkaproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-ts-kafkaproducer"
+  },
+  {
+    "command": "generate-java-amqpconsumer",
+    "description": "Generate Java AMQP 1.0 Consumer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "amqpconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-amqpconsumer"
+  },
+  {
+    "command": "generate-java-amqpjmsproducer",
+    "description": "Generate Java AMQP JMS Producer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "amqpjmsproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-amqpjmsproducer"
+  },
+  {
+    "command": "generate-java-amqpproducer",
+    "description": "Generate Java AMQP 1.0 Producer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "amqpproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-amqpproducer"
+  },
+  {
+    "command": "generate-java-ehconsumer",
+    "description": "Generate Java Azure Event Hubs Consumer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "ehconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-ehconsumer"
+  },
+  {
+    "command": "generate-java-ehproducer",
+    "description": "Generate Java Azure Event Hubs Producer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "ehproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-ehproducer"
+  },
+  {
+    "command": "generate-java-kafkaconsumer",
+    "description": "Generate Java Apache Kafka Consumer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "kafkaconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-kafkaconsumer"
+  },
+  {
+    "command": "generate-java-kafkaproducer",
+    "description": "Generate Java Apache Kafka Producer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "kafkaproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-kafkaproducer"
+  },
+  {
+    "command": "generate-java-mqttclient",
+    "description": "Generate Java MQTT 5.0 Client",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "mqttclient",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-mqttclient"
+  },
+  {
+    "command": "generate-java-sbconsumer",
+    "description": "Generate Java Azure Service Bus Consumer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "sbconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-sbconsumer"
+  },
+  {
+    "command": "generate-java-sbproducer",
+    "description": "Generate Java Azure Service Bus Producer",
+    "extensions": [".xreg.json"],
+    "group": "java",
+    "language": "java",
+    "style": "sbproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-java-sbproducer"
+  },
+  {
+    "command": "generate-cs-amqpconsumer",
+    "description": "Generate C# AMQP 1.0 Consumer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "amqpconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-amqpconsumer"
+  },
+  {
+    "command": "generate-cs-amqpproducer",
+    "description": "Generate C# AMQP 1.0 Producer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "amqpproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-amqpproducer"
+  },
+  {
+    "command": "generate-cs-egproducer",
+    "description": "Generate C# Azure Event Grid Producer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "egproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-egproducer"
+  },
+  {
+    "command": "generate-cs-ehconsumer",
+    "description": "Generate C# Azure Event Hubs Consumer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "ehconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-ehconsumer"
+  },
+  {
+    "command": "generate-cs-ehproducer",
+    "description": "Generate C# Azure Event Hubs Producer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "ehproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-ehproducer"
+  },
+  {
+    "command": "generate-cs-kafkaconsumer",
+    "description": "Generate C# Apache Kafka Consumer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "kafkaconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-kafkaconsumer"
+  },
+  {
+    "command": "generate-cs-kafkaproducer",
+    "description": "Generate C# Apache Kafka Producer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "kafkaproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-kafkaproducer"
+  },
+  {
+    "command": "generate-cs-mqttclient",
+    "description": "Generate C# MQTT 5.0 Client",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "mqttclient",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-mqttclient"
+  },
+  {
+    "command": "generate-cs-sbconsumer",
+    "description": "Generate C# Azure Service Bus Consumer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "sbconsumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-sbconsumer"
+  },
+  {
+    "command": "generate-cs-sbproducer",
+    "description": "Generate C# Azure Service Bus Producer",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "sbproducer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-sbproducer"
+  },
+  {
+    "command": "generate-cs-egazfn",
+    "description": "Generate C# Azure Event Grid Azure Function",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "egazfn",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-egazfn"
+  },
+  {
+    "command": "generate-cs-ehazfn",
+    "description": "Generate C# Azure Event Hubs Azure Function",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "ehazfn",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-ehazfn"
+  },
+  {
+    "command": "generate-cs-sbazfn",
+    "description": "Generate C# Azure Service Bus Azure Function",
+    "extensions": [".xreg.json"],
+    "group": "csharp",
+    "language": "cs",
+    "style": "sbazfn",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-cs-sbazfn"
+  },
+  {
+    "command": "generate-asyncapi-consumer",
+    "description": "Generate AsyncAPI Consumer Definition",
+    "extensions": [".xreg.json"],
+    "group": "api",
+    "language": "asyncapi",
+    "style": "consumer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-asyncapi-consumer.yaml"
+  },
+  {
+    "command": "generate-asyncapi-producer",
+    "description": "Generate AsyncAPI Producer Definition",
+    "extensions": [".xreg.json"],
+    "group": "api",
+    "language": "asyncapi",
+    "style": "producer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-asyncapi-producer.yaml"
+  },
+  {
+    "command": "generate-openapi-producer",
+    "description": "Generate OpenAPI Producer Definition",
+    "extensions": [".xreg.json"],
+    "group": "api",
+    "language": "openapi",
+    "style": "producer",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-openapi-producer.yaml"
+  },
+  {
+    "command": "generate-openapi-subscriber",
+    "description": "Generate OpenAPI Subscriber Definition",
+    "extensions": [".xreg.json"],
+    "group": "api",
+    "language": "openapi",
+    "style": "subscriber",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-openapi-subscriber.yaml"
+  },
+  {
+    "command": "generate-asaql-dispatch",
+    "description": "Generate Azure Stream Analytics Query Dispatch",
+    "extensions": [".xreg.json"],
+    "group": "azure",
+    "language": "asaql",
+    "style": "dispatch",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-asaql-dispatch.asaql"
+  },
+  {
+    "command": "generate-asaql-dispatchpayload",
+    "description": "Generate Azure Stream Analytics Query Dispatch with Payload",
+    "extensions": [".xreg.json"],
+    "group": "azure",
+    "language": "asaql",
+    "style": "dispatchpayload",
+    "args": [
+      {"name": "input", "type": "str", "help": "Input file path"},
+      {"name": "--output", "type": "str", "help": "Output directory"}
+    ],
+    "prompts": [],
+    "suggested_output_file_path": "{input_file_name}-asaql-dispatchpayload.asaql"
+  }
+]
