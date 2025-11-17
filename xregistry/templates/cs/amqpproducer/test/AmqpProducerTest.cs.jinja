@@ -17,6 +17,8 @@ using Amqp;
 using Amqp.Framing;
 using Amqp.Types;
 using Testcontainers.ActiveMq;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using CloudNative.CloudEvents;
 
 using {{ project_name | pascal }};
@@ -25,6 +27,8 @@ namespace {{ project_name | pascal }}.Test
 {
     public class {{ project_name |  pascal | strip_dots }}Fixture : IAsyncLifetime
     {
+        private const string amqpBroker = ""; // Set to "rabbitmq" to test with RabbitMQ
+        
         private const string brokerXml = @"<?xml version='1.0'?>
             <configuration xmlns=""urn:activemq""
                         xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
@@ -104,9 +108,11 @@ namespace {{ project_name | pascal }}.Test
             </configuration>";
 
         public ArtemisContainer? ArtemisContainerInstance { get; protected set; }
+        public IContainer? RabbitMqContainerInstance { get; protected set; }
         public Uri? ArtemisBrokerUrl { get; protected set; }
         private ILoggerFactory _loggerFactory;
         private ILogger _logger;
+        private string _broker;
 
         public ILoggerFactory GetLoggerFactory()
         {
@@ -128,30 +134,60 @@ namespace {{ project_name | pascal }}.Test
                 builder.AddDebug().AddConsole();
             });
             _logger = _loggerFactory.CreateLogger<{{ project_name |  pascal | strip_dots }}Fixture>();
+            _broker = Environment.GetEnvironmentVariable("AMQP_BROKER") ?? amqpBroker;
+            if (string.IsNullOrEmpty(_broker)) _broker = "artemis";
         }
 
         public async Task InitializeAsync()
         {
             try
             {
-                _logger.LogDebug("Initializing Artemis test fixture.");
-                var configFilePath = Path.GetTempFileName();
-                File.WriteAllText(configFilePath, brokerXml);
-
-                Amqp.Trace.TraceLevel = Amqp.TraceLevel.Frame;
-                Amqp.Trace.TraceListener = (l, f, a) => System.Diagnostics.Debug.WriteLine(f, a);
-                
-                ArtemisContainerInstance = new ArtemisBuilder()
-                        .WithBindMount(configFilePath, "/var/lib/artemis/etc-override/broker.xml")
+                if (_broker.Equals("rabbitmq", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogDebug("Initializing RabbitMQ test fixture.");
+                    
+                    Amqp.Trace.TraceLevel = Amqp.TraceLevel.Frame;
+                    Amqp.Trace.TraceListener = (l, f, a) => System.Diagnostics.Debug.WriteLine(f, a);
+                    
+                    RabbitMqContainerInstance = new ContainerBuilder()
+                        .WithImage("rabbitmq:3-management")
                         .WithPortBinding(5672, true)
-                        .WithUsername("guest")
-                        .WithPassword("guest")
+                        .WithPortBinding(15672, true)
+                        .WithEnvironment("RABBITMQ_DEFAULT_USER", "guest")
+                        .WithEnvironment("RABBITMQ_DEFAULT_PASS", "guest")
+                        .WithCommand("bash", "-c", "rabbitmq-plugins enable rabbitmq_amqp1_0 && docker-entrypoint.sh rabbitmq-server")
+                        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
                         .Build();
+                    
+                    await RabbitMqContainerInstance.StartAsync();
+                    _logger.LogDebug("RabbitMQ container started.");
+                    
+                    var host = RabbitMqContainerInstance.Hostname;
+                    var port = RabbitMqContainerInstance.GetMappedPublicPort(5672);
+                    ArtemisBrokerUrl = new Uri($"amqp://{host}:{port}");
+                    _logger.LogDebug($"RabbitMQ broker URL: {ArtemisBrokerUrl}");
+                }
+                else
+                {
+                    _logger.LogDebug("Initializing Artemis test fixture.");
+                    var configFilePath = Path.GetTempFileName();
+                    File.WriteAllText(configFilePath, brokerXml);
 
-                await ArtemisContainerInstance.StartAsync();
-                _logger.LogDebug("Artemis container started.");
-                ArtemisBrokerUrl = new UriBuilder(ArtemisContainerInstance.GetBrokerAddress()){ Scheme = "amqp"}.Uri;
-                _logger.LogDebug($"Artemis broker URL: {ArtemisBrokerUrl}");
+                    Amqp.Trace.TraceLevel = Amqp.TraceLevel.Frame;
+                    Amqp.Trace.TraceListener = (l, f, a) => System.Diagnostics.Debug.WriteLine(f, a);
+                    
+                    ArtemisContainerInstance = new ArtemisBuilder()
+                            .WithBindMount(configFilePath, "/var/lib/artemis/etc-override/broker.xml")
+                            .WithPortBinding(5672, true)
+                            .WithUsername("guest")
+                            .WithPassword("guest")
+                            .Build();
+
+                    await ArtemisContainerInstance.StartAsync();
+                    _logger.LogDebug("Artemis container started.");
+                    ArtemisBrokerUrl = new UriBuilder(ArtemisContainerInstance.GetBrokerAddress()){ Scheme = "amqp"}.Uri;
+                    _logger.LogDebug($"Artemis broker URL: {ArtemisBrokerUrl}");
+                }
             }
             catch (Exception ex)
             {
@@ -164,7 +200,13 @@ namespace {{ project_name | pascal }}.Test
         {
             try
             {
-                _logger.LogDebug("Disposing Artemis test fixture.");
+                _logger.LogDebug($"Disposing {_broker} test fixture.");
+
+                if (RabbitMqContainerInstance != null)
+                {
+                    await RabbitMqContainerInstance.StopAsync();
+                    _logger.LogDebug("RabbitMQ container stopped.");
+                }
                 
                 if (ArtemisContainerInstance != null)
                 {
