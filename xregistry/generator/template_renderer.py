@@ -110,10 +110,17 @@ class TemplateRenderer:
                 else:
                     self.ctx.base_uri = self.xreg_file_arg
 
-            xreg_file, xregistry_document = self.ctx.loader.load(
-                self.xreg_file_arg, self.headers, self.style == "schema", 
-                messagegroup_filter=self.ctx.messagegroup_filter, 
-                endpoint_filter=self.ctx.endpoint_filter)
+            # Use load_with_dependencies for HTTP URLs to automatically fetch related resources
+            if self.xreg_file_arg.startswith("http"):
+                xreg_file, xregistry_document = self.ctx.loader.load_with_dependencies(
+                    self.xreg_file_arg, self.headers, 
+                    messagegroup_filter=self.ctx.messagegroup_filter, 
+                    endpoint_filter=self.ctx.endpoint_filter)
+            else:
+                xreg_file, xregistry_document = self.ctx.loader.load(
+                    self.xreg_file_arg, self.headers, self.style == "schema", 
+                    messagegroup_filter=self.ctx.messagegroup_filter, 
+                    endpoint_filter=self.ctx.endpoint_filter)
         
         if not xreg_file or not xregistry_document:
             raise RuntimeError(

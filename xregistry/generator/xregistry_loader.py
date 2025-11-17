@@ -127,8 +127,87 @@ class DependencyResolver:
         
         return references
     
-    def resolve_reference(self, ref_url: str, headers: Dict[str, str]) -> Optional[JsonNode]:
-        """Resolve a single xid reference."""
+    def _mark_inline_resources_as_resolved(self, doc: Dict[str, Any], base_url: str) -> None:
+        """Mark all inline resources in the document as already resolved to prevent re-fetching.
+        
+        When using ?inline=*, the API returns nested resources (messages, schemas, versions, etc.)
+        already embedded in the response. We need to mark these as resolved so we don't try to
+        fetch them again from their 'self' URLs.
+        """
+        if not isinstance(doc, dict):
+            return
+        
+        # Extract the registry root from base_url for constructing absolute URLs
+        registry_root = None
+        if base_url.startswith("http"):
+            parsed = urllib.parse.urlparse(base_url)
+            registry_root = f"{parsed.scheme}://{parsed.netloc}"
+        
+        # Process each group type in the document
+        model_groups = self.model.groups
+        for group_type, group_def in model_groups.items():
+            if group_type not in doc or not isinstance(doc[group_type], dict):
+                continue
+                
+            group_collection = doc[group_type]
+            group_resources = group_def.get("resources", {})
+            
+            for group_id, group in group_collection.items():
+                if not isinstance(group, dict):
+                    continue
+                
+                # Mark the group instance itself as resolved
+                if "self" in group and isinstance(group["self"], str):
+                    self.resolved_resources[group["self"]] = group
+                if "xid" in group and isinstance(group["xid"], str) and registry_root:
+                    full_url = urllib.parse.urljoin(registry_root, group["xid"])
+                    self.resolved_resources[full_url] = group
+                
+                # Process each resource collection type (messages, schemas, etc.)
+                for resource_collection in group_resources.keys():
+                    if resource_collection not in group or not isinstance(group[resource_collection], dict):
+                        continue
+                    
+                    resources = group[resource_collection]
+                    for resource_id, resource in resources.items():
+                        if not isinstance(resource, dict):
+                            continue
+                        
+                        # Mark the resource itself as resolved
+                        if "self" in resource and isinstance(resource["self"], str):
+                            self.resolved_resources[resource["self"]] = resource
+                        if "xid" in resource and isinstance(resource["xid"], str) and registry_root:
+                            full_url = urllib.parse.urljoin(registry_root, resource["xid"])
+                            self.resolved_resources[full_url] = resource
+                        
+                        # If the resource has versions, mark each version as resolved
+                        if "versions" in resource and isinstance(resource["versions"], dict):
+                            for version_id, version in resource["versions"].items():
+                                if not isinstance(version, dict):
+                                    continue
+                                    
+                                if "self" in version and isinstance(version["self"], str):
+                                    self.resolved_resources[version["self"]] = version
+                                if "xid" in version and isinstance(version["xid"], str) and registry_root:
+                                    full_url = urllib.parse.urljoin(registry_root, version["xid"])
+                                    self.resolved_resources[full_url] = version
+    
+    def resolve_reference(self, ref_url: str, headers: Dict[str, str], base_url: Optional[str] = None) -> Optional[JsonNode]:
+        """Resolve a single xid reference.
+        
+        Args:
+            ref_url: The reference URL to resolve (can be relative or absolute)
+            headers: HTTP headers for authentication
+            base_url: Base URL for resolving relative references
+            
+        Returns:
+            The resolved resource data, or None if resolution fails
+        """
+        # Resolve relative references against base URL
+        if base_url and ref_url.startswith("/"):
+            ref_url = urllib.parse.urljoin(base_url, ref_url)
+            self.logger.debug(f"Resolved relative reference to: {ref_url}")
+        
         if ref_url in self.resolved_resources:
             return self.resolved_resources[ref_url]
         
@@ -150,8 +229,14 @@ class DependencyResolver:
                 group_type = parser.get_group_type() or "unknown"
                 nested_refs = self.find_xid_references(resource_data, group_type)
                 
+                # Extract base URL from ref_url for resolving nested relative references
+                nested_base_url = None
+                if ref_url.startswith("http"):
+                    parsed = urllib.parse.urlparse(ref_url)
+                    nested_base_url = f"{parsed.scheme}://{parsed.netloc}"
+                
                 for nested_ref in nested_refs:
-                    self.resolve_reference(nested_ref, headers)
+                    self.resolve_reference(nested_ref, headers, nested_base_url)
                 
                 return resource_data
             
@@ -162,8 +247,128 @@ class DependencyResolver:
             self.pending_resolution.discard(ref_url)        
         return None
     
-    def build_composed_document(self, entry_url: str, entry_data: JsonNode, headers: Dict[str, str]) -> JsonNode:
-        """Build a composed xRegistry document with all dependencies."""
+    def _normalize_schema_references(self, doc: Dict[str, Any]) -> None:
+        """Convert relative URI schema references to JSON pointers.
+        
+        After loading all dependencies, messages may reference schemas using relative URIs
+        like '/schemagroups/Contoso.ERP/schemas/SchemaName'. These should be normalized
+        to JSON pointers like '#/schemagroups/Contoso.ERP/schemas/SchemaName' so they can
+        be resolved within the composed document.
+        """
+        if not isinstance(doc, dict):
+            return
+        
+        # Process all message groups
+        if "messagegroups" in doc and isinstance(doc["messagegroups"], dict):
+            for mg_id, mg in doc["messagegroups"].items():
+                if not isinstance(mg, dict) or "messages" not in mg:
+                    continue
+                    
+                if not isinstance(mg["messages"], dict):
+                    continue
+                    
+                for msg_id, msg in mg["messages"].items():
+                    if not isinstance(msg, dict):
+                        continue
+                    
+                    # Normalize dataschemauri if present
+                    if "dataschemauri" in msg:
+                        schema_uri = msg["dataschemauri"]
+                        if isinstance(schema_uri, str) and schema_uri.startswith("/"):
+                            # Convert relative URI to JSON pointer
+                            msg["dataschemauri"] = "#" + schema_uri
+        
+        # Process all endpoints (they may also reference schemas or messages)
+        if "endpoints" in doc and isinstance(doc["endpoints"], dict):
+            for ep_id, ep in doc["endpoints"].items():
+                if not isinstance(ep, dict):
+                    continue
+                
+                # Normalize message references in endpoint configurations
+                # This is a placeholder for endpoint-specific normalization if needed
+                pass
+    
+    def _restructure_single_resource(self, version_obj: Dict[str, Any], group_type: str, resource_id: str) -> Dict[str, Any]:
+        """Restructure a single message/schema version object into proper group structure.
+        
+        When fetching a single message like /messagegroups/X/messages/Y, the API returns
+        a message version object with inline versions. We need to restructure this into:
+        - A proper group object with just this one message
+        - The message as a resource within the group's messages collection
+        
+        Args:
+            version_obj: The version object returned by the API
+            group_type: The group type (messagegroups, schemagroups, etc.)
+            resource_id: The resource ID (message name, schema name, etc.)
+            
+        Returns:
+            Properly structured group object
+        """
+        # Create the group structure
+        group_obj: Dict[str, Any] = {}
+        
+        # Determine resource collection name
+        if group_type == "messagegroups":
+            resource_collection = "messages"
+            id_field = "messageid"
+        elif group_type == "schemagroups":
+            resource_collection = "schemas"
+            id_field = "schemaid"
+        elif group_type == "endpoints":
+            resource_collection = "endpoints"
+            id_field = "endpointid"
+        else:
+            # Unknown group type, return as-is
+            return {resource_collection: {resource_id: version_obj}}
+        
+        # Create message/schema resource from the version object
+        # Extract metadata that belongs at the message level
+        resource_obj: Dict[str, Any] = {
+            id_field: version_obj.get(id_field, resource_id)
+        }
+        
+        # Copy message-level fields
+        message_level_fields = [
+            'description', 'envelope', 'envelopemetadata',
+            'dataschema', 'dataschemauri', 'dataschemaformat',
+            'format', 'schemaformat', 'schemaurl'
+        ]
+        
+        for field in message_level_fields:
+            if field in version_obj:
+                resource_obj[field] = version_obj[field]
+        
+        # If there are versions, keep them
+        if 'versions' in version_obj and isinstance(version_obj['versions'], dict):
+            resource_obj['versions'] = version_obj['versions']
+        
+        # Add resource URLs if present
+        if 'self' in version_obj:
+            # Convert version URL to resource URL by removing /versions/X
+            resource_url = version_obj['self'].rsplit('/versions/', 1)[0] if '/versions/' in version_obj['self'] else version_obj['self']
+            resource_obj['self'] = resource_url
+        
+        if 'xid' in version_obj:
+            resource_xid = version_obj['xid'].rsplit('/versions/', 1)[0] if '/versions/' in version_obj['xid'] else version_obj['xid']
+            resource_obj['xid'] = resource_xid
+        
+        # Create the group with the resource collection
+        group_obj[resource_collection] = {resource_id: resource_obj}
+        
+        return group_obj
+
+    def build_composed_document(self, entry_url: str, entry_data: JsonNode, headers: Dict[str, str], registry_root: Optional[str] = None) -> JsonNode:
+        """Build a composed xRegistry document with all dependencies.
+        
+        Args:
+            entry_url: The URL of the entry point
+            entry_data: The loaded entry data
+            headers: HTTP headers for authentication
+            registry_root: The discovered registry root URL for resolving relative references
+            
+        Returns:
+            Composed document with all dependencies
+        """
         parser = XRegistryUrlParser(entry_url)
         entry_type = parser.get_entry_type()
         
@@ -182,30 +387,54 @@ class DependencyResolver:
             # Full registry - use as-is but filter dependencies
             if isinstance(entry_data, dict):
                 composed_doc = dict(entry_data)
+                # Mark all inline resources as already resolved to prevent re-fetching
+                self._mark_inline_resources_as_resolved(composed_doc, entry_url)
         
         elif entry_type == "group_type":
             # Group type collection
             group_type = parser.get_group_type()
             if group_type and isinstance(entry_data, dict):
                 composed_doc[group_type] = entry_data
+                # Mark all inline resources as already resolved
+                self._mark_inline_resources_as_resolved(composed_doc, entry_url)
         
         elif entry_type in ["group_instance", "resource_collection", "resource", "version"]:
             # Specific group, resource, or version
             group_type = parser.get_group_type()
             group_id = parser.get_group_id()
+            resource_id = parser.get_resource_id()
             
             if group_type and group_id:
+                # Special handling for single message/schema resource
+                # The API returns a version object with inline versions, but we need proper structure
+                if entry_type == "resource" and resource_id and isinstance(entry_data, dict):
+                    if 'messageid' in entry_data or 'schemaid' in entry_data:
+                        # This is a message/schema version object, needs restructuring
+                        entry_data = self._restructure_single_resource(entry_data, group_type, resource_id)
+                
                 composed_doc[group_type] = {group_id: entry_data}
+                # Mark all inline resources (like messages fetched with ?inline=*) as already resolved
+                self._mark_inline_resources_as_resolved(composed_doc, entry_url)
         
         # Find and resolve all dependencies
         group_type = parser.get_group_type() or "unknown"
         all_refs = self.find_xid_references(composed_doc, group_type)
         
+        # Use the provided registry_root for resolving relative references
+        # If not provided, fall back to extracting from entry_url
+        base_url = registry_root
+        if not base_url and entry_url.startswith("http"):
+            parsed = urllib.parse.urlparse(entry_url)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+        
         for ref_url in all_refs:
-            resolved_resource = self.resolve_reference(ref_url, headers)
+            resolved_resource = self.resolve_reference(ref_url, headers, base_url)
             if resolved_resource is not None:
                 # Add resolved resource to composed document
                 self._add_resource_to_document(composed_doc, ref_url, resolved_resource)
+        
+        # Normalize schema references from relative URIs to JSON pointers
+        self._normalize_schema_references(composed_doc)
         
         return composed_doc
     
@@ -233,10 +462,14 @@ class DependencyResolver:
                 doc[group_type][group_id] = {}
             
             if resource_id:
-                # Add resource
-                group_model = self.model.groups.get(group_type, {})
-                resources_model = group_model.get("resources", {})
-                resource_collection = resources_model.get("plural", "resources") if isinstance(resources_model, dict) else "resources"
+                # Determine the resource collection name from the URL path
+                # URL format: /grouptype/groupid/resourcecollection/resourceid
+                url_parts = [p for p in urllib.parse.urlparse(resource_url).path.split('/') if p]
+                resource_collection = url_parts[2] if len(url_parts) > 2 else None
+                
+                if not resource_collection:
+                    self.logger.warning(f"Could not determine resource collection from URL: {resource_url}")
+                    return
                 
                 if not isinstance(doc[group_type][group_id], dict):
                     doc[group_type][group_id] = {}
@@ -254,7 +487,19 @@ class DependencyResolver:
                         doc[group_type][group_id][resource_collection][resource_id]["versions"][version_id] = resource_data
                 else:
                     # Add resource (might contain versions)
-                    doc[group_type][group_id][resource_collection][resource_id] = resource_data
+                    # If the resource already exists, merge the data instead of replacing it
+                    # This preserves inline data fetched with ?inline=*
+                    if resource_id in doc[group_type][group_id][resource_collection]:
+                        existing = doc[group_type][group_id][resource_collection][resource_id]
+                        if isinstance(existing, dict) and isinstance(resource_data, dict):
+                            # Merge: resource_data takes precedence, but we preserve existing keys
+                            existing.update(resource_data)
+                        else:
+                            # Can't merge, replace
+                            doc[group_type][group_id][resource_collection][resource_id] = resource_data
+                    else:
+                        # Resource doesn't exist, add it
+                        doc[group_type][group_id][resource_collection][resource_id] = resource_data
             else:
                 # Add group data
                 if isinstance(doc[group_type][group_id], dict) and isinstance(resource_data, dict):
@@ -370,10 +615,55 @@ class ResourceResolver:
                 except Exception as e:
                     self.logger.error(f"Error decoding legacy resourcebase64 resource: {e}")
     
+    def resolve_collection_urls(self, xreg_doc: JsonNode, headers: Dict[str, str]) -> None:
+        """Resolve collection URL references (like messagesurl, schemasurl) in group instances."""
+        if not isinstance(xreg_doc, dict):
+            return
+        
+        # Get model groups to process dynamically
+        model_groups = self.loader.model.groups
+        
+        for group_type, group_def in model_groups.items():
+            if group_type in xreg_doc and isinstance(xreg_doc[group_type], dict):
+                group_collection = xreg_doc[group_type]
+                if not isinstance(group_collection, dict):
+                    continue
+                    
+                # Get resource collections for this group type
+                group_resources = group_def.get("resources", {})
+                if not isinstance(group_resources, dict):
+                    continue
+                
+                for group_id, group in group_collection.items():
+                    if not isinstance(group, dict):
+                        continue
+                    
+                    # Check for collection URL references (e.g., messagesurl, schemasurl)
+                    for resource_collection, resource_def in group_resources.items():
+                        collection_url_field = f"{resource_collection}url"
+                        
+                        # If the collection is not present but a URL reference exists, fetch it
+                        if collection_url_field in group and resource_collection not in group:
+                            collection_url = group[collection_url_field]
+                            if isinstance(collection_url, str):
+                                try:
+                                    self.logger.debug(f"Fetching collection from {collection_url_field}: {collection_url}")
+                                    _, collection_data = self.loader._load_core(collection_url, headers, ignore_handled=True)
+                                    if collection_data is not None and isinstance(collection_data, dict):
+                                        group[resource_collection] = collection_data
+                                        self.logger.debug(f"Successfully resolved collection from {collection_url_field}: {collection_url}")
+                                    else:
+                                        self.logger.warning(f"Failed to fetch collection from {collection_url_field}: {collection_url}")
+                                except Exception as e:
+                                    self.logger.error(f"Error fetching collection from {collection_url_field} {collection_url}: {e}")
+    
     def resolve_all_resources(self, xreg_doc: JsonNode, headers: Dict[str, str]) -> None:
         """Recursively resolve all resource references in an xRegistry document."""
         if not isinstance(xreg_doc, dict):
             return
+        
+        # First resolve collection URLs (like messagesurl, schemasurl)
+        self.resolve_collection_urls(xreg_doc, headers)
         
         # Get model groups to process dynamically
         model_groups = self.loader.model.groups
@@ -624,6 +914,73 @@ class XRegistryLoader:
         # Schema handling state for template rendering compatibility
         self.schemas_handled: Set[str] = set()
         self.current_url: Optional[str] = None
+        
+        # Cache for discovered registry roots
+        self._registry_roots: Dict[str, str] = {}
+    
+    def discover_registry_root(self, url: str, headers: Optional[Dict[str, str]] = None) -> Optional[str]:
+        """Discover the xRegistry root by finding the /capabilities endpoint.
+        
+        This method traverses the URL path from the base to find where /capabilities
+        is available, which indicates the registry root.
+        
+        Args:
+            url: Any URL within an xRegistry
+            headers: HTTP headers for authentication
+            
+        Returns:
+            The registry root URL, or None if not found
+        """
+        if headers is None:
+            headers = {}
+        
+        # Check cache first
+        if url in self._registry_roots:
+            return self._registry_roots[url]
+        
+        parsed = urllib.parse.urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            # Not an HTTP URL, can't discover
+            return None
+        
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        
+        # Try the base URL first (most common case)
+        try:
+            caps_url = urllib.parse.urljoin(base, "/capabilities")
+            request = urllib.request.Request(caps_url)
+            for key, value in headers.items():
+                request.add_header(key, value)
+            response = urllib.request.urlopen(request)
+            response.read()  # Just check if it exists
+            self.logger.info(f"Discovered registry root: {base}")
+            self._registry_roots[url] = base
+            return base
+        except:
+            pass
+        
+        # Try progressively deeper paths
+        path_parts = [p for p in parsed.path.split('/') if p]
+        for i in range(len(path_parts)):
+            test_path = '/' + '/'.join(path_parts[:i+1])
+            registry_candidate = urllib.parse.urljoin(base, test_path)
+            caps_url = registry_candidate + "/capabilities"
+            try:
+                request = urllib.request.Request(caps_url)
+                for key, value in headers.items():
+                    request.add_header(key, value)
+                response = urllib.request.urlopen(request)
+                response.read()
+                self.logger.info(f"Discovered registry root: {registry_candidate}")
+                self._registry_roots[url] = registry_candidate
+                return registry_candidate
+            except:
+                continue
+        
+        # Fallback: assume base is the registry root
+        self.logger.warning(f"Could not discover registry root for {url}, using base URL: {base}")
+        self._registry_roots[url] = base
+        return base
     
     def load(self, uri: str, headers: Optional[Dict[str, str]] = None, 
              is_schema_style: bool = False, expand_refs: bool = False,
@@ -648,6 +1005,29 @@ class XRegistryLoader:
             resolved_uri, document = self._load_core(uri, headers)
             if document is None:
                 return uri, None
+            
+            # Check if we loaded a single resource (not a full xRegistry document)
+            # and wrap it into a proper document structure
+            if isinstance(document, dict):
+                # Detect if this is a full xRegistry document or a single resource
+                model_groups = self.model.groups
+                xreg_collections = set(model_groups.keys())
+                is_full_document = any(key in document for key in xreg_collections)
+                
+                if not is_full_document:
+                    # This appears to be a single resource - wrap it
+                    parser = XRegistryUrlParser(resolved_uri)
+                    entry_type = parser.get_entry_type()
+                    
+                    if entry_type in ["group_instance", "resource_collection", "resource", "version"]:
+                        # Wrap single group instance or resource into proper document
+                        group_type = parser.get_group_type()
+                        group_id = parser.get_group_id()
+                        
+                        if group_type and group_id:
+                            wrapped_doc = {group_type: {group_id: document}}
+                            self.logger.debug(f"Wrapped single resource into document structure: {group_type}/{group_id}")
+                            document = wrapped_doc
             
             # Apply basic resource resolution
             self.resource_resolver.resolve_all_resources(document, headers)
@@ -822,10 +1202,17 @@ class XRegistryLoader:
         Returns:
             Tuple of (resolved_uri, document) or (uri, None) on error
         """
+        self.logger.info(f"[ENTRY] load_with_dependencies called with uri: {uri}")
         if headers is None:
             headers = {}
         
         try:
+            # Discover the registry root for resolving relative URIs
+            registry_root = None
+            if uri.startswith("http"):
+                registry_root = self.discover_registry_root(uri, headers)
+                self.logger.info(f"Using registry root: {registry_root}")
+            
             # Load the entry point
             resolved_uri, entry_data = self._load_core(uri, headers)
             if entry_data is None:
@@ -833,14 +1220,92 @@ class XRegistryLoader:
             
             # Build composed document with all dependencies
             composed_document = self.dependency_resolver.build_composed_document(
-                resolved_uri, entry_data, headers)
+                resolved_uri, entry_data, headers, registry_root)
             
-            # Resolve all resource references in the composed document
+            # Resolve collection URLs (like messagesurl, schemasurl) first
+            # This fetches collections that may contain additional references
+            self.resource_resolver.resolve_collection_urls(composed_document, headers)
+            
+            # Iteratively resolve dependencies until no new references are found
+            max_iterations = 10  # Prevent infinite loops
+            for iteration in range(max_iterations):
+                # Find all references in the current document
+                all_refs = []
+                model_groups = self.model.groups
+                for group_type in model_groups.keys():
+                    if group_type in composed_document:
+                        refs = self.dependency_resolver.find_xid_references(
+                            {group_type: composed_document[group_type]}, group_type)
+                        all_refs.extend(refs)
+                
+                # Filter out already resolved references
+                new_refs = [ref for ref in all_refs if ref not in self.dependency_resolver.resolved_resources]
+                
+                if not new_refs:
+                    self.logger.debug(f"Dependency resolution complete after {iteration} iterations")
+                    break
+                
+                self.logger.debug(f"Iteration {iteration}: Resolving {len(new_refs)} new references")
+                
+                # Resolve new references
+                for ref_url in new_refs:
+                    # Convert relative URIs to full URLs using the discovered registry root
+                    full_ref_url = ref_url
+                    if ref_url.startswith('/') and registry_root:
+                        full_ref_url = urllib.parse.urljoin(registry_root, ref_url)
+                        self.logger.debug(f"Resolved relative URI {ref_url} to {full_ref_url}")
+                    
+                    # Check if this is a reference to a resource within a group
+                    # If so, we should also fetch the parent group instance
+                    parser = XRegistryUrlParser(full_ref_url)
+                    entry_type = parser.get_entry_type()
+                    
+                    if entry_type in ["resource", "version"]:
+                        # This is a resource or version - we should fetch the parent group too
+                        group_type = parser.get_group_type()
+                        group_id = parser.get_group_id()
+                        
+                        if group_type and group_id:
+                            # Check if the group instance is already in the document
+                            if group_type not in composed_document or group_id not in composed_document.get(group_type, {}):
+                                # Construct the parent group URL
+                                # group_type already has 's' at the end (e.g., 'schemagroups')
+                                group_path = f"/{group_type}/{group_id}"
+                                
+                                # Construct full URL if we have registry_root
+                                if registry_root:
+                                    group_url = urllib.parse.urljoin(registry_root, group_path)
+                                else:
+                                    group_url = group_path
+                                
+                                self.logger.debug(f"Fetching parent group for resource: {group_url}")
+                                group_resource = self.dependency_resolver.resolve_reference(group_url, headers, registry_root)
+                                if group_resource is not None:
+                                    self.logger.debug(f"Successfully fetched parent group {group_id}, adding to document")
+                                    self.dependency_resolver._add_resource_to_document(composed_document, group_url, group_resource)
+                                    # Resolve collection URLs in the newly added group
+                                    self.resource_resolver.resolve_collection_urls(composed_document, headers)
+                                else:
+                                    self.logger.debug(f"Failed to fetch parent group from {group_url}")
+                    
+                    resolved_resource = self.dependency_resolver.resolve_reference(full_ref_url, headers, registry_root)
+                    if resolved_resource is not None:
+                        self.dependency_resolver._add_resource_to_document(composed_document, full_ref_url, resolved_resource)
+                
+                # Resolve collection URLs again in case new groups were added
+                self.resource_resolver.resolve_collection_urls(composed_document, headers)
+            
+            # Resolve all individual resource references (like schemaurl, resourceurl)
             self.resource_resolver.resolve_all_resources(composed_document, headers)
             
             # Resolve basemessage references
             if isinstance(composed_document, dict):
                 self.message_resolver.resolve_all_basemessages(composed_document)
+            
+            # Normalize schema references from relative URIs to JSON pointers
+            # This must be done after all dependencies are resolved to ensure
+            # newly added resources have their references normalized
+            self.dependency_resolver._normalize_schema_references(composed_document)
             
             # Apply message group filtering if needed
             if messagegroup_filter and isinstance(composed_document, dict):
@@ -889,14 +1354,29 @@ class XRegistryLoader:
     def _load_from_url(self, url: str, headers: Dict[str, str]) -> Tuple[str, Optional[JsonNode]]:
         """Load document from HTTP/HTTPS URL."""
         try:
-            request = urllib.request.Request(url)
+            # Use the ?inline flag to fetch nested collections automatically
+            # This avoids the need to make multiple HTTP requests
+            parser = XRegistryUrlParser(url)
+            entry_type = parser.get_entry_type()
+            
+            # Add ?inline parameter for group instances and resources to fetch their collections
+            modified_url = url
+            if entry_type in ["group_instance", "resource"]:
+                # For group instances, inline all resource collections (messages, schemas, etc.)
+                # For resources, inline versions
+                separator = '&' if '?' in url else '?'
+                inline_param = "inline=*"  # Inline all collections
+                modified_url = f"{url}{separator}{inline_param}"
+                self.logger.debug(f"Adding inline parameter to URL: {modified_url}")
+            
+            request = urllib.request.Request(modified_url)
             for key, value in headers.items():
                 request.add_header(key, value)
             
             with urllib.request.urlopen(request) as response:
                 content = response.read().decode('utf-8')
                 document = self._parse_content(content)
-                return url, document
+                return url, document  # Return original URL for consistency
                 
         except urllib.error.HTTPError as e:
             self.logger.error(f"HTTP error loading {url}: {e.code} {e.reason}")
