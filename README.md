@@ -1,7 +1,7 @@
 # xRegistry Code Generation CLI
 
-[![Python Test](https://github.com/clemensv/xregistry-cli/actions/workflows/test.yml/badge.svg)](https://github.com/clemensv/xregistry-cli/actions/workflows/test.yml)
-[![Python Release](https://github.com/clemensv/xregistry-cli/actions/workflows/build.yml/badge.svg)](https://github.com/clemensv/xregistry-cli/actions/workflows/build.yml)
+[![Python Test](https://github.com/xregistry/codegen/actions/workflows/test.yml/badge.svg)](https://github.com/xregistry/codegen/actions/workflows/test.yml)
+[![Python Release](https://github.com/xregistry/codegen/actions/workflows/build.yml/badge.svg)](https://github.com/xregistry/codegen/actions/workflows/build.yml)
 
 A command-line tool for working with xRegistry documents and APIs, with powerful code generation capabilities for building messaging and eventing applications.
 
@@ -103,7 +103,7 @@ samples directory of this repository:
 The tool requires Python 3.10 or later. Install directly from GitHub:
 
 ```bash
-pip install git+https://github.com/clemensv/xregistry-cli.git
+pip install git+https://github.com/xregistry/codegen.git
 ```
 
 This installs the `xregistry` package with two command-line aliases:

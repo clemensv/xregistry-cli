@@ -48,4 +48,4 @@ CMD ["--help"]
 LABEL org.opencontainers.image.title="xRegistry CLI" \
       org.opencontainers.image.description="A command-line tool for xRegistry with code generation for messaging and eventing applications" \
       org.opencontainers.image.vendor="CNCF" \
-      org.opencontainers.image.source="https://github.com/clemensv/xregistry-cli"
+      org.opencontainers.image.source="https://github.com/xregistry/codegen"

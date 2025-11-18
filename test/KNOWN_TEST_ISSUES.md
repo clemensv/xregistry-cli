@@ -112,8 +112,8 @@ pytestmark = pytest.mark.skip(reason="EventHub emulator has environment-specific
 **Expected Passing:** 172 (156 + 16 fixed)  
 **Expected Skipped:** 21 (17 pre-existing + 4 catalog)  
 **Last Updated:** 2025-11-05  
-**Last Successful CI Run (before fix):** https://github.com/clemensv/xregistry-cli/actions/runs/19112322037  
-**Last Failed CI Run (Investigation):** https://github.com/clemensv/xregistry-cli/actions/runs/19111112588
+**Last Successful CI Run (before fix):** https://github.com/xregistry/codegen/actions/runs/19112322037  
+**Last Failed CI Run (Investigation):** https://github.com/xregistry/codegen/actions/runs/19111112588
 
 **Status Summary:**
 - **Catalog tests (4):** ⏳ Still skipped - Infrastructure issue with xrserver MySQL container initialization
