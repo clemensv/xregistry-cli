@@ -25,9 +25,9 @@ using {{ project_name | pascal }};
 
 namespace {{ project_name | pascal }}.Test
 {
-    public class {{ project_name |  pascal | strip_dots }}Fixture : IAsyncLifetime
+    // Base fixture class for AMQP broker setup
+    public abstract class AmqpBrokerFixture : IAsyncLifetime
     {
-        private const string amqpBroker = ""; // Set to "rabbitmq" to test with RabbitMQ
         
         private const string brokerXml = @"<?xml version='1.0'?>
             <configuration xmlns=""urn:activemq""
