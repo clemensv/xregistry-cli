@@ -5,11 +5,11 @@
 
 A command-line tool for working with xRegistry documents and APIs, with powerful code generation capabilities for building messaging and eventing applications.
 
-## Why xRegistry CLI?
+## Why xRegistry Code Generation CLI?
 
 ### Production-Ready Code, Not Just Snippets
 
-Unlike typical code generators that dump a single file and leave you to figure out the rest, xRegistry CLI generates complete, **SDK-like projects** with:
+Unlike typical code generators that dump a single file and leave you to figure out the rest, xRegistry Code Generation CLI generates complete, **SDK-like projects** with:
 
 - ✅ **Working integration tests** out of the box (using Docker/Testcontainers)
 - ✅ **Type-safe producer and consumer clients** for multiple platforms
@@ -117,14 +117,14 @@ For local development and testing, see [Development Environment](docs/developmen
 
 ## Usage
 
-The tool is invoked as `xregistry` (or `xcg`) and supports the following subcommands:
+The tool is invoked as `xcg` (or `xregistry`) and supports the following subcommands:
 
-- `xregistry generate`: Generate code from xRegistry definitions
-- `xregistry validate`: Validate xRegistry definition files
-- `xregistry list`: List available code generation templates
-- `xregistry config`: Manage tool configuration (defaults, registry URLs, auth)
-- `xregistry manifest`: Work with local xRegistry files (offline mode)
-- `xregistry catalog`: Interact with remote xRegistry services (online mode)
+- `xcg generate`: Generate code from xRegistry definitions
+- `xcg validate`: Validate xRegistry definition files
+- `xcg list`: List available code generation templates
+- `xcg config`: Manage tool configuration (defaults, registry URLs, auth)
+- `xcg manifest`: Work with local xRegistry files (offline mode)
+- `xcg catalog`: Interact with remote xRegistry services (online mode)
 
 ### Working with xRegistry Data: Manifest vs Catalog
 
@@ -132,14 +132,14 @@ xRegistry CLI supports two modes for managing registry data:
 
 #### Manifest Mode (Local Files)
 
-Use `xregistry manifest` commands to work with **local JSON files** containing xRegistry definitions:
+Use `xcg manifest` commands to work with **local JSON files** containing xRegistry definitions:
 
 ```bash
 # Create/update local manifest file
-xregistry manifest messagegroup add --manifest=./my-registry.json --id=orders ...
+xcg manifest messagegroup add --manifest=./my-registry.json --id=orders ...
 
 # Add messages to the local file
-xregistry manifest message add --manifest=./my-registry.json --messagegroupid=orders ...
+xcg manifest message add --manifest=./my-registry.json --messagegroupid=orders ...
 ```
 
 **When to use manifest mode:**
@@ -151,16 +151,16 @@ xregistry manifest message add --manifest=./my-registry.json --messagegroupid=or
 
 #### Catalog Mode (Remote Service)
 
-Use `xregistry catalog` commands to interact with a **remote xRegistry HTTP API**:
+Use `xcg catalog` commands to interact with a **remote xRegistry HTTP API**:
 
 ```bash
 # Set up registry connection
-xregistry config set registry.base_url https://registry.example.com
-xregistry config set registry.auth_token <token>
+xcg config set registry.base_url https://registry.example.com
+xcg config set registry.auth_token <token>
 
 # Work with remote registry
-xregistry catalog messagegroup add --id=orders ...
-xregistry catalog message add --messagegroupid=orders ...
+xcg catalog messagegroup add --id=orders ...
+xcg catalog message add --messagegroupid=orders ...
 ```
 
 **When to use catalog mode:**
@@ -172,7 +172,7 @@ xregistry catalog message add --messagegroupid=orders ...
 
 **Note:** Currently supports [xreg-github](https://github.com/duglin/xreg-github/) registry implementation.
 
-Run `xregistry manifest --help` or `xregistry catalog --help` to see all available operations (add, get, update, delete, list) for endpoints, message groups, messages, and schemas.
+Run `xcg manifest --help` or `xcg catalog --help` to see all available operations (add, get, update, delete, list) for endpoints, message groups, messages, and schemas.
 
 ### Config Command
 
@@ -180,32 +180,32 @@ Manage persistent configuration to avoid repeating common arguments:
 
 ```bash
 # View all configuration
-xregistry config list
+xcg config list
 
 # Set default values
-xregistry config set defaults.project_name MyProject
-xregistry config set defaults.language cs
-xregistry config set defaults.style producer
-xregistry config set defaults.output_dir ./generated
+xcg config set defaults.project_name MyProject
+xcg config set defaults.language cs
+xcg config set defaults.style producer
+xcg config set defaults.output_dir ./generated
 
 # Set registry connection
-xregistry config set registry.base_url https://registry.example.com
-xregistry config set registry.auth_token <your-token>
+xcg config set registry.base_url https://registry.example.com
+xcg config set registry.auth_token <your-token>
 
 # Set custom model URL
-xregistry config set model.url https://example.com/custom-model.json
+xcg config set model.url https://example.com/custom-model.json
 
 # Get specific value
-xregistry config get defaults.language
+xcg config get defaults.language
 
 # Clear a value
-xregistry config unset defaults.language
+xcg config unset defaults.language
 
 # Reset all to defaults
-xregistry config reset
+xcg config reset
 
 # Export as JSON
-xregistry config list --format json
+xcg config list --format json
 ```
 
 Configuration is stored in a platform-specific location:
@@ -321,7 +321,7 @@ There is a test suite that validates all templates.
 The tool can generate OpenAPI definitions for producer endpoints with:
 
 ```shell
-xregistry generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer
+xcg generate --language=openapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer
 ```
 
 This will yield a `MyProjectProducer/MyProjectProducer.yml' file that can be used to generate a
@@ -330,7 +330,7 @@ producer client for the given endpoint.
 Similarly, the tool can generate OpenAPI definitions for subscriber endpoints with:
 
 ```shell
-xregistry generate --language=openapi --style=subscriber --projectname=MyProjectSubscriber --definitions=definitions.json --output=MyProjectSubscriber
+xcg generate --language=openapi --style=subscriber --projectname=MyProjectSubscriber --definitions=definitions.json --output=MyProjectSubscriber
 ```
 
 This will yield a `MyProjectSubscriber/MyProjectSubcriber.yml' file that can be
@@ -342,7 +342,7 @@ with the CloudEvents Subscription API.
 The tool can generate AsyncAPI definitions with:
 
 ```shell
-xregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer
+xcg generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer
 ```
 
 For AsyncAPI, the tool support an extension parameter ce_content_mode that can be used to control the CloudEvents content mode of the generated AsyncAPI definition. The default is "structured" and the other supported value is "binary". The AsyncAPI template supports HTTP, MQTT, and AMQP 1.0 endpoints and injects the appropriate headers for the selected content mode for each protocol.
@@ -350,7 +350,7 @@ For AsyncAPI, the tool support an extension parameter ce_content_mode that can b
 Use it like this:
 
 ```shell
-xregistry generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer --template-args ce_content_mode=binary
+xcg generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer --template-args ce_content_mode=binary
 ```
 
 #### Custom Templates

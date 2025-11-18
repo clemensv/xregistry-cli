@@ -1,6 +1,6 @@
 # Basemessage Resolution Feature
 
-This document describes the basemessage resolution feature implemented in the xRegistry CLI, which follows the [xRegistry Message Specification](https://github.com/xregistry/spec/blob/main/message/spec.md#reusing-message-definitions).
+This document describes the basemessage resolution feature implemented in the xRegistry Code Generation CLI, which follows the [xRegistry Message Specification](https://github.com/xregistry/spec/blob/main/message/spec.md#reusing-message-definitions).
 
 ## Overview
 
