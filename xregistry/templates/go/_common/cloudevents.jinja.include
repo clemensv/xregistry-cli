@@ -1,0 +1,13 @@
+{#- CloudEvents macros for Go -#}
+
+{%- macro isCloudEvent(message) -%}
+{%- if message.envelope and message.envelope.lower().startswith("cloudevents") -%}
+true
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro usesCloudEvents(root) -%}
+{%- if (root.messagegroups | exists("envelope","CloudEvents/1.0")) or (root.endpoints | exists("envelope","CloudEvents/1.0")) -%}
+true
+{%- endif -%}
+{%- endmacro -%}

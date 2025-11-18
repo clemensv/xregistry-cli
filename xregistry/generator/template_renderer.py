@@ -265,6 +265,11 @@ class TemplateRenderer:
                     merged_schema, project_data_dir, package_name=self.data_project_name,
                     avro_annotation=avro_enabled, typedjson_annotation=json_enabled
                 )
+            elif self.language == "go":
+                avrotize.convert_avro_schema_to_go(
+                    merged_schema, project_data_dir, package_name=self.data_project_name,
+                    avro_annotation=avro_enabled, json_annotation=json_enabled
+                )
         self.render_code_templates(
             self.project_name, self.main_project_name, self.data_project_name, self.style, project_dir, xregistry_document,
             code_template_dirs, code_env, True, self.template_args, self.suppress_code_output
@@ -787,6 +792,7 @@ class TemplateRenderer:
         env.filters['pad'] = JinjaFilters.pad
         env.filters['toyaml'] = JinjaFilters.to_yaml
         env.filters['proto'] = JinjaFilters.proto
+        env.filters['go_type'] = JinjaFilters.go_type
         env.filters['exists'] = JinjaFilters.exists
         env.filters['existswithout'] = JinjaFilters.exists_without
         env.filters['push'] = self.ctx.stacks.push
@@ -1058,7 +1064,7 @@ class TemplateRenderer:
 
     def should_use_avrotize(self, schema_info: Dict[str, Any]) -> bool:
         """Check if schema should be processed with avrotize."""
-        return self.language in ["py", "cs", "java", "js", "ts"]
+        return self.language in ["py", "cs", "java", "js", "ts", "go"]
 
     def convert_json_to_avro_if_needed(self, schema_info: Dict[str, Any]) -> None:
         """Convert JSON schema to Avro if needed."""

@@ -177,6 +177,11 @@ class SchemaProcessor(ResourceProcessor):
                 merged_schema, project_data_dir, package_name=data_project_name,
                 avro_annotation=avro_enabled, typedjson_annotation=json_enabled
             )
+        elif language == "go":
+            avrotize.convert_avro_schema_to_go(
+                merged_schema, project_data_dir, package_name=data_project_name,
+                avro_annotation=avro_enabled, json_annotation=json_enabled
+            )
 
         # Clear the queue after processing
         self.avrotize_queue.clear()
@@ -254,7 +259,7 @@ class SchemaProcessor(ResourceProcessor):
 
     def _requires_avrotize(self, language: str, schema_format_short: str) -> bool:
         """Check if schema requires avrotize processing."""
-        return language in ["py", "cs", "java", "js", "ts"]
+        return language in ["py", "cs", "java", "js", "ts", "go"]
 
     def convert_jsons_to_avro(self, schema_reference: str, schema_root: JsonNode,
                              namespace_name: str, class_name: str) -> JsonNode:

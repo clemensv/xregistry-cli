@@ -260,6 +260,62 @@ class JinjaFilters:
         proto_text = re.sub(r"\n{3,}", "\n\n", proto_text)
         return proto_text
 
+    @staticmethod
+    def go_type(type_name: str) -> str:
+        """Convert a type name to a Go type.
+        
+        The input type_name comes from schema_type filter which returns:
+        - "projectNameData.TypeName" for most cases
+        - We need to convert the package part to match the import alias (snake_case)
+        and the type part to PascalCase.
+        """
+        logger.debug("Converting type name to Go type: %s", type_name)
+        if not type_name:
+            return "interface{}"
+        
+        # Handle primitive types
+        type_lower = type_name.lower()
+        if type_lower in ["string", "str"]:
+            return "string"
+        elif type_lower in ["int", "integer", "int32"]:
+            return "int32"
+        elif type_lower in ["long", "int64"]:
+            return "int64"
+        elif type_lower in ["float", "float32"]:
+            return "float32"
+        elif type_lower in ["double", "float64", "number"]:
+            return "float64"
+        elif type_lower in ["boolean", "bool"]:
+            return "bool"
+        elif type_lower in ["bytes", "binary", "byte[]", "[]byte"]:
+            return "[]byte"
+        elif type_lower == "object":
+            return "interface{}"
+        
+        # For complex types with namespace, extract package and type
+        # schema_type returns "projectNameData.TypeName", we need to convert
+        # the package part to snake_case (to match the import alias) and the type to PascalCase
+        if "." in type_name:
+            parts = type_name.split(".")
+            package = parts[0]
+            type_part = JinjaFilters.pascal(parts[-1])
+            
+            # Convert package name ending in "Data" to snake_case
+            # e.g., "test_prodData" -> "test_prod_data"
+            # This matches the import alias in the template
+            if package.endswith("Data"):
+                # Remove "Data" suffix, apply snake case, then re-add "data"
+                package_base = package[:-4]  # Remove "Data"
+                package = JinjaFilters.snake(package_base) + "_data"
+            else:
+                # Apply snake case (for cases like "test_prod_data_raw")
+                package = JinjaFilters.snake(package)
+            
+            return f"{package}.{type_part}"
+        
+        # For simple types, apply PascalCase
+        return JinjaFilters.pascal(type_name)
+
     # Resource handling filters for template-driven resource management
     
     @staticmethod

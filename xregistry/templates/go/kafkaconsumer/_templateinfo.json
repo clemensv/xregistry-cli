@@ -1,0 +1,12 @@
+{
+  "template": "kafkaconsumer",
+  "description": "Go Apache Kafka Consumer",
+  "language": "go",
+  "protocol": "Kafka",
+  "usage": [
+    "consumer"
+  ],
+  "requires": [
+    "messagegroups"
+  ]
+}

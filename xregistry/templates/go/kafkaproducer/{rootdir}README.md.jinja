@@ -1,0 +1,235 @@
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Producer" %}
+# {{ project_name | pascal }} - Apache Kafka Producer
+
+Auto-generated Go producer for Apache Kafka with CloudEvents support.
+
+## Overview
+
+Type-safe Kafka producer for {{ groupname }} message group using Confluent Kafka Go Client with CloudEvents support.
+
+## What is Apache Kafka?
+
+**Apache Kafka** is a distributed streaming platform that:
+- Handles **high-throughput** publish-subscribe messaging
+- Stores streams with **configurable retention**
+- Distributes data across **partitions** for parallelism
+- Provides **strong durability** with replication
+
+Used for: event streaming, log aggregation, real-time analytics, microservices communication.
+
+## Quick Start
+
+### 1. Add Dependency
+
+```bash
+go get github.com/confluentinc/confluent-kafka-go/v2/kafka
+go get github.com/cloudevents/sdk-go/v2
+```
+
+### 2. Produce Messages
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"{{ project_name | snake }}"
+)
+
+func main() {
+	// Create producer
+	producer, err := {{ project_name | snake }}.New{{ class_name }}("localhost:9092", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer producer.Close()
+
+	{%- set first_message = messagegroup.messages.items() | first %}
+	{%- if first_message %}
+	{%- set messageid, message = first_message %}
+	{%- set messagename = messageid | pascal | strip_namespace %}
+	{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+	// Create and send message
+	data := {{ message_body_type }}{
+		// Initialize your data here
+	}
+
+	err = producer.Send{{ messagename }}(context.Background(), data, "my-topic", "my-source", "my.event.type")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Message sent successfully")
+	{%- endif %}
+}
+```
+
+## Configuration
+
+### Basic Configuration
+
+```go
+config := &kafka.ConfigMap{
+	"bootstrap.servers": "localhost:9092",
+	"acks":             "all",
+	"retries":          3,
+}
+
+producer, err := {{ project_name | snake }}.New{{ class_name }}("localhost:9092", config)
+```
+
+### Production Configuration
+
+```go
+config := &kafka.ConfigMap{
+	"bootstrap.servers":   "broker1:9092,broker2:9092,broker3:9092",
+	"acks":               "all",
+	"retries":            10,
+	"max.in.flight":      5,
+	"compression.type":   "snappy",
+	"linger.ms":          10,
+	"batch.size":         16384,
+	"enable.idempotence": true,
+}
+
+producer, err := {{ project_name | snake }}.New{{ class_name }}("", config)
+```
+
+### Security Configuration (SASL/SSL)
+
+```go
+config := &kafka.ConfigMap{
+	"bootstrap.servers": "broker:9093",
+	"security.protocol": "SASL_SSL",
+	"sasl.mechanism":    "PLAIN",
+	"sasl.username":     "your-username",
+	"sasl.password":     "your-password",
+	"ssl.ca.location":   "/path/to/ca-cert",
+}
+
+producer, err := {{ project_name | snake }}.New{{ class_name }}("", config)
+```
+
+## API Reference
+
+### Producer Methods
+
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+
+#### `Send{{ messagename }}()`
+
+Send a {{ messagename }} message to Kafka.
+
+{%- if message.description %}
+**Description:** {{ message.description }}
+{%- endif %}
+
+**Signature:**
+```go
+func (p *{{ class_name }}) Send{{ messagename }}(
+	ctx context.Context,
+	data {{ message_body_type }},
+	topic string,
+	source string,
+	eventType string,
+) error
+```
+
+**Parameters:**
+- `ctx` - Context for cancellation and timeouts
+- `data` - The message data
+- `topic` - Kafka topic name
+- `source` - CloudEvent source
+- `eventType` - CloudEvent type
+
+**Returns:** `error` - nil on success, error on failure
+{%- endfor %}
+
+## Error Handling
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
+err := producer.Send{{ (messagegroup.messages.keys() | first) | pascal | strip_namespace }}(
+	ctx, data, "my-topic", "my-source", "my.event.type",
+)
+if err != nil {
+	log.Printf("Failed to send message: %v", err)
+	// Handle error appropriately
+}
+```
+
+## Best Practices
+
+### 1. Resource Management
+
+Always close the producer when done:
+
+```go
+producer, err := {{ project_name | snake }}.New{{ class_name }}("localhost:9092", nil)
+if err != nil {
+	log.Fatal(err)
+}
+defer producer.Close()
+```
+
+### 2. Context Usage
+
+Use contexts for cancellation and timeouts:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+err := producer.Send{{ (messagegroup.messages.keys() | first) | pascal | strip_namespace }}(ctx, data, topic, source, eventType)
+```
+
+### 3. Error Handling
+
+Always check and handle errors:
+
+```go
+if err := producer.Send{{ (messagegroup.messages.keys() | first) | pascal | strip_namespace }}(ctx, data, topic, source, eventType); err != nil {
+	log.Printf("Send failed: %v", err)
+	// Implement retry logic or dead letter queue
+}
+```
+
+### 4. Configuration Tuning
+
+Tune based on your requirements:
+
+- **High throughput**: Increase `batch.size`, `linger.ms`
+- **Low latency**: Decrease `linger.ms`, set `acks=1`
+- **Durability**: Set `acks=all`, `enable.idempotence=true`
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Connection refused | Check bootstrap servers address and port |
+| Authentication failed | Verify SASL credentials and mechanism |
+| Message too large | Increase `message.max.bytes` |
+| Timeout errors | Increase `request.timeout.ms` |
+| Slow performance | Tune `batch.size`, `linger.ms`, `compression.type` |
+
+## Dependencies
+
+- `github.com/confluentinc/confluent-kafka-go/v2` - Confluent Kafka Go Client
+- `github.com/cloudevents/sdk-go/v2` - CloudEvents SDK for Go
+- `github.com/google/uuid` - UUID generation
+
+## License
+
+Auto-generated code - see project license.
+{% endfor %}

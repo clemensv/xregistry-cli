@@ -1,0 +1,12 @@
+{
+  "template": "kafkaproducer",
+  "description": "Go Apache Kafka Producer",
+  "language": "go",
+  "protocol": "Kafka",
+  "usage": [
+    "producer"
+  ],
+  "requires": [
+    "messagegroups"
+  ]
+}

@@ -1,0 +1,26 @@
+{#- Kafka utility macros for Go -#}
+
+{#- Check if the root document uses Kafka protocol -#}
+{%- macro uses_kafka_protocol(root) -%}
+{{ root | exists("protocol", "Kafka") or root | exists("protocol", "kafka") }}
+{%- endmacro -%}
+
+{#- Check if the root document has Kafka endpoints -#}
+{%- macro uses_kafka_endpoint(root) -%}
+{%- if root.endpoints -%}
+{%- for endpointid, endpoint in root.endpoints.items() -%}
+{%- if endpoint.protocol and (endpoint.protocol | lower) == "kafka" -%}
+true
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Get the topic name from a message -#}
+{%- macro get_topic(message) -%}
+{%- if message.protocolmetadata and message.protocolmetadata.topic and message.protocolmetadata.topic.value -%}
+{{ message.protocolmetadata.topic.value }}
+{%- elif message.protocoloptions and message.protocoloptions.topic -%}
+{{ message.protocoloptions.topic }}
+{%- endif -%}
+{%- endmacro -%}

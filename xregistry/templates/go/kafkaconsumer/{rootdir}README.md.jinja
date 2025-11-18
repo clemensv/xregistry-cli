@@ -1,0 +1,339 @@
+{%- import "util.jinja.include" as util -%}
+{%- import "cloudevents.jinja.include" as cloudEvents -%}
+{%- set messagegroups = root.messagegroups %}
+{% for messagegroupid, messagegroup in messagegroups.items() -%}
+{%- set groupname = messagegroupid | pascal -%}
+{%- set class_name = (groupname | strip_namespace) + "Consumer" %}
+# {{ project_name | pascal }} - Apache Kafka Consumer
+
+Auto-generated Go consumer for Apache Kafka with CloudEvents support and consumer group management.
+
+## Overview
+
+Type-safe Kafka consumer for {{ groupname }} message group using Confluent Kafka Go Client with CloudEvents support.
+
+## What is Apache Kafka?
+
+**Apache Kafka** is a distributed streaming platform that:
+- Handles **high-throughput** publish-subscribe messaging
+- Stores streams with **configurable retention**
+- Distributes data across **partitions** for parallelism
+- Provides **strong durability** with replication
+
+Used for: event streaming, log aggregation, real-time analytics, microservices communication.
+
+## Quick Start
+
+### 1. Add Dependency
+
+```bash
+go get github.com/confluentinc/confluent-kafka-go/v2/kafka
+go get github.com/cloudevents/sdk-go/v2
+```
+
+### 2. Implement Handler
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	
+	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"{{ project_name | snake }}"
+)
+
+type MyHandler struct{}
+
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+{%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+
+{%- if isCloudEvent %}
+func (h *MyHandler) Handle{{ messagename }}(ctx context.Context, event cloudevents.Event, data {{ message_body_type }}) error {
+	log.Printf("Received {{ messagename }}: %+v", data)
+	// Process your message here
+	return nil
+}
+{%- else %}
+func (h *MyHandler) Handle{{ messagename }}(ctx context.Context, data {{ message_body_type }}) error {
+	log.Printf("Received {{ messagename }}: %+v", data)
+	// Process your message here
+	return nil
+}
+{%- endif %}
+{%- endfor %}
+
+func (h *MyHandler) HandleError(ctx context.Context, err error) {
+	log.Printf("Error: %v", err)
+}
+```
+
+### 3. Consume Messages
+
+```go
+func main() {
+	handler := &MyHandler{}
+	
+	consumer, err := {{ project_name | snake }}.New{{ class_name }}(
+		"localhost:9092",
+		"my-consumer-group",
+		[]string{"my-topic"},
+		nil,
+		handler,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer consumer.Close()
+
+	ctx := context.Background()
+	if err := consumer.Start(ctx); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+## Configuration
+
+### Basic Configuration
+
+```go
+config := &kafka.ConfigMap{
+	"bootstrap.servers": "localhost:9092",
+	"group.id":          "my-consumer-group",
+	"auto.offset.reset": "earliest",
+}
+
+consumer, err := {{ project_name | snake }}.New{{ class_name }}(
+	"",
+	"my-consumer-group",
+	[]string{"topic1", "topic2"},
+	config,
+	handler,
+)
+```
+
+### Production Configuration
+
+```go
+config := &kafka.ConfigMap{
+	"bootstrap.servers":     "broker1:9092,broker2:9092,broker3:9092",
+	"group.id":              "my-consumer-group",
+	"auto.offset.reset":     "earliest",
+	"enable.auto.commit":    true,
+	"auto.commit.interval.ms": 5000,
+	"session.timeout.ms":    10000,
+	"max.poll.interval.ms":  300000,
+}
+
+consumer, err := {{ project_name | snake }}.New{{ class_name }}("", "", topics, config, handler)
+```
+
+### Security Configuration (SASL/SSL)
+
+```go
+config := &kafka.ConfigMap{
+	"bootstrap.servers": "broker:9093",
+	"group.id":          "my-consumer-group",
+	"security.protocol": "SASL_SSL",
+	"sasl.mechanism":    "PLAIN",
+	"sasl.username":     "your-username",
+	"sasl.password":     "your-password",
+	"ssl.ca.location":   "/path/to/ca-cert",
+}
+
+consumer, err := {{ project_name | snake }}.New{{ class_name }}("", "", topics, config, handler)
+```
+
+## API Reference
+
+### Consumer Methods
+
+#### `New{{ class_name }}()`
+
+Create a new Kafka consumer.
+
+**Signature:**
+```go
+func New{{ class_name }}(
+	bootstrapServers string,
+	groupID string,
+	topics []string,
+	config *kafka.ConfigMap,
+	handler {{ class_name }}Handler,
+) (*{{ class_name }}, error)
+```
+
+#### `Start()`
+
+Start consuming messages. This is a blocking call.
+
+**Signature:**
+```go
+func (c *{{ class_name }}) Start(ctx context.Context) error
+```
+
+#### `Stop()`
+
+Stop consuming messages gracefully.
+
+**Signature:**
+```go
+func (c *{{ class_name }}) Stop()
+```
+
+#### `Close()`
+
+Close the consumer and release resources.
+
+**Signature:**
+```go
+func (c *{{ class_name }}) Close() error
+```
+
+### Handler Interface
+
+Implement the `{{ class_name }}Handler` interface to process messages:
+
+```go
+type {{ class_name }}Handler interface {
+{%- for messageid, message in messagegroup.messages.items() %}
+{%- set messagename = messageid | pascal | strip_namespace %}
+{%- set message_body_type = util.body_type(data_project_name, root, message) %}
+{%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+	{%- if isCloudEvent %}
+	Handle{{ messagename }}(ctx context.Context, event cloudevents.Event, data {{ message_body_type }}) error
+	{%- else %}
+	Handle{{ messagename }}(ctx context.Context, data {{ message_body_type }}) error
+	{%- endif %}
+{%- endfor %}
+	HandleError(ctx context.Context, err error)
+}
+```
+
+## Error Handling
+
+### Graceful Shutdown
+
+```go
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+
+// Handle OS signals
+sigChan := make(chan os.Signal, 1)
+signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+go func() {
+	<-sigChan
+	log.Println("Shutting down gracefully...")
+	consumer.Stop()
+	cancel()
+}()
+
+if err := consumer.Start(ctx); err != nil && err != context.Canceled {
+	log.Printf("Consumer error: %v", err)
+}
+```
+
+### Custom Error Handling
+
+```go
+type MyHandler struct {
+	retryCount map[string]int
+}
+
+func (h *MyHandler) HandleError(ctx context.Context, err error) {
+	log.Printf("Error occurred: %v", err)
+	// Implement custom error handling:
+	// - Retry logic
+	// - Dead letter queue
+	// - Alerting
+}
+```
+
+## Best Practices
+
+### 1. Consumer Groups
+
+Use consumer groups for load balancing:
+
+```go
+// Multiple instances with same group.id will share partition load
+consumer1, _ := {{ project_name | snake }}.New{{ class_name }}("localhost:9092", "group-1", topics, nil, handler)
+consumer2, _ := {{ project_name | snake }}.New{{ class_name }}("localhost:9092", "group-1", topics, nil, handler)
+```
+
+### 2. Offset Management
+
+Control offset commits:
+
+```go
+config := &kafka.ConfigMap{
+	"enable.auto.commit": false, // Manual commit
+}
+
+// In your handler:
+func (h *MyHandler) Handle{{ (messagegroup.messages.keys() | first) | pascal | strip_namespace }}(ctx context.Context, event cloudevents.Event, data {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }}) error {
+	// Process message
+	
+	// Manual commit if needed
+	// consumer.Commit()
+	
+	return nil
+}
+```
+
+### 3. Graceful Shutdown
+
+Always handle shutdown properly:
+
+```go
+defer func() {
+	consumer.Stop()
+	consumer.Close()
+}()
+```
+
+### 4. Idempotency
+
+Ensure message processing is idempotent:
+
+```go
+func (h *MyHandler) Handle{{ (messagegroup.messages.keys() | first) | pascal | strip_namespace }}(ctx context.Context, event cloudevents.Event, data {{ util.body_type(data_project_name, root, messagegroup.messages.values() | first) }}) error {
+	// Check if already processed (deduplication)
+	if h.alreadyProcessed(event.ID()) {
+		return nil
+	}
+	
+	// Process message
+	// ...
+	
+	// Mark as processed
+	h.markProcessed(event.ID())
+	return nil
+}
+```
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Consumer not in group | Check `group.id` configuration |
+| Offset reset errors | Set `auto.offset.reset` to `earliest` or `latest` |
+| Rebalancing issues | Tune `session.timeout.ms` and `heartbeat.interval.ms` |
+| Duplicate messages | Implement idempotency and consider manual commits |
+| Performance issues | Increase partition count, tune `fetch.min.bytes` |
+
+## Dependencies
+
+- `github.com/confluentinc/confluent-kafka-go/v2` - Confluent Kafka Go Client
+- `github.com/cloudevents/sdk-go/v2` - CloudEvents SDK for Go
+- `github.com/google/uuid` - UUID generation
+
+## License
+
+Auto-generated code - see project license.
+{% endfor %}
