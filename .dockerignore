@@ -1,0 +1,45 @@
+# Version control (but keep .git for flit_scm)
+.gitignore
+
+# Python
+.venv
+.env
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+*.egg
+dist
+build
+.pytest_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Development
+.vscode
+.vs
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test and temporary artifacts
+tmp/
+test/
+*.log
+.tmp
+
+# Documentation
+docs/
+samples/
+
+# CI/CD
+.github/workflows
+
+# Node/npm (if used in templates)
+node_modules/
+package-lock.json
+npm-debug.log
+

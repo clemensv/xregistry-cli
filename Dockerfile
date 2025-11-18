@@ -9,10 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files
+# Copy project files (including .git for version detection)
 COPY . .
 
 # Build the package
+# flit_scm needs git metadata to determine version
 RUN pip install --no-cache-dir build wheel && \
     python -m build --sdist --wheel --outdir dist
 
