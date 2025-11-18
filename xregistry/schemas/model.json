@@ -152,18 +152,8 @@
         "deprecated": {
           "name": "deprecated",
           "type": "object",
-          "description": "tbd",
+          "description": "Indicates whether the endpoint is deprecated",
           "attributes": {
-            "alternative": {
-              "name": "alternative",
-              "type": "url",
-              "description": "tbd"
-            },
-            "docs": {
-              "name": "docs",
-              "type": "url",
-              "description": "tbd"
-            },
             "effective": {
               "name": "effective",
               "type": "timestamp",
@@ -172,6 +162,16 @@
             "removal": {
               "name": "removal",
               "type": "timestamp",
+              "description": "tbd"
+            },
+            "alternative": {
+              "name": "alternative",
+              "type": "url",
+              "description": "tbd"
+            },
+            "docs": {
+              "name": "docs",
+              "type": "url",
               "description": "tbd"
             },
             "*": {
@@ -183,13 +183,13 @@
         "channel": {
           "name": "channel",
           "type": "string",
-          "description": "tbd"
+          "description": "The name of the channel"
         },
         "envelope": {
           "name": "envelope",
           "type": "string",
           "description": "Envelope metadata format identifier. If set, all definitions MUST use this format value",
-          "ifValues": {
+          "ifvalues": {
             "CloudEvents/1.0": {
               "siblingattributes": {
                 "envelopeoptions": {
@@ -197,10 +197,6 @@
                   "type": "object",
                   "description": "Envelope metadata constraints",
                   "attributes": {
-                    "format": {
-                      "name": "format",
-                      "type": "string"
-                    },
                     "mode": {
                       "name": "mode",
                       "type": "string",
@@ -208,6 +204,10 @@
                         "binary",
                         "structured"
                       ]
+                    },
+                    "format": {
+                      "name": "format",
+                      "type": "string"
                     },
                     "*": {
                       "name": "*",
@@ -224,14 +224,15 @@
           "type": "array",
           "description": "The message groups that are supported by this endpoint",
           "item": {
-            "type": "uri"
+            "type": "xid",
+            "target": "/messagegroups/messages"
           }
         },
         "protocol": {
           "name": "protocol",
           "type": "string",
           "description": "Endpoint protocol identifier. If set, all definitions MUST use this protocol value",
-          "ifValues": {
+          "ifvalues": {
             "AMQP/1.0": {
               "siblingattributes": {
                 "protocoloptions": {
@@ -240,84 +241,6 @@
                   "namecharset": "extended",
                   "description": "Configuration information for this endpoint",
                   "attributes": {
-                    "authorization": {
-                      "name": "authorization",
-                      "type": "array",
-                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
-                      "item": {
-                        "type": "object",
-                        "attributes": {
-                          "authorityuri": {
-                            "name": "authorityuri",
-                            "type": "uri",
-                            "description": "The authority uri where authorization shall be requested (if applicable)"
-                          },
-                          "granttypes": {
-                            "name": "granttypes",
-                            "type": "array",
-                            "description": "The grant types that can be requested (if applicable)",
-                            "item": {
-                              "type": "string"
-                            }
-                          },
-                          "resourceuri": {
-                            "name": "resourceuri",
-                            "type": "uri",
-                            "description": "The resource uri for which authorization shall be granted (if applicable)"
-                          },
-                          "type": {
-                            "name": "type",
-                            "type": "string",
-                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
-                          },
-                          "*": {
-                            "name": "*",
-                            "type": "any"
-                          }
-                        }
-                      }
-                    },
-                    "connection-capabilities": {
-                      "name": "connection-capabilities",
-                      "type": "array",
-                      "description": "The AMQP capabilities to use with the endpoint",
-                      "item": {
-                        "type": "string"
-                      }
-                    },
-                    "connection-properties": {
-                      "name": "connection-properties",
-                      "type": "map",
-                      "description": "An optional map of AMQP connection properties to use with the endpoint",
-                      "item": {
-                        "type": "string"
-                      }
-                    },
-                    "deployed": {
-                      "name": "deployed",
-                      "type": "boolean",
-                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
-                      "required": true,
-                      "default": false
-                    },
-                    "distribution-mode": {
-                      "name": "distribution-mode",
-                      "type": "string",
-                      "description": "The AMQP distribution mode for receivers. Can be 'move' or 'copy'.  A value of 'move' indicates an exclusive lock on the message. A value of 'copy' indicates a non-exclusive lock on the message",
-                      "enum": [
-                        "move",
-                        "copy"
-                      ],
-                      "required": true,
-                      "default": "move"
-                    },
-                    "durable": {
-                      "name": "durable",
-                      "type": "boolean",
-                      "description": "The AMQP durable flag. Whether the node is durable or transient",
-                      "required": true,
-                      "default": false
-                    },
                     "endpoints": {
                       "name": "endpoints",
                       "type": "array",
@@ -337,6 +260,62 @@
                         }
                       }
                     },
+                    "authorization": {
+                      "name": "authorization",
+                      "type": "array",
+                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
+                      "item": {
+                        "type": "object",
+                        "attributes": {
+                          "type": {
+                            "name": "type",
+                            "type": "string",
+                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
+                          },
+                          "resourceuri": {
+                            "name": "resourceuri",
+                            "type": "uri",
+                            "description": "The resource uri for which authorization shall be granted (if applicable)"
+                          },
+                          "authorityuri": {
+                            "name": "authorityuri",
+                            "type": "uri",
+                            "description": "The authority uri where authorization shall be requested (if applicable)"
+                          },
+                          "granttypes": {
+                            "name": "granttypes",
+                            "type": "array",
+                            "description": "The grant types that can be requested (if applicable)",
+                            "item": {
+                              "type": "string"
+                            }
+                          },
+                          "*": {
+                            "name": "*",
+                            "type": "any"
+                          }
+                        }
+                      }
+                    },
+                    "deployed": {
+                      "name": "deployed",
+                      "type": "boolean",
+                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
+                      "required": true,
+                      "default": false
+                    },
+                    "node": {
+                      "name": "node",
+                      "type": "string",
+                      "description": "The AMQP node name. Commonly the name of a queue or a topic. Corresponds to the 'address' in source or target of the attach frame."
+                    },
+                    "durable": {
+                      "name": "durable",
+                      "type": "boolean",
+                      "description": "The AMQP durable flag. Whether the node is durable or transient",
+                      "required": true,
+                      "default": false
+                    },
                     "link-properties": {
                       "name": "link-properties",
                       "type": "map",
@@ -345,10 +324,32 @@
                         "type": "string"
                       }
                     },
-                    "node": {
-                      "name": "node",
+                    "connection-properties": {
+                      "name": "connection-properties",
+                      "type": "map",
+                      "description": "An optional map of AMQP connection properties to use with the endpoint",
+                      "item": {
+                        "type": "string"
+                      }
+                    },
+                    "distribution-mode": {
+                      "name": "distribution-mode",
                       "type": "string",
-                      "description": "The AMQP node name. Commonly the name of a queue or a topic. Corresponds to the 'address' in source or target of the attach frame."
+                      "enum": [
+                        "move",
+                        "copy"
+                      ],
+                      "description": "The AMQP distribution mode for receivers. Can be 'move' or 'copy'.  A value of 'move' indicates an exclusive lock on the message. A value of 'copy' indicates a non-exclusive lock on the message",
+                      "required": true,
+                      "default": "move"
+                    },
+                    "connection-capabilities": {
+                      "name": "connection-capabilities",
+                      "type": "array",
+                      "description": "The AMQP capabilities to use with the endpoint",
+                      "item": {
+                        "type": "string"
+                      }
                     },
                     "node-capabilities": {
                       "name": "node-capabilities",
@@ -366,13 +367,32 @@
                 }
               }
             },
-            "HTTP": {
+            "MQTT/5.0": {
               "siblingattributes": {
                 "protocoloptions": {
                   "name": "protocoloptions",
                   "type": "object",
                   "description": "Configuration information for this endpoint",
                   "attributes": {
+                    "endpoints": {
+                      "name": "endpoints",
+                      "type": "array",
+                      "description": "The network addresses that are for communication with the endpoint. The endpoints are ordered by preference, with the first endpoint being the preferred endpoint. Some protocol implementations might not support multiple endpoints, in which case all but the first endpoint might be ignored. Whether the URI just identifies a network host or links directly to a resource managed by the network host is protocol specific",
+                      "item": {
+                        "type": "object",
+                        "attributes": {
+                          "uri": {
+                            "name": "uri",
+                            "type": "uri",
+                            "description": "MQTT URI (mqtt, mqtts, or ws scheme)"
+                          },
+                          "*": {
+                            "name": "*",
+                            "type": "any"
+                          }
+                        }
+                      }
+                    },
                     "authorization": {
                       "name": "authorization",
                       "type": "array",
@@ -380,6 +400,16 @@
                       "item": {
                         "type": "object",
                         "attributes": {
+                          "type": {
+                            "name": "type",
+                            "type": "string",
+                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
+                          },
+                          "resourceurl": {
+                            "name": "resourceurl",
+                            "type": "url",
+                            "description": "The resource uri for which authorization shall be granted (if applicable)"
+                          },
                           "authorityuri": {
                             "name": "authorityuri",
                             "type": "uri",
@@ -392,16 +422,6 @@
                             "item": {
                               "type": "string"
                             }
-                          },
-                          "resourceurl": {
-                            "name": "resourceurl",
-                            "type": "url",
-                            "description": "The resource uri for which authorization shall be granted (if applicable)"
-                          },
-                          "type": {
-                            "name": "type",
-                            "type": "string",
-                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
                           },
                           "*": {
                             "name": "*",
@@ -417,6 +437,183 @@
                       "required": true,
                       "default": false
                     },
+                    "topic": {
+                      "name": "topic",
+                      "type": "string",
+                      "description": "The MQTT topic path that is used for communication with the endpoint unless overridden by the message"
+                    },
+                    "qos": {
+                      "name": "qos",
+                      "type": "uinteger",
+                      "description": "The MQTT QoS level. May be 0, 1, or 2",
+                      "required": true,
+                      "default": 0,
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    },
+                    "retain": {
+                      "name": "retain",
+                      "type": "boolean",
+                      "description": "The MQTT retain flag to use for publishers on ths endpoint",
+                      "required": true,
+                      "default": false
+                    },
+                    "cleansession": {
+                      "name": "cleansession",
+                      "type": "boolean",
+                      "description": "The MQTT clean session flag to use for publishers on this endpoint",
+                      "required": true,
+                      "default": true
+                    },
+                    "willtopic": {
+                      "name": "willtopic",
+                      "type": "string",
+                      "description": "The MQTT will topic to configure for publishers on this endpoint"
+                    },
+                    "willmessage": {
+                      "name": "willmessage",
+                      "type": "xid",
+                      "target": "/messagegroups/messages",
+                      "description": "The MQTT will message definition to configure for publishers on this endpoint. This MUST be a reference to a message definition"
+                    },
+                    "*": {
+                      "name": "*",
+                      "type": "any"
+                    }
+                  }
+                }
+              }
+            },
+            "MQTT/3.1.1": {
+              "siblingattributes": {
+                "protocoloptions": {
+                  "name": "protocoloptions",
+                  "type": "object",
+                  "description": "Configuration information for this endpoint",
+                  "attributes": {
+                    "endpoints": {
+                      "name": "endpoints",
+                      "type": "array",
+                      "description": "The network addresses that are for communication with the endpoint. The endpoints are ordered by preference, with the first endpoint being the preferred endpoint. Some protocol implementations might not support multiple endpoints, in which case all but the first endpoint might be ignored. Whether the URI just identifies a network host or links directly to a resource managed by the network host is protocol specific",
+                      "item": {
+                        "type": "object",
+                        "attributes": {
+                          "uri": {
+                            "name": "uri",
+                            "type": "uri",
+                            "description": "MQTT URI (mqtt, mqtts, or ws scheme)"
+                          },
+                          "*": {
+                            "name": "*",
+                            "type": "any"
+                          }
+                        }
+                      }
+                    },
+                    "authorization": {
+                      "name": "authorization",
+                      "type": "array",
+                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
+                      "item": {
+                        "type": "object",
+                        "attributes": {
+                          "type": {
+                            "name": "type",
+                            "type": "string",
+                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
+                          },
+                          "resourceurl": {
+                            "name": "resourceurl",
+                            "type": "url",
+                            "description": "The resource uri for which authorization shall be granted (if applicable)"
+                          },
+                          "authorityuri": {
+                            "name": "authorityuri",
+                            "type": "uri",
+                            "description": "The authority uri where authorization shall be requested (if applicable)"
+                          },
+                          "granttypes": {
+                            "name": "granttypes",
+                            "type": "array",
+                            "description": "The grant types that can be requested (if applicable)",
+                            "item": {
+                              "type": "string"
+                            }
+                          },
+                          "*": {
+                            "name": "*",
+                            "type": "any"
+                          }
+                        }
+                      }
+                    },
+                    "deployed": {
+                      "name": "deployed",
+                      "type": "boolean",
+                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
+                      "required": true,
+                      "default": false
+                    },
+                    "topic": {
+                      "name": "topic",
+                      "type": "string",
+                      "description": "MQTT topic path that is used for communication with the endpoint unless overridden by the message"
+                    },
+                    "qos": {
+                      "name": "qos",
+                      "type": "uinteger",
+                      "description": "The MQTT QoS level. May be 0, 1, or 2",
+                      "required": true,
+                      "default": 0,
+                      "enum": [
+                        0,
+                        1,
+                        2
+                      ]
+                    },
+                    "retain": {
+                      "name": "retain",
+                      "type": "boolean",
+                      "description": "The MQTT retain flag to use for publishers on ths endpoint",
+                      "required": true,
+                      "default": false
+                    },
+                    "cleansession": {
+                      "name": "cleansession",
+                      "type": "boolean",
+                      "description": "The MQTT clean session flag to use for publishers on this endpoint",
+                      "required": true,
+                      "default": true
+                    },
+                    "willtopic": {
+                      "name": "willtopic",
+                      "type": "string",
+                      "description": "The MQTT will topic to configure for publishers on this endpoint"
+                    },
+                    "willmessage": {
+                      "name": "willmessage",
+                      "type": "xid",
+                      "target": "/messagegroups/messages",
+                      "description": "The MQTT will message definition to configure for publishers on this endpoint. This MUST be a reference to a message definition"
+                    },
+                    "*": {
+                      "name": "*",
+                      "type": "any"
+                    }
+                  }
+                }
+              }
+            },
+            "HTTP": {
+              "siblingattributes": {
+                "protocoloptions": {
+                  "name": "protocoloptions",
+                  "type": "object",
+                  "description": "Configuration information for this endpoint",
+                  "attributes": {
                     "endpoints": {
                       "name": "endpoints",
                       "type": "array",
@@ -435,6 +632,57 @@
                           }
                         }
                       }
+                    },
+                    "authorization": {
+                      "name": "authorization",
+                      "type": "array",
+                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
+                      "item": {
+                        "type": "object",
+                        "attributes": {
+                          "type": {
+                            "name": "type",
+                            "type": "string",
+                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
+                          },
+                          "resourceurl": {
+                            "name": "resourceurl",
+                            "type": "url",
+                            "description": "The resource uri for which authorization shall be granted (if applicable)"
+                          },
+                          "authorityuri": {
+                            "name": "authorityuri",
+                            "type": "uri",
+                            "description": "The authority uri where authorization shall be requested (if applicable)"
+                          },
+                          "granttypes": {
+                            "name": "granttypes",
+                            "type": "array",
+                            "description": "The grant types that can be requested (if applicable)",
+                            "item": {
+                              "type": "string"
+                            }
+                          },
+                          "*": {
+                            "name": "*",
+                            "type": "any"
+                          }
+                        }
+                      }
+                    },
+                    "deployed": {
+                      "name": "deployed",
+                      "type": "boolean",
+                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
+                      "required": true,
+                      "default": false
+                    },
+                    "method": {
+                      "name": "method",
+                      "type": "string",
+                      "description": "The HTTP method name",
+                      "required": true,
+                      "default": "POST"
                     },
                     "headers": {
                       "name": "headers",
@@ -456,13 +704,6 @@
                           }
                         }
                       }
-                    },
-                    "method": {
-                      "name": "method",
-                      "type": "string",
-                      "description": "The HTTP method name",
-                      "required": true,
-                      "default": "POST"
                     },
                     "query": {
                       "name": "query",
@@ -487,62 +728,6 @@
                   "type": "object",
                   "description": "Configuration information for this endpoint",
                   "attributes": {
-                    "acks": {
-                      "name": "acks",
-                      "type": "integer",
-                      "description": "The Apache Kafka acks setting to use. If no acks setting is specified, the default is -1",
-                      "required": true,
-                      "default": 1
-                    },
-                    "authorization": {
-                      "name": "authorization",
-                      "type": "array",
-                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
-                      "item": {
-                        "type": "object",
-                        "attributes": {
-                          "authorityuri": {
-                            "name": "authorityuri",
-                            "type": "uri",
-                            "description": "The authority uri where authorization shall be requested (if applicable)"
-                          },
-                          "granttypes": {
-                            "name": "granttypes",
-                            "type": "array",
-                            "description": "The grant types that can be requested (if applicable)",
-                            "item": {
-                              "type": "string"
-                            }
-                          },
-                          "resourceurl": {
-                            "name": "resourceurl",
-                            "type": "url",
-                            "description": "The resource uri for which authorization shall be granted (if applicable)"
-                          },
-                          "type": {
-                            "name": "type",
-                            "type": "string",
-                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
-                          },
-                          "*": {
-                            "name": "*",
-                            "type": "any"
-                          }
-                        }
-                      }
-                    },
-                    "consumergroup": {
-                      "name": "consumergroup",
-                      "type": "string",
-                      "description": "The Apache Kafka consumer group name to use for consumers"
-                    },
-                    "deployed": {
-                      "name": "deployed",
-                      "type": "boolean",
-                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
-                      "required": true,
-                      "default": false
-                    },
                     "endpoints": {
                       "name": "endpoints",
                       "type": "array",
@@ -559,13 +744,6 @@
                               "type": "string"
                             }
                           },
-                          "sasl.mechanism": {
-                            "name": "sasl.mechanism",
-                            "type": "string",
-                            "description": "The Kafka SASL mechanism",
-                            "required": true,
-                            "default": "PLAIN"
-                          },
                           "security.protocol": {
                             "name": "security.protocol",
                             "type": "string",
@@ -573,12 +751,90 @@
                             "required": true,
                             "default": "PLAINTEXT"
                           },
+                          "sasl.mechanism": {
+                            "name": "sasl.mechanism",
+                            "type": "string",
+                            "description": "The Kafka SASL mechanism",
+                            "required": true,
+                            "default": "PLAIN"
+                          },
                           "*": {
                             "name": "*",
                             "type": "any"
                           }
                         }
                       }
+                    },
+                    "authorization": {
+                      "name": "authorization",
+                      "type": "array",
+                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
+                      "item": {
+                        "type": "object",
+                        "attributes": {
+                          "type": {
+                            "name": "type",
+                            "type": "string",
+                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
+                          },
+                          "resourceurl": {
+                            "name": "resourceurl",
+                            "type": "url",
+                            "description": "The resource uri for which authorization shall be granted (if applicable)"
+                          },
+                          "authorityuri": {
+                            "name": "authorityuri",
+                            "type": "uri",
+                            "description": "The authority uri where authorization shall be requested (if applicable)"
+                          },
+                          "granttypes": {
+                            "name": "granttypes",
+                            "type": "array",
+                            "description": "The grant types that can be requested (if applicable)",
+                            "item": {
+                              "type": "string"
+                            }
+                          },
+                          "*": {
+                            "name": "*",
+                            "type": "any"
+                          }
+                        }
+                      }
+                    },
+                    "deployed": {
+                      "name": "deployed",
+                      "type": "boolean",
+                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
+                      "required": true,
+                      "default": false
+                    },
+                    "topic": {
+                      "name": "topic",
+                      "type": "string",
+                      "description": "Apache Kafka topic name"
+                    },
+                    "acks": {
+                      "name": "acks",
+                      "type": "integer",
+                      "description": "The Apache Kafka acks setting to use. If no acks setting is specified, the default is -1",
+                      "required": true,
+                      "default": 1
+                    },
+                    "key": {
+                      "name": "key",
+                      "type": "string",
+                      "description": "The Apache Kafka record key"
+                    },
+                    "partition": {
+                      "name": "partition",
+                      "type": "integer",
+                      "description": "The Apache Kafka partition number to use when writing to or receiving from Apache Kafka"
+                    },
+                    "consumergroup": {
+                      "name": "consumergroup",
+                      "type": "string",
+                      "description": "The Apache Kafka consumer group name to use for consumers"
                     },
                     "headers": {
                       "name": "headers",
@@ -588,27 +844,12 @@
                         "type": "string"
                       }
                     },
-                    "key": {
-                      "name": "key",
-                      "type": "string",
-                      "description": "The Apache Kafka record key"
-                    },
                     "keyserializer": {
                       "name": "keyserializer",
                       "type": "string",
                       "description": "The Kafka key serializer",
                       "required": true,
                       "default": "org.apache.kafka.common.serialization.StringSerializer"
-                    },
-                    "partition": {
-                      "name": "partition",
-                      "type": "integer",
-                      "description": "The Apache Kafka partition number to use when writing to or receiving from Apache Kafka"
-                    },
-                    "topic": {
-                      "name": "topic",
-                      "type": "string",
-                      "description": "Apache Kafka topic name"
                     },
                     "valueserializer": {
                       "name": "valueserializer",
@@ -625,244 +866,6 @@
                 }
               }
             },
-            "MQTT/3.1.1": {
-              "siblingattributes": {
-                "protocoloptions": {
-                  "name": "protocoloptions",
-                  "type": "object",
-                  "description": "Configuration information for this endpoint",
-                  "attributes": {
-                    "authorization": {
-                      "name": "authorization",
-                      "type": "array",
-                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
-                      "item": {
-                        "type": "object",
-                        "attributes": {
-                          "authorityuri": {
-                            "name": "authorityuri",
-                            "type": "uri",
-                            "description": "The authority uri where authorization shall be requested (if applicable)"
-                          },
-                          "granttypes": {
-                            "name": "granttypes",
-                            "type": "array",
-                            "description": "The grant types that can be requested (if applicable)",
-                            "item": {
-                              "type": "string"
-                            }
-                          },
-                          "resourceurl": {
-                            "name": "resourceurl",
-                            "type": "url",
-                            "description": "The resource uri for which authorization shall be granted (if applicable)"
-                          },
-                          "type": {
-                            "name": "type",
-                            "type": "string",
-                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
-                          },
-                          "*": {
-                            "name": "*",
-                            "type": "any"
-                          }
-                        }
-                      }
-                    },
-                    "cleansession": {
-                      "name": "cleansession",
-                      "type": "boolean",
-                      "description": "The MQTT clean session flag to use for publishers on this endpoint",
-                      "required": true,
-                      "default": true
-                    },
-                    "deployed": {
-                      "name": "deployed",
-                      "type": "boolean",
-                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
-                      "required": true,
-                      "default": false
-                    },
-                    "endpoints": {
-                      "name": "endpoints",
-                      "type": "array",
-                      "description": "The network addresses that are for communication with the endpoint. The endpoints are ordered by preference, with the first endpoint being the preferred endpoint. Some protocol implementations might not support multiple endpoints, in which case all but the first endpoint might be ignored. Whether the URI just identifies a network host or links directly to a resource managed by the network host is protocol specific",
-                      "item": {
-                        "type": "object",
-                        "attributes": {
-                          "uri": {
-                            "name": "uri",
-                            "type": "uri",
-                            "description": "MQTT URI (mqtt, mqtts, or ws scheme)"
-                          },
-                          "*": {
-                            "name": "*",
-                            "type": "any"
-                          }
-                        }
-                      }
-                    },
-                    "qos": {
-                      "name": "qos",
-                      "type": "uinteger",
-                      "description": "The MQTT QoS level. May be 0, 1, or 2",
-                      "enum": [
-                        0,
-                        1,
-                        2
-                      ],
-                      "required": true,
-                      "default": 0
-                    },
-                    "retain": {
-                      "name": "retain",
-                      "type": "boolean",
-                      "description": "The MQTT retain flag to use for publishers on ths endpoint",
-                      "required": true,
-                      "default": false
-                    },
-                    "topic": {
-                      "name": "topic",
-                      "type": "string",
-                      "description": "MQTT topic path that is used for communication with the endpoint unless overridden by the message"
-                    },
-                    "willmessage": {
-                      "name": "willmessage",
-                      "type": "xid",
-                      "description": "The MQTT will message definition to configure for publishers on this endpoint. This MUST be a reference to a message definition"
-                    },
-                    "willtopic": {
-                      "name": "willtopic",
-                      "type": "string",
-                      "description": "The MQTT will topic to configure for publishers on this endpoint"
-                    },
-                    "*": {
-                      "name": "*",
-                      "type": "any"
-                    }
-                  }
-                }
-              }
-            },
-            "MQTT/5.0": {
-              "siblingattributes": {
-                "protocoloptions": {
-                  "name": "protocoloptions",
-                  "type": "object",
-                  "description": "Configuration information for this endpoint",
-                  "attributes": {
-                    "authorization": {
-                      "name": "authorization",
-                      "type": "array",
-                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
-                      "item": {
-                        "type": "object",
-                        "attributes": {
-                          "authorityuri": {
-                            "name": "authorityuri",
-                            "type": "uri",
-                            "description": "The authority uri where authorization shall be requested (if applicable)"
-                          },
-                          "granttypes": {
-                            "name": "granttypes",
-                            "type": "array",
-                            "description": "The grant types that can be requested (if applicable)",
-                            "item": {
-                              "type": "string"
-                            }
-                          },
-                          "resourceurl": {
-                            "name": "resourceurl",
-                            "type": "url",
-                            "description": "The resource uri for which authorization shall be granted (if applicable)"
-                          },
-                          "type": {
-                            "name": "type",
-                            "type": "string",
-                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
-                          },
-                          "*": {
-                            "name": "*",
-                            "type": "any"
-                          }
-                        }
-                      }
-                    },
-                    "cleansession": {
-                      "name": "cleansession",
-                      "type": "boolean",
-                      "description": "The MQTT clean session flag to use for publishers on this endpoint",
-                      "required": true,
-                      "default": true
-                    },
-                    "deployed": {
-                      "name": "deployed",
-                      "type": "boolean",
-                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
-                      "required": true,
-                      "default": false
-                    },
-                    "endpoints": {
-                      "name": "endpoints",
-                      "type": "array",
-                      "description": "The network addresses that are for communication with the endpoint. The endpoints are ordered by preference, with the first endpoint being the preferred endpoint. Some protocol implementations might not support multiple endpoints, in which case all but the first endpoint might be ignored. Whether the URI just identifies a network host or links directly to a resource managed by the network host is protocol specific",
-                      "item": {
-                        "type": "object",
-                        "attributes": {
-                          "uri": {
-                            "name": "uri",
-                            "type": "uri",
-                            "description": "MQTT URI (mqtt, mqtts, or ws scheme)"
-                          },
-                          "*": {
-                            "name": "*",
-                            "type": "any"
-                          }
-                        }
-                      }
-                    },
-                    "qos": {
-                      "name": "qos",
-                      "type": "uinteger",
-                      "description": "The MQTT QoS level. May be 0, 1, or 2",
-                      "enum": [
-                        0,
-                        1,
-                        2
-                      ],
-                      "required": true,
-                      "default": 0
-                    },
-                    "retain": {
-                      "name": "retain",
-                      "type": "boolean",
-                      "description": "The MQTT retain flag to use for publishers on ths endpoint",
-                      "required": true,
-                      "default": false
-                    },
-                    "topic": {
-                      "name": "topic",
-                      "type": "string",
-                      "description": "The MQTT topic path that is used for communication with the endpoint unless overridden by the message"
-                    },
-                    "willmessage": {
-                      "name": "willmessage",
-                      "type": "xid",
-                      "description": "The MQTT will message definition to configure for publishers on this endpoint. This MUST be a reference to a message definition"
-                    },
-                    "willtopic": {
-                      "name": "willtopic",
-                      "type": "string",
-                      "description": "The MQTT will topic to configure for publishers on this endpoint"
-                    },
-                    "*": {
-                      "name": "*",
-                      "type": "any"
-                    }
-                  }
-                }
-              }
-            },
             "NATS": {
               "siblingattributes": {
                 "protocoloptions": {
@@ -870,50 +873,6 @@
                   "type": "object",
                   "description": "Configuration information for this endpoint",
                   "attributes": {
-                    "authorization": {
-                      "name": "authorization",
-                      "type": "array",
-                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
-                      "item": {
-                        "type": "object",
-                        "attributes": {
-                          "authorityuri": {
-                            "name": "authorityuri",
-                            "type": "uri",
-                            "description": "The authority uri where authorization shall be requested (if applicable)"
-                          },
-                          "granttypes": {
-                            "name": "granttypes",
-                            "type": "array",
-                            "description": "The grant types that can be requested (if applicable)",
-                            "item": {
-                              "type": "string"
-                            }
-                          },
-                          "resourceurl": {
-                            "name": "resourceurl",
-                            "type": "url",
-                            "description": "The resource uri for which authorization shall be granted (if applicable)"
-                          },
-                          "type": {
-                            "name": "type",
-                            "type": "string",
-                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
-                          },
-                          "*": {
-                            "name": "*",
-                            "type": "any"
-                          }
-                        }
-                      }
-                    },
-                    "deployed": {
-                      "name": "deployed",
-                      "type": "boolean",
-                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
-                      "required": true,
-                      "default": false
-                    },
                     "endpoints": {
                       "name": "endpoints",
                       "type": "array",
@@ -933,6 +892,50 @@
                         }
                       }
                     },
+                    "authorization": {
+                      "name": "authorization",
+                      "type": "array",
+                      "description": "Authorization options. These are hints for the adapter for interacting with the authorization endpoint. This is not a credentials configuration",
+                      "item": {
+                        "type": "object",
+                        "attributes": {
+                          "type": {
+                            "name": "type",
+                            "type": "string",
+                            "description": "The authentication/authorization type. OAuth2, Plain, APIKey, and X509Cert are well-defined"
+                          },
+                          "resourceurl": {
+                            "name": "resourceurl",
+                            "type": "url",
+                            "description": "The resource uri for which authorization shall be granted (if applicable)"
+                          },
+                          "authorityuri": {
+                            "name": "authorityuri",
+                            "type": "uri",
+                            "description": "The authority uri where authorization shall be requested (if applicable)"
+                          },
+                          "granttypes": {
+                            "name": "granttypes",
+                            "type": "array",
+                            "description": "The grant types that can be requested (if applicable)",
+                            "item": {
+                              "type": "string"
+                            }
+                          },
+                          "*": {
+                            "name": "*",
+                            "type": "any"
+                          }
+                        }
+                      }
+                    },
+                    "deployed": {
+                      "name": "deployed",
+                      "type": "boolean",
+                      "description": "If `true`, the endpoint metadata represents a public, live endpoint that is available for communication and a strict validator MAY test the liveness of the endpoint",
+                      "required": true,
+                      "default": false
+                    },
                     "subject": {
                       "name": "subject",
                       "type": "string",
@@ -950,14 +953,17 @@
         },
         "usage": {
           "name": "usage",
-          "type": "string",
+          "type": "array",
           "description": "Client's expected usage of this endpoint",
           "enum": [
             "subscriber",
             "consumer",
             "producer"
           ],
-          "strict": true
+          "strict": true,
+          "item": {
+            "type": "string"
+          }
         },
         "*": {
           "name": "*",

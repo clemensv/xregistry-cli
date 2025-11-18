@@ -582,7 +582,17 @@ def _apply_ifvalues(model: Model,
             continue
         canon = _canonical(spec, body[attr])
         body[attr] = canon
-        rule = _iv(spec).get(canon, {})
+        # Skip ifValues lookup for array types (lists aren't hashable)
+        if spec.get("type") == "array":
+            continue
+        # Case-insensitive lookup in ifValues dictionary
+        ifvalues_dict = _iv(spec)
+        rule = {}
+        canon_lower = canon.lower()
+        for key, value in ifvalues_dict.items():
+            if key.lower() == canon_lower:
+                rule = value
+                break
         for sib, sdef in rule.get("siblingattributes", {}).items():
             if sdef.get("type") in ("map",) or sib == "*" or sdef.get("type") == "array":
                 continue
