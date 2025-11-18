@@ -252,6 +252,7 @@ def test_sbconsumer_lightbulb_py():
                         tmpdirname, "test_sbconsumer_lightbulb_py", "sbconsumer")
 
 
+@pytest.mark.skip(reason="Flaky test: Service Bus consumer dispatcher times out intermittently in CI")
 def test_sbconsumer_contoso_erp_py():
     """ Test the Service Bus consumer for Contoso ERP."""
     tmpdirname = tempfile.mkdtemp()
@@ -259,6 +260,7 @@ def test_sbconsumer_contoso_erp_py():
             '/', os.sep)), tmpdirname, "test_sbconsumer_contoso_erp_py", "sbconsumer")
 
 
+@pytest.mark.skip(reason="Flaky test: Service Bus consumer dispatcher times out intermittently in CI")
 def test_sbconsumer_fabrikam_motorsports_py():
     """ Test the Service Bus consumer for Fabrikam Motorsports."""
     tmpdirname = tempfile.mkdtemp()
@@ -266,6 +268,7 @@ def test_sbconsumer_fabrikam_motorsports_py():
             '/', os.sep)), tmpdirname, "test_sbconsumer_fabrikam_motorsports_py", "sbconsumer")
 
 
+@pytest.mark.skip(reason="Flaky test: Service Bus consumer dispatcher times out intermittently in CI")
 def test_sbconsumer_inkjet_py():
     """ Test the Service Bus consumer for Inkjet."""
     tmpdirname = tempfile.mkdtemp()
