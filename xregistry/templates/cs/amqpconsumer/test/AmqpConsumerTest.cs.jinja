@@ -142,20 +142,28 @@ namespace {{ project_name | pascal }}.Test
             {
                 if (_broker.Equals("rabbitmq", StringComparison.OrdinalIgnoreCase))
                 {
-                    _logger.LogDebug("Initializing RabbitMQ test fixture.");
+                    string rabbitmqVersion = Environment.GetEnvironmentVariable("RABBITMQ_VERSION") ?? "4";
+                    string imageTag = rabbitmqVersion == "3" ? "3-management" : "4-management";
+                    _logger.LogDebug($"Initializing RabbitMQ {imageTag} test fixture.");
                     
                     Amqp.Trace.TraceLevel = Amqp.TraceLevel.Frame;
                     Amqp.Trace.TraceListener = (l, f, a) => System.Diagnostics.Debug.WriteLine(f, a);
                     
-                    RabbitMqContainerInstance = new ContainerBuilder()
-                        .WithImage("rabbitmq:3-management")
+                    var containerBuilder = new ContainerBuilder()
+                        .WithImage($"rabbitmq:{imageTag}")
                         .WithPortBinding(5672, true)
                         .WithPortBinding(15672, true)
                         .WithEnvironment("RABBITMQ_DEFAULT_USER", "guest")
                         .WithEnvironment("RABBITMQ_DEFAULT_PASS", "guest")
-                        .WithCommand("bash", "-c", "rabbitmq-plugins enable rabbitmq_amqp1_0 && docker-entrypoint.sh rabbitmq-server")
-                        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
-                        .Build();
+                        .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"));
+                    
+                    // RabbitMQ 3.x requires AMQP 1.0 plugin, RabbitMQ 4.0+ has native support
+                    if (rabbitmqVersion == "3")
+                    {
+                        containerBuilder = containerBuilder.WithCommand("bash", "-c", "rabbitmq-plugins enable rabbitmq_amqp1_0 && docker-entrypoint.sh rabbitmq-server");
+                    }
+                    
+                    RabbitMqContainerInstance = containerBuilder.Build();
                     
                     await RabbitMqContainerInstance.StartAsync();
                     _logger.LogDebug("RabbitMQ container started.");

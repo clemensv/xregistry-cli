@@ -4,12 +4,18 @@ This guide explains how to use RabbitMQ with the AMQP 1.0 protocol for the xRegi
 
 ## Overview
 
-RabbitMQ natively supports **AMQP 0.9.1**, but it also provides an **AMQP 1.0 plugin** that enables compatibility with AMQP 1.0 clients. The xRegistry CLI generates AMQP 1.0 client code that works with any AMQP 1.0 compliant broker, including:
+RabbitMQ's AMQP 1.0 support differs by version:
+
+- **RabbitMQ 4.0+**: Native AMQP 1.0 support (no plugin required)
+- **RabbitMQ 3.8.0 - 3.x**: AMQP 1.0 via plugin (`rabbitmq_amqp1_0`)
+
+The xRegistry CLI generates AMQP 1.0 client code that works with any AMQP 1.0 compliant broker, including:
 
 - **Apache ActiveMQ Artemis** (native AMQP 1.0 support)
 - **Apache Qpid** (native AMQP 1.0 support)
 - **Azure Service Bus** (native AMQP 1.0 support)
-- **RabbitMQ** (via AMQP 1.0 plugin)
+- **RabbitMQ 4.0+** (native AMQP 1.0 support)
+- **RabbitMQ 3.8.0 - 3.x** (via AMQP 1.0 plugin)
 
 ## Why Use AMQP 1.0 with RabbitMQ?
 
@@ -22,12 +28,45 @@ While RabbitMQ's native AMQP 0.9.1 protocol is mature and widely used, AMQP 1.0 
 
 ## Prerequisites
 
+### RabbitMQ 4.0 and Later
+
+- RabbitMQ 4.0 or later
+- No additional setup required - AMQP 1.0 is natively supported
+
+### RabbitMQ 3.8.0 to 3.x
+
 - RabbitMQ 3.8.0 or later
-- Admin access to enable plugins
+- Admin access to enable the AMQP 1.0 plugin
 
-## Enabling the AMQP 1.0 Plugin
+## Enabling AMQP 1.0 Support
 
-### On a Local RabbitMQ Installation
+### RabbitMQ 4.0+: Native Support (Recommended)
+
+RabbitMQ 4.0 and later versions include **native AMQP 1.0 support** out of the box. No plugin installation or configuration is needed.
+
+**Using Docker with RabbitMQ 4.0+**:
+
+```bash
+docker run -d \
+  --name rabbitmq-amqp \
+  -p 5672:5672 \
+  -p 15672:15672 \
+  rabbitmq:4-management
+```
+
+**Verify AMQP 1.0 is available**:
+```bash
+# Check that port 5672 is listening (AMQP 1.0 and 0.9.1 share this port)
+docker exec rabbitmq-amqp rabbitmqctl status
+```
+
+### RabbitMQ 3.x: Plugin Installation
+
+### RabbitMQ 3.x: Plugin Installation
+
+For RabbitMQ versions 3.8.0 through 3.x, you need to enable the AMQP 1.0 plugin.
+
+#### On a Local RabbitMQ Installation
 
 1. **Enable the plugin**:
    ```bash
@@ -54,9 +93,7 @@ While RabbitMQ's native AMQP 0.9.1 protocol is mature and widely used, AMQP 1.0 
    [E*] rabbitmq_amqp1_0
    ```
 
-### Using Docker
-
-The easiest way to run RabbitMQ with AMQP 1.0 support is using Docker:
+#### Using Docker with RabbitMQ 3.x
 
 ```bash
 docker run -d \
@@ -76,7 +113,7 @@ docker run -d \
 docker exec rabbitmq-amqp rabbitmq-plugins list
 ```
 
-### Using Docker Compose
+#### Using Docker Compose with RabbitMQ 3.x
 
 Create a `docker-compose.yml` file:
 
@@ -105,9 +142,109 @@ Start the service:
 docker-compose up -d
 ```
 
-### Using Kubernetes
+### Docker Compose Examples
 
-Example Kubernetes deployment with AMQP 1.0 plugin:
+#### RabbitMQ 4.0+ (Recommended)
+
+Create a `docker-compose.yml` file for RabbitMQ 4.0+:
+
+```yaml
+version: '3.8'
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: rabbitmq-amqp
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+```
+
+#### RabbitMQ 3.x with Plugin
+
+For RabbitMQ 3.x, the plugin must be explicitly enabled:
+
+```yaml
+version: '3.8'
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-amqp
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_PLUGINS=rabbitmq_amqp1_0
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+```
+
+### Kubernetes Deployments
+
+#### RabbitMQ 4.0+ (Recommended)
+
+Example Kubernetes deployment with native AMQP 1.0 support:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-amqp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:4-management
+        ports:
+        - containerPort: 5672
+          name: amqp
+        - containerPort: 15672
+          name: management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "guest"
+        - name: RABBITMQ_DEFAULT_PASS
+          value: "guest"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-amqp
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+  - name: amqp
+    port: 5672
+    targetPort: 5672
+  - name: management
+    port: 15672
+    targetPort: 15672
+```
+
+#### RabbitMQ 3.x with Plugin
+
+Example Kubernetes deployment for RabbitMQ 3.x with AMQP 1.0 plugin:
 
 ```yaml
 apiVersion: apps/v1
@@ -424,10 +561,43 @@ curl -u guest:guest http://localhost:15672/api/overview
 
 ### High Availability Setup
 
-For production, deploy RabbitMQ in a cluster:
+For production, deploy RabbitMQ in a cluster.
+
+#### RabbitMQ 4.0+ HA Cluster (Recommended)
 
 ```yaml
-# docker-compose.yml for HA cluster
+# docker-compose.yml for RabbitMQ 4.0+ HA cluster
+version: '3.8'
+services:
+  rabbitmq1:
+    image: rabbitmq:4-management
+    hostname: rabbitmq1
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=shared_secret_cookie
+    ports:
+      - "5672:5672"
+      
+  rabbitmq2:
+    image: rabbitmq:4-management
+    hostname: rabbitmq2
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=shared_secret_cookie
+    depends_on:
+      - rabbitmq1
+      
+  rabbitmq3:
+    image: rabbitmq:4-management
+    hostname: rabbitmq3
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=shared_secret_cookie
+    depends_on:
+      - rabbitmq1
+```
+
+#### RabbitMQ 3.x HA Cluster
+
+```yaml
+# docker-compose.yml for RabbitMQ 3.x HA cluster
 version: '3.8'
 services:
   rabbitmq1:

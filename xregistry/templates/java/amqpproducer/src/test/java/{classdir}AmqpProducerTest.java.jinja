@@ -41,7 +41,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Integration tests for AMQP producer using Testcontainers.
  * 
  * By default, tests run against ActiveMQ Artemis.
- * Set AMQP_BROKER=rabbitmq environment variable to test against RabbitMQ with AMQP 1.0 plugin.
+ * Set AMQP_BROKER=rabbitmq environment variable to test against RabbitMQ.
+ * Set RABBITMQ_VERSION=3 or RABBITMQ_VERSION=4 to choose RabbitMQ version (default: 4).
  */
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -60,14 +61,22 @@ public class {{ class_name | strip_namespace }} {
         logger.info("Creating AMQP broker container for: {}", broker);
         
         if ("rabbitmq".equalsIgnoreCase(broker)) {
-            // RabbitMQ with AMQP 1.0 plugin enabled
-            return new GenericContainer<>(DockerImageName.parse("rabbitmq:3-management"))
+            String rabbitmqVersion = System.getenv().getOrDefault("RABBITMQ_VERSION", "4");
+            String imageTag = rabbitmqVersion.equals("3") ? "3-management" : "4-management";
+            logger.info("Using RabbitMQ version: {}", imageTag);
+            
+            GenericContainer<?> container = new GenericContainer<>(DockerImageName.parse("rabbitmq:" + imageTag))
                 .withExposedPorts(5672, 15672)
                 .withEnv("RABBITMQ_DEFAULT_USER", "guest")
-                .withEnv("RABBITMQ_DEFAULT_PASS", "guest")
-                .withCommand("bash", "-c", 
-                    "rabbitmq-plugins enable rabbitmq_amqp1_0 && docker-entrypoint.sh rabbitmq-server")
-                .waitingFor(Wait.forLogMessage(".*Server startup complete.*", 1)
+                .withEnv("RABBITMQ_DEFAULT_PASS", "guest");
+            
+            // RabbitMQ 3.x requires AMQP 1.0 plugin, RabbitMQ 4.0+ has native support
+            if (rabbitmqVersion.equals("3")) {
+                container.withCommand("bash", "-c", 
+                    "rabbitmq-plugins enable rabbitmq_amqp1_0 && docker-entrypoint.sh rabbitmq-server");
+            }
+            
+            return container.waitingFor(Wait.forLogMessage(".*Server startup complete.*", 1)
                     .withStartupTimeout(Duration.ofSeconds(120)));
         } else {
             // Default: ActiveMQ Artemis
