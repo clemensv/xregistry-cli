@@ -15,6 +15,14 @@ Type-safe AMQP 1.0 producer client for {{ groupname }} message group using Apach
 
 **AMQP (Advanced Message Queuing Protocol) 1.0** is an open standard for business messaging with reliable message delivery, transactions, and flow control.
 
+**Supported AMQP 1.0 Brokers:**
+- Apache ActiveMQ Artemis (native AMQP 1.0)
+- Apache Qpid (native AMQP 1.0)
+- Azure Service Bus (native AMQP 1.0)
+- RabbitMQ (with AMQP 1.0 plugin - [setup guide](https://github.com/clemensv/xregistry-cli/blob/main/docs/rabbitmq_amqp_setup.md))
+
+**Note for RabbitMQ users:** RabbitMQ requires the AMQP 1.0 plugin to be enabled. See the [RabbitMQ AMQP 1.0 Setup Guide](https://github.com/clemensv/xregistry-cli/blob/main/docs/rabbitmq_amqp_setup.md) for detailed instructions.
+
 ## Quick Start
 
 ### 1. Add Dependency

@@ -119,6 +119,55 @@ jobs:
       if: always()
       run: df -h
 
+  # Java RabbitMQ tests - AMQP with RabbitMQ AMQP 1.0 plugin (requires Docker + Java)
+  test-java-rabbitmq:
+    runs-on: ubuntu-latest
+    env:
+      AMQP_BROKER: rabbitmq
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'microsoft' 
+        java-version: '21'
+    - name: Setup Maven Action
+      uses: s4u/setup-maven-action@v1.12.0
+      with:
+        java-version: 21
+        maven-version: '3.9.6'
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.11
+    - name: Get CloudNative.CloudEvents.Endpoint package code (java)
+      uses: actions/checkout@v3
+      with:
+        repository: clemensv/io.cloudevents.experimental.endpoints
+        ref: main
+        path: javaendpoints
+    - name: Build CloudNative.CloudEvents.Endpoint package
+      run: mvn install -DskipTests -f javaendpoints/pom.xml
+    - name: Install dependencies and build package
+      run: |
+        python -m pip install --upgrade pip build wheel
+        python -m pip install -e .[dev]
+    - name: Check disk space before tests
+      run: df -h
+    - name: Run Java AMQP tests with RabbitMQ
+      run: |
+        pytest -v test/java/ -k amqp
+    - name: Clean up Docker resources
+      if: always()
+      run: |
+        docker ps -aq | xargs -r docker rm -f || true
+        docker images -q | xargs -r docker rmi -f || true
+        docker system prune -af --volumes || true
+    - name: Report disk space after cleanup
+      if: always()
+      run: df -h
+
   # TypeScript tests - Kafka, Event Hubs, Service Bus (requires Docker + Node)
   test-typescript:
     runs-on: ubuntu-latest
