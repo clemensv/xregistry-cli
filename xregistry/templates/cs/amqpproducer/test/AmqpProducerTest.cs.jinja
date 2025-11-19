@@ -515,7 +515,11 @@ namespace {{ project_name | pascal }}.Test
                     {%- elif is_amqp %}
                     {%- set uriargs = amqp.DeclareUriTemplateArguments(message) %}
                     {%- endif %}
+                    {%- if message_body_type != "byte[]" %}
                     var testMessage = new {{ message_body_type }}();
+                    {%- else %}
+                    var testMessage = Array.Empty<byte>();
+                    {%- endif %}
                     await producer.Send{{ messagename }}Async(testMessage
                     {%- if uriargs -%}
                     {%- for arg in uriargs.split(',') if arg.strip() -%}
@@ -601,7 +605,11 @@ namespace {{ project_name | pascal }}.Test
                     {%- elif is_amqp %}
                     {%- set uriargs = amqp.DeclareUriTemplateArguments(message) %}
                     {%- endif %}
+                    {%- if message_body_type != "byte[]" %}
                     var testMessage = new {{ message_body_type }}();
+                    {%- else %}
+                    var testMessage = Array.Empty<byte>();
+                    {%- endif %}
                     await producer.Send{{ messagename }}Async(testMessage
                     {%- if uriargs -%}
                     {%- for arg in uriargs.split(',') if arg.strip() -%}
