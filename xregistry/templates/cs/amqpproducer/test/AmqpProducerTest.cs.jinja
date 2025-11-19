@@ -360,7 +360,7 @@ namespace {{ project_name | pascal }}.Test
                     
                     // Set up receiver to verify messages were sent
                     var factory = new ConnectionFactory();
-                    var address = new Address(_fixture.ArtemisBrokerUrl?.AbsoluteUri);
+                    var address = new Address(_fixture.BrokerUrl?.AbsoluteUri);
                     var connection = await factory.CreateAsync(address);
                     try 
                     {
@@ -504,12 +504,25 @@ namespace {{ project_name | pascal }}.Test
                 var producer = {{ producer_class_name }}.CreateBuilder()
                     .WithEndpoint(new Uri(_fixture.BrokerUrl, _fixture.QueueName))
                     .WithCredential(plainEndpointCredential)
-                    .WithLogger(_fixture.GetLoggerFactory())
+                    .WithLogger(_fixture.GetLoggerFactory().CreateLogger<{{ producer_class_name }}>())
                     .Build();
                 try
                 {
+                    {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+                    {%- set is_amqp = amqp.is_amqp(message) %}
+                    {%- if isCloudEvent %}
+                    {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) %}
+                    {%- elif is_amqp %}
+                    {%- set uriargs = amqp.DeclareUriTemplateArguments(message) %}
+                    {%- endif %}
                     var testMessage = new {{ message_body_type }}();
-                    await producer.Send{{ messagename }}Async(testMessage);
+                    await producer.Send{{ messagename }}Async(testMessage
+                    {%- if uriargs -%}
+                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                    , {{ arg.strip().split(' ')[1] }}: "test"
+                    {%- endfor -%}
+                    {%- endif -%}
+                    );
                     _logger.LogInformation("Message sent successfully");
 
                     // Verify message was received
@@ -577,12 +590,25 @@ namespace {{ project_name | pascal }}.Test
                 var producer = {{ producer_class_name }}.CreateBuilder()
                     .WithEndpoint(new Uri(_fixture.BrokerUrl, _fixture.QueueName))
                     .WithCredential(plainEndpointCredential)
-                    .WithLogger(_fixture.GetLoggerFactory())
+                    .WithLogger(_fixture.GetLoggerFactory().CreateLogger<{{ producer_class_name }}>())
                     .Build();
                 try
                 {
+                    {%- set isCloudEvent = cloudEvents.isCloudEvent(message) %}
+                    {%- set is_amqp = amqp.is_amqp(message) %}
+                    {%- if isCloudEvent %}
+                    {%- set uriargs = cloudEvents.DeclareUriTemplateArguments(message) %}
+                    {%- elif is_amqp %}
+                    {%- set uriargs = amqp.DeclareUriTemplateArguments(message) %}
+                    {%- endif %}
                     var testMessage = new {{ message_body_type }}();
-                    await producer.Send{{ messagename }}Async(testMessage);
+                    await producer.Send{{ messagename }}Async(testMessage
+                    {%- if uriargs -%}
+                    {%- for arg in uriargs.split(',') if arg.strip() -%}
+                    , {{ arg.strip().split(' ')[1] }}: "test"
+                    {%- endfor -%}
+                    {%- endif -%}
+                    );
                     _logger.LogInformation("Message sent successfully");
 
                     // Verify message was received
