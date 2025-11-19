@@ -29,7 +29,7 @@ namespace {{ project_name | pascal }}.Test
     public abstract class AmqpBrokerFixture : IAsyncLifetime
     {
         
-        private const string brokerXml = @"<?xml version='1.0'?>
+        protected const string brokerXml = @"<?xml version='1.0'?>
             <configuration xmlns=""urn:activemq""
                         xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
                         xmlns:xi=""http://www.w3.org/2001/XInclude""

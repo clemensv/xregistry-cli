@@ -26,7 +26,7 @@ namespace {{ project_name | pascal }}.Test
     // Base fixture class for AMQP broker setup
     public abstract class AmqpBrokerFixture : IAsyncLifetime
     {
-        private const string brokerXml = @"<?xml version='1.0'?>
+        protected const string brokerXml = @"<?xml version='1.0'?>
             <configuration xmlns=""urn:activemq""
                         xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
                         xmlns:xi=""http://www.w3.org/2001/XInclude""
@@ -358,7 +358,7 @@ namespace {{ project_name | pascal }}.Test
                     var receivedCount = 0;
                     var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
                     
-                    dispatcher.{{ messagename }}Async += (amqpMessage, messageObj, context) =>
+                    dispatcher.{{ messagename }}Async += async (amqpMessage, messageObj, context) =>
                     {
                         try
                         {
@@ -379,11 +379,11 @@ namespace {{ project_name | pascal }}.Test
                             context.Release();
                             messageReceived.SetResult(false);
                         }
-                        return Task.CompletedTask;
+                        await Task.CompletedTask;
                     };
 
                     var factory = new ConnectionFactory();
-                    var address = new Address(_fixture.ArtemisBrokerUrl?.AbsoluteUri);
+                    var address = new Address(_fixture.BrokerUrl?.AbsoluteUri);
                     var connection = await factory.CreateAsync(address);
                     try 
                     {
@@ -496,7 +496,7 @@ namespace {{ project_name | pascal }}.Test
                     var receivedCount = 0;
                     var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
                     
-                    dispatcher.{{ messagename }}Async += (amqpMessage, messageObj, context) =>
+                    dispatcher.{{ messagename }}Async += async (amqpMessage, messageObj, context) =>
                     {
                         try
                         {
@@ -516,6 +516,7 @@ namespace {{ project_name | pascal }}.Test
                             _logger.LogError(ex, "Error in message handler");
                             messageReceived.TrySetException(ex);
                         }
+                        await Task.CompletedTask;
                     };
 
                     // Start test message sender
@@ -529,8 +530,13 @@ namespace {{ project_name | pascal }}.Test
                             var sender = new SenderLink(session, "test-sender", _fixture.QueueName);
                             for (int i = 0; i < 5; i++)
                             {
+                                {%- if message_body_type == "byte[]" %}
+                                var testMessage = Array.Empty<byte>();
+                                var data = testMessage;
+                                {%- else %}
                                 var testMessage = new {{ message_body_type }}();
                                 var data = testMessage.ToByteArray("avro/binary");
+                                {%- endif %}
                                 var amqpMessage = new Message(data)
                                 {
                                     Properties = new Properties { MessageId = Guid.NewGuid().ToString(), ContentType = "avro/binary" }
@@ -612,7 +618,7 @@ namespace {{ project_name | pascal }}.Test
                     var receivedCount = 0;
                     var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
                     
-                    dispatcher.{{ messagename }}Async += (amqpMessage, messageObj, context) =>
+                    dispatcher.{{ messagename }}Async += async (amqpMessage, messageObj, context) =>
                     {
                         try
                         {
@@ -632,6 +638,7 @@ namespace {{ project_name | pascal }}.Test
                             _logger.LogError(ex, "Error in message handler");
                             messageReceived.TrySetException(ex);
                         }
+                        await Task.CompletedTask;
                     };
 
                     // Start test message sender
@@ -645,8 +652,13 @@ namespace {{ project_name | pascal }}.Test
                             var sender = new SenderLink(session, "test-sender", _fixture.QueueName);
                             for (int i = 0; i < 5; i++)
                             {
+                                {%- if message_body_type == "byte[]" %}
+                                var testMessage = Array.Empty<byte>();
+                                var data = testMessage;
+                                {%- else %}
                                 var testMessage = new {{ message_body_type }}();
                                 var data = testMessage.ToByteArray("avro/binary");
+                                {%- endif %}
                                 var amqpMessage = new Message(data)
                                 {
                                     Properties = new Properties { MessageId = Guid.NewGuid().ToString(), ContentType = "avro/binary" }
