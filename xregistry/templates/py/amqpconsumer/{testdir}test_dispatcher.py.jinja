@@ -77,25 +77,36 @@ ARTEMIS_BROKER_XML = """<?xml version='1.0'?>
 """
 
 @pytest.fixture(scope="module")
-def artemis_container():
-    """Create and start an ActiveMQ Artemis container for testing"""
-    # Create temp file for broker configuration
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
-        f.write(ARTEMIS_BROKER_XML)
-        config_file = f.name
+def amqp_broker():
+    """Create and start an AMQP broker container for testing.
     
-    try:
-        container = DockerContainer("apache/activemq-artemis:latest")
-        container.with_bind_ports(5672, 5672)
-        container.with_env("ARTEMIS_USER", "guest")
-        container.with_env("ARTEMIS_PASSWORD", "guest")
-        container.with_volume_mapping(config_file, "/var/lib/artemis-instance/etc-override/broker.xml")
-        container.with_exposed_ports(5672)
+    Uses ActiveMQ Artemis by default.
+    Set AMQP_BROKER=rabbitmq environment variable to test with RabbitMQ.
+    Set RABBITMQ_VERSION=3 or RABBITMQ_VERSION=4 to choose RabbitMQ version (default: 4).
+    """
+    broker_type = os.environ.get("AMQP_BROKER", "artemis").lower()
+    
+    if broker_type == "rabbitmq":
+        rabbitmq_version = os.environ.get("RABBITMQ_VERSION", "4")
+        image_tag = "3-management" if rabbitmq_version == "3" else "4-management"
         
-        # Wait for Artemis to be ready
+        container = DockerContainer(f"rabbitmq:{image_tag}")
+        container.with_bind_ports(5672, 5672)
+        container.with_bind_ports(15672, 15672)
+        container.with_env("RABBITMQ_DEFAULT_USER", "guest")
+        container.with_env("RABBITMQ_DEFAULT_PASS", "guest")
+        container.with_exposed_ports(5672, 15672)
+        
+        # RabbitMQ 3.x requires AMQP 1.0 plugin, RabbitMQ 4.0+ has native support
+        if rabbitmq_version == "3":
+            container.with_command(
+                "bash", "-c", 
+                "rabbitmq-plugins enable rabbitmq_amqp1_0 && docker-entrypoint.sh rabbitmq-server"
+            )
+        
         container.start()
-        # Wait for broker to log that it's ready (AMQ241004 = "Artemis Server is now live")
-        wait_for_logs(container, "AMQ241004", timeout=60)
+        # Wait for RabbitMQ to be ready
+        wait_for_logs(container, "Server startup complete", timeout=120)
         
         yield {
             "host": container.get_container_host_ip(),
@@ -106,9 +117,44 @@ def artemis_container():
         }
         
         container.stop()
-    finally:
-        if os.path.exists(config_file):
-            os.unlink(config_file)
+    else:
+        # Default: ActiveMQ Artemis
+        # Create temp file for broker configuration
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
+            f.write(ARTEMIS_BROKER_XML)
+            config_file = f.name
+        
+        try:
+            container = DockerContainer("apache/activemq-artemis:latest")
+            container.with_bind_ports(5672, 5672)
+            container.with_env("ARTEMIS_USER", "guest")
+            container.with_env("ARTEMIS_PASSWORD", "guest")
+            container.with_volume_mapping(config_file, "/var/lib/artemis-instance/etc-override/broker.xml")
+            container.with_exposed_ports(5672)
+            
+            # Wait for Artemis to be ready
+            container.start()
+            # Wait for broker to log that it's ready (AMQ241004 = "Artemis Server is now live")
+            wait_for_logs(container, "AMQ241004", timeout=60)
+            
+            yield {
+                "host": container.get_container_host_ip(),
+                "port": container.get_exposed_port(5672),
+                "username": "guest",
+                "password": "guest",
+                "address": "test-queue"
+            }
+            
+            container.stop()
+        finally:
+            if os.path.exists(config_file):
+                os.unlink(config_file)
+
+# Keep old fixture name for backwards compatibility
+@pytest.fixture(scope="module")
+def artemis_container(amqp_broker):
+    """Alias for amqp_broker for backwards compatibility"""
+    return amqp_broker
 
 
 class SimpleSender(MessagingHandler):

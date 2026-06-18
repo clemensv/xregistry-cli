@@ -37,23 +37,52 @@ public class {{ class_name | strip_namespace }} {
     private static final int MESSAGE_TIMEOUT_SECONDS = 20;
     private static final int CONSUMER_STARTUP_DELAY_MS = 1000;
     private static final int MAX_RETRY_ATTEMPTS = 2;
+    private static final String AMQP_BROKER = System.getenv().getOrDefault("AMQP_BROKER", "artemis");
     
     @Container
-    private static final GenericContainer<?> artemisContainer = new GenericContainer<>(DockerImageName.parse("apache/activemq-artemis:latest"))
-        .withExposedPorts(5672)
-        .withEnv("ARTEMIS_USER", "guest")
-        .withEnv("ARTEMIS_PASSWORD", "guest")
-        .withEnv("ANONYMOUS_LOGIN", "true")
-        .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)));
+    private static GenericContainer<?> brokerContainer = createBrokerContainer();
     
     private URI brokerUrl;
     
+    private static GenericContainer<?> createBrokerContainer() {
+        String broker = System.getenv().getOrDefault("AMQP_BROKER", "artemis");
+        logger.info("Creating AMQP broker container for: {}", broker);
+        
+        if ("rabbitmq".equalsIgnoreCase(broker)) {
+            String rabbitmqVersion = System.getenv().getOrDefault("RABBITMQ_VERSION", "4");
+            String imageTag = rabbitmqVersion.equals("3") ? "3-management" : "4-management";
+            logger.info("Using RabbitMQ version: {}", imageTag);
+            
+            GenericContainer<?> container = new GenericContainer<>(DockerImageName.parse("rabbitmq:" + imageTag))
+                .withExposedPorts(5672, 15672)
+                .withEnv("RABBITMQ_DEFAULT_USER", "guest")
+                .withEnv("RABBITMQ_DEFAULT_PASS", "guest");
+            
+            // RabbitMQ 3.x requires AMQP 1.0 plugin, RabbitMQ 4.0+ has native support
+            if (rabbitmqVersion.equals("3")) {
+                container.withCommand("bash", "-c", 
+                    "rabbitmq-plugins enable rabbitmq_amqp1_0 && docker-entrypoint.sh rabbitmq-server");
+            }
+            
+            return container.waitingFor(Wait.forLogMessage(".*Server startup complete.*", 1)
+                    .withStartupTimeout(Duration.ofSeconds(120)));
+        } else {
+            // Default: ActiveMQ Artemis
+            return new GenericContainer<>(DockerImageName.parse("apache/activemq-artemis:latest"))
+                .withExposedPorts(5672)
+                .withEnv("ARTEMIS_USER", "guest")
+                .withEnv("ARTEMIS_PASSWORD", "guest")
+                .withEnv("ANONYMOUS_LOGIN", "true")
+                .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(60)));
+        }
+    }
+    
     @BeforeAll
     public void setUp() throws Exception {
-        String host = artemisContainer.getHost();
-        Integer port = artemisContainer.getMappedPort(5672);
+        String host = brokerContainer.getHost();
+        Integer port = brokerContainer.getMappedPort(5672);
         brokerUrl = new URI("amqp://" + host + ":" + port + "/" + QUEUE_NAME);
-        logger.info("Artemis broker URL: " + brokerUrl);
+        logger.info("{} broker URL: {}", AMQP_BROKER, brokerUrl);
     }
     
     {%- for messagegroupid, messagegroup in messagegroups.items() %}

@@ -353,6 +353,60 @@ Use it like this:
 xcg generate --language=asyncapi --style=producer --projectname=MyProjectProducer --definitions=definitions.json --output=MyProjectProducer --template-args ce_content_mode=binary
 ```
 
+##### AMQP 1.0
+
+The tool can generate AMQP 1.0 producer and consumer code for multiple languages (Java, C#, Python, TypeScript). The generated code works with any AMQP 1.0 compliant broker:
+
+**Supported Brokers:**
+- Apache ActiveMQ Artemis (native AMQP 1.0)
+- Apache Qpid (native AMQP 1.0)
+- Azure Service Bus (native AMQP 1.0)
+- **RabbitMQ 4.0+** (native AMQP 1.0)
+- **RabbitMQ 3.x** (via AMQP 1.0 plugin - requires plugin enablement)
+
+**Using RabbitMQ:**
+
+- **RabbitMQ 4.0+**: Native AMQP 1.0 support (no plugin required)
+- **RabbitMQ 3.x**: Requires the AMQP 1.0 plugin to be enabled
+
+For detailed setup instructions, including Docker deployment, connection configuration, and production best practices, see:
+
+📖 **[RabbitMQ AMQP 1.0 Setup Guide](docs/rabbitmq_amqp_setup.md)**
+
+Quick start with Docker:
+
+**RabbitMQ 4.0+ (Recommended)**:
+```bash
+docker run -d --name rabbitmq-amqp \
+  -p 5672:5672 -p 15672:15672 \
+  rabbitmq:4-management
+```
+
+**RabbitMQ 3.x** (requires plugin):
+```bash
+docker run -d --name rabbitmq-amqp \
+  -p 5672:5672 -p 15672:15672 \
+  -e RABBITMQ_PLUGINS=rabbitmq_amqp1_0 \
+  rabbitmq:3-management
+```
+
+Generate AMQP 1.0 clients:
+```bash
+# Java AMQP producer
+xregistry generate --language=java --style=amqpproducer --projectname=MyProducer --definitions=definitions.json --output=./output
+
+# C# AMQP consumer
+xregistry generate --language=cs --style=amqpconsumer --projectname=MyConsumer --definitions=definitions.json --output=./output
+
+# Python AMQP producer
+xregistry generate --language=py --style=amqpproducer --projectname=MyProducer --definitions=definitions.json --output=./output
+
+# TypeScript AMQP consumer
+xregistry generate --language=ts --style=amqpconsumer --projectname=MyConsumer --definitions=definitions.json --output=./output
+```
+
+The generated code includes integration tests that work with ActiveMQ Artemis and both RabbitMQ 3.x (with plugin) and RabbitMQ 4.0+ (native support).
+
 #### Custom Templates
 
 The tool supports custom templates. Custom templates reside in a directory and are organized in subdirectories for each language and style. The directory structure is the same as the built-in templates. The tool will look for custom templates in the directories specified with the `--templates` option. Custom templates take precedence over built-in templates.
