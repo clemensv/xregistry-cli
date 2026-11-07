@@ -20,7 +20,13 @@ This library provides a type-safe AMQP 1.0 consumer client for {{ groupname }} m
 - **Message durability** with persistent storage
 - **Transactions** and flow control
 
-Common brokers: Azure Service Bus, Apache ActiveMQ Artemis, Apache Qpid, RabbitMQ.
+**Supported AMQP 1.0 Brokers:**
+- Apache ActiveMQ Artemis (native AMQP 1.0)
+- Apache Qpid (native AMQP 1.0)
+- Azure Service Bus (native AMQP 1.0)
+- RabbitMQ (with AMQP 1.0 plugin - [setup guide](https://github.com/clemensv/xregistry-cli/blob/main/docs/rabbitmq_amqp_setup.md))
+
+**Note for RabbitMQ users:** RabbitMQ requires the AMQP 1.0 plugin to be enabled. See the [RabbitMQ AMQP 1.0 Setup Guide](https://github.com/clemensv/xregistry-cli/blob/main/docs/rabbitmq_amqp_setup.md) for detailed instructions.
 
 ## Quick Start
 

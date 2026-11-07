@@ -16,14 +16,17 @@ using Amqp;
 using Amqp.Framing;
 using Amqp.Types;
 using Testcontainers.ActiveMq;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 
 using {{ project_name | pascal }};
 
 namespace {{ project_name | pascal }}.Test
 {
-    public class {{ project_name |  pascal | strip_dots }}Fixture : IAsyncLifetime
+    // Base fixture class for AMQP broker setup
+    public abstract class AmqpBrokerFixture : IAsyncLifetime
     {
-        private const string brokerXml = @"<?xml version='1.0'?>
+        protected const string brokerXml = @"<?xml version='1.0'?>
             <configuration xmlns=""urn:activemq""
                         xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance""
                         xmlns:xi=""http://www.w3.org/2001/XInclude""
@@ -102,9 +105,10 @@ namespace {{ project_name | pascal }}.Test
             </configuration>";
 
         public ArtemisContainer? ArtemisContainerInstance { get; protected set; }
-        public Uri? ArtemisBrokerUrl { get; protected set; }
-        private ILoggerFactory _loggerFactory;
-        private ILogger _logger;
+        public IContainer? RabbitMqContainerInstance { get; protected set; }
+        public Uri? BrokerUrl { get; protected set; }
+        protected ILoggerFactory _loggerFactory;
+        protected ILogger _logger;
 
         public ILoggerFactory GetLoggerFactory()
         {
@@ -119,16 +123,24 @@ namespace {{ project_name | pascal }}.Test
             }
         }
 
-        public {{ project_name |  pascal | strip_dots }}Fixture()
+        public AmqpBrokerFixture()
         {
             _loggerFactory = LoggerFactory.Create(builder =>
             {
                 builder.AddDebug().AddConsole();
             });
-            _logger = _loggerFactory.CreateLogger<{{ project_name |  pascal | strip_dots }}Fixture>();
+            _logger = _loggerFactory.CreateLogger<AmqpBrokerFixture>();
         }
 
-        public async Task InitializeAsync()
+        public abstract Task InitializeAsync();
+        
+        public abstract Task DisposeAsync();
+    }
+
+    // Fixture for ActiveMQ Artemis
+    public class ArtemisFixture : AmqpBrokerFixture
+    {
+        public override async Task InitializeAsync()
         {
             try
             {
@@ -148,8 +160,8 @@ namespace {{ project_name | pascal }}.Test
 
                 await ArtemisContainerInstance.StartAsync();
                 _logger.LogDebug("Artemis container started.");
-                ArtemisBrokerUrl = new UriBuilder(ArtemisContainerInstance.GetBrokerAddress()){ Scheme = "amqp"}.Uri;
-                _logger.LogDebug($"Artemis broker URL: {ArtemisBrokerUrl}");
+                BrokerUrl = new UriBuilder(ArtemisContainerInstance.GetBrokerAddress()){ Scheme = "amqp"}.Uri;
+                _logger.LogDebug($"Artemis broker URL: {BrokerUrl}");
             }
             catch (Exception ex)
             {
@@ -158,7 +170,7 @@ namespace {{ project_name | pascal }}.Test
             }
         }
 
-        public async Task DisposeAsync()
+        public override async Task DisposeAsync()
         {
             try
             {
@@ -175,11 +187,132 @@ namespace {{ project_name | pascal }}.Test
                 _logger.LogError(ex, "An error occurred during DisposeAsync");
             }
         }
-
     }
 
-    [CollectionDefinition("Artemis container")]
-    public class {{ project_name |  pascal | strip_dots }}CollectionFixture : ICollectionFixture<{{ project_name |  pascal | strip_dots }}Fixture>
+    // Fixture for RabbitMQ 3.x (with AMQP 1.0 plugin)
+    public class RabbitMq3Fixture : AmqpBrokerFixture
+    {
+        public override async Task InitializeAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Initializing RabbitMQ 3.x test fixture.");
+                
+                Amqp.Trace.TraceLevel = Amqp.TraceLevel.Frame;
+                Amqp.Trace.TraceListener = (l, f, a) => System.Diagnostics.Debug.WriteLine(f, a);
+                
+                RabbitMqContainerInstance = new ContainerBuilder()
+                    .WithImage("rabbitmq:3-management")
+                    .WithPortBinding(5672, true)
+                    .WithPortBinding(15672, true)
+                    .WithEnvironment("RABBITMQ_DEFAULT_USER", "guest")
+                    .WithEnvironment("RABBITMQ_DEFAULT_PASS", "guest")
+                    .WithCommand("bash", "-c", "rabbitmq-plugins enable rabbitmq_amqp1_0 && docker-entrypoint.sh rabbitmq-server")
+                    .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
+                    .Build();
+                
+                await RabbitMqContainerInstance.StartAsync();
+                _logger.LogDebug("RabbitMQ 3.x container started.");
+                
+                var host = RabbitMqContainerInstance.Hostname;
+                var port = RabbitMqContainerInstance.GetMappedPublicPort(5672);
+                BrokerUrl = new Uri($"amqp://{host}:{port}");
+                _logger.LogDebug($"RabbitMQ 3.x broker URL: {BrokerUrl}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during InitializeAsync");
+                throw;
+            }
+        }
+
+        public override async Task DisposeAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Disposing RabbitMQ 3.x test fixture.");
+                
+                if (RabbitMqContainerInstance != null)
+                {
+                    await RabbitMqContainerInstance.StopAsync();
+                    _logger.LogDebug("RabbitMQ 3.x container stopped.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during DisposeAsync");
+            }
+        }
+    }
+
+    // Fixture for RabbitMQ 4.0+ (native AMQP 1.0 support)
+    public class RabbitMq4Fixture : AmqpBrokerFixture
+    {
+        public override async Task InitializeAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Initializing RabbitMQ 4.0+ test fixture.");
+                
+                Amqp.Trace.TraceLevel = Amqp.TraceLevel.Frame;
+                Amqp.Trace.TraceListener = (l, f, a) => System.Diagnostics.Debug.WriteLine(f, a);
+                
+                RabbitMqContainerInstance = new ContainerBuilder()
+                    .WithImage("rabbitmq:4-management")
+                    .WithPortBinding(5672, true)
+                    .WithPortBinding(15672, true)
+                    .WithEnvironment("RABBITMQ_DEFAULT_USER", "guest")
+                    .WithEnvironment("RABBITMQ_DEFAULT_PASS", "guest")
+                    .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
+                    .Build();
+                
+                await RabbitMqContainerInstance.StartAsync();
+                _logger.LogDebug("RabbitMQ 4.0+ container started.");
+                
+                var host = RabbitMqContainerInstance.Hostname;
+                var port = RabbitMqContainerInstance.GetMappedPublicPort(5672);
+                BrokerUrl = new Uri($"amqp://{host}:{port}");
+                _logger.LogDebug($"RabbitMQ 4.0+ broker URL: {BrokerUrl}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during InitializeAsync");
+                throw;
+            }
+        }
+
+        public override async Task DisposeAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Disposing RabbitMQ 4.0+ test fixture.");
+                
+                if (RabbitMqContainerInstance != null)
+                {
+                    await RabbitMqContainerInstance.StopAsync();
+                    _logger.LogDebug("RabbitMQ 4.0+ container stopped.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during DisposeAsync");
+            }
+        }
+    }
+
+    // Collection definitions for xUnit
+    [CollectionDefinition("Artemis")]
+    public class ArtemisCollectionFixture : ICollectionFixture<ArtemisFixture>
+    {
+    }
+
+    [CollectionDefinition("RabbitMQ 3")]
+    public class RabbitMq3CollectionFixture : ICollectionFixture<RabbitMq3Fixture>
+    {
+    }
+
+    [CollectionDefinition("RabbitMQ 4")]
+    public class RabbitMq4CollectionFixture : ICollectionFixture<RabbitMq4Fixture>
     {
     }
 
@@ -187,16 +320,18 @@ namespace {{ project_name | pascal }}.Test
     {%- set pascal_group_name = messagegroupid | pascal %}
     {%- set class_name = (pascal_group_name | strip_namespace) + "EventConsumer" %}
     {%- set test_class_name = ( project_name | strip_dots | pascal )+( pascal_group_name | strip_dots )+"Tests" %}
-    [Collection("Artemis container")]
-    public class {{ test_class_name }} 
+    
+    // Test class for Artemis broker
+    [Collection("Artemis")]
+    public class {{ test_class_name }}WithArtemis 
     {
-        private readonly {{ project_name |  pascal | strip_dots }}Fixture _fixture;
+        private readonly ArtemisFixture _fixture;
         private readonly ILogger _logger;
 
-        public {{ test_class_name }}({{ project_name |  pascal | strip_dots }}Fixture fixture)
+        public {{ test_class_name }}WithArtemis(ArtemisFixture fixture)
         {
             _fixture = fixture;
-            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}>();
+            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}WithArtemis>();
         }
 
 #pragma warning disable CS8604 // init takes care of nullables 
@@ -207,12 +342,12 @@ namespace {{ project_name | pascal }}.Test
         [Fact]
         public async Task Test{{ messagename }}Message()
         {
-            _logger.LogInformation("Starting Test{{ messagename }}Message");
+            _logger.LogInformation("Starting Test{{ messagename }}Message with Artemis");
             try
             {
                 var plainEndpointCredential = new PlainEndpointCredential("guest", "guest");
                 var dispatcher = {{ class_name }}.CreateBuilder()
-                    .WithEndpoint(new Uri(_fixture.ArtemisBrokerUrl, _fixture.QueueName))
+                    .WithEndpoint(new Uri(_fixture.BrokerUrl, _fixture.QueueName))
                     .WithCredential(plainEndpointCredential)
                     .WithLogger(_fixture.GetLoggerFactory())
                     .Build();
@@ -223,7 +358,7 @@ namespace {{ project_name | pascal }}.Test
                     var receivedCount = 0;
                     var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
                     
-                    dispatcher.{{ messagename }}Async += (amqpMessage, messageObj, context) =>
+                    dispatcher.{{ messagename }}Async += async (amqpMessage, messageObj, context) =>
                     {
                         try
                         {
@@ -244,11 +379,11 @@ namespace {{ project_name | pascal }}.Test
                             context.Release();
                             messageReceived.SetResult(false);
                         }
-                        return Task.CompletedTask;
+                        await Task.CompletedTask;
                     };
 
                     var factory = new ConnectionFactory();
-                    var address = new Address(_fixture.ArtemisBrokerUrl?.AbsoluteUri);
+                    var address = new Address(_fixture.BrokerUrl?.AbsoluteUri);
                     var connection = await factory.CreateAsync(address);
                     try 
                     {
@@ -297,6 +432,250 @@ namespace {{ project_name | pascal }}.Test
                             finally
                             {
                                 await sender.CloseAsync();
+                            }
+                        }
+                        finally
+                        {
+                            await session.CloseAsync();
+                        }
+                    }
+                    finally
+                    {
+                        await connection.CloseAsync();
+                    }
+                }
+                finally
+                {
+                    await dispatcher.StopAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during Test{{ messagename }}Message");
+                throw;
+            }
+        }
+
+        {%- endfor %}
+    }
+
+    // Test class for RabbitMQ 3.x broker
+    [Collection("RabbitMQ 3")]
+    public class {{ test_class_name }}WithRabbitMq3 
+    {
+        private readonly RabbitMq3Fixture _fixture;
+        private readonly ILogger _logger;
+
+        public {{ test_class_name }}WithRabbitMq3(RabbitMq3Fixture fixture)
+        {
+            _fixture = fixture;
+            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}WithRabbitMq3>();
+        }
+
+#pragma warning disable CS8604 // init takes care of nullables 
+
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        {%- set message_body_type = util.body_type(data_project_name, root, message) %}
+        [Fact]
+        public async Task Test{{ messagename }}Message()
+        {
+            _logger.LogInformation("Starting Test{{ messagename }}Message with RabbitMQ 3.x");
+            try
+            {
+                var plainEndpointCredential = new PlainEndpointCredential("guest", "guest");
+                var dispatcher = {{ class_name }}.CreateBuilder()
+                    .WithEndpoint(new Uri(_fixture.BrokerUrl, _fixture.QueueName))
+                    .WithCredential(plainEndpointCredential)
+                    .WithLogger(_fixture.GetLoggerFactory())
+                    .Build();
+                await dispatcher.StartAsync();
+                try
+                {
+                    var messageReceived = new TaskCompletionSource<bool>();
+                    var receivedCount = 0;
+                    var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
+                    
+                    dispatcher.{{ messagename }}Async += async (amqpMessage, messageObj, context) =>
+                    {
+                        try
+                        {
+                            _logger.LogInformation("{{ messagename }} message received");
+                            Assert.NotNull(amqpMessage);
+                            Assert.NotNull(messageObj);
+                            receivedMessages.Add(messageObj);
+                            context.Accept();
+                            Interlocked.Increment(ref receivedCount);
+                            if (receivedCount >= 5)
+                            {
+                                messageReceived.TrySetResult(true);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error in message handler");
+                            messageReceived.TrySetException(ex);
+                        }
+                        await Task.CompletedTask;
+                    };
+
+                    // Start test message sender
+                    var address = new Address(_fixture.BrokerUrl?.AbsoluteUri);
+                    var connection = await Connection.Factory.CreateAsync(address);
+                    try
+                    {
+                        var session = new Session(connection);
+                        try
+                        {
+                            var sender = new SenderLink(session, "test-sender", _fixture.QueueName);
+                            for (int i = 0; i < 5; i++)
+                            {
+                                {%- if message_body_type == "byte[]" %}
+                                var testMessage = Array.Empty<byte>();
+                                var data = testMessage;
+                                {%- else %}
+                                var testMessage = new {{ message_body_type }}();
+                                var data = testMessage.ToByteArray("avro/binary");
+                                {%- endif %}
+                                var amqpMessage = new Message(data)
+                                {
+                                    Properties = new Properties { MessageId = Guid.NewGuid().ToString(), ContentType = "avro/binary" }
+                                };
+                                await sender.SendAsync(amqpMessage);
+                                _logger.LogInformation($"Sent test message {i + 1}");
+                            }
+                            
+                            var receivedTask = messageReceived.Task;
+                            if (await Task.WhenAny(receivedTask, Task.Delay(TimeSpan.FromSeconds(30))) == receivedTask)
+                            {
+                                await receivedTask; 
+                                Assert.True(receivedMessages.Count >= 5, "Should receive at least 5 messages");
+                            }
+                            else
+                            {
+                                throw new TimeoutException("Timed out waiting for messages");
+                            }
+                        }
+                        finally
+                        {
+                            await session.CloseAsync();
+                        }
+                    }
+                    finally
+                    {
+                        await connection.CloseAsync();
+                    }
+                }
+                finally
+                {
+                    await dispatcher.StopAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during Test{{ messagename }}Message");
+                throw;
+            }
+        }
+
+        {%- endfor %}
+    }
+
+    // Test class for RabbitMQ 4.0+ broker
+    [Collection("RabbitMQ 4")]
+    public class {{ test_class_name }}WithRabbitMq4 
+    {
+        private readonly RabbitMq4Fixture _fixture;
+        private readonly ILogger _logger;
+
+        public {{ test_class_name }}WithRabbitMq4(RabbitMq4Fixture fixture)
+        {
+            _fixture = fixture;
+            _logger = _fixture.GetLoggerFactory().CreateLogger<{{ test_class_name }}WithRabbitMq4>();
+        }
+
+#pragma warning disable CS8604 // init takes care of nullables 
+
+        {%- for messageid, message in messagegroup.messages.items() %}
+        {%- set messagename = messageid | strip_dots | pascal %}
+        {%- set message_body_type = util.body_type(data_project_name, root, message) %}
+        [Fact]
+        public async Task Test{{ messagename }}Message()
+        {
+            _logger.LogInformation("Starting Test{{ messagename }}Message with RabbitMQ 4.0+");
+            try
+            {
+                var plainEndpointCredential = new PlainEndpointCredential("guest", "guest");
+                var dispatcher = {{ class_name }}.CreateBuilder()
+                    .WithEndpoint(new Uri(_fixture.BrokerUrl, _fixture.QueueName))
+                    .WithCredential(plainEndpointCredential)
+                    .WithLogger(_fixture.GetLoggerFactory())
+                    .Build();
+                await dispatcher.StartAsync();
+                try
+                {
+                    var messageReceived = new TaskCompletionSource<bool>();
+                    var receivedCount = 0;
+                    var receivedMessages = new System.Collections.Concurrent.ConcurrentBag<object>();
+                    
+                    dispatcher.{{ messagename }}Async += async (amqpMessage, messageObj, context) =>
+                    {
+                        try
+                        {
+                            _logger.LogInformation("{{ messagename }} message received");
+                            Assert.NotNull(amqpMessage);
+                            Assert.NotNull(messageObj);
+                            receivedMessages.Add(messageObj);
+                            context.Accept();
+                            Interlocked.Increment(ref receivedCount);
+                            if (receivedCount >= 5)
+                            {
+                                messageReceived.TrySetResult(true);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error in message handler");
+                            messageReceived.TrySetException(ex);
+                        }
+                        await Task.CompletedTask;
+                    };
+
+                    // Start test message sender
+                    var address = new Address(_fixture.BrokerUrl?.AbsoluteUri);
+                    var connection = await Connection.Factory.CreateAsync(address);
+                    try
+                    {
+                        var session = new Session(connection);
+                        try
+                        {
+                            var sender = new SenderLink(session, "test-sender", _fixture.QueueName);
+                            for (int i = 0; i < 5; i++)
+                            {
+                                {%- if message_body_type == "byte[]" %}
+                                var testMessage = Array.Empty<byte>();
+                                var data = testMessage;
+                                {%- else %}
+                                var testMessage = new {{ message_body_type }}();
+                                var data = testMessage.ToByteArray("avro/binary");
+                                {%- endif %}
+                                var amqpMessage = new Message(data)
+                                {
+                                    Properties = new Properties { MessageId = Guid.NewGuid().ToString(), ContentType = "avro/binary" }
+                                };
+                                await sender.SendAsync(amqpMessage);
+                                _logger.LogInformation($"Sent test message {i + 1}");
+                            }
+                            
+                            var receivedTask = messageReceived.Task;
+                            if (await Task.WhenAny(receivedTask, Task.Delay(TimeSpan.FromSeconds(30))) == receivedTask)
+                            {
+                                await receivedTask; 
+                                Assert.True(receivedMessages.Count >= 5, "Should receive at least 5 messages");
+                            }
+                            else
+                            {
+                                throw new TimeoutException("Timed out waiting for messages");
                             }
                         }
                         finally

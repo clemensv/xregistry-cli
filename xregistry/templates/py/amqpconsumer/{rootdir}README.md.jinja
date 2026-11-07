@@ -19,7 +19,13 @@ This module provides a type-safe AMQP 1.0 consumer for receiving and dispatching
 
 Use cases: Enterprise integration, IoT messaging, financial services, cloud-native applications.
 
-**Note:** This library uses AMQP 1.0, which is fundamentally different from AMQP 0.9.x (used by RabbitMQ). Make sure your broker supports AMQP 1.0 (e.g., Azure Service Bus, Apache ActiveMQ, Apache Qpid).
+**Supported AMQP 1.0 Brokers:**
+- Apache ActiveMQ Artemis (native AMQP 1.0)
+- Apache Qpid (native AMQP 1.0)
+- Azure Service Bus (native AMQP 1.0)
+- RabbitMQ (with AMQP 1.0 plugin - [setup guide](https://github.com/clemensv/xregistry-cli/blob/main/docs/rabbitmq_amqp_setup.md))
+
+**Note for RabbitMQ users:** RabbitMQ requires the AMQP 1.0 plugin to be enabled. See the [RabbitMQ AMQP 1.0 Setup Guide](https://github.com/clemensv/xregistry-cli/blob/main/docs/rabbitmq_amqp_setup.md) for detailed instructions.
 
 ## Installation
 
